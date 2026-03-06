@@ -1,0 +1,44 @@
+{
+  "name": "rill-ext",
+  "version": "0.8.6",
+  "description": "rill extension ecosystem — vendor extensions for rill",
+  "private": true,
+  "packageManager": "pnpm@10.29.2",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rcrsr/rill-ext/issues"
+  },
+  "homepage": "https://github.com/rcrsr/rill-ext#readme",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "check": "pnpm -r run check"
+  },
+  "author": "Andre Bremer",
+  "license": "MIT",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "eslint": "^10.0.2",
+    "globals": "^17.3.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack and install pnpm
+        run: corepack enable && corepack prepare --activate
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm -r run build
+
+      - name: Run tests
+        run: pnpm -r run test
+
+      - name: Publish packages
+        run: |
+          for dir in packages/ext/*/; do
+            dir="${dir%/}"
+            [ -f "$dir/package.json" ] || continue
+            PRIVATE=$(node -p "require('./$dir/package.json').private || false")
+            [ "$PRIVATE" = "true" ] && continue
+            NAME=$(node -p "require('./$dir/package.json').name")
+            VERSION=$(node -p "require('./$dir/package.json').version")
+            if npm view "${NAME}@${VERSION}" version &>/dev/null; then
+              echo "Skipping $NAME@$VERSION (already published)"
+              continue
+            fi
+            echo "Publishing $NAME@$VERSION..."
+            cd "$dir"
+            pnpm publish --access public
+            cd "$GITHUB_WORKSPACE"
+          done
+
+      - name: Create git tags
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          for dir in packages/ext/*/; do
+            dir="${dir%/}"
+            [ -f "$dir/package.json" ] || continue
+            PRIVATE=$(node -p "require('./$dir/package.json').private || false")
+            [ "$PRIVATE" = "true" ] && continue
+            NAME=$(node -p "require('./$dir/package.json').name")
+            VERSION=$(node -p "require('./$dir/package.json').version")
+            TAG="${NAME}@${VERSION}"
+            if git tag -l "$TAG" | grep -q "$TAG"; then
+              echo "Tag $TAG already exists, skipping"
+            else
+              git tag -a "$TAG" -m "Release $TAG"
+            fi
+          done
+
+          git push --tags

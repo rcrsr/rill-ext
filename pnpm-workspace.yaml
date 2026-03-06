@@ -1,0 +1,3 @@
+packages:
+  - 'packages/ext/*'
+  - 'packages/shared/*'
