@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, callable, type RillValue } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
 
@@ -996,6 +996,32 @@ describe('embed_batch() function', () => {
   });
 });
 
+/**
+ * Create an ApplicationCallable with description and param metadata for tool_loop tests.
+ */
+function makeTool(
+  fn: (args: RillValue[]) => RillValue | Promise<RillValue>,
+  options?: {
+    description?: string;
+    params?: Array<{ name: string; type: string; description?: string }>;
+  }
+): RillValue {
+  const tool = callable(fn);
+  if (options?.description !== undefined) {
+    (tool as Record<string, unknown>)['description'] = options.description;
+  }
+  if (options?.params !== undefined) {
+    (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
+      name: p.name,
+      typeName: p.type,
+      defaultValue: null,
+      annotations: {},
+      description: p.description ?? '',
+    }));
+  }
+  return tool;
+}
+
 // ============================================================
 // TOOL_LOOP() TESTS
 // ============================================================
@@ -1034,21 +1060,13 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const mockTool = {
-        __type: 'callable',
-        kind: 'application',
-        fn: vi.fn().mockResolvedValue('sunny'),
-      };
-
+      const mockToolFn = vi.fn().mockResolvedValue('sunny');
       const options = {
-        tools: [
-          {
-            name: 'get_weather',
+        tools: {
+          get_weather: makeTool(mockToolFn, {
             description: 'Get weather for location',
-            fn: mockTool,
-            params: {},
-          },
-        ],
+          }),
+        },
       };
 
       const result = (await ext.tool_loop.fn(
@@ -1059,7 +1077,7 @@ describe('tool_loop() function', () => {
       expect(result['content']).toBe('The weather in NYC is sunny.');
       expect(result['turns']).toBe(2);
       expect(result['stop_reason']).toBe('stop');
-      expect(mockTool.fn).toHaveBeenCalledTimes(1);
+      expect(mockToolFn).toHaveBeenCalledTimes(1);
     });
 
     // AC-26: tool_loop() with 0 tool calls returns immediately
@@ -1077,19 +1095,11 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const mockTool = {
-        __type: 'callable',
-        kind: 'application',
-        fn: vi.fn(),
-      };
-
+      const mockToolFn = vi.fn();
       const options = {
-        tools: [
-          {
-            name: 'get_weather',
-            fn: mockTool,
-          },
-        ],
+        tools: {
+          get_weather: makeTool(mockToolFn),
+        },
       };
 
       const result = (await ext.tool_loop.fn(
@@ -1099,7 +1109,7 @@ describe('tool_loop() function', () => {
 
       expect(result['content']).toBe('I cannot help with that.');
       expect(result['turns']).toBe(1);
-      expect(mockTool.fn).not.toHaveBeenCalled();
+      expect(mockToolFn).not.toHaveBeenCalled();
     });
 
     // AC-25: tool_loop() with max_turns:1 stops after one response
@@ -1123,14 +1133,10 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const mockTool = {
-        __type: 'callable',
-        kind: 'application',
-        fn: vi.fn().mockResolvedValue('sunny'),
-      };
-
       const options = {
-        tools: [{ name: 'get_weather', fn: mockTool }],
+        tools: {
+          get_weather: makeTool(vi.fn().mockResolvedValue('sunny')),
+        },
         max_turns: 1,
       };
 
@@ -1156,7 +1162,7 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       const options = {
-        tools: [{ name: 'test', fn: { __type: 'callable', fn: vi.fn() } }],
+        tools: { test: makeTool(vi.fn()) },
       };
 
       await expect(ext.tool_loop.fn(['   ', options], ctx)).rejects.toThrow(
@@ -1201,12 +1207,9 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       const options = {
-        tools: [
-          {
-            name: 'get_weather',
-            fn: { __type: 'callable', kind: 'application', fn: vi.fn() },
-          },
-        ],
+        tools: {
+          get_weather: makeTool(vi.fn()),
+        },
         max_errors: 3,
       };
 
@@ -1237,14 +1240,12 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const failingTool = {
-        __type: 'callable',
-        kind: 'application',
-        fn: vi.fn().mockRejectedValue(new Error('Tool failed')),
-      };
-
       const options = {
-        tools: [{ name: 'failing_tool', fn: failingTool }],
+        tools: {
+          failing_tool: makeTool(
+            vi.fn().mockRejectedValue(new Error('Tool failed'))
+          ),
+        },
         max_errors: 2,
       };
 
@@ -1278,13 +1279,9 @@ describe('tool_loop() function', () => {
           functionCalls: undefined,
         });
 
-      const tools = [
-        {
-          name: 'tool',
-          description: 'Tool',
-          fn: { __type: 'callable', kind: 'application', fn: vi.fn() },
-        },
-      ];
+      const tools = {
+        tool: makeTool(vi.fn(), { description: 'Tool' }),
+      };
 
       const [result1, result2] = await Promise.all([
         ext1.tool_loop.fn(['Prompt 1', { tools }], ctx1),

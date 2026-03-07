@@ -109,7 +109,6 @@ Provides the same 11 functions as the core kv extension:
 
 ## See Also
 
-- [Bundled Extensions](bundled-extensions.md) — All shipped extensions
-- [Extension Backend Selection](integration-backends.md) — Choosing storage backends
-- [Developing Extensions](integration-extensions.md) — Writing custom extensions
-- [Host Integration](integration-host.md) — Embedding API
+- [rill](https://github.com/rcrsr/rill) — Core language runtime
+- [Extensions Guide](https://github.com/rcrsr/rill/blob/main/docs/integration-extensions.md) — Extension contract and patterns
+- [Host API Reference](https://github.com/rcrsr/rill/blob/main/docs/ref-host-api.md) — Runtime context and host functions

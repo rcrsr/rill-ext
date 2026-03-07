@@ -290,7 +290,7 @@ Dispose is idempotent. Always call before process exit to prevent resource leaks
 
 ## See Also
 
-- [Bundled Extensions](bundled-extensions.md) — All shipped extensions
-- [Developing Extensions](integration-extensions.md) — Writing custom extensions
-- [Host Integration](integration-host.md) — Embedding API
-- [Reference](ref-language.md) — Language specification
+- [rill](https://github.com/rcrsr/rill) — Core language runtime
+- [Extensions Guide](https://github.com/rcrsr/rill/blob/main/docs/integration-extensions.md) — Extension contract and patterns
+- [Host API Reference](https://github.com/rcrsr/rill/blob/main/docs/ref-host-api.md) — Runtime context and host functions
+- [MCP Specification](https://spec.modelcontextprotocol.io) — Model Context Protocol documentation

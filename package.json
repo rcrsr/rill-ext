@@ -1,6 +1,6 @@
 {
   "name": "rill-ext",
-  "version": "0.8.6",
+  "version": "0.9.0",
   "description": "rill extension ecosystem — vendor extensions for rill",
   "private": true,
   "packageManager": "pnpm@10.29.2",
@@ -38,6 +38,7 @@
     "eslint": "^10.0.2",
     "globals": "^17.3.0",
     "prettier": "^3.8.1",
+    "tsc-files": "^1.1.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }

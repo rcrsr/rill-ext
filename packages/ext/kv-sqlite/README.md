@@ -1,13 +1,13 @@
-# @rcrsr/rill-ext-kv-redis
+# @rcrsr/rill-ext-kv-sqlite
 
-[rill](https://rill.run) extension for Redis key-value storage. Provides persistent key-value operations with TTL support, SCAN-based key listing, and TLS connectivity.
+[rill](https://rill.run) extension for SQLite key-value storage. Provides persistent key-value operations backed by SQLite databases for large datasets and concurrent access.
 
 > **Experimental.** Breaking changes will occur before stabilization.
 
 ## Install
 
 ```bash
-npm install @rcrsr/rill-ext-kv-redis
+npm install @rcrsr/rill-ext-kv-sqlite
 ```
 
 **Peer dependencies:** `@rcrsr/rill`
@@ -16,14 +16,14 @@ npm install @rcrsr/rill-ext-kv-redis
 
 ```typescript
 import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
-import { createRedisKvExtension } from '@rcrsr/rill-ext-kv-redis';
+import { createSqliteKvExtension } from '@rcrsr/rill-ext-kv-sqlite';
 
-const ext = createRedisKvExtension({
-  url: 'redis://localhost:6379',
+const ext = createSqliteKvExtension({
   mounts: {
     user: {
       mode: 'read-write',
-      prefix: 'app:user:',
+      database: './data/app.db',
+      table: 'user_state',
     },
   },
 });
@@ -35,7 +35,7 @@ const ctx = createRuntimeContext({ functions });
 
 ## Documentation
 
-See [full documentation](docs/extension-kv-redis.md) for configuration, functions, mount options, and error handling.
+See [full documentation](docs/extension-kv-sqlite.md) for configuration, functions, mount options, and error handling.
 
 ## Related
 

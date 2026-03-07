@@ -278,18 +278,15 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Define tool
-      const weatherTool = {
-        name: 'get_weather',
-        description: 'Get weather for location',
-        params: {
-          location: { type: 'string', description: 'City name' },
-          unit: { type: 'string', description: 'Temperature unit' },
-        },
-        fn: callable(vi.fn().mockReturnValue('18°C, partly cloudy')),
-      };
+      const weatherFn = callable(vi.fn().mockReturnValue('18°C, partly cloudy'));
+      (weatherFn as Record<string, unknown>)['description'] = 'Get weather for location';
+      (weatherFn as Record<string, unknown>)['params'] = [
+        { name: 'location', typeName: 'string', defaultValue: null, annotations: {}, description: 'City name' },
+        { name: 'unit', typeName: 'string', defaultValue: null, annotations: {}, description: 'Temperature unit' },
+      ];
 
       await ext.tool_loop.fn(
-        ['What is the weather in San Francisco?', { tools: [weatherTool] }],
+        ['What is the weather in San Francisco?', { tools: { get_weather: weatherFn } }],
         ctx
       );
 
@@ -360,18 +357,15 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const calculateTool = {
-        name: 'calculate',
-        description: 'Add two numbers',
-        params: {
-          a: { type: 'number' },
-          b: { type: 'number' },
-        },
-        fn: callable(vi.fn().mockReturnValue(8)),
-      };
+      const calculateFn = callable(vi.fn().mockReturnValue(8));
+      (calculateFn as Record<string, unknown>)['description'] = 'Add two numbers';
+      (calculateFn as Record<string, unknown>)['params'] = [
+        { name: 'a', typeName: 'number', defaultValue: null, annotations: {} },
+        { name: 'b', typeName: 'number', defaultValue: null, annotations: {} },
+      ];
 
       await ext.tool_loop.fn(
-        ['Calculate 5 + 3', { tools: [calculateTool] }],
+        ['Calculate 5 + 3', { tools: { calculate: calculateFn } }],
         ctx
       );
 
@@ -436,17 +430,13 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const failingTool = {
-        name: 'failing_tool',
-        description: 'Always fails',
-        params: {},
-        fn: callable(() => {
-          throw new Error('Tool execution error');
-        }),
-      };
+      const failingTool = callable(() => {
+        throw new Error('Tool execution error');
+      });
+      (failingTool as Record<string, unknown>)['description'] = 'Always fails';
 
       await ext.tool_loop.fn(
-        ['Test failing tool', { tools: [failingTool] }],
+        ['Test failing tool', { tools: { failing_tool: failingTool } }],
         ctx
       );
 
@@ -492,7 +482,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.tool_loop.fn(['Simple question', { tools: [] }], ctx);
+      await ext.tool_loop.fn(['Simple question', { tools: {} }], ctx);
 
       // Find tool_loop event
       const toolLoopEvents = events.filter(
@@ -577,22 +567,13 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const step1Tool = {
-        name: 'step1',
-        description: 'First step',
-        params: {},
-        fn: callable(vi.fn().mockReturnValue('step1 done')),
-      };
-
-      const step2Tool = {
-        name: 'step2',
-        description: 'Second step',
-        params: {},
-        fn: callable(vi.fn().mockReturnValue('step2 done')),
-      };
+      const step1Fn = callable(vi.fn().mockReturnValue('step1 done'));
+      (step1Fn as Record<string, unknown>)['description'] = 'First step';
+      const step2Fn = callable(vi.fn().mockReturnValue('step2 done'));
+      (step2Fn as Record<string, unknown>)['description'] = 'Second step';
 
       await ext.tool_loop.fn(
-        ['Multi-step task', { tools: [step1Tool, step2Tool] }],
+        ['Multi-step task', { tools: { step1: step1Fn, step2: step2Fn } }],
         ctx
       );
 
@@ -799,7 +780,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       // Test all three main functions
       await ext.message.fn(['Test message', {}], ctx);
       await ext.messages.fn([[{ role: 'user', content: 'Test' }], {}], ctx);
-      await ext.tool_loop.fn(['Test tool loop', { tools: [] }], ctx);
+      await ext.tool_loop.fn(['Test tool loop', { tools: {} }], ctx);
 
       expect(mockCreate).toHaveBeenCalledTimes(3);
 

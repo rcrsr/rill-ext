@@ -18,10 +18,10 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "^0.8.6"
+    "@rcrsr/rill": "^0.9.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "^0.8.6"
+    "@rcrsr/rill": "^0.9.0"
   },
   "repository": {
     "type": "git",

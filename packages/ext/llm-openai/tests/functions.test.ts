@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, callable, type RillValue } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
 
@@ -953,6 +953,32 @@ describe('embed_batch() function', () => {
   });
 });
 
+/**
+ * Create an ApplicationCallable with description and param metadata for tool_loop tests.
+ */
+function makeTool(
+  fn: (args: RillValue[]) => RillValue | Promise<RillValue>,
+  options?: {
+    description?: string;
+    params?: Array<{ name: string; type: string; description?: string }>;
+  }
+): RillValue {
+  const tool = callable(fn);
+  if (options?.description !== undefined) {
+    (tool as Record<string, unknown>)['description'] = options.description;
+  }
+  if (options?.params !== undefined) {
+    (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
+      name: p.name,
+      typeName: p.type,
+      defaultValue: null,
+      annotations: {},
+      description: p.description ?? '',
+    }));
+  }
+  return tool;
+}
+
 // ============================================================
 // TOOL_LOOP() TESTS
 // ============================================================
@@ -989,21 +1015,11 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const mockToolFn = {
-        __type: 'callable' as const,
-        kind: 'runtime' as const,
-        isProperty: false,
-        fn: vi.fn().mockResolvedValue('tool result'),
-      };
+      const mockToolFn = vi.fn().mockResolvedValue('tool result');
 
-      const tools = [
-        {
-          name: 'test_tool',
-          description: 'A test tool',
-          params: {},
-          fn: mockToolFn,
-        },
-      ];
+      const tools = {
+        test_tool: makeTool(mockToolFn, { description: 'A test tool' }),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['test prompt', { tools }],
@@ -1054,21 +1070,11 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const mockToolFn = {
-        __type: 'callable' as const,
-        kind: 'runtime' as const,
-        isProperty: false,
-        fn: vi.fn().mockResolvedValue('tool result'),
-      };
-
-      const tools = [
-        {
-          name: 'test_tool',
+      const tools = {
+        test_tool: makeTool(vi.fn().mockResolvedValue('tool result'), {
           description: 'A test tool',
-          params: {},
-          fn: mockToolFn,
-        },
-      ];
+        }),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['test prompt', { tools, max_turns: 1 }],
@@ -1104,19 +1110,9 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const tools = [
-        {
-          name: 'test_tool',
-          description: 'A test tool',
-          params: {},
-          fn: {
-            __type: 'callable' as const,
-            kind: 'runtime' as const,
-            isProperty: false,
-            fn: vi.fn(),
-          },
-        },
-      ];
+      const tools = {
+        test_tool: makeTool(vi.fn(), { description: 'A test tool' }),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['test prompt', { tools }],
@@ -1190,21 +1186,12 @@ describe('tool_loop() function', () => {
 
       const mockToolFn = vi.fn().mockResolvedValue('Sunny, 72°F');
 
-      const tools = [
-        {
-          name: 'get_weather',
+      const tools = {
+        get_weather: makeTool(mockToolFn, {
           description: 'Get weather',
-          params: {
-            location: { type: 'string', description: 'City name' },
-          },
-          fn: {
-            __type: 'callable' as const,
-            kind: 'runtime' as const,
-            isProperty: false,
-            fn: mockToolFn,
-          },
-        },
-      ];
+          params: [{ name: 'location', type: 'string', description: 'City name' }],
+        }),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['What is the weather?', { tools }],
@@ -1229,7 +1216,7 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.tool_loop.fn(['', { tools: [] }], ctx)).rejects.toThrow(
+      await expect(ext.tool_loop.fn(['', { tools: {} }], ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
@@ -1337,19 +1324,9 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const tools = [
-        {
-          name: 'known_tool',
-          description: 'A known tool',
-          params: {},
-          fn: {
-            __type: 'callable' as const,
-            kind: 'runtime' as const,
-            isProperty: false,
-            fn: vi.fn(),
-          },
-        },
-      ];
+      const tools = {
+        known_tool: makeTool(vi.fn(), { description: 'A known tool' }),
+      };
 
       await expect(
         ext.tool_loop.fn(['test prompt', { tools }], ctx)
@@ -1445,19 +1422,9 @@ describe('tool_loop() function', () => {
         .fn()
         .mockRejectedValue(new Error('Tool execution failed'));
 
-      const tools = [
-        {
-          name: 'test_tool',
-          description: 'A test tool',
-          params: {},
-          fn: {
-            __type: 'callable' as const,
-            kind: 'runtime' as const,
-            isProperty: false,
-            fn: mockToolFn,
-          },
-        },
-      ];
+      const tools = {
+        test_tool: makeTool(mockToolFn, { description: 'A test tool' }),
+      };
 
       await expect(
         ext.tool_loop.fn(['test prompt', { tools, max_errors: 3 }], ctx)

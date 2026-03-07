@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, callable } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
 
@@ -396,19 +396,11 @@ describe('extension event emission', () => {
       });
 
       // Create mock tool
-      const mockTool = {
-        name: 'test_tool',
-        fn: {
-          __type: 'callable' as const,
-          kind: 'application' as const,
-          fn: vi.fn().mockResolvedValue('Tool result'),
-        },
-        description: 'Test tool',
-        params: {},
-      };
+      const testToolFn = callable(vi.fn().mockResolvedValue('Tool result'));
+      (testToolFn as Record<string, unknown>)['description'] = 'Test tool';
 
       const options = {
-        tools: [mockTool],
+        tools: { test_tool: testToolFn },
         max_turns: 5,
       };
 
@@ -477,19 +469,11 @@ describe('extension event emission', () => {
         },
       });
 
-      const mockTool = {
-        name: 'test_tool',
-        fn: {
-          __type: 'callable' as const,
-          kind: 'application' as const,
-          fn: vi.fn(),
-        },
-        description: 'Test tool',
-        params: {},
-      };
+      const testTool = callable(vi.fn());
+      (testTool as Record<string, unknown>)['description'] = 'Test tool';
 
       const options = {
-        tools: [mockTool],
+        tools: { test_tool: testTool },
       };
 
       await expect(
@@ -543,19 +527,13 @@ describe('extension event emission', () => {
       });
 
       // Create mock tool that throws an error
-      const mockTool = {
-        name: 'test_tool',
-        fn: {
-          __type: 'callable' as const,
-          kind: 'application' as const,
-          fn: vi.fn().mockRejectedValue(new Error('Tool execution failed')),
-        },
-        description: 'Test tool',
-        params: {},
-      };
+      const failingTool = callable(
+        vi.fn().mockRejectedValue(new Error('Tool execution failed'))
+      );
+      (failingTool as Record<string, unknown>)['description'] = 'Test tool';
 
       const options = {
-        tools: [mockTool],
+        tools: { test_tool: failingTool },
         max_turns: 5,
         max_errors: 3,
       };
