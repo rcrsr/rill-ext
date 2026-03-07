@@ -16,6 +16,8 @@ warn() { echo -e "${YELLOW}WARN: $1${NC}"; }
 [ -f "pnpm-workspace.yaml" ] || error "Must run from project root"
 [ -z "$(git status --porcelain)" ] || error "Working directory not clean"
 
+git fetch --tags || error "Failed to fetch tags"
+
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [ "$CURRENT_BRANCH" != "main" ]; then
   warn "Not on main branch (currently on $CURRENT_BRANCH)"
