@@ -1,7 +1,9 @@
 name: Release
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   release:
@@ -32,6 +34,8 @@ jobs:
         run: pnpm -r run test
 
       - name: Publish packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for dir in packages/ext/*/; do
             dir="${dir%/}"
@@ -46,28 +50,14 @@ jobs:
             fi
             echo "Publishing $NAME@$VERSION..."
             cd "$dir"
-            pnpm publish --access public
+            pnpm publish --access public --no-git-checks
             cd "$GITHUB_WORKSPACE"
           done
 
-      - name: Create git tags
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          for dir in packages/ext/*/; do
-            dir="${dir%/}"
-            [ -f "$dir/package.json" ] || continue
-            PRIVATE=$(node -p "require('./$dir/package.json').private || false")
-            [ "$PRIVATE" = "true" ] && continue
-            NAME=$(node -p "require('./$dir/package.json').name")
-            VERSION=$(node -p "require('./$dir/package.json').version")
-            TAG="${NAME}@${VERSION}"
-            if git tag -l "$TAG" | grep -q "$TAG"; then
-              echo "Tag $TAG already exists, skipping"
-            else
-              git tag -a "$TAG" -m "Release $TAG"
-            fi
-          done
-
-          git push --tags
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
