@@ -15,7 +15,7 @@ Vendor extensions for [rill](https://github.com/rcrsr/rill). Each extension is a
 | `llm-openai` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-openai)](https://www.npmjs.com/package/@rcrsr/rill-ext-openai) | OpenAI API |
 | `llm-gemini` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-gemini)](https://www.npmjs.com/package/@rcrsr/rill-ext-gemini) | Google Gemini API |
 
-### Tool Use
+### Integrations
 
 | Package | npm | Description |
 |---------|-----|-------------|
