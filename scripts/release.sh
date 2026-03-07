@@ -3,7 +3,6 @@ set -e
 
 # Rill Extensions Release Script
 # Validates, creates a version tag, and pushes to trigger CI release.
-# Extensions share a single release tag (independent per-package versions).
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -30,10 +29,9 @@ pnpm run -r build || error "Build failed"
 info "Running tests..."
 pnpm run -r test || error "Tests failed"
 
-# Prompt for tag name
-echo
-read -p "Tag name (e.g. v0.8.7): " TAG
-[ -n "$TAG" ] || error "Tag name required"
+# Extract version from root package.json
+VERSION=$(node -p "require('./package.json').version")
+TAG="v${VERSION}"
 
 if git tag -l "$TAG" | grep -q "$TAG"; then
   error "Tag $TAG already exists"
