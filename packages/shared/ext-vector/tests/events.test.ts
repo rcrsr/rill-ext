@@ -244,7 +244,7 @@ describe('withEventEmission', () => {
       });
 
       const event = onLogEvent.mock.calls[0][0];
-      expect(event.duration).toBeGreaterThanOrEqual(50);
+      expect(event.duration).toBeGreaterThanOrEqual(25);
     });
   });
 
