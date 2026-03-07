@@ -51,6 +51,13 @@ cd packages/ext/llm-anthropic && npx vitest run tests/tool-loop.test.ts
 
 All extension packages declare `@rcrsr/rill` as a `peerDependency`. The core runtime is consumed from npm, not from source. Types like `RillValue`, `RuntimeError`, `ExtensionResult`, `RuntimeContext`, and helpers like `isDict`, `isCallable`, `invokeCallable` come from this package.
 
+## Versioning
+
+Extensions use semver with two rules:
+
+1. **Minor version compatibility**: an extension's `peerDependency` on `@rcrsr/rill` matches by minor version (e.g., `rill@0.4.x` works with any extension at `0.4.y`). A rill minor bump requires a corresponding extension minor bump.
+2. **Patch version per change**: bump the extension's patch version for each publish, regardless of change size.
+
 ## Release Process
 
 Each extension tracks its own version in its `package.json`. Run `./scripts/release.sh` to publish extensions independently. The script validates build, tests, and lint before creating a release tag.

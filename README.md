@@ -66,6 +66,10 @@ await dispose();
 
 Extensions in the same category share function signatures. Swap providers with no script changes.
 
+## Versioning
+
+Extensions match the **minor** version of `@rcrsr/rill`. Any extension at `0.4.x` works with `rill@0.4.y`. Each extension change bumps the patch version independently.
+
 ## Development
 
 ```bash
