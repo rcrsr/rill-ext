@@ -78,6 +78,33 @@ vi.mock('@anthropic-ai/sdk', () => {
   };
 });
 
+/**
+ * Create an ApplicationCallable with description and param metadata for tool_loop tests.
+ * Converts old {name, description, params, fn} format to the new dict-form callable.
+ */
+function makeTool(
+  fn: (args: RillValue[]) => RillValue | Promise<RillValue>,
+  options?: {
+    description?: string;
+    params?: Array<{ name: string; type: string; description?: string }>;
+  }
+): RillValue {
+  const tool = callable(fn);
+  if (options?.description !== undefined) {
+    (tool as Record<string, unknown>)['description'] = options.description;
+  }
+  if (options?.params !== undefined) {
+    (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
+      name: p.name,
+      typeName: p.type,
+      defaultValue: null,
+      annotations: {},
+      description: p.description ?? '',
+    }));
+  }
+  return tool;
+}
+
 // ============================================================
 // TOOL_LOOP() TESTS
 // ============================================================
@@ -109,21 +136,18 @@ describe('tool_loop() function', () => {
           createMockTextResponse('The weather in SF is sunny.')
         );
 
-      const weatherTool = callable((args) => {
-        expect(args[0]).toBe('SF');
-        return 'Sunny, 72°F';
-      });
-
-      const tools = [
-        {
-          name: 'get_weather',
-          description: 'Get weather',
-          params: {
-            location: { type: 'string', description: 'City name' },
+      const tools = {
+        get_weather: makeTool(
+          (args) => {
+            expect(args[0]).toBe('SF');
+            return 'Sunny, 72°F';
           },
-          fn: weatherTool,
-        },
-      ];
+          {
+            description: 'Get weather',
+            params: [{ name: 'location', type: 'string', description: 'City name' }],
+          }
+        ),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['What is the weather in SF?', { tools }],
@@ -151,14 +175,9 @@ describe('tool_loop() function', () => {
         createMockTextResponse('I can answer that directly: 42')
       );
 
-      const tools = [
-        {
-          name: 'calculator',
-          description: 'Calculate',
-          params: {},
-          fn: callable(() => 'result'),
-        },
-      ];
+      const tools = {
+        calculator: makeTool(() => 'result', { description: 'Calculate' }),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['What is the answer?', { tools }],
@@ -186,14 +205,12 @@ describe('tool_loop() function', () => {
         ])
       );
 
-      const tools = [
-        {
-          name: 'search',
+      const tools = {
+        search: makeTool(() => 'results', {
           description: 'Search',
-          params: { query: { type: 'string', description: 'Query' } },
-          fn: callable(() => 'results'),
-        },
-      ];
+          params: [{ name: 'query', type: 'string', description: 'Query' }],
+        }),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['Search for something', { tools, max_turns: 1 }],
@@ -227,34 +244,22 @@ describe('tool_loop() function', () => {
         .mockResolvedValueOnce(createMockTextResponse('All tools completed'));
 
       const executionOrder: string[] = [];
-      const createTool = (name: string) =>
-        callable(async () => {
-          executionOrder.push(`${name}-start`);
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          executionOrder.push(`${name}-end`);
-          return `${name} result`;
-        });
+      const makeConcurrentTool = (name: string) =>
+        makeTool(
+          async () => {
+            executionOrder.push(`${name}-start`);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            executionOrder.push(`${name}-end`);
+            return `${name} result`;
+          },
+          { description: `Tool ${name}` }
+        );
 
-      const tools = [
-        {
-          name: 'tool_a',
-          description: 'Tool A',
-          params: {},
-          fn: createTool('A'),
-        },
-        {
-          name: 'tool_b',
-          description: 'Tool B',
-          params: {},
-          fn: createTool('B'),
-        },
-        {
-          name: 'tool_c',
-          description: 'Tool C',
-          params: {},
-          fn: createTool('C'),
-        },
-      ];
+      const tools = {
+        tool_a: makeConcurrentTool('A'),
+        tool_b: makeConcurrentTool('B'),
+        tool_c: makeConcurrentTool('C'),
+      };
 
       await ext.tool_loop.fn(['Run tools', { tools }], ctx);
 
@@ -278,7 +283,7 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.tool_loop.fn(['   ', { tools: [] }], ctx)
+        ext.tool_loop.fn(['   ', { tools: {} }], ctx)
       ).rejects.toThrow('prompt text cannot be empty');
     });
 
@@ -317,14 +322,9 @@ describe('tool_loop() function', () => {
         )
         .mockResolvedValueOnce(createMockTextResponse('Done'));
 
-      const tools = [
-        {
-          name: 'known_tool',
-          description: 'Known tool',
-          params: {},
-          fn: callable(() => 'result'),
-        },
-      ];
+      const tools = {
+        known_tool: makeTool(() => 'result', { description: 'Known tool' }),
+      };
 
       // Should complete without throwing despite unknown tool error
       const result = await ext.tool_loop.fn(['Test', { tools }], ctx);
@@ -364,16 +364,14 @@ describe('tool_loop() function', () => {
           ])
         );
 
-      const tools = [
-        {
-          name: 'failing_tool',
-          description: 'Failing tool',
-          params: {},
-          fn: callable(() => {
+      const tools = {
+        failing_tool: makeTool(
+          () => {
             throw new Error('Tool failed');
-          }),
-        },
-      ];
+          },
+          { description: 'Failing tool' }
+        ),
+      };
 
       await expect(
         ext.tool_loop.fn(['Test', { tools, max_errors: 3 }], ctx)
@@ -403,20 +401,18 @@ describe('tool_loop() function', () => {
         )
         .mockResolvedValueOnce(createMockTextResponse('Done'));
 
-      const tools = [
-        {
-          name: 'tool',
-          description: 'Tool',
-          params: {},
-          fn: callable(() => {
+      const tools = {
+        tool: makeTool(
+          () => {
             callCount++;
             if (callCount === 1 || callCount === 2) {
               throw new Error('Fail');
             }
             return 'success';
-          }),
-        },
-      ];
+          },
+          { description: 'Tool' }
+        ),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['Test', { tools, max_errors: 3 }],
@@ -442,16 +438,14 @@ describe('tool_loop() function', () => {
         )
         .mockResolvedValueOnce(createMockTextResponse('Handled error'));
 
-      const tools = [
-        {
-          name: 'tool',
-          description: 'Tool',
-          params: {},
-          fn: callable(() => {
+      const tools = {
+        tool: makeTool(
+          () => {
             throw new Error('Custom error message');
-          }),
-        },
-      ];
+          },
+          { description: 'Tool' }
+        ),
+      };
 
       await ext.tool_loop.fn(['Test', { tools }], ctx);
 
@@ -479,14 +473,9 @@ describe('tool_loop() function', () => {
 
       mockCreate.mockResolvedValueOnce(createMockTextResponse('Response'));
 
-      const tools = [
-        {
-          name: 'tool',
-          description: 'Tool',
-          params: {},
-          fn: callable(() => 'result'),
-        },
-      ];
+      const tools = {
+        tool: makeTool(() => 'result', { description: 'Tool' }),
+      };
 
       const messages = [
         { role: 'user', content: 'Previous message 1' },
@@ -526,14 +515,9 @@ describe('tool_loop() function', () => {
         )
         .mockResolvedValueOnce(createMockTextResponse('Final response'));
 
-      const tools = [
-        {
-          name: 'tool',
-          description: 'Tool',
-          params: {},
-          fn: callable(() => 'tool result'),
-        },
-      ];
+      const tools = {
+        tool: makeTool(() => 'tool result', { description: 'Tool' }),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['Test prompt', { tools }],
@@ -568,14 +552,9 @@ describe('tool_loop() function', () => {
           usage: { input_tokens: 200, output_tokens: 75 },
         });
 
-      const tools = [
-        {
-          name: 'tool',
-          description: 'Tool',
-          params: {},
-          fn: callable(() => 'result'),
-        },
-      ];
+      const tools = {
+        tool: makeTool(() => 'result', { description: 'Tool' }),
+      };
 
       const result = (await ext.tool_loop.fn(
         ['Test', { tools }],
@@ -601,20 +580,18 @@ describe('tool_loop() function', () => {
 
       mockCreate.mockResolvedValueOnce(createMockTextResponse('Done'));
 
-      const tools = [
-        {
-          name: 'complex_tool',
+      const tools = {
+        complex_tool: makeTool(() => 'result', {
           description: 'Tool with various param types',
-          params: {
-            str_param: { type: 'string', description: 'A string' },
-            num_param: { type: 'number', description: 'A number' },
-            bool_param: { type: 'bool', description: 'A boolean' },
-            list_param: { type: 'list', description: 'A list' },
-            dict_param: { type: 'dict', description: 'A dict' },
-          },
-          fn: callable(() => 'result'),
-        },
-      ];
+          params: [
+            { name: 'str_param', type: 'string', description: 'A string' },
+            { name: 'num_param', type: 'number', description: 'A number' },
+            { name: 'bool_param', type: 'bool', description: 'A boolean' },
+            { name: 'list_param', type: 'list', description: 'A list' },
+            { name: 'dict_param', type: 'dict', description: 'A dict' },
+          ],
+        }),
+      };
 
       await ext.tool_loop.fn(['Test', { tools }], ctx);
 
@@ -651,20 +628,21 @@ describe('tool_loop() function', () => {
 
       let capturedArgs: RillValue[] | null = null;
 
-      const tools = [
-        {
-          name: 'tool',
-          description: 'Tool',
-          params: {
-            param_a: { type: 'string', description: 'Param A' },
-            param_b: { type: 'number', description: 'Param B' },
-          },
-          fn: callable((args) => {
+      const tools = {
+        tool: makeTool(
+          (args) => {
             capturedArgs = args;
             return 'result';
-          }),
-        },
-      ];
+          },
+          {
+            description: 'Tool',
+            params: [
+              { name: 'param_a', type: 'string', description: 'Param A' },
+              { name: 'param_b', type: 'number', description: 'Param B' },
+            ],
+          }
+        ),
+      };
 
       await ext.tool_loop.fn(['Test', { tools }], ctx);
 
@@ -688,14 +666,9 @@ describe('tool_loop() function', () => {
         .mockResolvedValueOnce(createMockTextResponse('Response 1'))
         .mockResolvedValueOnce(createMockTextResponse('Response 2'));
 
-      const tools = [
-        {
-          name: 'tool',
-          description: 'Tool',
-          params: {},
-          fn: callable(() => 'result'),
-        },
-      ];
+      const tools = {
+        tool: makeTool(() => 'result', { description: 'Tool' }),
+      };
 
       const [result1, result2] = await Promise.all([
         ext.tool_loop.fn(['Prompt 1', { tools }], ctx1),

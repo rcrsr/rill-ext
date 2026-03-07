@@ -8,12 +8,13 @@
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { HostFunctionDefinition, RillValue } from '@rcrsr/rill';
+import type { HostFunctionDefinition, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
 import { emitExtensionEvent } from '@rcrsr/rill';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
 type RuntimeContextLike = {
   readonly variables: Map<string, RillValue>;
+  readonly callbacks?: RuntimeCallbacks | undefined;
   pipeValue: RillValue;
 };
 import {
@@ -178,7 +179,7 @@ function createPromptFunction(
   ): Promise<RillValue> => {
     // Emit mcp:connect on first prompt call [IR-1]
     if (!lifecycleState.connectEmitted) {
-      emitExtensionEvent(ctx as any, {
+      emitExtensionEvent(ctx, {
         event: 'mcp:connect',
         subsystem: 'extension:mcp',
       });
@@ -211,7 +212,7 @@ function createPromptFunction(
     }
 
     // Emit mcp:prompt_get event [IR-1]
-    emitExtensionEvent(ctx as any, {
+    emitExtensionEvent(ctx, {
       event: 'mcp:prompt_get',
       subsystem: 'extension:mcp',
       prompt: prompt.name,
@@ -240,7 +241,7 @@ function createPromptFunction(
       return parsePromptMessages(result);
     } catch (error) {
       // Emit mcp:error event [IR-1]
-      emitExtensionEvent(ctx as any, {
+      emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
         error: error instanceof Error ? error.message : String(error),

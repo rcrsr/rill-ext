@@ -252,7 +252,7 @@ Completion events (`anthropic:message`, `anthropic:messages`, `anthropic:tool_lo
 
 ## Test Host
 
-A runnable example at `packages/ext/anthropic/examples/test-host.ts` demonstrates integration:
+A runnable example at `examples/test-host.ts` demonstrates integration:
 
 ```bash
 # Set API key
@@ -272,7 +272,6 @@ Override model or endpoint with `ANTHROPIC_MODEL` and `ANTHROPIC_BASE_URL`.
 
 ## See Also
 
-- [Bundled Extensions](bundled-extensions.md) — All shipped extensions
-- [Developing Extensions](integration-extensions.md) — Writing custom extensions
-- [Host Integration](integration-host.md) — Embedding API
-- [Reference](ref-language.md) — Language specification
+- [rill](https://github.com/rcrsr/rill) — Core language runtime
+- [Extensions Guide](https://github.com/rcrsr/rill/blob/main/docs/integration-extensions.md) — Extension contract and patterns
+- [Host API Reference](https://github.com/rcrsr/rill/blob/main/docs/ref-host-api.md) — Runtime context and host functions

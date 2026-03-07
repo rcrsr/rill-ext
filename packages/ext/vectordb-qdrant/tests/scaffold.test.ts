@@ -20,17 +20,6 @@ describe('Package Scaffold', () => {
       expect(tsconfig.default.extends).toBe('../tsconfig.ext.json');
       expect(tsconfig.default.compilerOptions.rootDir).toBe('./src');
       expect(tsconfig.default.compilerOptions.outDir).toBe('./dist');
-      expect(tsconfig.default.references).toEqual([{ path: '../../core' }]);
-    });
-  });
-
-  describe('Vitest configuration', () => {
-    it('resolves @rcrsr/rill alias correctly', async () => {
-      const config = await import('../vitest.config.ts');
-      expect(config.default.resolve?.alias).toBeDefined();
-      expect(config.default.resolve?.alias?.['@rcrsr/rill']).toContain(
-        'core/src/index.ts'
-      );
     });
   });
 });

@@ -1,61 +1,51 @@
 # @rcrsr/rill-ext-fs-s3
 
-S3 file system extension for rill.
+[rill](https://rill.run) extension for S3-compatible object storage. Provides filesystem operations backed by AWS S3, Cloudflare R2, MinIO, and other S3-compatible services.
 
-Provides file system operations backed by S3-compatible storage (AWS S3, MinIO, etc.).
+> **Experimental.** Breaking changes will occur before stabilization.
 
-## Status
-
-🚧 **Under Development** - Package scaffolding complete. Implementation in progress.
-
-## Installation
+## Install
 
 ```bash
-pnpm add @rcrsr/rill-ext-fs-s3
+npm install @rcrsr/rill-ext-fs-s3
 ```
 
-## Development
+**Peer dependencies:** `@rcrsr/rill`
 
-```bash
-# Install dependencies
-pnpm install
+## Quick Start
 
-# Build package
-pnpm build
+```typescript
+import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createS3FsExtension } from '@rcrsr/rill-ext-fs-s3';
 
-# Run tests
-pnpm test
+const ext = createS3FsExtension({
+  mounts: {
+    data: {
+      mode: 'read-write',
+      region: 'us-east-1',
+      bucket: 'my-app-data',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      },
+    },
+  },
+});
+const functions = prefixFunctions('fs', ext);
+const ctx = createRuntimeContext({ functions });
 
-# Type check
-pnpm typecheck
-
-# Lint
-pnpm lint
-
-# Full check
-pnpm check
+// Script: fs::read("data", "report.txt")
 ```
 
-## Package Structure
+## Documentation
 
-```
-packages/ext/fs-s3/
-├── src/
-│   ├── index.ts              # Public API exports
-│   └── index.test.ts         # Smoke tests
-├── dist/                     # Build output (generated)
-├── package.json              # Package manifest
-├── tsconfig.json             # TypeScript config (extends ../tsconfig.ext.json)
-├── tsconfig.build.json       # Build-specific TypeScript config
-├── tsup.config.ts            # Build configuration
-├── vitest.config.ts          # Test configuration
-└── dts-bundle-generator.config.cjs  # Type bundling configuration
-```
+See [full documentation](docs/extension-fs-s3.md) for configuration, functions, provider examples, and error handling.
 
-## Dependencies
+## Related
 
-- **Production**: `@aws-sdk/client-s3` - AWS SDK for JavaScript v3 S3 client
-- **Peer**: `@rcrsr/rill` - Core rill runtime
+- [rill](https://github.com/rcrsr/rill) — Core language runtime
+- [Extensions Guide](https://github.com/rcrsr/rill/blob/main/docs/integration-extensions.md) — Extension contract and patterns
+- [Host API Reference](https://github.com/rcrsr/rill/blob/main/docs/ref-host-api.md) — Runtime context and host functions
 
 ## License
 
