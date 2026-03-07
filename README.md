@@ -7,16 +7,38 @@ Vendor extensions for [rill](https://github.com/rcrsr/rill). Each extension is a
 
 ## Packages
 
+### LLM
+
 | Package | npm | Description |
 |---------|-----|-------------|
 | `llm-anthropic` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-anthropic)](https://www.npmjs.com/package/@rcrsr/rill-ext-anthropic) | Anthropic Claude API |
 | `llm-openai` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-openai)](https://www.npmjs.com/package/@rcrsr/rill-ext-openai) | OpenAI API |
 | `llm-gemini` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-gemini)](https://www.npmjs.com/package/@rcrsr/rill-ext-gemini) | Google Gemini API |
+
+### Tool Use
+
+| Package | npm | Description |
+|---------|-----|-------------|
 | `mcp` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-mcp)](https://www.npmjs.com/package/@rcrsr/rill-ext-mcp) | MCP server integration |
 | `claude-code` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-claude-code)](https://www.npmjs.com/package/@rcrsr/rill-ext-claude-code) | Claude Code CLI |
+
+### Key-Value
+
+| Package | npm | Description |
+|---------|-----|-------------|
 | `kv-sqlite` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-kv-sqlite)](https://www.npmjs.com/package/@rcrsr/rill-ext-kv-sqlite) | SQLite key-value backend |
 | `kv-redis` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-kv-redis)](https://www.npmjs.com/package/@rcrsr/rill-ext-kv-redis) | Redis key-value backend |
+
+### Filesystem
+
+| Package | npm | Description |
+|---------|-----|-------------|
 | `fs-s3` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-fs-s3)](https://www.npmjs.com/package/@rcrsr/rill-ext-fs-s3) | S3 filesystem backend |
+
+### Vector Database
+
+| Package | npm | Description |
+|---------|-----|-------------|
 | `vectordb-qdrant` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-qdrant)](https://www.npmjs.com/package/@rcrsr/rill-ext-qdrant) | Qdrant vector database |
 | `vectordb-pinecone` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-pinecone)](https://www.npmjs.com/package/@rcrsr/rill-ext-pinecone) | Pinecone vector database |
 | `vectordb-chroma` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-chroma)](https://www.npmjs.com/package/@rcrsr/rill-ext-chroma) | ChromaDB vector database |
