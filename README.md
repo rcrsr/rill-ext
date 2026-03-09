@@ -1,6 +1,6 @@
 # rill-ext
 
-[![CI](https://github.com/rcrsr/rill-ext/actions/workflows/pr-check.yml/badge.svg)](https://github.com/rcrsr/rill-ext/actions/workflows/pr-check.yml)
+[![CI](https://github.com/rcrsr/rill-ext/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rcrsr/rill-ext/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/rcrsr/rill-ext)](https://github.com/rcrsr/rill-ext/blob/main/LICENSE)
 
 Vendor extensions for [rill](https://github.com/rcrsr/rill). Each extension is an independent npm package under `@rcrsr/`.

@@ -17,14 +17,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '25'
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Update @rcrsr/rill to latest
-        run: pnpm -r update @rcrsr/rill@latest
+      - name: Update @rcrsr/rill to latest compatible
+        run: pnpm -r update @rcrsr/rill
 
       - name: Build all packages
         run: pnpm -r run build
