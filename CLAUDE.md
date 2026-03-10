@@ -19,9 +19,9 @@ rill-ext is a pnpm workspace containing vendor extensions for the rill language 
 | `packages/ext/vectordb-chroma` | `@rcrsr/rill-ext-chroma` | chromadb |
 | `packages/ext/vectordb-pinecone` | `@rcrsr/rill-ext-pinecone` | @pinecone-database/pinecone |
 | `packages/ext/vectordb-qdrant` | `@rcrsr/rill-ext-qdrant` | @qdrant/js-client-rest |
-| `packages/ext/example` | `@rcrsr/rill-ext-example` (private) | -- |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
 | `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` (private) | -- |
+| `packages/shared/ext-param` | `@rcrsr/rill-ext-param-shared` (private) | -- |
 
 ## Commands
 
@@ -68,15 +68,25 @@ Each extension tracks its own version in its `package.json`. Run `./scripts/rele
 
 Every extension exports a `create*Extension(config)` factory function that returns an `ExtensionResult`. This result contains named host functions (as `{ fn, params }` objects) and a `dispose()` cleanup function. The factory validates config, instantiates the vendor SDK client, and defines closures over it.
 
+Parameters use `RillParam` shape (4 fields: `name`, `type`, `defaultValue`, `annotations`). Use `p.*` helpers from `@rcrsr/rill-ext-param-shared` to construct params. Apply a `satisfies ExtensionResult` check on the return expression to catch signature drift at compile time.
+
 Example shape:
 ```typescript
-export function createAnthropicExtension(config): ExtensionResult {
+import { p } from '@rcrsr/rill-ext-param-shared';
+
+export function createAnthropicExtension(config: AnthropicExtensionConfig): ExtensionResult {
   // validate config, create SDK client
   return {
-    message: { fn: async (args, ctx) => { ... }, params: [...] },
-    tool_loop: { fn: async (args, ctx) => { ... }, params: [...] },
+    message: {
+      fn: async (args, ctx) => { ... },
+      params: [p.string('text'), p.dict('options').optional()],
+    },
+    tool_loop: {
+      fn: async (args, ctx) => { ... },
+      params: [p.string('text'), p.dict('tools'), p.dict('options').optional()],
+    },
     dispose: async () => { ... },
-  };
+  } satisfies ExtensionResult;
 }
 ```
 
@@ -86,6 +96,7 @@ Shared packages (`packages/shared/`) are **bundled into** the consuming extensio
 
 - **ext-llm-shared**: Validation (`validateApiKey`, `validateModel`, `validateTemperature`), error mapping (`mapProviderError`), JSON Schema building (`buildJsonSchema`), and tool loop orchestration (`executeToolLoop`). All 3 LLM extensions depend on this.
 - **ext-vector-shared**: Error mapping, event emission, batch execution, disposal state, distance normalization, and function wrappers. All 3 vector DB extensions depend on this.
+- **ext-param-shared**: Parameter construction helpers (`p.*`) for building `RillParam` objects. All extensions that declare typed host function parameters depend on this.
 
 ### LLM Extension Call Flow
 
@@ -120,4 +131,4 @@ Extensions use `RuntimeError` with error code `RILL-R004` for extension-level er
 
 ## Extension Authoring
 
-Docs for each extension live in `packages/ext/*/docs/`. The `packages/ext/example` package serves as a template for new extensions.
+Docs for each extension live in `packages/ext/*/docs/`.
