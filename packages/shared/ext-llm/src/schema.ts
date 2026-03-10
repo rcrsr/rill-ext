@@ -97,7 +97,7 @@ function buildPropertyFromStructuralType(rillType: RillType): JsonSchemaProperty
     return { type: 'object' };
   }
 
-  // string, number, bool, vector, ordered, union, type — map through RILL_TYPE_MAP
+  // string, number, bool, vector, shape — map through RILL_TYPE_MAP; unsupported types throw
   return { type: mapRillType(rillType.type) };
 }
 

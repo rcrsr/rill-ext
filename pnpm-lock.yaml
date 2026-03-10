@@ -54,15 +54,21 @@ importers:
       '@rcrsr/rill':
         specifier: ^0.11.0
         version: 0.11.0
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.5
       '@types/which':
         specifier: ^3.0.4
         version: 3.0.4
-
-  packages/ext/example:
-    devDependencies:
-      '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+      dts-bundle-generator:
+        specifier: ^9.5.1
+        version: 9.5.1
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.8)(typescript@5.9.3)
+      undici-types:
+        specifier: ^7.22.0
+        version: 7.22.0
 
   packages/ext/fs-s3:
     dependencies:

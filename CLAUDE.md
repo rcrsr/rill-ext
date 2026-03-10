@@ -79,11 +79,11 @@ export function createAnthropicExtension(config: AnthropicExtensionConfig): Exte
   return {
     message: {
       fn: async (args, ctx) => { ... },
-      params: [p.string('text'), p.dict('options').optional()],
+      params: [p.str('text'), p.dict('options')],
     },
     tool_loop: {
       fn: async (args, ctx) => { ... },
-      params: [p.string('text'), p.dict('tools'), p.dict('options').optional()],
+      params: [p.str('text'), p.dict('tools'), p.dict('options')],
     },
     dispose: async () => { ... },
   } satisfies ExtensionResult;
