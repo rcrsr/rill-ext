@@ -1,17 +1,17 @@
 {
   "name": "@rcrsr/rill-ext-example",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.11.0",
   "description": "rill extension template for building custom extensions",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "peerDependencies": {
-    "@rcrsr/rill": "^0.9.0"
+    "@rcrsr/rill": "^0.11.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "^0.9.0"
+    "@rcrsr/rill": "^0.11.0"
   },
   "repository": {
     "type": "git",

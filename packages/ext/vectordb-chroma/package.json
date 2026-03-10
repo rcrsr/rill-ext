@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-chroma",
-  "version": "0.9.0",
+  "version": "0.11.0",
   "description": "rill extension for ChromaDB vector database integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -25,10 +25,10 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "^0.9.0"
+    "@rcrsr/rill": "^0.11.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "^0.9.0",
+    "@rcrsr/rill": "^0.11.0",
     "@rcrsr/rill-ext-vector-shared": "workspace:^",
     "@types/node": "^25.3.0",
     "dts-bundle-generator": "^9.5.1",

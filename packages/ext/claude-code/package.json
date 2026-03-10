@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-claude-code",
-  "version": "0.9.0",
+  "version": "0.11.0",
   "description": "rill extension for Claude Code CLI integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -24,11 +24,11 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "^0.9.0",
+    "@rcrsr/rill": "^0.11.0",
     "node-pty": "^1.0.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "^0.9.0",
+    "@rcrsr/rill": "^0.11.0",
     "@types/which": "^3.0.4"
   },
   "files": [
