@@ -9,7 +9,7 @@ Use Redis backend for distributed systems, caching layers, high-throughput workl
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createRedisKvExtension } from '@rcrsr/rill-ext-kv-redis';
 
 const ext = createRedisKvExtension({
@@ -21,10 +21,35 @@ const ext = createRedisKvExtension({
     },
   },
 });
-const functions = prefixFunctions('kv', ext);
-const ctx = createRuntimeContext({ functions });
+const { functions, dispose } = hoistExtension('kv', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { kv: functions } },
+  },
+});
+```
 
-// Script: kv::set("user", "name", "Alice")
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:kv> => $store
+$store.set("user", "name", "Alice")
+$store.get("user", "name") => $name
+$name -> log
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:kv.set>("user", "name", "Alice")
+use<ext:kv.get>("user", "name") => $name
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+kv::set("user", "name", "Alice")
 ```
 
 ## Configuration

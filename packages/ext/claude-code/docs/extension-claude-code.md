@@ -9,14 +9,37 @@ Each call returns a dict with the response text, token usage breakdown, cost in 
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createClaudeCodeExtension } from '@rcrsr/rill-ext-claude-code';
 
 const ext = createClaudeCodeExtension({ defaultTimeout: 60000 });
-const functions = prefixFunctions('claude_code', ext);
-const ctx = createRuntimeContext({ functions });
+const { functions, dispose } = hoistExtension('claude_code', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { claude_code: functions } },
+  },
+});
+```
 
-// Script: claude_code::prompt("Explain TCP handshakes")
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:claude_code> => $cc
+$cc.prompt("Explain TCP handshakes") => $result
+$result.result -> log
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:claude_code.prompt>("Explain TCP handshakes") => $result
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+claude_code::prompt("Explain TCP handshakes")
 ```
 
 ## Prerequisites

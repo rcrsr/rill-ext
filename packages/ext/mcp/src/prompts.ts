@@ -1,14 +1,15 @@
 /**
  * Prompt function generation for MCP Server Mapper Extension.
  *
- * Converts MCP prompts to rill HostFunctionDefinition objects:
+ * Converts MCP prompts to rill RillFunction objects:
  * - Each prompt becomes ns::prompt_{prompt_name}(params...) -> list
  * - Returns list of dicts with role and content fields
  * - Multi-part content concatenated to single string per message
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { HostFunctionDefinition, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
+import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
+import { p } from '@rcrsr/rill-ext-param-shared';
 import { emitExtensionEvent } from '@rcrsr/rill';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
@@ -147,7 +148,7 @@ function parsePromptMessages(result: McpPromptResult): RillValue {
 /**
  * Creates a prompt function.
  *
- * Generates rill HostFunctionDefinition for parameterized prompts.
+ * Generates rill RillFunction for parameterized prompts.
  * Calls MCP client.getPrompt with prompt name and argument dict.
  * Returns list of dicts with role and content fields.
  *
@@ -155,22 +156,19 @@ function parsePromptMessages(result: McpPromptResult): RillValue {
  * @param client - Connected MCP client
  * @param timeoutMs - Timeout in milliseconds
  * @param lifecycleState - Shared state for lifecycle event tracking
- * @returns HostFunctionDefinition for this prompt
+ * @returns RillFunction for this prompt
  */
 function createPromptFunction(
   prompt: McpPrompt,
   client: Client,
   timeoutMs: number,
   lifecycleState: { connectEmitted: boolean }
-): HostFunctionDefinition {
+): RillFunction {
   // Generate parameters from prompt arguments
   const promptArgs = prompt.arguments ?? [];
-  const params = promptArgs.map((arg) => ({
-    name: arg.name,
-    type: 'string' as const,
-    description: arg.description ?? `Prompt argument: ${arg.name}`,
-    ...(arg.required !== true && { defaultValue: '' }),
-  }));
+  const params = promptArgs.map((arg) =>
+    p.str(arg.name, arg.description ?? `Prompt argument: ${arg.name}`)
+  );
 
   // Create async function wrapper
   const fn = async (
@@ -295,7 +293,7 @@ function createPromptFunction(
     ...(prompt.description !== undefined && {
       description: prompt.description,
     }),
-    returnType: 'list',
+    returnType: { type: 'list' },
   };
 }
 
@@ -303,7 +301,7 @@ function createPromptFunction(
  * Generates rill host functions for MCP prompts.
  *
  * Applies name sanitization with collision detection and creates
- * HostFunctionDefinition for each prompt.
+ * RillFunction for each prompt.
  *
  * Prompt names are prefixed with "prompt_" to distinguish from other functions.
  *
@@ -311,20 +309,20 @@ function createPromptFunction(
  * @param client - Connected MCP client
  * @param timeoutMs - Timeout in milliseconds
  * @param lifecycleState - Shared state for lifecycle event tracking
- * @returns Record of sanitized function name to HostFunctionDefinition
+ * @returns Record of sanitized function name to RillFunction
  */
 export function generatePromptFunctions(
   prompts: McpPrompt[],
   client: Client,
   timeoutMs: number,
   lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
-): Record<string, HostFunctionDefinition> {
+): Record<string, RillFunction> {
   // Prefix prompt names with "prompt_" before sanitization
   const prefixedNames = prompts.map((prompt) => `prompt_${prompt.name}`);
 
   // Sanitize names with collision detection
   const nameMap = sanitizeNames(prefixedNames);
-  const functions: Record<string, HostFunctionDefinition> = {};
+  const functions: Record<string, RillFunction> = {};
 
   for (let i = 0; i < prompts.length; i++) {
     const prompt = prompts[i]!;

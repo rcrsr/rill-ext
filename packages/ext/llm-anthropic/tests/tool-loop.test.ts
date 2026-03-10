@@ -96,10 +96,9 @@ function makeTool(
   if (options?.params !== undefined) {
     (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
       name: p.name,
-      typeName: p.type,
-      defaultValue: null,
-      annotations: {},
-      description: p.description ?? '',
+      type: { type: p.type },
+      defaultValue: undefined,
+      annotations: p.description !== undefined ? { description: p.description } : {},
     }));
   }
   return tool;

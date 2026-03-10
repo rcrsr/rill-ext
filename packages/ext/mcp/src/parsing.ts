@@ -1,11 +1,11 @@
 /**
  * JSON Schema to rill type mapping utilities.
  *
- * Converts MCP tool JSON Schema definitions to rill HostFunctionParam arrays.
+ * Converts MCP tool JSON Schema definitions to rill RillParam arrays.
  */
 
-import type { HostFunctionParam } from '@rcrsr/rill';
-import type { RillValue } from '@rcrsr/rill';
+import type { RillParam, RillValue } from '@rcrsr/rill';
+import { p } from '@rcrsr/rill-ext-param-shared';
 
 // ============================================================
 // JSON SCHEMA TYPES
@@ -42,8 +42,11 @@ export interface JsonSchema {
 // TYPE MAPPING
 // ============================================================
 
+/** Rill type names used for JSON Schema mapping. */
+export type RillTypeName = 'string' | 'number' | 'bool' | 'dict' | 'list' | 'vector' | 'any';
+
 /**
- * Maps JSON Schema type to rill type.
+ * Maps JSON Schema type to rill type name.
  *
  * Mapping rules:
  * - `string` → `string`
@@ -56,11 +59,11 @@ export interface JsonSchema {
  * - missing/unknown → `dict` (accept any value)
  *
  * @param property - JSON Schema property definition
- * @returns Rill type string
+ * @returns Rill type name string
  */
 export function mapJsonSchemaTypeToRillType(
   property: JsonSchemaProperty
-): HostFunctionParam['type'] {
+): RillTypeName {
   // Handle enum/oneOf/anyOf: fallback to string
   if (property.enum || property.oneOf || property.anyOf) {
     return 'string';
@@ -101,7 +104,7 @@ export function mapJsonSchemaTypeToRillType(
  * @returns Default value for the type
  */
 export function getDefaultValueForType(
-  type: HostFunctionParam['type']
+  type: RillTypeName
 ): RillValue {
   switch (type) {
     case 'string':
@@ -154,50 +157,33 @@ export function sanitizeParameterName(name: string): string {
 // ============================================================
 
 /**
- * Generates rill HostFunctionParam array from JSON Schema.
+ * Generates rill RillParam array from JSON Schema.
  *
  * Rules:
- * - Each `properties` entry → one HostFunctionParam
+ * - Each `properties` entry → one RillParam
  * - Property key → `name` (sanitized)
- * - `properties[key].type` → `type` (mapped via mapJsonSchemaTypeToRillType)
- * - `properties[key].description` → `description` (pass through)
- * - Key in `required[]` → no `defaultValue` (required parameter)
- * - Key NOT in `required[]` → `defaultValue` set to type-appropriate default
+ * - All parameters use string type (MCP tool arguments are string-typed)
+ * - `properties[key].description` → `annotations.description`
  * - Order: `Object.entries(properties)` iteration order
  * - Missing `properties` → empty array
- * - Missing `required` → all parameters optional
  *
  * @param schema - JSON Schema object definition
- * @returns Array of HostFunctionParam
+ * @returns Array of RillParam
  */
 export function generateParametersFromSchema(
   schema: JsonSchema
-): HostFunctionParam[] {
-  // Missing properties: return empty array
+): RillParam[] {
+  // Missing properties: return empty array (AC-34)
   if (!schema.properties) {
     return [];
   }
 
-  const required = new Set(schema.required ?? []);
-  const params: HostFunctionParam[] = [];
+  const params: RillParam[] = [];
 
   // Iterate properties in Object.entries order
   for (const [key, property] of Object.entries(schema.properties)) {
-    const rillType = mapJsonSchemaTypeToRillType(property);
     const sanitizedName = sanitizeParameterName(key);
-    const isRequired = required.has(key);
-
-    // Build parameter object with conditional properties
-    const param: HostFunctionParam = {
-      name: sanitizedName,
-      type: rillType,
-      ...(property.description !== undefined && {
-        description: property.description,
-      }),
-      ...(!isRequired && { defaultValue: getDefaultValueForType(rillType) }),
-    };
-
-    params.push(param);
+    params.push(p.str(sanitizedName, property.description));
   }
 
   return params;

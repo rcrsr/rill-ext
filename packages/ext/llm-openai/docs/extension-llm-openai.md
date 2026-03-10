@@ -2,7 +2,7 @@
 
 *OpenAI API integration for rill scripts*
 
-This extension allows rill scripts to access OpenAI's GPT and embedding APIs. The host binds it to a namespace with `prefixFunctions('llm', ext)`, and scripts call `llm::message()`, `llm::embed()`, and so on. Switching to Anthropic or Google means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access OpenAI's GPT and embedding APIs. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:openai>`. Switching to Anthropic or Google means changing one line of host config. Scripts stay identical.
 
 Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings — OpenAI offers `text-embedding-3-small` and `text-embedding-3-large` for this. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured output matching a schema dict. `message`, `messages`, and `tool_loop` return a `content`/`messages` shape. `generate` returns a `data`/`raw` shape.
 
@@ -11,17 +11,41 @@ The host sets API key, model, and temperature at creation time — scripts never
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createOpenAIExtension } from '@rcrsr/rill-ext-openai';
 
 const ext = createOpenAIExtension({
   api_key: process.env.OPENAI_API_KEY!,
   model: 'gpt-4o',
 });
-const functions = prefixFunctions('openai', ext);
-const ctx = createRuntimeContext({ functions });
+const { functions, dispose } = hoistExtension('openai', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { openai: functions } },
+  },
+});
+```
 
-// Script: openai::message("Explain TCP handshakes")
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:openai> => $llm
+$llm.message("Explain TCP handshakes") => $result
+$result.content -> log
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:openai.message>("Explain TCP handshakes") => $result
+$result.content -> log
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+openai::message("Explain TCP handshakes")
 ```
 
 ## Configuration

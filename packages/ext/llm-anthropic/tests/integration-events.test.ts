@@ -281,8 +281,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const weatherFn = callable(vi.fn().mockReturnValue('18°C, partly cloudy'));
       (weatherFn as Record<string, unknown>)['description'] = 'Get weather for location';
       (weatherFn as Record<string, unknown>)['params'] = [
-        { name: 'location', typeName: 'string', defaultValue: null, annotations: {}, description: 'City name' },
-        { name: 'unit', typeName: 'string', defaultValue: null, annotations: {}, description: 'Temperature unit' },
+        { name: 'location', type: { type: 'string' }, defaultValue: undefined, annotations: { description: 'City name' } },
+        { name: 'unit', type: { type: 'string' }, defaultValue: undefined, annotations: { description: 'Temperature unit' } },
       ];
 
       await ext.tool_loop.fn(
@@ -360,8 +360,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const calculateFn = callable(vi.fn().mockReturnValue(8));
       (calculateFn as Record<string, unknown>)['description'] = 'Add two numbers';
       (calculateFn as Record<string, unknown>)['params'] = [
-        { name: 'a', typeName: 'number', defaultValue: null, annotations: {} },
-        { name: 'b', typeName: 'number', defaultValue: null, annotations: {} },
+        { name: 'a', type: { type: 'number' }, defaultValue: undefined, annotations: {} },
+        { name: 'b', type: { type: 'number' }, defaultValue: undefined, annotations: {} },
       ];
 
       await ext.tool_loop.fn(

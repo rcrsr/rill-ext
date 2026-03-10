@@ -1,14 +1,15 @@
 /**
  * Resource function generation for MCP Server Mapper Extension.
  *
- * Converts MCP resources to rill HostFunctionDefinition objects:
+ * Converts MCP resources to rill RillFunction objects:
  * - Static resource read: ns::read_resource(uri: string) -> dict
  * - Resource templates: ns::resource_{template_name}(params...) -> dict
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { HostFunctionDefinition, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
+import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
 import { emitExtensionEvent } from '@rcrsr/rill';
+import { p } from '@rcrsr/rill-ext-param-shared';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
 type RuntimeContextLike = {
@@ -127,19 +128,19 @@ function expandUriTemplate(
 /**
  * Creates the static read_resource function.
  *
- * Generates rill HostFunctionDefinition for reading MCP resources by URI.
+ * Generates rill RillFunction for reading MCP resources by URI.
  * Calls MCP client.readResource with timeout and parses response content.
  *
  * @param client - Connected MCP client
  * @param timeoutMs - Timeout in milliseconds
  * @param lifecycleState - Shared state for lifecycle event tracking
- * @returns HostFunctionDefinition for read_resource
+ * @returns RillFunction for read_resource
  */
 export function createReadResourceFunction(
   client: Client,
   timeoutMs: number,
   lifecycleState: { connectEmitted: boolean }
-): HostFunctionDefinition {
+): RillFunction {
   const fn = async (
     args: RillValue[],
     ctx: RuntimeContextLike
@@ -244,16 +245,10 @@ export function createReadResourceFunction(
   };
 
   return {
-    params: [
-      {
-        name: 'uri',
-        type: 'string',
-        description: 'Resource URI to read',
-      },
-    ],
+    params: [p.str('uri', 'Resource URI to read')],
     fn,
     description: 'Read an MCP resource by URI',
-    returnType: 'dict',
+    returnType: { type: 'dict' },
   };
 }
 
@@ -264,30 +259,28 @@ export function createReadResourceFunction(
 /**
  * Creates a resource template function.
  *
- * Generates rill HostFunctionDefinition for parameterized resource templates.
+ * Generates rill RillFunction for parameterized resource templates.
  * Extracts URI template variables, expands with arguments, and reads resource.
  *
  * @param template - MCP resource template
  * @param client - Connected MCP client
  * @param timeoutMs - Timeout in milliseconds
  * @param lifecycleState - Shared state for lifecycle event tracking
- * @returns HostFunctionDefinition for this template
+ * @returns RillFunction for this template
  */
 function createResourceTemplateFunction(
   template: McpResourceTemplate,
   client: Client,
   timeoutMs: number,
   lifecycleState: { connectEmitted: boolean }
-): HostFunctionDefinition {
+): RillFunction {
   // Extract template variables
   const variables = extractTemplateVariables(template.uriTemplate);
 
   // Generate parameters from template variables
-  const params = variables.map((varName) => ({
-    name: varName,
-    type: 'string' as const,
-    description: `URI template variable: ${varName}`,
-  }));
+  const params = variables.map((varName) =>
+    p.str(varName, `URI template variable: ${varName}`)
+  );
 
   // Create async function wrapper
   const fn = async (
@@ -400,7 +393,7 @@ function createResourceTemplateFunction(
     ...(template.description !== undefined && {
       description: template.description,
     }),
-    returnType: 'dict',
+    returnType: { type: 'dict' },
   };
 }
 
@@ -408,7 +401,7 @@ function createResourceTemplateFunction(
  * Generates rill host functions for MCP resource templates.
  *
  * Applies name sanitization with collision detection and creates
- * HostFunctionDefinition for each resource template.
+ * RillFunction for each resource template.
  *
  * Template names are prefixed with "resource_" to distinguish from other functions.
  *
@@ -416,14 +409,14 @@ function createResourceTemplateFunction(
  * @param client - Connected MCP client
  * @param timeoutMs - Timeout in milliseconds
  * @param lifecycleState - Shared state for lifecycle event tracking
- * @returns Record of sanitized function name to HostFunctionDefinition
+ * @returns Record of sanitized function name to RillFunction
  */
 export function generateResourceTemplateFunctions(
   templates: McpResourceTemplate[],
   client: Client,
   timeoutMs: number,
   lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
-): Record<string, HostFunctionDefinition> {
+): Record<string, RillFunction> {
   // Prefix template names with "resource_" before sanitization
   const prefixedNames = templates.map(
     (template) => `resource_${template.name}`
@@ -431,7 +424,7 @@ export function generateResourceTemplateFunctions(
 
   // Sanitize names with collision detection
   const nameMap = sanitizeNames(prefixedNames);
-  const functions: Record<string, HostFunctionDefinition> = {};
+  const functions: Record<string, RillFunction> = {};
 
   for (let i = 0; i < templates.length; i++) {
     const template = templates[i]!;

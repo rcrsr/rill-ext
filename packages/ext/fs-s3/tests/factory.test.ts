@@ -346,14 +346,14 @@ describe('createS3FsExtension', () => {
       expect(ext.read.params.length).toBeGreaterThan(0);
       expect(ext.read.fn).toBeTypeOf('function');
       expect(ext.read.description).toBeTypeOf('string');
-      expect(ext.read.returnType).toBe('string');
+      expect(ext.read.returnType).toEqual({ type: 'string' });
 
       // Verify structure for write function
       expect(ext.write.params).toBeDefined();
       expect(Array.isArray(ext.write.params)).toBe(true);
       expect(ext.write.fn).toBeTypeOf('function');
       expect(ext.write.description).toBeTypeOf('string');
-      expect(ext.write.returnType).toBe('string');
+      expect(ext.write.returnType).toEqual({ type: 'string' });
 
       // Verify structure for mounts function (no params)
       expect(ext.mounts.params).toBeDefined();
@@ -361,7 +361,7 @@ describe('createS3FsExtension', () => {
       expect(ext.mounts.params.length).toBe(0);
       expect(ext.mounts.fn).toBeTypeOf('function');
       expect(ext.mounts.description).toBeTypeOf('string');
-      expect(ext.mounts.returnType).toBe('list');
+      expect(ext.mounts.returnType).toEqual({ type: 'list' });
 
       ext.dispose?.();
     });

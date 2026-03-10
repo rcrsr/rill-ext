@@ -157,12 +157,12 @@ describe('createGeminiExtension', () => {
 
       expect(result.message).toMatchObject({
         params: [
-          { name: 'text', type: 'string' },
-          { name: 'options', type: 'dict', defaultValue: {} },
+          { name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
+          { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
         description: expect.any(String),
-        returnType: 'dict',
+        returnType: { type: 'dict' },
       });
     });
 
@@ -176,12 +176,12 @@ describe('createGeminiExtension', () => {
 
       expect(result.messages).toMatchObject({
         params: [
-          { name: 'messages', type: 'list' },
-          { name: 'options', type: 'dict', defaultValue: {} },
+          { name: 'messages', type: { type: 'list' }, defaultValue: undefined, annotations: {} },
+          { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
         description: expect.any(String),
-        returnType: 'dict',
+        returnType: { type: 'dict' },
       });
     });
 
@@ -194,10 +194,10 @@ describe('createGeminiExtension', () => {
       const result = createGeminiExtension(config);
 
       expect(result.embed).toMatchObject({
-        params: [{ name: 'text', type: 'string' }],
+        params: [{ name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} }],
         fn: expect.any(Function),
         description: expect.any(String),
-        returnType: 'vector',
+        returnType: { type: 'vector' },
       });
     });
 
@@ -210,10 +210,10 @@ describe('createGeminiExtension', () => {
       const result = createGeminiExtension(config);
 
       expect(result.embed_batch).toMatchObject({
-        params: [{ name: 'texts', type: 'list' }],
+        params: [{ name: 'texts', type: { type: 'list' }, defaultValue: undefined, annotations: {} }],
         fn: expect.any(Function),
         description: expect.any(String),
-        returnType: 'list',
+        returnType: { type: 'list' },
       });
     });
 
@@ -227,12 +227,12 @@ describe('createGeminiExtension', () => {
 
       expect(result.tool_loop).toMatchObject({
         params: [
-          { name: 'prompt', type: 'string' },
-          { name: 'options', type: 'dict', defaultValue: {} },
+          { name: 'prompt', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
+          { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
         description: expect.any(String),
-        returnType: 'dict',
+        returnType: { type: 'dict' },
       });
     });
   });

@@ -6,8 +6,8 @@
  */
 
 import {
-  type RillStructuralType,
-  type CallableParam,
+  type RillType,
+  type RillParam,
   RuntimeError,
 } from '@rcrsr/rill';
 
@@ -65,91 +65,88 @@ export function mapRillType(rillType: string): string {
 }
 
 /**
- * Build a JsonSchemaProperty from a RillStructuralType in param position.
+ * Build a JsonSchemaProperty from a RillType in param position.
  *
- * - closure and tuple kinds throw RuntimeError RILL-R004 (EC-3).
- * - any kind produces an unconstrained property (no type field).
- * - primitive kind maps the type name via mapRillType.
+ * - closure and tuple types throw RuntimeError RILL-R004 (EC-3).
+ * - any type produces an unconstrained property (no type field).
+ * - list type maps to array, recursing into element if present (AC-25).
+ * - dict type maps to object.
+ * - primitive types (string, number, bool) map via mapRillType.
  */
-function buildPropertyFromStructuralType(
-  structuralType: RillStructuralType
-): JsonSchemaProperty {
-  if (structuralType.kind === 'closure' || structuralType.kind === 'tuple') {
+function buildPropertyFromStructuralType(rillType: RillType): JsonSchemaProperty {
+  if (rillType.type === 'closure' || rillType.type === 'tuple') {
     throw new RuntimeError(
       'RILL-R004',
-      `unsupported type for JSON Schema: ${structuralType.kind}`
+      `unsupported type for JSON Schema: ${rillType.type}`
     );
   }
 
-  if (structuralType.kind === 'any') {
+  if (rillType.type === 'any') {
     return {};
   }
 
-  if (structuralType.kind === 'primitive') {
-    return { type: mapRillType(structuralType.name) };
+  if (rillType.type === 'list') {
+    const property: JsonSchemaProperty = { type: 'array' };
+    if (rillType.element !== undefined) {
+      property.items = buildPropertyFromStructuralType(rillType.element);
+    }
+    return property;
   }
 
-  if (structuralType.kind === 'list') {
-    return { type: 'array' };
-  }
-
-  if (structuralType.kind === 'dict' || structuralType.kind === 'ordered') {
+  if (rillType.type === 'dict') {
     return { type: 'object' };
   }
 
-  // Exhaustive guard — should never reach here with a valid RillStructuralType
-  const exhaustive: never = structuralType;
-  throw new RuntimeError(
-    'RILL-R004',
-    `unsupported type: ${String(exhaustive)}`
-  );
+  // string, number, bool, vector, shape — map through RILL_TYPE_MAP; unsupported types throw
+  return { type: mapRillType(rillType.type) };
 }
 
 /**
- * Build a JSON Schema object from a RillStructuralType (IR-4).
+ * Build a JSON Schema object from a RillType (v0.11).
  *
  * For the closure variant:
- * - Iterates type.params (array of [name, RillStructuralType]).
+ * - Iterates type.params (array of [name, RillType]).
  * - Matches each entry to params[i] by position for metadata.
- * - annotations.description from callableParam.annotations['description'].
- * - annotations.enum from callableParam.annotations['enum'].
- * - optional = callableParam.defaultValue !== null.
+ * - annotations.description from rillParam.annotations['description'].
+ * - annotations.enum from rillParam.annotations['enum'].
+ * - optional = rillParam.defaultValue !== undefined.
  * - Non-optional params added to required[].
  * - additionalProperties: false always present.
  *
- * @throws RuntimeError RILL-R004 for closure/tuple kind in param position (EC-3)
+ * @throws RuntimeError RILL-R004 for closure/tuple type in param position (EC-3)
  * @throws RuntimeError RILL-R004 for unsupported type name (EC-3)
  */
 export function buildJsonSchemaFromStructuralType(
-  type: RillStructuralType,
-  params?: CallableParam[]
+  type: RillType,
+  params?: RillParam[]
 ): JsonSchemaObject {
   const properties: Record<string, JsonSchemaProperty> = {};
   const required: string[] = [];
 
-  if (type.kind === 'closure') {
-    for (let i = 0; i < type.params.length; i++) {
-      const [paramName, paramType] = type.params[i]!;
-      const callableParam = params?.[i];
+  if (type.type === 'closure') {
+    const closureParams = type.params ?? [];
+    for (let i = 0; i < closureParams.length; i++) {
+      const [paramName, paramType] = closureParams[i]!;
+      const rillParam = params?.[i];
 
       const property = buildPropertyFromStructuralType(paramType);
 
       // Map annotations.description
-      const description = callableParam?.annotations['description'];
+      const description = rillParam?.annotations['description'];
       if (typeof description === 'string') {
         property.description = description;
       }
 
       // Map annotations.enum (stored as RillValue — a JS array)
-      const enumAnnotation = callableParam?.annotations['enum'];
+      const enumAnnotation = rillParam?.annotations['enum'];
       if (Array.isArray(enumAnnotation)) {
         property.enum = enumAnnotation as string[];
       }
 
       properties[paramName] = property;
 
-      // Non-optional params (defaultValue === null) go into required[]
-      if (callableParam === undefined || callableParam.defaultValue === null) {
+      // Params without a defaultValue are required (defaultValue === undefined means required)
+      if (rillParam === undefined || rillParam.defaultValue === undefined) {
         required.push(paramName);
       }
     }

@@ -7,7 +7,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
   RuntimeError,
-  validateHostFunctionArgs,
 } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
@@ -542,18 +541,17 @@ describe('generate() function', () => {
       expect(errorEvents[0]!.error).toContain('Rate limit exceeded');
     });
 
-    // DEBT-1: rill runtime arity gate fires RILL-R001 when options arg is absent
-    it('throws RILL-R001 via validateHostFunctionArgs when called with 1 argument', () => {
+    // DEBT-1: generate requires options param with schema field
+    it('throws RILL-R004 when called without schema in options', async () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
+      const ctx = createRuntimeContext();
 
-      expect(() =>
-        validateHostFunctionArgs(['prompt'], ext.generate.params, 'generate')
-      ).toThrow(
-        expect.objectContaining({
-          errorId: 'RILL-R001',
-          message: expect.stringContaining('options'),
-        })
-      );
+      await expect(
+        ext.generate.fn(['prompt', {}], ctx)
+      ).rejects.toMatchObject({
+        errorId: 'RILL-R004',
+        message: expect.stringContaining('schema'),
+      });
     });
   });
 
@@ -638,15 +636,15 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
       expect(ext.generate.params).toEqual([
-        { name: 'prompt', type: 'string' },
-        { name: 'options', type: 'dict' },
+        { name: 'prompt', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'options', type: { type: 'dict' }, defaultValue: undefined, annotations: {} },
       ]);
     });
 
     it('has correct return type', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
-      expect(ext.generate.returnType).toBe('dict');
+      expect(ext.generate.returnType).toEqual({ type: 'dict' });
     });
 
     it('has description string', () => {

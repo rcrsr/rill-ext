@@ -2,7 +2,7 @@
 
 *Qdrant vector database integration for rill scripts*
 
-This extension allows rill scripts to access Qdrant's vector database API. The host binds it to a namespace with `prefixFunctions('qdrant', ext)`, and scripts call `qdrant::upsert()`, `qdrant::search()`, and so on. Switching to Pinecone or Chroma means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access Qdrant's vector database API. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:qdrant>`. Switching to Pinecone or Chroma means changing one line of host config. Scripts stay identical.
 
 Eleven functions cover vector operations and collection management. `upsert` and `upsert_batch` insert vectors with metadata. `search` finds similar vectors. `get` retrieves by ID. `delete` and `delete_batch` remove vectors. `count` returns the total vector count. `create_collection`, `delete_collection`, `list_collections`, and `describe` manage collections. All operations use the configured collection unless overridden.
 
@@ -11,7 +11,7 @@ The host sets URL, collection name, and API key at creation time — scripts nev
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createQdrantExtension } from '@rcrsr/rill-ext-qdrant';
 
 const ext = createQdrantExtension({
@@ -19,11 +19,33 @@ const ext = createQdrantExtension({
   collection: 'my_vectors',
   dimensions: 384,
 });
-const prefixed = prefixFunctions('qdrant', ext);
-const { dispose, ...functions } = prefixed;
-const ctx = createRuntimeContext({ functions });
+const { functions, dispose } = hoistExtension('qdrant', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { qdrant: functions } },
+  },
+});
+```
 
-// Script: qdrant::upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:qdrant> => $db
+$db.upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:qdrant.search>([0.1, 0.2, 0.3], [limit: 5]) => $results
+$results.points -> log
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+qdrant::upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
 ```
 
 ## Configuration

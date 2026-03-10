@@ -11,6 +11,7 @@ import {
   isDict,
   isVector,
   type ExtensionResult,
+  type LlmExtensionContract,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -27,6 +28,7 @@ import {
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
 } from '@rcrsr/rill-ext-llm-shared';
+import { p } from '@rcrsr/rill-ext-param-shared';
 import type { OpenAIExtensionConfig } from './types.js';
 
 // ============================================================
@@ -133,13 +135,13 @@ export function createOpenAIExtension(
     }
   };
 
-  // Return extension result with implementations
-  const result: ExtensionResult = {
+  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
+  const result: ExtensionResult = ({
     // IR-4: openai::message
     message: {
       params: [
-        { name: 'text', type: 'string' },
-        { name: 'options', type: 'dict', defaultValue: {} },
+        p.str('text'),
+        p.dict('options', undefined, {}),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -246,14 +248,14 @@ export function createOpenAIExtension(
         }
       },
       description: 'Send single message to OpenAI API',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-5: openai::messages
     messages: {
       params: [
-        { name: 'messages', type: 'list' },
-        { name: 'options', type: 'dict', defaultValue: {} },
+        p.list('messages'),
+        p.dict('options', undefined, {}),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -419,12 +421,12 @@ export function createOpenAIExtension(
         }
       },
       description: 'Send multi-turn conversation to OpenAI API',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-6: openai::embed
     embed: {
-      params: [{ name: 'text', type: 'string' }],
+      params: [p.str('text')],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
@@ -489,12 +491,12 @@ export function createOpenAIExtension(
         }
       },
       description: 'Generate embedding vector for text',
-      returnType: 'vector',
+      returnType: { type: 'vector' },
     },
 
     // IR-7: openai::embed_batch
     embed_batch: {
-      params: [{ name: 'texts', type: 'list' }],
+      params: [p.list('texts')],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
@@ -570,14 +572,14 @@ export function createOpenAIExtension(
         }
       },
       description: 'Generate embedding vectors for multiple texts',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
 
     // IR-8: openai::tool_loop
     tool_loop: {
       params: [
-        { name: 'prompt', type: 'string' },
-        { name: 'options', type: 'dict', defaultValue: {} },
+        p.str('prompt'),
+        p.dict('options', undefined, {}),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -945,14 +947,14 @@ export function createOpenAIExtension(
         }
       },
       description: 'Execute tool-use loop with OpenAI API',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-3: openai::generate
     generate: {
       params: [
-        { name: 'prompt', type: 'string' },
-        { name: 'options', type: 'dict' },
+        p.str('prompt'),
+        p.dict('options'),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -1119,9 +1121,9 @@ export function createOpenAIExtension(
         }
       },
       description: 'Generate structured output from OpenAI API',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
-  };
+  }) satisfies LlmExtensionContract;
 
   // IR-11: Attach dispose lifecycle method
   result.dispose = dispose;

@@ -6,7 +6,7 @@
  * visibility into all server capabilities regardless of filter settings.
  */
 
-import type { HostFunctionDefinition, RillValue } from '@rcrsr/rill';
+import type { RillFunction, RillValue } from '@rcrsr/rill';
 
 // ============================================================
 // MCP CAPABILITY TYPES (subset from SDK)
@@ -69,7 +69,7 @@ export interface McpPrompt {
  * @param allResources - All resources discovered from MCP server
  * @param allResourceTemplates - All resource templates discovered from MCP server
  * @param allPrompts - All prompts discovered from MCP server
- * @returns Record of function name to HostFunctionDefinition
+ * @returns Record of function name to RillFunction
  *
  * @example
  * ```typescript
@@ -87,7 +87,7 @@ export function createIntrospectionFunctions(
   allResources: readonly McpResource[],
   allResourceTemplates: readonly McpResourceTemplate[],
   allPrompts: readonly McpPrompt[]
-): Record<string, HostFunctionDefinition> {
+): Record<string, RillFunction> {
   // Convert tools to rill dict format
   const toolsList: RillValue[] = allTools.map((tool) => ({
     name: tool.name,
@@ -133,27 +133,27 @@ export function createIntrospectionFunctions(
   });
 
   // Create list_tools function
-  const listTools: HostFunctionDefinition = {
+  const listTools: RillFunction = {
     params: [],
     fn: async (): Promise<RillValue> => toolsList,
     description: 'List all available tools from MCP server',
-    returnType: 'list',
+    returnType: { type: 'list' },
   };
 
   // Create list_resources function
-  const listResources: HostFunctionDefinition = {
+  const listResources: RillFunction = {
     params: [],
     fn: async (): Promise<RillValue> => resourcesList,
     description: 'List all available resources from MCP server',
-    returnType: 'list',
+    returnType: { type: 'list' },
   };
 
   // Create list_prompts function
-  const listPrompts: HostFunctionDefinition = {
+  const listPrompts: RillFunction = {
     params: [],
     fn: async (): Promise<RillValue> => promptsList,
     description: 'List all available prompts from MCP server',
-    returnType: 'list',
+    returnType: { type: 'list' },
   };
 
   return {

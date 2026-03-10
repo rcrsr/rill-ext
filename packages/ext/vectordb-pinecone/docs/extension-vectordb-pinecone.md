@@ -2,7 +2,7 @@
 
 *Pinecone vector database integration for rill scripts*
 
-This extension allows rill scripts to access Pinecone's vector database API. The host binds it to a namespace with `prefixFunctions('pinecone', ext)`, and scripts call `pinecone::upsert()`, `pinecone::search()`, and so on. Switching to Qdrant or Chroma means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access Pinecone's vector database API. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:pinecone>`. Switching to Qdrant or Chroma means changing one line of host config. Scripts stay identical.
 
 Eleven functions cover vector operations and collection management. `upsert` and `upsert_batch` insert vectors with metadata. `search` finds k-nearest neighbors. `get` fetches by ID. `delete` and `delete_batch` remove vectors. `count` returns the namespace vector count. `create_collection`, `delete_collection`, `list_collections`, and `describe` manage collections. All operations use the configured index and namespace.
 
@@ -11,7 +11,7 @@ The host sets API key, index name, and namespace at creation time — scripts ne
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createPineconeExtension } from '@rcrsr/rill-ext-pinecone';
 
 const ext = createPineconeExtension({
@@ -19,11 +19,33 @@ const ext = createPineconeExtension({
   index: 'my-index',
   namespace: 'default',
 });
-const prefixed = prefixFunctions('pinecone', ext);
-const { dispose, ...functions } = prefixed;
-const ctx = createRuntimeContext({ functions });
+const { functions, dispose } = hoistExtension('pinecone', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { pinecone: functions } },
+  },
+});
+```
 
-// Script: pinecone::upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:pinecone> => $db
+$db.upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:pinecone.search>([0.1, 0.2, 0.3], [limit: 5]) => $results
+$results.matches -> log
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+pinecone::upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
 ```
 
 ## Configuration

@@ -1,12 +1,12 @@
 /**
  * Tool function generation for MCP Server Mapper Extension.
  *
- * Converts MCP tools to rill HostFunctionDefinition objects with
+ * Converts MCP tools to rill RillFunction objects with
  * parameter validation, timeout handling, and result parsing.
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { HostFunctionDefinition, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
+import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
 import { emitExtensionEvent } from '@rcrsr/rill';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
@@ -151,7 +151,7 @@ function parseToolResult(result: McpToolResult): RillValue {
 // ============================================================
 
 /**
- * Generates rill HostFunctionDefinition from MCP tool.
+ * Generates rill RillFunction from MCP tool.
  *
  * Creates async wrapper that:
  * - Emits mcp:tool_call lifecycle event
@@ -164,14 +164,14 @@ function parseToolResult(result: McpToolResult): RillValue {
  * @param client - Connected MCP client
  * @param timeoutMs - Timeout in milliseconds
  * @param lifecycleState - Shared state for lifecycle event tracking
- * @returns HostFunctionDefinition for this tool
+ * @returns RillFunction for this tool
  */
 function generateToolFunction(
   tool: McpTool,
   client: Client,
   timeoutMs: number,
   lifecycleState: { connectEmitted: boolean }
-): HostFunctionDefinition {
+): RillFunction {
   // Generate parameters from JSON Schema
   const params = generateParametersFromSchema(tool.inputSchema);
 
@@ -293,7 +293,7 @@ function generateToolFunction(
     params,
     fn,
     ...(tool.description !== undefined && { description: tool.description }),
-    returnType: 'any',
+    returnType: { type: 'any' },
   };
 }
 
@@ -301,23 +301,23 @@ function generateToolFunction(
  * Generates rill host functions for all MCP tools.
  *
  * Applies name sanitization with collision detection and creates
- * HostFunctionDefinition for each tool.
+ * RillFunction for each tool.
  *
  * @param tools - Array of MCP tool definitions
  * @param client - Connected MCP client
  * @param timeoutMs - Timeout in milliseconds (default: 30000)
  * @param lifecycleState - Shared state for lifecycle event tracking
- * @returns Record of sanitized function name to HostFunctionDefinition
+ * @returns Record of sanitized function name to RillFunction
  */
 export function generateToolFunctions(
   tools: McpTool[],
   client: Client,
   timeoutMs = 30000,
   lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
-): Record<string, HostFunctionDefinition> {
+): Record<string, RillFunction> {
   // Sanitize tool names with collision detection
   const nameMap = sanitizeNames(tools.map((tool) => tool.name));
-  const functions: Record<string, HostFunctionDefinition> = {};
+  const functions: Record<string, RillFunction> = {};
 
   for (const tool of tools) {
     const sanitizedName = nameMap.get(tool.name);

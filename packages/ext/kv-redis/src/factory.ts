@@ -5,7 +5,8 @@
  */
 
 import { Redis } from 'ioredis';
-import type { ExtensionResult, RillValue } from '@rcrsr/rill';
+import type { ExtensionResult, KvExtensionContract, RillValue } from '@rcrsr/rill';
+import { p } from '@rcrsr/rill-ext-param-shared';
 import type { RedisKvMountConfig } from './types.js';
 
 /**
@@ -595,101 +596,98 @@ export function createRedisKvExtension(
 
   // ============================================================
   // EXTENSION RESULT
+  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
   // ============================================================
 
-  const result: ExtensionResult = {
+  const result: ExtensionResult = ({
     get: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        { name: 'key', type: 'string', description: 'Key to retrieve' },
+        p.str('mount', 'Mount name'),
+        p.str('key', 'Key to retrieve'),
       ],
       fn: get,
       description: 'Get value or schema default',
-      returnType: 'any',
+      returnType: { type: 'any' },
     },
     get_or: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        { name: 'key', type: 'string', description: 'Key to retrieve' },
-        {
-          name: 'fallback',
-          type: 'dict',
-          description: 'Fallback value if key missing',
-        },
+        p.str('mount', 'Mount name'),
+        p.str('key', 'Key to retrieve'),
+        p.dict('fallback', 'Fallback value if key missing'),
       ],
       fn: get_or,
       description: 'Get value or return fallback if key missing',
-      returnType: 'any',
+      returnType: { type: 'any' },
     },
     set: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        { name: 'key', type: 'string', description: 'Key to set' },
-        { name: 'value', type: 'string', description: 'Value to store' },
+        p.str('mount', 'Mount name'),
+        p.str('key', 'Key to set'),
+        p.str('value', 'Value to store'),
       ],
       fn: set,
       description: 'Set value with validation',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     merge: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        { name: 'key', type: 'string', description: 'Key to merge into' },
-        { name: 'partial', type: 'dict', description: 'Partial dict to merge' },
+        p.str('mount', 'Mount name'),
+        p.str('key', 'Key to merge into'),
+        p.dict('partial', 'Partial dict to merge'),
       ],
       fn: merge,
       description: 'Merge partial dict into existing dict value',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     delete: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        { name: 'key', type: 'string', description: 'Key to delete' },
+        p.str('mount', 'Mount name'),
+        p.str('key', 'Key to delete'),
       ],
       fn: deleteKey,
       description: 'Delete key',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     keys: {
-      params: [{ name: 'mount', type: 'string', description: 'Mount name' }],
+      params: [p.str('mount', 'Mount name')],
       fn: keys,
       description: 'Get all keys in mount',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
     has: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        { name: 'key', type: 'string', description: 'Key to check' },
+        p.str('mount', 'Mount name'),
+        p.str('key', 'Key to check'),
       ],
       fn: has,
       description: 'Check key existence',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     clear: {
-      params: [{ name: 'mount', type: 'string', description: 'Mount name' }],
+      params: [p.str('mount', 'Mount name')],
       fn: clear,
       description: 'Clear all keys in mount',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     getAll: {
-      params: [{ name: 'mount', type: 'string', description: 'Mount name' }],
+      params: [p.str('mount', 'Mount name')],
       fn: getAll,
       description: 'Get all entries as dict',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
     schema: {
-      params: [{ name: 'mount', type: 'string', description: 'Mount name' }],
+      params: [p.str('mount', 'Mount name')],
       fn: schema,
       description: 'Get schema information',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
     mounts: {
       params: [],
       fn: mountsList,
       description: 'Get list of mount metadata',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
-  };
+  }) satisfies KvExtensionContract;
 
   // Attach dispose lifecycle method
   result.dispose = async (): Promise<void> => {

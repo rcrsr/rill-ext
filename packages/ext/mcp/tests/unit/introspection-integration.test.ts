@@ -47,11 +47,11 @@ describe('introspection integration', () => {
 
       // Assert - function metadata
       expect(functions.list_tools.params).toEqual([]);
-      expect(functions.list_tools.returnType).toBe('list');
+      expect(functions.list_tools.returnType).toEqual({ type: 'list' });
       expect(functions.list_resources.params).toEqual([]);
-      expect(functions.list_resources.returnType).toBe('list');
+      expect(functions.list_resources.returnType).toEqual({ type: 'list' });
       expect(functions.list_prompts.params).toEqual([]);
-      expect(functions.list_prompts.returnType).toBe('list');
+      expect(functions.list_prompts.returnType).toEqual({ type: 'list' });
     });
 
     it('list_tools returns all tools regardless of filters', async () => {

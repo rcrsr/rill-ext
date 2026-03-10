@@ -14,7 +14,8 @@ import {
   type GetObjectCommandOutput,
 } from '@aws-sdk/client-s3';
 import type { S3FsConfig, S3FsMountConfig } from './types.js';
-import type { ExtensionConfigSchema, RillValue } from '@rcrsr/rill';
+import type { ExtensionConfigSchema, FsExtensionContract, RillValue } from '@rcrsr/rill';
+import { p } from '@rcrsr/rill-ext-param-shared';
 
 // ============================================================
 // PUBLIC TYPES
@@ -673,158 +674,121 @@ export function createS3FsExtension(config: S3FsConfig) {
 
   // ============================================================
   // EXTENSION RESULT
+  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
   // ============================================================
 
-  return {
+  return ({
     read: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'path',
-          type: 'string',
-          description: 'File path relative to mount',
-        },
+        p.str('mount', 'Mount name'),
+        p.str('path', 'File path relative to mount'),
       ],
       fn: read,
       description: 'Read file contents from S3',
-      returnType: 'string',
+      returnType: { type: 'string' },
     },
     write: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'path',
-          type: 'string',
-          description: 'File path relative to mount',
-        },
-        { name: 'content', type: 'string', description: 'Content to write' },
+        p.str('mount', 'Mount name'),
+        p.str('path', 'File path relative to mount'),
+        p.str('content', 'Content to write'),
       ],
       fn: write,
       description: 'Write file to S3, replacing if exists',
-      returnType: 'string',
+      returnType: { type: 'string' },
     },
     append: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'path',
-          type: 'string',
-          description: 'File path relative to mount',
-        },
-        { name: 'content', type: 'string', description: 'Content to append' },
+        p.str('mount', 'Mount name'),
+        p.str('path', 'File path relative to mount'),
+        p.str('content', 'Content to append'),
       ],
       fn: append,
       description: 'Append content to file in S3',
-      returnType: 'string',
+      returnType: { type: 'string' },
     },
     list: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'path',
-          type: 'string',
-          description: 'Directory path relative to mount',
-          defaultValue: '',
-        },
+        p.str('mount', 'Mount name'),
+        { ...p.str('path', 'Directory path relative to mount'), defaultValue: '' },
       ],
       fn: list,
       description: 'List directory contents in S3',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
     find: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'pattern',
-          type: 'string',
-          description: 'Glob pattern for filtering',
-          defaultValue: '*',
-        },
+        p.str('mount', 'Mount name'),
+        { ...p.str('pattern', 'Glob pattern for filtering'), defaultValue: '*' },
       ],
       fn: find,
       description: 'Recursive file search in S3',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
     exists: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'path',
-          type: 'string',
-          description: 'File path relative to mount',
-        },
+        p.str('mount', 'Mount name'),
+        p.str('path', 'File path relative to mount'),
       ],
       fn: exists,
       description: 'Check if file exists in S3',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     remove: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'path',
-          type: 'string',
-          description: 'File path relative to mount',
-        },
+        p.str('mount', 'Mount name'),
+        p.str('path', 'File path relative to mount'),
       ],
       fn: remove,
       description: 'Delete file from S3',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     stat: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'path',
-          type: 'string',
-          description: 'File path relative to mount',
-        },
+        p.str('mount', 'Mount name'),
+        p.str('path', 'File path relative to mount'),
       ],
       fn: stat,
       description: 'Get file metadata from S3',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
     mkdir: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        {
-          name: 'path',
-          type: 'string',
-          description: 'Directory path relative to mount',
-        },
+        p.str('mount', 'Mount name'),
+        p.str('path', 'Directory path relative to mount'),
       ],
       fn: mkdir,
       description: 'Create directory (no-op for S3)',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     copy: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        { name: 'src', type: 'string', description: 'Source file path' },
-        { name: 'dest', type: 'string', description: 'Destination file path' },
+        p.str('mount', 'Mount name'),
+        p.str('src', 'Source file path'),
+        p.str('dest', 'Destination file path'),
       ],
       fn: copy,
       description: 'Copy file within S3',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     move: {
       params: [
-        { name: 'mount', type: 'string', description: 'Mount name' },
-        { name: 'src', type: 'string', description: 'Source file path' },
-        { name: 'dest', type: 'string', description: 'Destination file path' },
+        p.str('mount', 'Mount name'),
+        p.str('src', 'Source file path'),
+        p.str('dest', 'Destination file path'),
       ],
       fn: move,
       description: 'Move file within S3',
-      returnType: 'bool',
+      returnType: { type: 'bool' },
     },
     mounts: {
       params: [],
       fn: mountsList,
       description: 'List configured S3 mounts',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
     dispose,
-  };
+  }) satisfies FsExtensionContract;
 }
 
 // ============================================================

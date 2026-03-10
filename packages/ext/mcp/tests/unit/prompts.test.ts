@@ -45,18 +45,18 @@ describe('Prompt Function Generation', () => {
       expect(fn.params).toHaveLength(2);
       expect(fn.params[0]).toMatchObject({
         name: 'code',
-        type: 'string',
+        type: { type: 'string' },
       });
-      expect(fn.params[0]?.defaultValue).toBeUndefined(); // Required param
+      expect(fn.params[0]?.defaultValue).toBeUndefined();
 
       expect(fn.params[1]).toMatchObject({
         name: 'language',
-        type: 'string',
-        defaultValue: '',
+        type: { type: 'string' },
       });
+      expect(fn.params[1]?.defaultValue).toBeUndefined();
 
       expect(fn.description).toBe('Review code for issues');
-      expect(fn.returnType).toBe('list');
+      expect(fn.returnType).toEqual({ type: 'list' });
     });
 
     it('generates function with no parameters for prompt without arguments', () => {
@@ -73,7 +73,7 @@ describe('Prompt Function Generation', () => {
       const fn = functions.prompt_greeting!;
 
       expect(fn.params).toHaveLength(0);
-      expect(fn.returnType).toBe('list');
+      expect(fn.returnType).toEqual({ type: 'list' });
     });
 
     it('sets defaultValue for optional arguments only', () => {
@@ -92,8 +92,8 @@ describe('Prompt Function Generation', () => {
       const fn = functions.prompt_test!;
 
       expect(fn.params[0]?.defaultValue).toBeUndefined(); // required: true
-      expect(fn.params[1]?.defaultValue).toBe(''); // required: false
-      expect(fn.params[2]?.defaultValue).toBe(''); // required: undefined
+      expect(fn.params[1]?.defaultValue).toBeUndefined(); // required: false — all params use p.str (defaultValue: undefined)
+      expect(fn.params[2]?.defaultValue).toBeUndefined(); // required: undefined
     });
   });
 

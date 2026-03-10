@@ -11,7 +11,7 @@ Host functions generate dynamically from server metadata: one function per tool,
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createMcpExtension } from '@rcrsr/rill-ext-mcp';
 
 const ext = await createMcpExtension({
@@ -21,12 +21,33 @@ const ext = await createMcpExtension({
     args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
   },
 });
-const prefixed = prefixFunctions('fs', ext);
-const { dispose, ...functions } = prefixed;
+const { functions, dispose } = hoistExtension('fs', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { fs: functions } },
+  },
+});
+```
 
-const ctx = createRuntimeContext({ functions });
+Rill script — load the extension as a handle and call functions via dot-path:
 
-// Script: fs::list_tools() -> log
+```rill
+use<ext:fs> => $mcp
+$mcp.list_tools() => $tools
+$tools -> log
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:fs.list_tools>() => $tools
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+fs::list_tools() -> log
 ```
 
 ## Configuration

@@ -74,7 +74,7 @@ describe('createIntrospectionFunctions', () => {
       expect(functions.list_tools.description).toBe(
         'List all available tools from MCP server'
       );
-      expect(functions.list_tools.returnType).toBe('list');
+      expect(functions.list_tools.returnType).toEqual({ type: 'list' });
     });
   });
 
@@ -159,7 +159,7 @@ describe('createIntrospectionFunctions', () => {
       expect(functions.list_resources.description).toBe(
         'List all available resources from MCP server'
       );
-      expect(functions.list_resources.returnType).toBe('list');
+      expect(functions.list_resources.returnType).toEqual({ type: 'list' });
     });
   });
 
@@ -256,7 +256,7 @@ describe('createIntrospectionFunctions', () => {
       expect(functions.list_prompts.description).toBe(
         'List all available prompts from MCP server'
       );
-      expect(functions.list_prompts.returnType).toBe('list');
+      expect(functions.list_prompts.returnType).toEqual({ type: 'list' });
     });
   });
 

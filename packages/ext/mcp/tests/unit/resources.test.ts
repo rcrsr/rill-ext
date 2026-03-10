@@ -81,12 +81,13 @@ describe('createReadResourceFunction', () => {
     expect(func.params).toEqual([
       {
         name: 'uri',
-        type: 'string',
-        description: 'Resource URI to read',
+        type: { type: 'string' },
+        defaultValue: undefined,
+        annotations: { description: 'Resource URI to read' },
       },
     ]);
     expect(func.description).toBe('Read an MCP resource by URI');
-    expect(func.returnType).toBe('dict');
+    expect(func.returnType).toEqual({ type: 'dict' });
   });
 
   it('calls MCP readResource with provided URI', async () => {
@@ -332,12 +333,13 @@ describe('generateResourceTemplateFunctions', () => {
     expect(func.params).toEqual([
       {
         name: 'tableName',
-        type: 'string',
-        description: 'URI template variable: tableName',
+        type: { type: 'string' },
+        defaultValue: undefined,
+        annotations: { description: 'URI template variable: tableName' },
       },
     ]);
     expect(func.description).toBe('Access database table');
-    expect(func.returnType).toBe('dict');
+    expect(func.returnType).toEqual({ type: 'dict' });
   });
 
   it('generates function for multi-variable template (IR-4)', () => {
@@ -361,13 +363,15 @@ describe('generateResourceTemplateFunctions', () => {
     expect(func.params).toEqual([
       {
         name: 'tableName',
-        type: 'string',
-        description: 'URI template variable: tableName',
+        type: { type: 'string' },
+        defaultValue: undefined,
+        annotations: { description: 'URI template variable: tableName' },
       },
       {
         name: 'rowId',
-        type: 'string',
-        description: 'URI template variable: rowId',
+        type: { type: 'string' },
+        defaultValue: undefined,
+        annotations: { description: 'URI template variable: rowId' },
       },
     ]);
   });

@@ -748,19 +748,19 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'city',
-            typeName: 'string',
-            defaultValue: null,
+            type: { type: 'string' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'count',
-            typeName: 'number',
-            defaultValue: null,
+            type: { type: 'number' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'optional_flag',
-            typeName: 'bool',
+            type: { type: 'bool' },
             defaultValue: true,
             annotations: {},
           },
@@ -813,39 +813,37 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'str_param',
-            typeName: 'string',
-            defaultValue: null,
-            annotations: {},
-            description: 'A string parameter',
+            type: { type: 'string' },
+            defaultValue: undefined,
+            annotations: { description: 'A string parameter' },
           },
           {
             name: 'num_param',
-            typeName: 'number',
-            defaultValue: null,
-            annotations: {},
-            description: 'A number parameter',
+            type: { type: 'number' },
+            defaultValue: undefined,
+            annotations: { description: 'A number parameter' },
           },
           {
             name: 'bool_param',
-            typeName: 'bool',
-            defaultValue: null,
+            type: { type: 'bool' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'list_param',
-            typeName: 'list',
-            defaultValue: null,
+            type: { type: 'list' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'dict_param',
-            typeName: 'dict',
-            defaultValue: null,
+            type: { type: 'dict' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'optional_param',
-            typeName: 'string',
+            type: { type: 'string' },
             defaultValue: 'default value',
             annotations: {},
           },
@@ -904,6 +902,149 @@ describe('executeToolLoop', () => {
         'dict_param',
       ]);
     });
+
+    it('produces unconstrained property {} when param.type is undefined (AC-24, AC-30)', async () => {
+      // AC-30: param.type undefined → JSON Schema property {}
+      const toolFn: RillValue = {
+        __type: 'callable',
+        kind: 'application',
+        params: [
+          {
+            name: 'unconstrained',
+            type: undefined,
+            defaultValue: undefined,
+            annotations: {},
+          },
+        ],
+        fn: () => 'result',
+        description: 'Tool with unconstrained param',
+      };
+
+      const buildTools = vi.fn((tools) => tools);
+      const callbacks = createMockCallbacks({
+        buildTools,
+        extractToolCalls: vi.fn(() => null),
+      });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        { test_tool: toolFn },
+        3,
+        callbacks,
+        vi.fn()
+      );
+
+      const descriptor = buildTools.mock.calls[0]?.[0]?.[0];
+      // Unconstrained param produces {} (no type field)
+      expect(descriptor.input_schema.properties['unconstrained']).toEqual({});
+      expect(descriptor.input_schema.required).toContain('unconstrained');
+    });
+
+    it('omits description field when annotations is empty (AC-27)', async () => {
+      // AC-27: empty annotations → no description in schema property
+      const toolFn: RillValue = {
+        __type: 'callable',
+        kind: 'application',
+        params: [
+          {
+            name: 'param',
+            type: { type: 'string' },
+            defaultValue: undefined,
+            annotations: {},
+          },
+        ],
+        fn: () => 'result',
+        description: 'Tool',
+      };
+
+      const buildTools = vi.fn((tools) => tools);
+      const callbacks = createMockCallbacks({
+        buildTools,
+        extractToolCalls: vi.fn(() => null),
+      });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        { test_tool: toolFn },
+        3,
+        callbacks,
+        vi.fn()
+      );
+
+      const descriptor = buildTools.mock.calls[0]?.[0]?.[0];
+      expect(descriptor.input_schema.properties['param']).toEqual({ type: 'string' });
+      expect(descriptor.input_schema.properties['param']).not.toHaveProperty('description');
+    });
+
+    it('includes param in required[] when defaultValue is undefined (AC-28)', async () => {
+      // AC-28: defaultValue === undefined → param appears in required[]
+      const toolFn: RillValue = {
+        __type: 'callable',
+        kind: 'application',
+        params: [
+          {
+            name: 'required_param',
+            type: { type: 'string' },
+            defaultValue: undefined,
+            annotations: {},
+          },
+        ],
+        fn: () => 'result',
+        description: 'Tool',
+      };
+
+      const buildTools = vi.fn((tools) => tools);
+      const callbacks = createMockCallbacks({
+        buildTools,
+        extractToolCalls: vi.fn(() => null),
+      });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        { test_tool: toolFn },
+        3,
+        callbacks,
+        vi.fn()
+      );
+
+      const descriptor = buildTools.mock.calls[0]?.[0]?.[0];
+      expect(descriptor.input_schema.required).toContain('required_param');
+    });
+
+    it('excludes param from required[] when defaultValue is 0 (falsy but defined) (AC-29)', async () => {
+      // AC-29: defaultValue: 0 → absent from required[]
+      const toolFn: RillValue = {
+        __type: 'callable',
+        kind: 'application',
+        params: [
+          {
+            name: 'optional_num',
+            type: { type: 'number' },
+            defaultValue: 0,
+            annotations: {},
+          },
+        ],
+        fn: () => 'result',
+        description: 'Tool',
+      };
+
+      const buildTools = vi.fn((tools) => tools);
+      const callbacks = createMockCallbacks({
+        buildTools,
+        extractToolCalls: vi.fn(() => null),
+      });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        { test_tool: toolFn },
+        3,
+        callbacks,
+        vi.fn()
+      );
+
+      const descriptor = buildTools.mock.calls[0]?.[0]?.[0];
+      expect(descriptor.input_schema.required).not.toContain('optional_num');
+    });
   });
 
   describe('argument conversion', () => {
@@ -921,14 +1062,14 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'param_a',
-            typeName: 'string',
-            defaultValue: null,
+            type: { type: 'string' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'param_b',
-            typeName: 'number',
-            defaultValue: null,
+            type: { type: 'number' },
+            defaultValue: undefined,
             annotations: {},
           },
         ],
@@ -983,20 +1124,20 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'first',
-            typeName: 'string',
-            defaultValue: null,
+            type: { type: 'string' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'second',
-            typeName: 'string',
-            defaultValue: null,
+            type: { type: 'string' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'third',
-            typeName: 'string',
-            defaultValue: null,
+            type: { type: 'string' },
+            defaultValue: undefined,
             annotations: {},
           },
         ],
@@ -1053,14 +1194,14 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'name',
-            typeName: 'string',
-            defaultValue: null,
+            type: { type: 'string' },
+            defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'age',
-            typeName: 'number',
-            defaultValue: null,
+            type: { type: 'number' },
+            defaultValue: undefined,
             annotations: {},
           },
         ],
@@ -1604,9 +1745,9 @@ describe('executeToolLoop', () => {
       params: [
         {
           name: 'query',
-          typeName: 'string' as const,
-          defaultValue: null,
-          annotations: {},
+          type: { type: 'string' } as const,
+          defaultValue: undefined,
+          annotations: { description: 'Search query' },
         },
       ],
       body: {} as never,
@@ -1615,7 +1756,7 @@ describe('executeToolLoop', () => {
         pipeValue: null,
       } as never,
       annotations: { description: 'Search the web' },
-      paramAnnotations: { query: { description: 'Search query' } },
+      paramAnnotations: {},
       isProperty: false,
     };
 
@@ -1626,8 +1767,8 @@ describe('executeToolLoop', () => {
       params: [
         {
           name: 'q',
-          typeName: 'string' as const,
-          defaultValue: null,
+          type: { type: 'string' } as const,
+          defaultValue: undefined,
           annotations: {},
         },
       ],

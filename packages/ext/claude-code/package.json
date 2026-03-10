@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-claude-code",
-  "version": "0.9.0",
+  "version": "0.11.0",
   "description": "rill extension for Claude Code CLI integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -17,19 +17,23 @@
     "scripting"
   ],
   "scripts": {
-    "build": "tsc --build",
+    "build": "tsup && dts-bundle-generator --config dts-bundle-generator.config.cjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --config ../../../eslint.config.js src/",
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "^0.9.0",
+    "@rcrsr/rill": "^0.11.0",
     "node-pty": "^1.0.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "^0.9.0",
-    "@types/which": "^3.0.4"
+    "@rcrsr/rill": "^0.11.0",
+    "@types/node": "^25.3.0",
+    "@types/which": "^3.0.4",
+    "dts-bundle-generator": "^9.5.1",
+    "tsup": "^8.5.1",
+    "undici-types": "^7.22.0"
   },
   "files": [
     "dist"
@@ -47,6 +51,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rcrsr/rill-ext-param-shared": "workspace:*",
     "which": "^6.0.1"
   }
 }
