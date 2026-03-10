@@ -9,7 +9,7 @@ Use S3 fs backend for cloud deployments, serverless environments, multi-region d
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createS3FsExtension } from '@rcrsr/rill-ext-fs-s3';
 
 const ext = createS3FsExtension({
@@ -25,10 +25,33 @@ const ext = createS3FsExtension({
     }
   }
 });
-const functions = prefixFunctions('fs', ext);
-const ctx = createRuntimeContext({ functions });
+const { functions, dispose } = hoistExtension('fs', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { fs: functions } },
+  },
+});
+```
 
-// Script: fs::read("data", "report.txt")
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:fs> => $storage
+$storage.read("data", "report.txt") => $content
+$content -> log
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:fs.read>("data", "report.txt") => $content
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+fs::read("data", "report.txt")
 ```
 
 ## Configuration

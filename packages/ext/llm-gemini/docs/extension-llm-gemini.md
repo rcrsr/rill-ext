@@ -2,7 +2,7 @@
 
 *Gemini API integration for rill scripts*
 
-This extension allows rill scripts to access the Gemini API using the `@google/genai` SDK (preview). The host binds it to a namespace with `prefixFunctions('llm', ext)`, and scripts call `llm::message()`, `llm::embed()`, and so on. Switching to Anthropic or OpenAI means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access the Gemini API using the `@google/genai` SDK (preview). The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:gemini>`. Switching to Anthropic or OpenAI means changing one line of host config. Scripts stay identical.
 
 Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured data as a typed dict. `message`, `messages`, and `tool_loop` return the same dict shape (`content`, `model`, `usage`, `stop_reason`, `id`, `messages`), so scripts work across providers without changes. `generate` returns a separate shape with `data` and `raw` fields instead of `content` and `messages`. Google's API returns 0 for token counts and empty string for request IDs — see [Provider Notes](#provider-notes) for details.
 
@@ -11,17 +11,41 @@ The host sets API key, model, and temperature at creation time — scripts never
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createGeminiExtension } from '@rcrsr/rill-ext-gemini';
 
 const ext = createGeminiExtension({
   api_key: process.env.GEMINI_API_KEY!,
   model: 'gemini-2.0-flash',
 });
-const functions = prefixFunctions('gemini', ext);
-const ctx = createRuntimeContext({ functions });
+const { functions, dispose } = hoistExtension('gemini', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { gemini: functions } },
+  },
+});
+```
 
-// Script: gemini::message("Explain TCP handshakes")
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:gemini> => $llm
+$llm.message("Explain TCP handshakes") => $result
+$result.content -> log
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:gemini.message>("Explain TCP handshakes") => $result
+$result.content -> log
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+gemini::message("Explain TCP handshakes")
 ```
 
 ## Configuration

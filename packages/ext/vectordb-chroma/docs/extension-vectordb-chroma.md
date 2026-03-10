@@ -2,7 +2,7 @@
 
 *ChromaDB vector database integration for rill scripts*
 
-This extension allows rill scripts to access ChromaDB's vector database API. The host binds it to a namespace with `prefixFunctions('chroma', ext)`, and scripts call `chroma::upsert()`, `chroma::search()`, and so on. Switching to Pinecone or Qdrant means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access ChromaDB's vector database API. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:chroma>`. Switching to Pinecone or Qdrant means changing one line of host config. Scripts stay identical.
 
 Eleven functions cover vector operations and collection management. `upsert` and `upsert_batch` insert vectors with metadata. `search` finds similar vectors. `get` retrieves by ID. `delete` and `delete_batch` remove vectors. `count` returns the total vector count. `create_collection`, `delete_collection`, `list_collections`, and `describe` manage collections. All operations use the configured collection unless overridden.
 
@@ -11,18 +11,40 @@ The host sets URL and collection name at creation time — scripts never handle 
 ## Quick Start
 
 ```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createChromaExtension } from '@rcrsr/rill-ext-chroma';
 
 const ext = createChromaExtension({
   url: 'http://localhost:8000',
   collection: 'my_vectors',
 });
-const prefixed = prefixFunctions('chroma', ext);
-const { dispose, ...functions } = prefixed;
-const ctx = createRuntimeContext({ functions });
+const { functions, dispose } = hoistExtension('chroma', ext);
+const ctx = createRuntimeContext({
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { chroma: functions } },
+  },
+});
+```
 
-// Script: chroma::upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:chroma> => $db
+$db.upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
+```
+
+Direct dot-path — no intermediate variable:
+
+```rill
+use<ext:chroma.search>([0.1, 0.2, 0.3], [k: 5]) => $results
+$results -> log
+```
+
+Secondary pattern (still works, not primary):
+
+```rill
+chroma::upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
 ```
 
 ## Configuration
