@@ -51,6 +51,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rcrsr/rill-ext-param-shared": "workspace:^",
     "chromadb": "^3.3.1"
   }
 }

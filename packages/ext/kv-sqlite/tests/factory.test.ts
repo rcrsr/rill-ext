@@ -386,7 +386,7 @@ describe('createSqliteKvExtension', () => {
       expect(ext.get.params).toBeDefined();
       expect(ext.get.fn).toBeTypeOf('function');
       expect(ext.get.description).toBeTypeOf('string');
-      expect(ext.get.returnType).toBe('any');
+      expect(ext.get.returnType).toEqual({ type: 'any' });
 
       ext.dispose?.();
     });

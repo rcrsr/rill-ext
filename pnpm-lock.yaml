@@ -41,6 +41,9 @@ importers:
 
   packages/ext/claude-code:
     dependencies:
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
       node-pty:
         specifier: ^1.0.0
         version: 1.1.0
@@ -66,6 +69,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.997.0
         version: 3.1003.0
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
         specifier: ^0.11.0
@@ -85,6 +91,9 @@ importers:
 
   packages/ext/kv-redis:
     dependencies:
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
       ioredis:
         specifier: ^5.9.3
         version: 5.10.0
@@ -107,6 +116,9 @@ importers:
 
   packages/ext/kv-sqlite:
     dependencies:
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -135,6 +147,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.78.0
         version: 0.78.0(zod@4.3.6)
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
         specifier: ^0.11.0
@@ -160,6 +175,9 @@ importers:
       '@google/genai':
         specifier: ^1.42.0
         version: 1.44.0(@modelcontextprotocol/sdk@1.27.1(zod@4.3.6))
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
         specifier: ^0.11.0
@@ -182,6 +200,9 @@ importers:
 
   packages/ext/llm-openai:
     dependencies:
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
       openai:
         specifier: ^6.25.0
         version: 6.27.0(ws@8.19.0)(zod@4.3.6)
@@ -210,6 +231,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.1
         version: 1.27.1(zod@4.3.6)
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
         specifier: ^0.11.0
@@ -229,6 +253,9 @@ importers:
 
   packages/ext/vectordb-chroma:
     dependencies:
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-param
       chromadb:
         specifier: ^3.3.1
         version: 3.3.1
@@ -257,6 +284,9 @@ importers:
       '@pinecone-database/pinecone':
         specifier: ^7.1.0
         version: 7.1.0
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
         specifier: ^0.11.0
@@ -282,6 +312,9 @@ importers:
       '@qdrant/js-client-rest':
         specifier: ^1.17.0
         version: 1.17.0(typescript@5.9.3)
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
         specifier: ^0.11.0
@@ -303,6 +336,12 @@ importers:
         version: 7.22.0
 
   packages/shared/ext-llm:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ^0.11.0
+        version: 0.11.0
+
+  packages/shared/ext-param:
     devDependencies:
       '@rcrsr/rill':
         specifier: ^0.11.0

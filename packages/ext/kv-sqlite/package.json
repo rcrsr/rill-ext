@@ -49,6 +49,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rcrsr/rill-ext-param-shared": "workspace:*",
     "better-sqlite3": "^12.6.2"
   }
 }

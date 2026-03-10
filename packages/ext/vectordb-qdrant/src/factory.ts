@@ -8,6 +8,7 @@ import {
   RuntimeError,
   createVector,
   type ExtensionResult,
+  type VectorExtensionContract,
   type RillValue,
   type RuntimeContext,
   type RillVector,
@@ -20,7 +21,16 @@ import {
   dispose,
   assertRequired,
 } from '@rcrsr/rill-ext-vector-shared';
+import { p } from '@rcrsr/rill-ext-param-shared';
 import type { QdrantConfig } from './types.js';
+
+// Inline RillParam for vector type (no p.vector helper exists)
+const vectorParam = (name: string) => ({
+  name,
+  type: { type: 'vector' as const },
+  defaultValue: undefined,
+  annotations: {},
+});
 
 // ============================================================
 // FACTORY
@@ -80,14 +90,14 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
     });
   };
 
-  // Return extension result with implementations
-  const result: ExtensionResult = {
+  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
+  const result: ExtensionResult = ({
     // IR-1: qdrant::upsert
     upsert: {
       params: [
-        { name: 'id', type: 'string' },
-        { name: 'vector', type: 'vector' },
-        { name: 'metadata', type: 'dict', defaultValue: {} },
+        p.str('id'),
+        vectorParam('vector'),
+        p.dict('metadata', undefined, {}),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed(disposalState, 'qdrant');
@@ -124,12 +134,12 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Insert or update single vector with metadata',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-2: qdrant::upsert_batch
     upsert_batch: {
-      params: [{ name: 'items', type: 'list' }],
+      params: [p.list('items')],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed(disposalState, 'qdrant');
 
@@ -195,14 +205,14 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Batch insert/update vectors',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-3: qdrant::search
     search: {
       params: [
-        { name: 'vector', type: 'vector' },
-        { name: 'options', type: 'dict', defaultValue: {} },
+        vectorParam('vector'),
+        p.dict('options', undefined, {}),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed(disposalState, 'qdrant');
@@ -269,12 +279,12 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Search k nearest neighbors',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
 
     // IR-4: qdrant::get
     get: {
-      params: [{ name: 'id', type: 'string' }],
+      params: [p.str('id')],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed(disposalState, 'qdrant');
 
@@ -332,12 +342,12 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Fetch vector by ID',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-5: qdrant::delete
     delete: {
-      params: [{ name: 'id', type: 'string' }],
+      params: [p.str('id')],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed(disposalState, 'qdrant');
 
@@ -365,12 +375,12 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Delete vector by ID',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-6: qdrant::delete_batch
     delete_batch: {
-      params: [{ name: 'ids', type: 'list' }],
+      params: [p.list('ids')],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed(disposalState, 'qdrant');
 
@@ -414,7 +424,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Batch delete vectors',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-7: qdrant::count
@@ -440,14 +450,14 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Return total vector count in collection',
-      returnType: 'number',
+      returnType: { type: 'number' },
     },
 
     // IR-8: qdrant::create_collection
     create_collection: {
       params: [
-        { name: 'name', type: 'string' },
-        { name: 'options', type: 'dict', defaultValue: {} },
+        p.str('name'),
+        p.dict('options', undefined, {}),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed(disposalState, 'qdrant');
@@ -494,12 +504,12 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Create new vector collection',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-9: qdrant::delete_collection
     delete_collection: {
-      params: [{ name: 'name', type: 'string' }],
+      params: [p.str('name')],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed(disposalState, 'qdrant');
 
@@ -524,7 +534,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Delete vector collection',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-10: qdrant::list_collections
@@ -550,7 +560,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'List all collection names',
-      returnType: 'list',
+      returnType: { type: 'list' },
     },
 
     // IR-11: qdrant::describe
@@ -596,9 +606,9 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       description: 'Describe configured collection',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
-  };
+  }) satisfies VectorExtensionContract;
 
   // Attach dispose lifecycle method
   result.dispose = disposeExtension;

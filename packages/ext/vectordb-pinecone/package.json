@@ -50,6 +50,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rcrsr/rill-ext-param-shared": "workspace:^",
     "@pinecone-database/pinecone": "^7.1.0"
   }
 }

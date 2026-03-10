@@ -49,6 +49,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@aws-sdk/client-s3": "^3.997.0"
   }
 }

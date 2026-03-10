@@ -11,6 +11,7 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
+import { p } from '@rcrsr/rill-ext-param-shared';
 import type { ClaudeCodeConfig, ClaudeMessage } from './types.js';
 import { spawnClaudeCli } from './process.js';
 import { createStreamParser } from './stream-parser.js';
@@ -177,8 +178,8 @@ export function createClaudeCodeExtension(
     // IR-2: claude-code::prompt
     prompt: {
       params: [
-        { name: 'text', type: 'string' },
-        { name: 'options', type: 'dict', defaultValue: {} },
+        p.str('text'),
+        p.dict('options', undefined, {}),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -258,14 +259,14 @@ export function createClaudeCodeExtension(
       },
       description:
         'Execute Claude Code prompt and return result text and token usage',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-3: claude-code::skill
     skill: {
       params: [
-        { name: 'name', type: 'string' },
-        { name: 'args', type: 'dict', defaultValue: {} },
+        p.str('name'),
+        p.dict('args', undefined, {}),
       ],
       fn: async (fnArgs, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -350,14 +351,14 @@ export function createClaudeCodeExtension(
       },
       description:
         'Execute Claude Code skill with instruction and return structured result',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
 
     // IR-4: claude-code::command
     command: {
       params: [
-        { name: 'name', type: 'string' },
-        { name: 'args', type: 'dict', defaultValue: {} },
+        p.str('name'),
+        p.dict('args', undefined, {}),
       ],
       fn: async (fnArgs, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -442,7 +443,7 @@ export function createClaudeCodeExtension(
       },
       description:
         'Execute Claude Code command with task description and return execution summary',
-      returnType: 'dict',
+      returnType: { type: 'dict' },
     },
   };
 

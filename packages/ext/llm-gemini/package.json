@@ -50,6 +50,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@google/genai": "^1.42.0"
+    "@google/genai": "^1.42.0",
+    "@rcrsr/rill-ext-param-shared": "workspace:*"
   }
 }

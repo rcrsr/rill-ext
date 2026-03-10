@@ -118,16 +118,16 @@ describe('generateToolFunctions', () => {
       expect(fn.params).toHaveLength(2);
       expect(fn.params[0]).toMatchObject({
         name: 'weight_kg',
-        type: 'number',
-        description: 'Weight in kilograms',
+        type: { type: 'string' },
+        annotations: { description: 'Weight in kilograms' },
       });
       expect(fn.params[1]).toMatchObject({
         name: 'height_m',
-        type: 'number',
-        description: 'Height in meters',
+        type: { type: 'string' },
+        annotations: { description: 'Height in meters' },
       });
       expect(fn.description).toBe('Calculate Body Mass Index');
-      expect(fn.returnType).toBe('any');
+      expect(fn.returnType).toEqual({ type: 'any' });
       expect(typeof fn.fn).toBe('function');
     });
 
@@ -139,7 +139,7 @@ describe('generateToolFunctions', () => {
       const fn = functions.get_status!;
 
       expect(fn.params).toHaveLength(0);
-      expect(fn.returnType).toBe('any');
+      expect(fn.returnType).toEqual({ type: 'any' });
     });
 
     it('generates function with optional params', () => {
@@ -151,8 +151,8 @@ describe('generateToolFunctions', () => {
 
       const fn = functions.search!;
       expect(fn.params).toHaveLength(2);
-      expect(fn.params[0]).not.toHaveProperty('defaultValue');
-      expect(fn.params[1]).toHaveProperty('defaultValue', 0);
+      expect(fn.params[0]!.defaultValue).toBeUndefined();
+      expect(fn.params[1]!.defaultValue).toBeUndefined();
     });
 
     it('applies name sanitization', () => {
@@ -553,7 +553,7 @@ describe('generateToolFunctions', () => {
         name: 'search',
         arguments: {
           query: 'test',
-          limit: 0, // default value from type
+          limit: undefined, // no default value in RillParam
         },
       });
     });
@@ -590,20 +590,12 @@ describe('generateToolFunctions', () => {
       expect(fn).toBeDefined();
       expect(fn!.params).toHaveLength(100);
 
-      // Verify first 50 params are required (no defaultValue)
-      for (let i = 0; i < 50; i++) {
+      // All 100 params use string type with no defaultValue (RillParam shape)
+      for (let i = 0; i < 100; i++) {
         const param = fn!.params[i]!;
         expect(param.name).toBe(`param${i}`);
-        expect(param.type).toBe('string');
+        expect(param.type).toEqual({ type: 'string' });
         expect(param.defaultValue).toBeUndefined();
-      }
-
-      // Verify last 50 params are optional (have defaultValue)
-      for (let i = 50; i < 100; i++) {
-        const param = fn!.params[i]!;
-        expect(param.name).toBe(`param${i}`);
-        expect(param.type).toBe('string');
-        expect(param.defaultValue).toBe(''); // default for string
       }
     });
   });

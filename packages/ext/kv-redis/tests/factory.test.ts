@@ -82,7 +82,7 @@ describe('createRedisKvExtension', () => {
         expect(typeof result[fnName]?.fn).toBe('function');
         expect(Array.isArray(result[fnName]?.params)).toBe(true);
         expect(typeof result[fnName]?.description).toBe('string');
-        expect(typeof result[fnName]?.returnType).toBe('string');
+        expect(typeof result[fnName]?.returnType).toBe('object');
       }
     });
 

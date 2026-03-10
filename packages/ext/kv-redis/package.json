@@ -49,6 +49,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rcrsr/rill-ext-param-shared": "workspace:*",
     "ioredis": "^5.9.3"
   }
 }

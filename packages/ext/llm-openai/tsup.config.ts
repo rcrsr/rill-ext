@@ -5,5 +5,5 @@ export default defineConfig({
   format: ['esm'],
   dts: false,
   clean: true,
-  noExternal: ['@rcrsr/rill-ext-llm-shared'],
+  noExternal: ['@rcrsr/rill-ext-llm-shared', '@rcrsr/rill-ext-param-shared'],
 });

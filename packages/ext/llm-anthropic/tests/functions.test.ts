@@ -722,7 +722,7 @@ describe('embed() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed.params).toEqual([{ name: 'text', type: 'string' }]);
+      expect(ext.embed.params).toEqual([{ name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} }]);
     });
 
     it('has correct description', () => {
@@ -746,7 +746,7 @@ describe('embed() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed.returnType).toBe('vector');
+      expect(ext.embed.returnType).toEqual({ type: 'vector' });
     });
   });
 });
@@ -862,7 +862,7 @@ describe('embed_batch() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed_batch.params).toEqual([{ name: 'texts', type: 'list' }]);
+      expect(ext.embed_batch.params).toEqual([{ name: 'texts', type: { type: 'list' }, defaultValue: undefined, annotations: {} }]);
     });
 
     it('has correct description', () => {
@@ -888,7 +888,7 @@ describe('embed_batch() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed_batch.returnType).toBe('list');
+      expect(ext.embed_batch.returnType).toEqual({ type: 'list' });
     });
   });
 });

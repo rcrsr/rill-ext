@@ -155,8 +155,8 @@ describe('sanitizeParameterName', () => {
 });
 
 describe('generateParametersFromSchema', () => {
-  describe('AC-8: Parameter Generation', () => {
-    it('generates parameters from properties', () => {
+  describe('AC-20: RillParam Output Shape', () => {
+    it('generates RillParam from properties', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -171,57 +171,54 @@ describe('generateParametersFromSchema', () => {
       expect(params).toHaveLength(2);
       expect(params[0]).toEqual({
         name: 'name',
-        type: 'string',
-        description: 'User name',
+        type: { type: 'string' },
+        defaultValue: undefined,
+        annotations: { description: 'User name' },
       });
       expect(params[1]).toEqual({
         name: 'age',
-        type: 'number',
-        description: 'User age',
-        defaultValue: 0,
+        type: { type: 'string' },
+        defaultValue: undefined,
+        annotations: { description: 'User age' },
       });
     });
 
-    it('sets defaultValue for optional parameters', () => {
+    it('outputs string type for all property types (AC-20)', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
-          optional_string: { type: 'string' },
-          optional_number: { type: 'number' },
-          optional_bool: { type: 'boolean' },
-          optional_list: { type: 'array' },
-          optional_dict: { type: 'object' },
+          str_param: { type: 'string' },
+          num_param: { type: 'number' },
+          bool_param: { type: 'boolean' },
+          list_param: { type: 'array' },
+          dict_param: { type: 'object' },
         },
       };
 
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(5);
-      expect(params[0].defaultValue).toBe('');
-      expect(params[1].defaultValue).toBe(0);
-      expect(params[2].defaultValue).toBe(false);
-      expect(params[3].defaultValue).toEqual([]);
-      expect(params[4].defaultValue).toEqual({});
+      for (const param of params) {
+        expect(param.type).toEqual({ type: 'string' });
+        expect(param.defaultValue).toBeUndefined();
+      }
     });
 
-    it('omits defaultValue for required parameters', () => {
+    it('sets defaultValue to undefined for all parameters', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
           required_param: { type: 'string' },
+          optional_param: { type: 'string' },
         },
         required: ['required_param'],
       };
 
       const params = generateParametersFromSchema(schema);
 
-      expect(params).toHaveLength(1);
-      expect(params[0]).toEqual({
-        name: 'required_param',
-        type: 'string',
-        description: undefined,
-      });
-      expect('defaultValue' in params[0]).toBe(false);
+      expect(params).toHaveLength(2);
+      expect(params[0]!.defaultValue).toBeUndefined();
+      expect(params[1]!.defaultValue).toBeUndefined();
     });
 
     it('preserves Object.entries iteration order', () => {
@@ -237,9 +234,9 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(3);
-      expect(params[0].name).toBe('zulu');
-      expect(params[1].name).toBe('alpha');
-      expect(params[2].name).toBe('bravo');
+      expect(params[0]!.name).toBe('zulu');
+      expect(params[1]!.name).toBe('alpha');
+      expect(params[2]!.name).toBe('bravo');
     });
 
     it('sanitizes parameter names', () => {
@@ -255,12 +252,12 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(3);
-      expect(params[0].name).toBe('file_path');
-      expect(params[1].name).toBe('file_name');
-      expect(params[2].name).toBe('config_option');
+      expect(params[0]!.name).toBe('file_path');
+      expect(params[1]!.name).toBe('file_name');
+      expect(params[2]!.name).toBe('config_option');
     });
 
-    it('passes through description', () => {
+    it('places description in annotations.description', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -271,10 +268,10 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0].description).toBe('Test parameter');
+      expect(params[0]!.annotations).toEqual({ description: 'Test parameter' });
     });
 
-    it('omits description when absent', () => {
+    it('uses empty annotations when description is absent', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -285,10 +282,10 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0].description).toBeUndefined();
+      expect(params[0]!.annotations).toEqual({});
     });
 
-    it('returns empty array for missing properties', () => {
+    it('returns empty array for missing properties (AC-34)', () => {
       const schema: JsonSchema = {
         type: 'object',
       };
@@ -298,20 +295,12 @@ describe('generateParametersFromSchema', () => {
       expect(params).toEqual([]);
     });
 
-    it('treats all parameters as optional when required is missing', () => {
-      const schema: JsonSchema = {
-        type: 'object',
-        properties: {
-          param1: { type: 'string' },
-          param2: { type: 'number' },
-        },
-      };
+    it('returns empty array for schema with no properties key (AC-34)', () => {
+      const schema: JsonSchema = {};
 
       const params = generateParametersFromSchema(schema);
 
-      expect(params).toHaveLength(2);
-      expect(params[0].defaultValue).toBe('');
-      expect(params[1].defaultValue).toBe(0);
+      expect(params).toEqual([]);
     });
   });
 
@@ -327,43 +316,7 @@ describe('generateParametersFromSchema', () => {
       expect(params).toEqual([]);
     });
 
-    it('handles empty required array', () => {
-      const schema: JsonSchema = {
-        type: 'object',
-        properties: {
-          param: { type: 'string' },
-        },
-        required: [],
-      };
-
-      const params = generateParametersFromSchema(schema);
-
-      expect(params).toHaveLength(1);
-      expect(params[0].defaultValue).toBe('');
-    });
-
-    it('handles mixed required and optional parameters', () => {
-      const schema: JsonSchema = {
-        type: 'object',
-        properties: {
-          required1: { type: 'string' },
-          optional1: { type: 'string' },
-          required2: { type: 'number' },
-          optional2: { type: 'number' },
-        },
-        required: ['required1', 'required2'],
-      };
-
-      const params = generateParametersFromSchema(schema);
-
-      expect(params).toHaveLength(4);
-      expect('defaultValue' in params[0]).toBe(false); // required1
-      expect(params[1].defaultValue).toBe(''); // optional1
-      expect('defaultValue' in params[2]).toBe(false); // required2
-      expect(params[3].defaultValue).toBe(0); // optional2
-    });
-
-    it('handles enum types', () => {
+    it('handles enum types as string params', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -374,10 +327,10 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0].type).toBe('string');
+      expect(params[0]!.type).toEqual({ type: 'string' });
     });
 
-    it('handles oneOf types', () => {
+    it('handles oneOf types as string params', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -388,10 +341,10 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0].type).toBe('string');
+      expect(params[0]!.type).toEqual({ type: 'string' });
     });
 
-    it('handles anyOf types', () => {
+    it('handles anyOf types as string params', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -402,10 +355,10 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0].type).toBe('string');
+      expect(params[0]!.type).toEqual({ type: 'string' });
     });
 
-    it('handles missing type in property', () => {
+    it('handles missing type in property as string param', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -416,7 +369,8 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0].type).toBe('dict');
+      expect(params[0]!.type).toEqual({ type: 'string' });
+      expect(params[0]!.annotations).toEqual({ description: 'A value' });
     });
   });
 });

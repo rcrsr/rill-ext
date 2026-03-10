@@ -1,0 +1,31 @@
+{
+  "name": "@rcrsr/rill-ext-param-shared",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Shared param builder utilities for rill extensions",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config ../../../eslint.config.js src/",
+    "check": "pnpm run build && pnpm run test && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@rcrsr/rill": "^0.11.0"
+  },
+  "devDependencies": {
+    "@rcrsr/rill": "^0.11.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git",
+    "directory": "packages/shared/ext-param"
+  }
+}

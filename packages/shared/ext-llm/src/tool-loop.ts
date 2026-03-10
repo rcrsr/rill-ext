@@ -11,12 +11,13 @@ import {
   RuntimeError,
   type ApplicationCallable,
   type RillCallable,
+  type RillType,
   type RillValue,
   type RuntimeContext,
   type ScriptCallable,
 } from '@rcrsr/rill';
 import type { ToolLoopCallbacks, ToolLoopResult } from './types.js';
-import { buildJsonSchema } from './schema.js';
+import { buildJsonSchemaFromStructuralType } from './schema.js';
 
 // Minimal context interface compatible with CallableFn signature
 // Matches RuntimeContextLike from @rcrsr/rill's callable.ts
@@ -364,52 +365,19 @@ export async function executeToolLoop(
           : [];
 
     if (params.length > 0) {
-      // Build properties directly to handle null typeName as unconstrained ({}).
-      // null typeName means no type constraint — produce empty JSON Schema property.
-      // Works for both ApplicationCallable (host fns) and ScriptCallable (closures).
-      const properties: Record<string, unknown> = {};
-      const required: string[] = [];
-
-      for (const param of params) {
-        const property: Record<string, unknown> = {};
-
-        // null typeName → unconstrained ({}); otherwise map via buildJsonSchema
-        if (param.typeName !== null) {
-          const descriptor: Record<string, unknown> = {
-            [param.name]: { type: param.typeName },
-          };
-          const schema = buildJsonSchema(descriptor);
-          const built = schema.properties[param.name];
-          if (built !== undefined) {
-            Object.assign(property, built);
-          }
-        }
-
-        // Param description: ScriptCallable reads paramAnnotations, ApplicationCallable reads .description
-        let paramDesc: string;
-        if (callable.kind === 'script') {
-          const annot = (callable as ScriptCallable).paramAnnotations[
-            param.name
-          ];
-          paramDesc = (annot?.['description'] as string | undefined) ?? '';
-        } else {
-          paramDesc = param.description ?? '';
-        }
-        if (paramDesc) {
-          property['description'] = paramDesc;
-        }
-
-        properties[param.name] = property;
-
-        if (param.defaultValue === null) {
-          required.push(param.name);
-        }
-      }
+      // Build a synthetic closure type to delegate to buildJsonSchemaFromStructuralType.
+      // param.type undefined → treated as 'any' (unconstrained, produces {} property).
+      // param.annotations['description'] used for all callable kinds (AC-10, AC-11, AC-30).
+      const closureType: RillType = {
+        type: 'closure',
+        params: params.map((p) => [p.name, p.type ?? { type: 'any' }] as [string, RillType]),
+      };
+      const builtSchema = buildJsonSchemaFromStructuralType(closureType, [...params]);
 
       inputSchema = {
         type: 'object',
-        properties,
-        required,
+        properties: builtSchema.properties,
+        required: builtSchema.required,
       };
     } else {
       inputSchema = { type: 'object', properties: {}, required: [] };

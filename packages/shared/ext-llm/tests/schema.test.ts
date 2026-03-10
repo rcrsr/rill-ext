@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { type CallableParam, RuntimeError } from '@rcrsr/rill';
+import { type RillParam, RuntimeError } from '@rcrsr/rill';
 import {
   buildJsonSchema,
   buildJsonSchemaFromStructuralType,
@@ -493,19 +493,18 @@ describe('buildJsonSchema', () => {
   describe('buildJsonSchemaFromStructuralType [AC-10, AC-18, EC-3]', () => {
     // AC-10: output identical to equivalent legacy schema for same param structure
     it('AC-10: string param produces same output as buildJsonSchema string type', () => {
-      const params: CallableParam[] = [
+      const params: RillParam[] = [
         {
           name: 'name',
-          typeName: 'string',
-          defaultValue: null,
+          type: { type: 'string' },
+          defaultValue: undefined,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          kind: 'closure',
-          params: [['name', { kind: 'primitive', name: 'string' }]],
-          ret: { kind: 'any' },
+          type: 'closure',
+          params: [['name', { type: 'string' }]],
         },
         params
       );
@@ -516,19 +515,18 @@ describe('buildJsonSchema', () => {
     });
 
     it('AC-10: number param produces same output as buildJsonSchema number type', () => {
-      const params: CallableParam[] = [
+      const params: RillParam[] = [
         {
           name: 'count',
-          typeName: 'number',
-          defaultValue: null,
+          type: { type: 'number' },
+          defaultValue: undefined,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          kind: 'closure',
-          params: [['count', { kind: 'primitive', name: 'number' }]],
-          ret: { kind: 'any' },
+          type: 'closure',
+          params: [['count', { type: 'number' }]],
         },
         params
       );
@@ -537,59 +535,95 @@ describe('buildJsonSchema', () => {
     });
 
     it('AC-10: bool param produces type "boolean" matching buildJsonSchema', () => {
-      const params: CallableParam[] = [
+      const params: RillParam[] = [
         {
           name: 'active',
-          typeName: 'bool',
-          defaultValue: null,
+          type: { type: 'bool' },
+          defaultValue: undefined,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          kind: 'closure',
-          params: [['active', { kind: 'primitive', name: 'bool' }]],
-          ret: { kind: 'any' },
+          type: 'closure',
+          params: [['active', { type: 'bool' }]],
         },
         params
       );
       expect(result.properties['active']?.type).toBe('boolean');
     });
 
-    it('param with defaultValue !== null is optional (not in required)', () => {
-      const params: CallableParam[] = [
+    it('AC-10: dict param produces type "object"', () => {
+      const params: RillParam[] = [
+        {
+          name: 'meta',
+          type: { type: 'dict' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+      ];
+      const result = buildJsonSchemaFromStructuralType(
+        {
+          type: 'closure',
+          params: [['meta', { type: 'dict' }]],
+        },
+        params
+      );
+      expect(result.properties['meta']?.type).toBe('object');
+      expect(result.required).toContain('meta');
+    });
+
+    it('param with defaultValue !== undefined is optional (not in required)', () => {
+      const params: RillParam[] = [
         {
           name: 'limit',
-          typeName: 'number',
+          type: { type: 'number' },
           defaultValue: 10,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          kind: 'closure',
-          params: [['limit', { kind: 'primitive', name: 'number' }]],
-          ret: { kind: 'any' },
+          type: 'closure',
+          params: [['limit', { type: 'number' }]],
         },
         params
       );
       expect(result.required).not.toContain('limit');
     });
 
+    it('param with defaultValue 0 is optional (falsy non-undefined value)', () => {
+      const params: RillParam[] = [
+        {
+          name: 'offset',
+          type: { type: 'number' },
+          defaultValue: 0,
+          annotations: {},
+        },
+      ];
+      const result = buildJsonSchemaFromStructuralType(
+        {
+          type: 'closure',
+          params: [['offset', { type: 'number' }]],
+        },
+        params
+      );
+      expect(result.required).not.toContain('offset');
+    });
+
     it('description annotation propagates to property', () => {
-      const params: CallableParam[] = [
+      const params: RillParam[] = [
         {
           name: 'query',
-          typeName: 'string',
-          defaultValue: null,
+          type: { type: 'string' },
+          defaultValue: undefined,
           annotations: { description: 'Search query' },
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          kind: 'closure',
-          params: [['query', { kind: 'primitive', name: 'string' }]],
-          ret: { kind: 'any' },
+          type: 'closure',
+          params: [['query', { type: 'string' }]],
         },
         params
       );
@@ -597,19 +631,18 @@ describe('buildJsonSchema', () => {
     });
 
     it('enum annotation propagates to property', () => {
-      const params: CallableParam[] = [
+      const params: RillParam[] = [
         {
           name: 'status',
-          typeName: 'string',
-          defaultValue: null,
+          type: { type: 'string' },
+          defaultValue: undefined,
           annotations: { enum: ['active', 'inactive'] },
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          kind: 'closure',
-          params: [['status', { kind: 'primitive', name: 'string' }]],
-          ret: { kind: 'any' },
+          type: 'closure',
+          params: [['status', { type: 'string' }]],
         },
         params
       );
@@ -618,24 +651,62 @@ describe('buildJsonSchema', () => {
 
     it('empty closure produces empty properties and required arrays', () => {
       const result = buildJsonSchemaFromStructuralType({
-        kind: 'closure',
+        type: 'closure',
         params: [],
-        ret: { kind: 'any' },
       });
       expect(result.properties).toEqual({});
       expect(result.required).toEqual([]);
     });
 
+    // AC-25: list with element maps to array with items
+    it('AC-25: list type with element produces array with items in JSON Schema', () => {
+      const params: RillParam[] = [
+        {
+          name: 'tags',
+          type: { type: 'list', element: { type: 'string' } },
+          defaultValue: undefined,
+          annotations: {},
+        },
+      ];
+      const result = buildJsonSchemaFromStructuralType(
+        {
+          type: 'closure',
+          params: [['tags', { type: 'list', element: { type: 'string' } }]],
+        },
+        params
+      );
+      expect(result.properties['tags']?.type).toBe('array');
+      expect(result.properties['tags']?.items?.type).toBe('string');
+    });
+
+    it('list type without element produces array with no items', () => {
+      const result = buildJsonSchemaFromStructuralType({
+        type: 'closure',
+        params: [['items', { type: 'list' }]],
+      });
+      expect(result.properties['items']?.type).toBe('array');
+      expect(result.properties['items']?.items).toBeUndefined();
+    });
+
+    it('nested list element type recurses correctly', () => {
+      const result = buildJsonSchemaFromStructuralType({
+        type: 'closure',
+        params: [['matrix', { type: 'list', element: { type: 'list', element: { type: 'number' } } }]],
+      });
+      expect(result.properties['matrix']?.type).toBe('array');
+      expect(result.properties['matrix']?.items?.type).toBe('array');
+      expect(result.properties['matrix']?.items?.items?.type).toBe('number');
+    });
+
     // AC-18 / EC-3: unsupported type throws RILL-R004
-    it('AC-18/EC-3: closure kind in param throws RuntimeError RILL-R004', () => {
+    it('AC-18/EC-3: closure type in param throws RuntimeError RILL-R004', () => {
       let thrown: RuntimeError | undefined;
       try {
         buildJsonSchemaFromStructuralType({
-          kind: 'closure',
+          type: 'closure',
           params: [
-            ['fn', { kind: 'closure', params: [], ret: { kind: 'any' } }],
+            ['fn', { type: 'closure', params: [] }],
           ],
-          ret: { kind: 'any' },
         });
       } catch (e) {
         thrown = e as RuntimeError;
@@ -644,13 +715,12 @@ describe('buildJsonSchema', () => {
       expect(thrown?.errorId).toBe('RILL-R004');
     });
 
-    it('AC-18/EC-3: tuple kind in param throws RuntimeError RILL-R004', () => {
+    it('AC-18/EC-3: tuple type in param throws RuntimeError RILL-R004', () => {
       let thrown: RuntimeError | undefined;
       try {
         buildJsonSchemaFromStructuralType({
-          kind: 'closure',
-          params: [['t', { kind: 'tuple', elements: [] }]],
-          ret: { kind: 'any' },
+          type: 'closure',
+          params: [['t', { type: 'tuple', elements: [] }]],
         });
       } catch (e) {
         thrown = e as RuntimeError;

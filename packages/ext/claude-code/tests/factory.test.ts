@@ -57,30 +57,30 @@ describe('createClaudeCodeExtension', () => {
       const ext = createClaudeCodeExtension();
 
       expect(ext.prompt.params).toEqual([
-        { name: 'text', type: 'string' },
-        { name: 'options', type: 'dict', defaultValue: {} },
+        { name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.prompt.returnType).toBe('dict');
+      expect(ext.prompt.returnType).toEqual({ type: 'dict' });
     });
 
     it('creates skill function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension();
 
       expect(ext.skill.params).toEqual([
-        { name: 'name', type: 'string' },
-        { name: 'args', type: 'dict', defaultValue: {} },
+        { name: 'name', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'args', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.skill.returnType).toBe('dict');
+      expect(ext.skill.returnType).toEqual({ type: 'dict' });
     });
 
     it('creates command function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension();
 
       expect(ext.command.params).toEqual([
-        { name: 'name', type: 'string' },
-        { name: 'args', type: 'dict', defaultValue: {} },
+        { name: 'name', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'args', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.command.returnType).toBe('dict');
+      expect(ext.command.returnType).toEqual({ type: 'dict' });
     });
 
     it('validates prompt text before processing', async () => {

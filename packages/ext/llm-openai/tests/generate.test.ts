@@ -19,7 +19,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
   RuntimeError,
-  validateHostFunctionArgs,
 } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
@@ -221,18 +220,17 @@ describe('generate() function', () => {
       ).rejects.toThrow();
     });
 
-    // DEBT-1: rill runtime arity gate fires RILL-R001 when options arg is absent
-    it('throws RILL-R001 via validateHostFunctionArgs when called with 1 argument', () => {
+    // DEBT-1: generate requires options param with schema field
+    it('throws RILL-R004 when called without schema in options', async () => {
       const ext = createOpenAIExtension(baseConfig);
+      const ctx = createRuntimeContext();
 
-      expect(() =>
-        validateHostFunctionArgs(['prompt'], ext.generate.params, 'generate')
-      ).toThrow(
-        expect.objectContaining({
-          errorId: 'RILL-R001',
-          message: expect.stringContaining('options'),
-        })
-      );
+      await expect(
+        ext.generate.fn(['prompt', {}], ctx)
+      ).rejects.toMatchObject({
+        errorId: 'RILL-R004',
+        message: expect.stringContaining('schema'),
+      });
     });
 
     // AC-27/EC-6: provider API error emits openai:error event

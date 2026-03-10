@@ -50,6 +50,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@rcrsr/rill-ext-param-shared": "workspace:^",
     "@qdrant/js-client-rest": "^1.17.0"
   }
 }

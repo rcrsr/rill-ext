@@ -90,12 +90,12 @@ describe('IR-1: Factory result works with prefixFunctions', () => {
     const promptDef = prefixed['claude-code::prompt'];
     expect(promptDef.params).toHaveLength(2);
     expect(promptDef.params[0].name).toBe('text');
-    expect(promptDef.params[0].type).toBe('string');
+    expect(promptDef.params[0].type).toEqual({ type: 'string' });
     expect(promptDef.params[1].name).toBe('options');
-    expect(promptDef.params[1].type).toBe('dict');
+    expect(promptDef.params[1].type).toEqual({ type: 'dict' });
     expect(promptDef.fn).toBeInstanceOf(Function);
     expect(promptDef.description).toBeTruthy();
-    expect(promptDef.returnType).toBe('dict');
+    expect(promptDef.returnType).toEqual({ type: 'dict' });
   });
 
   it('allows prefixed functions to be called via runtime context', async () => {
