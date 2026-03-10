@@ -42,3 +42,8 @@ export { createFunctionWrapper } from './wrapper.js';
 // DISTANCE NORMALIZATION
 // ============================================================
 export { normalizeDistance } from './distance.js';
+
+// ============================================================
+// PARAM HELPERS
+// ============================================================
+export { vectorParam } from './param.js';

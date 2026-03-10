@@ -21,18 +21,11 @@ import {
   checkDisposed as sharedCheckDisposed,
   dispose as sharedDispose,
   assertRequired,
+  vectorParam,
   type DisposalState,
 } from '@rcrsr/rill-ext-vector-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { PineconeConfig } from './types.js';
-
-// Inline RillParam for vector type (no p.vector helper exists)
-const vectorParam = (name: string) => ({
-  name,
-  type: { type: 'vector' as const },
-  defaultValue: undefined,
-  annotations: {},
-});
 
 // ============================================================
 // HELPER FUNCTIONS

@@ -20,17 +20,10 @@ import {
   checkDisposed,
   dispose,
   assertRequired,
+  vectorParam,
 } from '@rcrsr/rill-ext-vector-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { QdrantConfig } from './types.js';
-
-// Inline RillParam for vector type (no p.vector helper exists)
-const vectorParam = (name: string) => ({
-  name,
-  type: { type: 'vector' as const },
-  defaultValue: undefined,
-  annotations: {},
-});
 
 // ============================================================
 // FACTORY
