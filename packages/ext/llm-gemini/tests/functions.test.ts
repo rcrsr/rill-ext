@@ -1060,16 +1060,14 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       const mockToolFn = vi.fn().mockResolvedValue('sunny');
-      const options = {
-        tools: {
-          get_weather: makeTool(mockToolFn, {
-            description: 'Get weather for location',
-          }),
-        },
+      const tools = {
+        get_weather: makeTool(mockToolFn, {
+          description: 'Get weather for location',
+        }),
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'What is the weather in NYC?', options },
+        { prompt: 'What is the weather in NYC?', tools },
         ctx
       )) as Record<string, unknown>;
 
@@ -1095,14 +1093,12 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       const mockToolFn = vi.fn();
-      const options = {
-        tools: {
-          get_weather: makeTool(mockToolFn),
-        },
+      const tools = {
+        get_weather: makeTool(mockToolFn),
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'Hello', options },
+        { prompt: 'Hello', tools },
         ctx
       )) as Record<string, unknown>;
 
@@ -1132,14 +1128,11 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const options = {
-        tools: {
-          get_weather: makeTool(vi.fn().mockResolvedValue('sunny')),
-        },
-        max_turns: 1,
+      const tools = {
+        get_weather: makeTool(vi.fn().mockResolvedValue('sunny')),
       };
 
-      const result = (await ext.tool_loop.fn({ prompt: 'Test', options }, ctx)) as Record<
+      const result = (await ext.tool_loop.fn({ prompt: 'Test', tools, options: { max_turns: 1 } }, ctx)) as Record<
         string,
         unknown
       >;
@@ -1160,17 +1153,15 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const options = {
-        tools: { test: makeTool(vi.fn()) },
-      };
+      const tools = { test: makeTool(vi.fn()) };
 
-      await expect(ext.tool_loop.fn({ prompt: '   ', options }, ctx)).rejects.toThrow(
+      await expect(ext.tool_loop.fn({ prompt: '   ', tools }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
 
-    // EC-23: Missing tools option
-    it('throws RuntimeError when tools option missing', async () => {
+    // EC-23: Missing tools argument
+    it('throws RuntimeError when tools argument missing', async () => {
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
         model: 'gemini-2.0-flash',
@@ -1179,8 +1170,8 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.tool_loop.fn({ prompt: 'Hello', options: {} }, ctx)).rejects.toThrow(
-        "tool_loop requires 'tools' option"
+      await expect(ext.tool_loop.fn({ prompt: 'Hello' }, ctx)).rejects.toThrow(
+        'tools parameter is required'
       );
     });
 
@@ -1205,14 +1196,11 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const options = {
-        tools: {
-          get_weather: makeTool(vi.fn()),
-        },
-        max_errors: 3,
+      const tools = {
+        get_weather: makeTool(vi.fn()),
       };
 
-      await expect(ext.tool_loop.fn({ prompt: 'Test', options }, ctx)).rejects.toThrow(
+      await expect(ext.tool_loop.fn({ prompt: 'Test', tools, options: { max_errors: 3 } }, ctx)).rejects.toThrow(
         'Tool execution failed: 3 consecutive errors'
       );
     });
@@ -1239,16 +1227,13 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const options = {
-        tools: {
-          failing_tool: makeTool(
-            vi.fn().mockRejectedValue(new Error('Tool failed'))
-          ),
-        },
-        max_errors: 2,
+      const tools = {
+        failing_tool: makeTool(
+          vi.fn().mockRejectedValue(new Error('Tool failed'))
+        ),
       };
 
-      await expect(ext.tool_loop.fn({ prompt: 'Test', options }, ctx)).rejects.toThrow(
+      await expect(ext.tool_loop.fn({ prompt: 'Test', tools, options: { max_errors: 2 } }, ctx)).rejects.toThrow(
         'Tool execution failed: 2 consecutive errors'
       );
     });
@@ -1283,8 +1268,8 @@ describe('tool_loop() function', () => {
       };
 
       const [result1, result2] = await Promise.all([
-        ext1.tool_loop.fn({ prompt: 'Prompt 1', options: { tools } }, ctx1),
-        ext2.tool_loop.fn({ prompt: 'Prompt 2', options: { tools } }, ctx2),
+        ext1.tool_loop.fn({ prompt: 'Prompt 1', tools }, ctx1),
+        ext2.tool_loop.fn({ prompt: 'Prompt 2', tools }, ctx2),
       ]);
 
       const r1 = result1 as Record<string, unknown>;

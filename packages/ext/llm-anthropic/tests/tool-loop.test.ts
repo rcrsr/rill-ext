@@ -149,7 +149,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'What is the weather in SF?', options: { tools } },
+        { prompt: 'What is the weather in SF?', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -179,7 +179,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'What is the answer?', options: { tools } },
+        { prompt: 'What is the answer?', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -212,7 +212,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'Search for something', options: { tools, max_turns: 1 } },
+        { prompt: 'Search for something', tools, options: { max_turns: 1 } },
         ctx
       )) as Record<string, unknown>;
 
@@ -260,7 +260,7 @@ describe('tool_loop() function', () => {
         tool_c: makeConcurrentTool('C'),
       };
 
-      await ext.tool_loop.fn({ prompt: 'Run tools', options: { tools } }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Run tools', tools, options: {} }, ctx);
 
       // All tools should start before any finish (parallel execution)
       expect(executionOrder.filter((e) => e.endsWith('-start')).length).toBe(3);
@@ -282,12 +282,12 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.tool_loop.fn({ prompt: '   ', options: { tools: {} } }, ctx)
+        ext.tool_loop.fn({ prompt: '   ', tools: {}, options: {} }, ctx)
       ).rejects.toThrow('prompt text cannot be empty');
     });
 
-    // EC-23: Missing tools in options raises error
-    it('throws error when tools option missing', async () => {
+    // EC-23: Missing tools argument raises error
+    it('throws error when tools argument missing', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -296,9 +296,9 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.tool_loop.fn({ prompt: 'Test', options: {} }, ctx)).rejects.toThrow(
-        "tool_loop requires 'tools' option"
-      );
+      await expect(
+        ext.tool_loop.fn({ prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} }, ctx)
+      ).rejects.toThrow('tools parameter is required');
     });
 
     // EC-15: Unknown tool name in tool loop
@@ -326,7 +326,7 @@ describe('tool_loop() function', () => {
       };
 
       // Should complete without throwing despite unknown tool error
-      const result = await ext.tool_loop.fn({ prompt: 'Test', options: { tools } }, ctx);
+      const result = await ext.tool_loop.fn({ prompt: 'Test', tools, options: {} }, ctx);
 
       // Verify result structure
       expect(result).toHaveProperty('content');
@@ -373,7 +373,7 @@ describe('tool_loop() function', () => {
       };
 
       await expect(
-        ext.tool_loop.fn({ prompt: 'Test', options: { tools, max_errors: 3 } }, ctx)
+        ext.tool_loop.fn({ prompt: 'Test', tools, options: { max_errors: 3 } }, ctx)
       ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
     });
 
@@ -414,7 +414,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'Test', options: { tools, max_errors: 3 } },
+        { prompt: 'Test', tools, options: { max_errors: 3 } },
         ctx
       )) as Record<string, unknown>;
 
@@ -446,7 +446,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test', options: { tools } }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Test', tools, options: {} }, ctx);
 
       // Check second API call includes error in tool_result
       const secondCall = mockCreate.mock.calls[1]?.[0] as any;
@@ -481,7 +481,7 @@ describe('tool_loop() function', () => {
         { role: 'assistant', content: 'Previous response 1' },
       ];
 
-      await ext.tool_loop.fn({ prompt: 'New prompt', options: { tools, messages } }, ctx);
+      await ext.tool_loop.fn({ prompt: 'New prompt', tools, options: { messages } }, ctx);
 
       const firstCall = mockCreate.mock.calls[0]?.[0] as any;
       expect(firstCall.messages.length).toBe(3);
@@ -519,7 +519,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'Test prompt', options: { tools } },
+        { prompt: 'Test prompt', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -556,7 +556,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'Test', options: { tools } },
+        { prompt: 'Test', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -592,7 +592,7 @@ describe('tool_loop() function', () => {
         }),
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test', options: { tools } }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Test', tools, options: {} }, ctx);
 
       const firstCall = mockCreate.mock.calls[0]?.[0] as any;
       const tool = firstCall.tools[0];
@@ -643,7 +643,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test', options: { tools } }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Test', tools, options: {} }, ctx);
 
       expect(capturedArgs).toEqual({ param_a: 'value_a', param_b: 42 });
     });
@@ -670,8 +670,8 @@ describe('tool_loop() function', () => {
       };
 
       const [result1, result2] = await Promise.all([
-        ext.tool_loop.fn({ prompt: 'Prompt 1', options: { tools } }, ctx1),
-        ext.tool_loop.fn({ prompt: 'Prompt 2', options: { tools } }, ctx2),
+        ext.tool_loop.fn({ prompt: 'Prompt 1', tools, options: {} }, ctx1),
+        ext.tool_loop.fn({ prompt: 'Prompt 2', tools, options: {} }, ctx2),
       ]);
 
       const r1 = result1 as Record<string, unknown>;

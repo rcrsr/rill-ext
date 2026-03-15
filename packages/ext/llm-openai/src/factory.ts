@@ -8,7 +8,6 @@ import {
   RuntimeError,
   emitExtensionEvent,
   createVector,
-  isDict,
   isVector,
   rillTypeToTypeValue,
   type ExtensionResult,
@@ -606,8 +605,13 @@ export function createOpenAIExtension(
     tool_loop: {
       params: [
         p.str('prompt'),
-        p.dict('options', undefined, {}, {
-          tools: { type: { type: 'dict' } },
+        {
+          name: 'tools',
+          type: { type: 'dict', valueType: { type: 'closure' } },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        p.dict('options', undefined, undefined, {
           system: { type: { type: 'string' }, defaultValue: '' },
           max_tokens: { type: { type: 'number' }, defaultValue: 0 },
           max_errors: { type: { type: 'number' }, defaultValue: 3 },
@@ -621,19 +625,12 @@ export function createOpenAIExtension(
         try {
           // Extract arguments
           const prompt = args['prompt'] as string;
+          const toolsDict = args['tools'] as RillValue;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-20: Validate prompt is non-empty
           if (prompt.trim().length === 0) {
             throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
-          }
-
-          // EC-21: Validate tools option is present and is a dict
-          if (!('tools' in options) || !isDict(options['tools'] as RillValue)) {
-            throw new RuntimeError(
-              'RILL-R004',
-              "tool_loop requires 'tools' option"
-            );
           }
 
           // Extract options
@@ -880,7 +877,7 @@ export function createOpenAIExtension(
           // Execute shared tool loop
           const loopResult = await executeToolLoop(
             messages,
-            options['tools'] as RillValue,
+            toolsDict,
             maxErrors,
             callbacks,
             (event: string, data: Record<string, unknown>) => {

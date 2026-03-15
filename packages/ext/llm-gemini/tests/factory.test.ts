@@ -228,7 +228,8 @@ describe('createGeminiExtension', () => {
       expect(result.tool_loop).toMatchObject({
         params: [
           { name: 'prompt', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
+          { name: 'tools', type: { type: 'dict', valueType: { type: 'closure' } }, defaultValue: undefined, annotations: {} },
+          { name: 'options', type: { type: 'dict' }, defaultValue: undefined, annotations: {} },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },

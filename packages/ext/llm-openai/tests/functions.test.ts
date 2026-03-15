@@ -1021,7 +1021,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'test prompt', options: { tools } },
+        { prompt: 'test prompt', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -1076,7 +1076,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'test prompt', options: { tools, max_turns: 1 } },
+        { prompt: 'test prompt', tools, options: { max_turns: 1 } },
         ctx
       )) as Record<string, unknown>;
 
@@ -1114,7 +1114,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'test prompt', options: { tools } },
+        { prompt: 'test prompt', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -1193,7 +1193,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        { prompt: 'What is the weather?', options: { tools } },
+        { prompt: 'What is the weather?', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -1215,12 +1215,12 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.tool_loop.fn({ prompt: '', options: { tools: {} } }, ctx)).rejects.toThrow(
+      await expect(ext.tool_loop.fn({ prompt: '', tools: {}, options: {} }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
 
-    // EC-21: Missing tools option
+    // EC-21: Missing tools argument
     it('throws RuntimeError when tools missing', async () => {
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
@@ -1230,8 +1230,8 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.tool_loop.fn({ prompt: 'test', options: {} }, ctx)).rejects.toThrow(
-        "tool_loop requires 'tools' option"
+      await expect(ext.tool_loop.fn({ prompt: 'test', tools: undefined, options: {} }, ctx)).rejects.toThrow(
+        'tools parameter is required'
       );
     });
 
@@ -1328,7 +1328,7 @@ describe('tool_loop() function', () => {
       };
 
       await expect(
-        ext.tool_loop.fn({ prompt: 'test prompt', options: { tools } }, ctx)
+        ext.tool_loop.fn({ prompt: 'test prompt', tools, options: {} }, ctx)
       ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
     });
 
@@ -1426,7 +1426,7 @@ describe('tool_loop() function', () => {
       };
 
       await expect(
-        ext.tool_loop.fn({ prompt: 'test prompt', options: { tools, max_errors: 3 } }, ctx)
+        ext.tool_loop.fn({ prompt: 'test prompt', tools, options: { max_errors: 3 } }, ctx)
       ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
     });
   });

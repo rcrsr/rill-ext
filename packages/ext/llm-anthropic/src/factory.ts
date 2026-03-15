@@ -7,7 +7,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import {
   RuntimeError,
   emitExtensionEvent,
-  isDict,
   rillTypeToTypeValue,
   type ExtensionResult,
   type LlmExtensionContract,
@@ -600,8 +599,13 @@ export function createAnthropicExtension(
     tool_loop: {
       params: [
         p.str('prompt'),
-        p.dict('options', undefined, {}, {
-          tools: { type: { type: 'dict' } },
+        {
+          name: 'tools',
+          type: { type: 'dict', valueType: { type: 'closure' } },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        p.dict('options', undefined, undefined, {
           system: { type: { type: 'string' }, defaultValue: '' },
           max_tokens: { type: { type: 'number' }, defaultValue: 0 },
           max_errors: { type: { type: 'number' }, defaultValue: 3 },
@@ -615,22 +619,13 @@ export function createAnthropicExtension(
         try {
           // Extract arguments
           const prompt = args['prompt'] as string;
+          const toolsDict = args['tools'] as RillValue;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-22: Empty prompt raises error
           if (prompt.trim().length === 0) {
             throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
           }
-
-          // EC-23: Missing tools in options raises error
-          if (!('tools' in options) || !isDict(options['tools'] as RillValue)) {
-            throw new RuntimeError(
-              'RILL-R004',
-              "tool_loop requires 'tools' option"
-            );
-          }
-
-          const toolsDict = options['tools'] as RillValue;
 
           // Extract options
           const system =

@@ -286,7 +286,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       ];
 
       await ext.tool_loop.fn(
-        { prompt: 'What is the weather in San Francisco?', options: { tools: { get_weather: weatherFn } } },
+        { prompt: 'What is the weather in San Francisco?', tools: { get_weather: weatherFn }, options: {} },
         ctx
       );
 
@@ -365,7 +365,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       ];
 
       await ext.tool_loop.fn(
-        { prompt: 'Calculate 5 + 3', options: { tools: { calculate: calculateFn } } },
+        { prompt: 'Calculate 5 + 3', tools: { calculate: calculateFn }, options: {} },
         ctx
       );
 
@@ -436,7 +436,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       (failingTool as Record<string, unknown>)['description'] = 'Always fails';
 
       await ext.tool_loop.fn(
-        { prompt: 'Test failing tool', options: { tools: { failing_tool: failingTool } } },
+        { prompt: 'Test failing tool', tools: { failing_tool: failingTool }, options: {} },
         ctx
       );
 
@@ -482,7 +482,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.tool_loop.fn({ prompt: 'Simple question', options: { tools: {} } }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Simple question', tools: {}, options: {} }, ctx);
 
       // Find tool_loop event
       const toolLoopEvents = events.filter(
@@ -573,7 +573,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       (step2Fn as Record<string, unknown>)['description'] = 'Second step';
 
       await ext.tool_loop.fn(
-        { prompt: 'Multi-step task', options: { tools: { step1: step1Fn, step2: step2Fn } } },
+        { prompt: 'Multi-step task', tools: { step1: step1Fn, step2: step2Fn }, options: {} },
         ctx
       );
 
@@ -671,16 +671,16 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      // Missing tools option triggers validation error
-      await expect(ext.tool_loop.fn({ prompt: 'Test', options: {} }, ctx)).rejects.toThrow(
-        "tool_loop requires 'tools' option"
-      );
+      // Missing tools argument triggers validation error
+      await expect(
+        ext.tool_loop.fn({ prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} }, ctx)
+      ).rejects.toThrow('tools parameter is required');
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
 
       const event = errorEvents[0]!;
-      expect(event.error).toContain("tool_loop requires 'tools' option");
+      expect(event.error).toContain('tools parameter is required');
     });
   });
 
@@ -780,7 +780,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       // Test all three main functions
       await ext.message.fn({ text: 'Test message', options: {} }, ctx);
       await ext.messages.fn({ messages: [{ role: 'user', content: 'Test' }], options: {} }, ctx);
-      await ext.tool_loop.fn({ prompt: 'Test tool loop', options: { tools: {} } }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Test tool loop', tools: {}, options: {} }, ctx);
 
       expect(mockCreate).toHaveBeenCalledTimes(3);
 

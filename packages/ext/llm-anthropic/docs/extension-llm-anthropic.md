@@ -115,7 +115,7 @@ $vec.model           # Embedding model used
 $vectors.len  # Number of vectors
 ```
 
-**tool_loop(prompt, options?)** — Agentic tool-use loop:
+**tool_loop(prompt, tools, options?)** — Agentic tool-use loop:
 
 ```rill
 ^("Get current weather for a city") |^("City name") city: string| {
@@ -123,7 +123,8 @@ $vectors.len  # Number of vectors
 } => $get_weather
 
 anthropic::tool_loop("What's the weather in Paris?", [
-  tools: [get_weather: $get_weather],
+  get_weather: $get_weather,
+], [
   max_turns: 5,
 ]) => $result
 $result.content  # Final response
@@ -182,7 +183,6 @@ Params using `closure` or `tuple` type are not representable in JSON Schema and 
 |--------|------|-----------|-------------|
 | `system` | string | message, messages, tool_loop, generate | Override system prompt |
 | `max_tokens` | number | message, messages, tool_loop, generate | Override max tokens |
-| `tools` | dict | tool_loop (required) | Tool callables keyed by name |
 | `max_turns` | number | tool_loop | Limit LLM round-trips |
 | `max_errors` | number | tool_loop | Consecutive error limit (default: 3) |
 | `messages` | list | tool_loop, generate | Prepend conversation history |
@@ -227,7 +227,7 @@ The `tool_loop` result adds `turns` (number of LLM round-trips).
 - Invalid role → `RuntimeError RILL-R004: invalid role '{value}'`
 - Missing content → `RuntimeError RILL-R004: {role} message requires 'content'`
 - No embed_model → `RuntimeError RILL-R004: embed_model not configured`
-- Missing tools → `RuntimeError RILL-R004: tool_loop requires 'tools' option`
+- Missing tools → `RuntimeError RILL-R004: tool_loop requires a tools argument`
 
 **API errors** (from provider):
 
