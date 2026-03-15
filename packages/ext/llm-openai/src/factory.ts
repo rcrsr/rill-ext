@@ -165,7 +165,7 @@ export function createOpenAIExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
@@ -295,7 +295,7 @@ export function createOpenAIExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
@@ -639,7 +639,7 @@ export function createOpenAIExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
           const maxErrors =
@@ -1032,7 +1032,7 @@ export function createOpenAIExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
