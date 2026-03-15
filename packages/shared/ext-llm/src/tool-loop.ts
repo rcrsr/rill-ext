@@ -550,3 +550,22 @@ export async function executeToolLoop(
     turns: turnCount,
   };
 }
+
+// ============================================================
+// RESPONSE MESSAGES
+// ============================================================
+
+/**
+ * Build normalized response messages array with assistant reply appended.
+ * Used by all LLM extensions to ensure consistent messages field in responses.
+ *
+ * @param inputMessages - Conversation history (already normalized to {role, content})
+ * @param assistantContent - Text content from the assistant response
+ * @returns New array with assistant message appended
+ */
+export function buildResponseMessages(
+  inputMessages: ReadonlyArray<{ role: string; content: string }>,
+  assistantContent: string
+): Array<{ role: string; content: string }> {
+  return [...inputMessages, { role: 'assistant', content: assistantContent }];
+}

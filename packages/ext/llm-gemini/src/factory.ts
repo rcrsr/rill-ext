@@ -32,6 +32,7 @@ import {
   mapProviderError,
   executeToolLoop,
   buildJsonSchema,
+  buildResponseMessages,
   type JsonSchemaProperty,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
@@ -276,11 +277,13 @@ export function createGeminiExtension(
             },
             stop_reason: 'stop',
             id: '', // Gemini API doesn't provide request IDs in the same way
-            messages: [
-              ...(system ? [{ role: 'system', content: system }] : []),
-              { role: 'user', content: text },
-              { role: 'assistant', content },
-            ],
+            messages: buildResponseMessages(
+              [
+                ...(system ? [{ role: 'system', content: system }] : []),
+                { role: 'user', content: text },
+              ],
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -457,17 +460,6 @@ export function createGeminiExtension(
           // Extract text content from response
           const content = response.text ?? '';
 
-          // Build full conversation history (§3.2)
-          const fullMessages = [
-            ...messages.map((m) => {
-              const normalized: Record<string, unknown> = { role: m['role'] };
-              if ('content' in m) normalized['content'] = m['content'];
-              if ('tool_calls' in m) normalized['tool_calls'] = m['tool_calls'];
-              return normalized;
-            }),
-            { role: 'assistant', content },
-          ];
-
           // Build normalized response dict (§3.2)
           const result = {
             content,
@@ -478,7 +470,13 @@ export function createGeminiExtension(
             },
             stop_reason: 'stop',
             id: '', // Gemini API doesn't provide request IDs in the same way
-            messages: fullMessages,
+            messages: buildResponseMessages(
+              messages.map((m) => ({
+                role: m['role'] as string,
+                content: (m['content'] as string) ?? '',
+              })),
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -968,11 +966,16 @@ export function createGeminiExtension(
             usage: loopResult.totalTokens,
             stop_reason: response ? 'stop' : 'max_turns',
             turns: loopResult.turns,
-            messages: [
-              ...initialMessages,
-              { role: 'user', content: prompt },
-              { role: 'assistant', content },
-            ],
+            messages: buildResponseMessages(
+              [
+                ...initialMessages.map((m) => ({
+                  role: m['role'] as string,
+                  content: (m['content'] as string) ?? '',
+                })),
+                { role: 'user', content: prompt },
+              ],
+              content
+            ),
           };
 
           // Emit tool_loop event

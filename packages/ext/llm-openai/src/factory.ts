@@ -25,6 +25,7 @@ import {
   mapProviderError,
   executeToolLoop,
   buildJsonSchema,
+  buildResponseMessages,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
 } from '@rcrsr/rill-ext-llm-shared';
@@ -211,11 +212,13 @@ export function createOpenAIExtension(
             },
             stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
             id: response.id,
-            messages: [
-              ...(system ? [{ role: 'system', content: system }] : []),
-              { role: 'user', content: text },
-              { role: 'assistant', content },
-            ],
+            messages: buildResponseMessages(
+              [
+                ...(system ? [{ role: 'system', content: system }] : []),
+                { role: 'user', content: text },
+              ],
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -380,17 +383,6 @@ export function createOpenAIExtension(
           // Extract text content from response
           const content = response.choices[0]?.message?.content ?? '';
 
-          // Build full conversation history (§3.2)
-          const fullMessages = [
-            ...messages.map((m) => {
-              const normalized: Record<string, unknown> = { role: m['role'] };
-              if ('content' in m) normalized['content'] = m['content'];
-              if ('tool_calls' in m) normalized['tool_calls'] = m['tool_calls'];
-              return normalized;
-            }),
-            { role: 'assistant', content },
-          ];
-
           // Build normalized response dict (§3.2)
           const result = {
             content,
@@ -401,7 +393,13 @@ export function createOpenAIExtension(
             },
             stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
             id: response.id,
-            messages: fullMessages,
+            messages: buildResponseMessages(
+              messages.map((m) => ({
+                role: m['role'] as string,
+                content: (m['content'] as string) ?? '',
+              })),
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -906,32 +904,6 @@ export function createOpenAIExtension(
               ? 'max_turns'
               : (response?.choices[0]?.finish_reason ?? 'stop');
 
-          // Build conversation history for response
-          // Reconstruct full message history from messages array
-          const fullMessages: Array<Record<string, unknown>> = [];
-          for (const msg of messages) {
-            if ('role' in msg && msg.role !== 'system') {
-              const historyMsg: Record<string, unknown> = {
-                role: msg.role,
-              };
-              if ('content' in msg && msg.content) {
-                historyMsg['content'] = msg.content;
-              }
-              if ('tool_calls' in msg && msg.tool_calls) {
-                historyMsg['tool_calls'] = msg.tool_calls;
-              }
-              fullMessages.push(historyMsg);
-            }
-          }
-
-          // Add final assistant response if present
-          if (response) {
-            fullMessages.push({
-              role: 'assistant',
-              content,
-            });
-          }
-
           // Build result dict
           const result = {
             content,
@@ -942,7 +914,18 @@ export function createOpenAIExtension(
             },
             stop_reason: stopReason,
             turns: loopResult.turns,
-            messages: fullMessages,
+            messages: buildResponseMessages(
+              messages
+                .filter((m) => 'role' in m && (m as unknown as Record<string, unknown>)['role'] !== 'system')
+                .map((m) => {
+                  const msg = m as unknown as Record<string, unknown>;
+                  return {
+                    role: msg['role'] as string,
+                    content: typeof msg['content'] === 'string' ? msg['content'] : JSON.stringify(msg['content'] ?? ''),
+                  };
+                }),
+              content
+            ),
           };
 
           // Emit success event (§4.10)

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { RuntimeError, callable, type RillValue } from '@rcrsr/rill';
-import { executeToolLoop } from './tool-loop.js';
+import { executeToolLoop, buildResponseMessages } from './tool-loop.js';
 import type { ToolLoopCallbacks } from './types.js';
 
 // ============================================================
@@ -2111,5 +2111,47 @@ describe('executeToolLoop', () => {
         expect(appDescriptor?.description).toBe('My tool description');
       });
     });
+  });
+});
+
+// ============================================================
+// BUILD RESPONSE MESSAGES
+// ============================================================
+
+describe('buildResponseMessages', () => {
+  it('returns array with assistant message appended', () => {
+    const input = [{ role: 'user', content: 'Hello' }];
+    const result = buildResponseMessages(input, 'Hi there');
+    expect(result).toEqual([
+      { role: 'user', content: 'Hello' },
+      { role: 'assistant', content: 'Hi there' },
+    ]);
+  });
+
+  it('works with empty input messages', () => {
+    const result = buildResponseMessages([], 'Hello');
+    expect(result).toEqual([{ role: 'assistant', content: 'Hello' }]);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [{ role: 'user', content: 'Hello' }];
+    const inputCopy = [...input];
+    buildResponseMessages(input, 'Hi there');
+    expect(input).toEqual(inputCopy);
+    expect(input).toHaveLength(1);
+  });
+
+  it('preserves all input message fields', () => {
+    const input = [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'user', content: 'Question' },
+      { role: 'assistant', content: 'Answer' },
+    ];
+    const result = buildResponseMessages(input, 'Final answer');
+    expect(result).toHaveLength(4);
+    expect(result[0]).toEqual({ role: 'system', content: 'You are a helpful assistant.' });
+    expect(result[1]).toEqual({ role: 'user', content: 'Question' });
+    expect(result[2]).toEqual({ role: 'assistant', content: 'Answer' });
+    expect(result[3]).toEqual({ role: 'assistant', content: 'Final answer' });
   });
 });

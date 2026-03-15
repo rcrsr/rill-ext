@@ -23,6 +23,7 @@ import {
   mapProviderError,
   executeToolLoop,
   buildJsonSchema,
+  buildResponseMessages,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
 } from '@rcrsr/rill-ext-llm-shared';
@@ -223,10 +224,10 @@ export function createAnthropicExtension(
             },
             stop_reason: response.stop_reason,
             id: response.id,
-            messages: [
-              { role: 'user', content: text },
-              { role: 'assistant', content },
-            ],
+            messages: buildResponseMessages(
+              [{ role: 'user', content: text }],
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -388,15 +389,6 @@ export function createAnthropicExtension(
             response.content as Array<{ type: string; text?: string }>
           );
 
-          // Build full conversation history (§3.2)
-          const fullMessages = [
-            ...messages.map((m) => ({
-              role: m['role'] as string,
-              content: m['content'] as string,
-            })),
-            { role: 'assistant', content },
-          ];
-
           // Build normalized response dict (§3.2)
           const result = {
             content,
@@ -407,7 +399,13 @@ export function createAnthropicExtension(
             },
             stop_reason: response.stop_reason,
             id: response.id,
-            messages: fullMessages,
+            messages: buildResponseMessages(
+              messages.map((m) => ({
+                role: m['role'] as string,
+                content: m['content'] as string,
+              })),
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -842,13 +840,16 @@ export function createAnthropicExtension(
             usage: loopResult.totalTokens,
             stop_reason: response ? response.stop_reason : 'max_turns',
             turns: loopResult.turns,
-            messages: messages.map((m) => ({
-              role: m.role,
-              content:
-                typeof m.content === 'string'
-                  ? m.content
-                  : JSON.stringify(m.content),
-            })),
+            messages: buildResponseMessages(
+              messages.map((m) => ({
+                role: m.role,
+                content:
+                  typeof m.content === 'string'
+                    ? m.content
+                    : JSON.stringify(m.content),
+              })),
+              content
+            ),
           };
 
           // Emit tool_loop event
