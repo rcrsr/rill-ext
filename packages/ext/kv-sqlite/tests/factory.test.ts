@@ -7,6 +7,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
+import { anyTypeValue } from '@rcrsr/rill';
 import { createSqliteKvExtension } from '../src/factory.js';
 import type { SqliteKvConfig } from '../src/types.js';
 
@@ -385,8 +386,8 @@ describe('createSqliteKvExtension', () => {
       // Verify structure for one function (all follow same pattern)
       expect(ext.get.params).toBeDefined();
       expect(ext.get.fn).toBeTypeOf('function');
-      expect(ext.get.description).toBeTypeOf('string');
-      expect(ext.get.returnType).toEqual({ type: 'any' });
+      expect(ext.get.annotations?.['description']).toBeTypeOf('string');
+      expect(ext.get.returnType).toEqual(anyTypeValue);
 
       ext.dispose?.();
     });

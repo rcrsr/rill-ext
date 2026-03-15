@@ -5,7 +5,7 @@
  */
 
 import { Redis } from 'ioredis';
-import type { ExtensionResult, KvExtensionContract, RillValue } from '@rcrsr/rill';
+import { anyTypeValue, rillTypeToTypeValue, type ExtensionResult, type KvExtensionContract, type RillValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { RedisKvMountConfig } from './types.js';
 
@@ -205,9 +205,9 @@ export function createRedisKvExtension(
    * EC-1: Returns schema default if key missing.
    * EC-2: Throws if mount unknown (handled by getMountConfig).
    */
-  const get = async (args: RillValue[]): Promise<RillValue> => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
+  const get = async (args: Record<string, RillValue>): Promise<RillValue> => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
 
     const mountConfig = getMountConfig(mountName);
 
@@ -236,10 +236,10 @@ export function createRedisKvExtension(
   /**
    * IR-2: Get value or fallback.
    */
-  const get_or = async (args: RillValue[]): Promise<RillValue> => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
-    const fallback = args[2] as RillValue;
+  const get_or = async (args: Record<string, RillValue>): Promise<RillValue> => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const fallback = args['fallback'] as RillValue;
 
     const mountConfig = getMountConfig(mountName);
 
@@ -259,10 +259,10 @@ export function createRedisKvExtension(
    * EC-3: Throws if mode is read-only.
    * EC-4: Throws if value exceeds maxValueSize.
    */
-  const set = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
-    const value = args[2] as RillValue;
+  const set = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const value = args['value'] as RillValue;
 
     const mountConfig = getMountConfig(mountName);
 
@@ -321,10 +321,10 @@ export function createRedisKvExtension(
    * EC-5: Throws if existing value is not a dict.
    * EC-6: Throws if mode is read-only.
    */
-  const merge = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
-    const partial = args[2] as Record<string, RillValue>;
+  const merge = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const partial = args['partial'] as Record<string, RillValue>;
 
     const mountConfig = getMountConfig(mountName);
 
@@ -406,9 +406,9 @@ export function createRedisKvExtension(
   /**
    * IR-5: Delete key.
    */
-  const deleteKey = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
+  const deleteKey = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
 
     const mountConfig = getMountConfig(mountName);
 
@@ -447,8 +447,8 @@ export function createRedisKvExtension(
   /**
    * IR-6: Get all keys.
    */
-  const keys = async (args: RillValue[]): Promise<string[]> => {
-    const mountName = args[0] as string;
+  const keys = async (args: Record<string, RillValue>): Promise<string[]> => {
+    const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
 
     const pattern = `${mountConfig.prefix}*`;
@@ -462,9 +462,9 @@ export function createRedisKvExtension(
   /**
    * IR-7: Check key existence.
    */
-  const has = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
+  const has = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
 
     const mountConfig = getMountConfig(mountName);
 
@@ -477,8 +477,8 @@ export function createRedisKvExtension(
   /**
    * IR-8: Clear all keys (restores schema defaults if declared mode).
    */
-  const clear = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
+  const clear = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
 
     // Check write permission
@@ -518,9 +518,9 @@ export function createRedisKvExtension(
    * IR-9: Get all entries as dict.
    */
   const getAll = async (
-    args: RillValue[]
+    args: Record<string, RillValue>
   ): Promise<Record<string, RillValue>> => {
-    const mountName = args[0] as string;
+    const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
 
     const pattern = `${mountConfig.prefix}*`;
@@ -552,8 +552,8 @@ export function createRedisKvExtension(
   /**
    * IR-10: Get schema information (empty list in open mode).
    */
-  const schema = (args: RillValue[]): RillValue[] => {
-    const mountName = args[0] as string;
+  const schema = (args: Record<string, RillValue>): RillValue[] => {
+    const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
 
     if (!mountConfig.schema) {
@@ -606,8 +606,8 @@ export function createRedisKvExtension(
         p.str('key', 'Key to retrieve'),
       ],
       fn: get,
-      description: 'Get value or schema default',
-      returnType: { type: 'any' },
+      annotations: { description: 'Get value or schema default' },
+      returnType: anyTypeValue,
     },
     get_or: {
       params: [
@@ -616,8 +616,8 @@ export function createRedisKvExtension(
         p.dict('fallback', 'Fallback value if key missing'),
       ],
       fn: get_or,
-      description: 'Get value or return fallback if key missing',
-      returnType: { type: 'any' },
+      annotations: { description: 'Get value or return fallback if key missing' },
+      returnType: anyTypeValue,
     },
     set: {
       params: [
@@ -626,8 +626,8 @@ export function createRedisKvExtension(
         p.str('value', 'Value to store'),
       ],
       fn: set,
-      description: 'Set value with validation',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Set value with validation' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     merge: {
       params: [
@@ -636,8 +636,8 @@ export function createRedisKvExtension(
         p.dict('partial', 'Partial dict to merge'),
       ],
       fn: merge,
-      description: 'Merge partial dict into existing dict value',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Merge partial dict into existing dict value' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     delete: {
       params: [
@@ -645,14 +645,14 @@ export function createRedisKvExtension(
         p.str('key', 'Key to delete'),
       ],
       fn: deleteKey,
-      description: 'Delete key',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Delete key' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     keys: {
       params: [p.str('mount', 'Mount name')],
       fn: keys,
-      description: 'Get all keys in mount',
-      returnType: { type: 'list' },
+      annotations: { description: 'Get all keys in mount' },
+      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
     },
     has: {
       params: [
@@ -660,32 +660,56 @@ export function createRedisKvExtension(
         p.str('key', 'Key to check'),
       ],
       fn: has,
-      description: 'Check key existence',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Check key existence' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     clear: {
       params: [p.str('mount', 'Mount name')],
       fn: clear,
-      description: 'Clear all keys in mount',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Clear all keys in mount' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     getAll: {
       params: [p.str('mount', 'Mount name')],
       fn: getAll,
-      description: 'Get all entries as dict',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Get all entries as dict' },
+      returnType: rillTypeToTypeValue({ type: 'dict' }),
     },
     schema: {
       params: [p.str('mount', 'Mount name')],
       fn: schema,
-      description: 'Get schema information',
-      returnType: { type: 'list' },
+      annotations: { description: 'Get schema information' },
+      returnType: rillTypeToTypeValue({
+        type: 'list',
+        element: {
+          type: 'dict',
+          fields: {
+            key: { type: { type: 'string' } },
+            type: { type: { type: 'string' } },
+            description: { type: { type: 'string' } },
+          },
+        },
+      }),
     },
     mounts: {
       params: [],
       fn: mountsList,
-      description: 'Get list of mount metadata',
-      returnType: { type: 'list' },
+      annotations: { description: 'Get list of mount metadata' },
+      returnType: rillTypeToTypeValue({
+        type: 'list',
+        element: {
+          type: 'dict',
+          fields: {
+            name: { type: { type: 'string' } },
+            mode: { type: { type: 'string' } },
+            schema: { type: { type: 'string' } },
+            maxEntries: { type: { type: 'number' } },
+            maxValueSize: { type: { type: 'number' } },
+            prefix: { type: { type: 'string' } },
+            ttl: { type: { type: 'number' } },
+          },
+        },
+      }),
     },
   }) satisfies KvExtensionContract;
 

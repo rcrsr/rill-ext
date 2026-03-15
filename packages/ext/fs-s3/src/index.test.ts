@@ -1,11 +1,15 @@
+import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
-import { S3_FS_EXTENSION_VERSION, createS3FsExtension } from './index.js';
+import { VERSION, createS3FsExtension } from './index.js';
 import type { S3FsMountConfig, S3Credentials, S3FsConfig } from './index.js';
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
 
 describe('S3 FS Extension', () => {
   describe('package exports', () => {
-    it('exports version constant', () => {
-      expect(S3_FS_EXTENSION_VERSION).toBe('0.0.1');
+    it('exports version matching package.json', () => {
+      expect(VERSION).toBe(_pkg.version);
     });
   });
 

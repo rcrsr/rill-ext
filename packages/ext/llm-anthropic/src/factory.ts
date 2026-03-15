@@ -8,6 +8,7 @@ import {
   RuntimeError,
   emitExtensionEvent,
   isDict,
+  rillTypeToTypeValue,
   type ExtensionResult,
   type LlmExtensionContract,
   type RillValue,
@@ -158,15 +159,18 @@ export function createAnthropicExtension(
     message: {
       params: [
         p.str('text'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const text = args[0] as string;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const text = args['text'] as string;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-5: Validate text is non-empty
           if (text.trim().length === 0) {
@@ -258,23 +262,36 @@ export function createAnthropicExtension(
           throw rillError;
         }
       },
-      description: 'Send single message to Claude API',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Send single message to Claude API' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          content: { type: { type: 'string' } },
+          model: { type: { type: 'string' } },
+          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+          stop_reason: { type: { type: 'string' } },
+          id: { type: { type: 'string' } },
+          messages: { type: { type: 'list', element: { type: 'dict' } } },
+        },
+      }),
     },
 
     // IR-5: anthropic::messages
     messages: {
       params: [
-        p.list('messages'),
-        p.dict('options', undefined, {}),
+        p.list('messages', { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } }),
+        p.dict('options', undefined, {}, {
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const messages = args[0] as Array<Record<string, unknown>>;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const messages = args['messages'] as Array<Record<string, unknown>>;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // AC-23: Empty messages list raises error
           if (messages.length === 0) {
@@ -426,8 +443,18 @@ export function createAnthropicExtension(
           throw rillError;
         }
       },
-      description: 'Send multi-turn conversation to Claude API',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Send multi-turn conversation to Claude API' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          content: { type: { type: 'string' } },
+          model: { type: { type: 'string' } },
+          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+          stop_reason: { type: { type: 'string' } },
+          id: { type: { type: 'string' } },
+          messages: { type: { type: 'list', element: { type: 'dict' } } },
+        },
+      }),
     },
 
     // IR-6: anthropic::embed
@@ -438,7 +465,7 @@ export function createAnthropicExtension(
 
         try {
           // Extract argument
-          const text = args[0] as string;
+          const text = args['text'] as string;
 
           // Validate using shared validation functions (wrapped to use RILL-R004)
           wrapValidation(validateEmbedText)(text);
@@ -494,8 +521,8 @@ export function createAnthropicExtension(
           throw rillError;
         }
       },
-      description: 'Generate embedding vector for text',
-      returnType: { type: 'vector' },
+      annotations: { description: 'Generate embedding vector for text' },
+      returnType: rillTypeToTypeValue({ type: 'vector' }),
     },
 
     // IR-7: anthropic::embed_batch
@@ -506,7 +533,7 @@ export function createAnthropicExtension(
 
         try {
           // Extract argument
-          const texts = args[0] as RillValue[];
+          const texts = args['texts'] as RillValue[];
 
           // AC-24: Empty list returns empty list without API call
           if (texts.length === 0) {
@@ -565,23 +592,30 @@ export function createAnthropicExtension(
           throw rillError;
         }
       },
-      description: 'Generate embedding vectors for multiple texts',
-      returnType: { type: 'list' },
+      annotations: { description: 'Generate embedding vectors for multiple texts' },
+      returnType: rillTypeToTypeValue({ type: 'list' }),
     },
 
     // IR-8: anthropic::tool_loop
     tool_loop: {
       params: [
         p.str('prompt'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          tools: { type: { type: 'dict' } },
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+          max_errors: { type: { type: 'number' }, defaultValue: 3 },
+          max_turns: { type: { type: 'number' }, defaultValue: 10 },
+          messages: { type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: [] },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const prompt = args[0] as string;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const prompt = args['prompt'] as string;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-22: Empty prompt raises error
           if (prompt.trim().length === 0) {
@@ -853,23 +887,38 @@ export function createAnthropicExtension(
           throw rillError;
         }
       },
-      description: 'Execute tool-use loop with Claude API',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Execute tool-use loop with Claude API' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          content: { type: { type: 'string' } },
+          model: { type: { type: 'string' } },
+          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+          stop_reason: { type: { type: 'string' } },
+          turns: { type: { type: 'number' } },
+          messages: { type: { type: 'list', element: { type: 'dict' } } },
+        },
+      }),
     },
 
     // IR-3: anthropic::generate
     generate: {
       params: [
         p.str('prompt'),
-        p.dict('options'),
+        p.dict('options', undefined, {}, {
+          schema: { type: { type: 'dict' } },
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+          messages: { type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: [] },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const prompt = args[0] as string;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const prompt = args['prompt'] as string;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-3: Validate schema option is present
           if (
@@ -1022,8 +1071,18 @@ export function createAnthropicExtension(
           throw rillError;
         }
       },
-      description: 'Generate structured output from Anthropic API',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Generate structured output from Anthropic API' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          data: { type: { type: 'any' } },
+          raw: { type: { type: 'string' } },
+          model: { type: { type: 'string' } },
+          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+          stop_reason: { type: { type: 'string' } },
+          id: { type: { type: 'string' } },
+        },
+      }),
     },
   }) satisfies LlmExtensionContract;
 

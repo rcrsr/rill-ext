@@ -128,9 +128,9 @@ describe('EC-3, AC-11: Empty text to prompt', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.prompt.fn(['', {}], ctx)).rejects.toThrow(RuntimeError);
+    await expect(ext.prompt.fn({ text: '', options: {} }, ctx)).rejects.toThrow(RuntimeError);
 
-    await expect(ext.prompt.fn(['', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: '', options: {} }, ctx)).rejects.toThrow(
       'prompt text cannot be empty'
     );
   });
@@ -142,11 +142,11 @@ describe('EC-3, AC-11: Empty text to prompt', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.prompt.fn(['   ', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: '   ', options: {} }, ctx)).rejects.toThrow(
       'prompt text cannot be empty'
     );
 
-    await expect(ext.prompt.fn(['\t\n  ', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: '\t\n  ', options: {} }, ctx)).rejects.toThrow(
       'prompt text cannot be empty'
     );
   });
@@ -181,11 +181,11 @@ describe('EC-4, AC-6: Binary not found at spawn (ENOENT)', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       RuntimeError
     );
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       /claude binary not found/
     );
   });
@@ -215,11 +215,11 @@ describe('EC-5, AC-7: Permission denied (EACCES)', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       RuntimeError
     );
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       /Permission denied: claude/
     );
   });
@@ -249,11 +249,11 @@ describe('EC-6: Generic spawn failure', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       RuntimeError
     );
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       /Failed to spawn claude binary/
     );
   });
@@ -292,11 +292,11 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       RuntimeError
     );
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       /Claude CLI timeout after \d+ms/
     );
   });
@@ -335,11 +335,11 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       RuntimeError
     );
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       /Claude CLI exited with code \d+/
     );
   });
@@ -372,7 +372,7 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.prompt.fn(['test', {}], ctx)).rejects.toThrow(
+    await expect(ext.prompt.fn({ text: 'test', options: {} }, ctx)).rejects.toThrow(
       'Claude CLI exited with code 127'
     );
   });
@@ -390,9 +390,9 @@ describe('EC-10: Empty skill name', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.skill.fn(['', {}], ctx)).rejects.toThrow(RuntimeError);
+    await expect(ext.skill.fn({ name: '', args: {} }, ctx)).rejects.toThrow(RuntimeError);
 
-    await expect(ext.skill.fn(['', {}], ctx)).rejects.toThrow(
+    await expect(ext.skill.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
       'skill name cannot be empty'
     );
   });
@@ -404,7 +404,7 @@ describe('EC-10: Empty skill name', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.skill.fn(['   ', {}], ctx)).rejects.toThrow(
+    await expect(ext.skill.fn({ name: '   ', args: {} }, ctx)).rejects.toThrow(
       'skill name cannot be empty'
     );
   });
@@ -443,11 +443,11 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.skill.fn(['invalid-skill', {}], ctx)).rejects.toThrow(
+    await expect(ext.skill.fn({ name: 'invalid-skill', args: {} }, ctx)).rejects.toThrow(
       RuntimeError
     );
 
-    await expect(ext.skill.fn(['invalid-skill', {}], ctx)).rejects.toThrow(
+    await expect(ext.skill.fn({ name: 'invalid-skill', args: {} }, ctx)).rejects.toThrow(
       /Claude CLI exited with code \d+/
     );
   });
@@ -476,7 +476,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.skill.fn(['test-skill', {}], ctx)).rejects.toThrow(
+    await expect(ext.skill.fn({ name: 'test-skill', args: {} }, ctx)).rejects.toThrow(
       /Failed to spawn claude binary/
     );
   });
@@ -508,7 +508,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.skill.fn(['test-skill', {}], ctx)).rejects.toThrow(
+    await expect(ext.skill.fn({ name: 'test-skill', args: {} }, ctx)).rejects.toThrow(
       /Claude CLI timeout after \d+ms/
     );
   });
@@ -526,9 +526,9 @@ describe('EC-13: Empty command name', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.command.fn(['', {}], ctx)).rejects.toThrow(RuntimeError);
+    await expect(ext.command.fn({ name: '', args: {} }, ctx)).rejects.toThrow(RuntimeError);
 
-    await expect(ext.command.fn(['', {}], ctx)).rejects.toThrow(
+    await expect(ext.command.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
       'command name cannot be empty'
     );
   });
@@ -540,7 +540,7 @@ describe('EC-13: Empty command name', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.command.fn(['\t\n', {}], ctx)).rejects.toThrow(
+    await expect(ext.command.fn({ name: '\t\n', args: {} }, ctx)).rejects.toThrow(
       'command name cannot be empty'
     );
   });
@@ -578,11 +578,11 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.command.fn(['invalid-command', {}], ctx)).rejects.toThrow(
+    await expect(ext.command.fn({ name: 'invalid-command', args: {} }, ctx)).rejects.toThrow(
       RuntimeError
     );
 
-    await expect(ext.command.fn(['invalid-command', {}], ctx)).rejects.toThrow(
+    await expect(ext.command.fn({ name: 'invalid-command', args: {} }, ctx)).rejects.toThrow(
       /Claude CLI exited with code \d+/
     );
   });
@@ -611,7 +611,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.command.fn(['test-command', {}], ctx)).rejects.toThrow(
+    await expect(ext.command.fn({ name: 'test-command', args: {} }, ctx)).rejects.toThrow(
       /claude binary not found/
     );
   });
@@ -643,7 +643,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.command.fn(['test-command', {}], ctx)).rejects.toThrow(
+    await expect(ext.command.fn({ name: 'test-command', args: {} }, ctx)).rejects.toThrow(
       /Claude CLI timeout after \d+ms/
     );
   });
@@ -666,7 +666,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    await expect(ext.command.fn(['test-command', {}], ctx)).rejects.toThrow(
+    await expect(ext.command.fn({ name: 'test-command', args: {} }, ctx)).rejects.toThrow(
       /Permission denied: claude/
     );
   });
@@ -714,7 +714,7 @@ describe('EC-16: Cleanup failure on dispose', () => {
     const ctx = createRuntimeContext();
 
     // Start prompt (don't await - it will never complete)
-    const promptPromise = ext.prompt.fn(['test', {}], ctx);
+    const promptPromise = ext.prompt.fn({ text: 'test', options: {} }, ctx);
 
     // Dispose while process is still running - should log warning, not throw
     expect(() => ext.dispose?.()).not.toThrow();
@@ -770,8 +770,8 @@ describe('EC-16: Cleanup failure on dispose', () => {
     const ctx = createRuntimeContext();
 
     // Start two prompts (don't await - they will never complete)
-    const promise1 = ext.prompt.fn(['test1', {}], ctx);
-    const promise2 = ext.prompt.fn(['test2', {}], ctx);
+    const promise1 = ext.prompt.fn({ text: 'test1', options: {} }, ctx);
+    const promise2 = ext.prompt.fn({ text: 'test2', options: {} }, ctx);
 
     // Dispose should call both, log warning for first, not throw
     expect(() => ext.dispose?.()).not.toThrow();
@@ -825,7 +825,7 @@ describe('EC-16: Cleanup failure on dispose', () => {
     const ctx = createRuntimeContext();
 
     // Start prompt (don't await - it will never complete)
-    const promptPromise = ext.prompt.fn(['test', {}], ctx);
+    const promptPromise = ext.prompt.fn({ text: 'test', options: {} }, ctx);
 
     expect(() => ext.dispose?.()).not.toThrow();
 

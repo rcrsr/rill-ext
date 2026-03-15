@@ -43,8 +43,8 @@ describe('createFunctionWrapper', () => {
       const wrappedFn = wrap('query', async () => 'result', undefined);
 
       const ctx = createMockContext();
-      await expect(wrappedFn([], ctx)).rejects.toThrow(RuntimeError);
-      await expect(wrappedFn([], ctx)).rejects.toThrow('operation cancelled');
+      await expect(wrappedFn({}, ctx)).rejects.toThrow(RuntimeError);
+      await expect(wrappedFn({}, ctx)).rejects.toThrow('operation cancelled');
     });
 
     it('checks disposal before executing function', async () => {
@@ -58,7 +58,7 @@ describe('createFunctionWrapper', () => {
       state.isDisposed = true;
 
       const ctx = createMockContext();
-      await expect(wrappedFn([], ctx)).rejects.toThrow();
+      await expect(wrappedFn({}, ctx)).rejects.toThrow();
       expect(executionSpy).not.toHaveBeenCalled();
     });
   });
@@ -77,8 +77,8 @@ describe('createFunctionWrapper', () => {
       );
 
       const ctx = createMockContext();
-      await expect(wrappedFn([], ctx)).rejects.toThrow(RuntimeError);
-      await expect(wrappedFn([], ctx)).rejects.toThrow('authentication failed');
+      await expect(wrappedFn({}, ctx)).rejects.toThrow(RuntimeError);
+      await expect(wrappedFn({}, ctx)).rejects.toThrow('authentication failed');
     });
 
     it('emits error event on failure', async () => {
@@ -97,7 +97,7 @@ describe('createFunctionWrapper', () => {
         undefined
       );
 
-      await expect(wrappedFn([], ctx)).rejects.toThrow();
+      await expect(wrappedFn({}, ctx)).rejects.toThrow();
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           event: `${provider}:error`,
@@ -123,7 +123,7 @@ describe('createFunctionWrapper', () => {
         undefined
       );
 
-      await expect(wrappedFn([], ctx)).rejects.toThrow();
+      await expect(wrappedFn({}, ctx)).rejects.toThrow();
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           duration: expect.any(Number),
@@ -143,7 +143,7 @@ describe('createFunctionWrapper', () => {
 
       const wrappedFn = wrap('query', async () => 'result', undefined);
 
-      await wrappedFn([], ctx);
+      await wrappedFn({}, ctx);
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -165,13 +165,13 @@ describe('createFunctionWrapper', () => {
       const wrappedFn = wrap(
         'upsert',
         async () => 'ok',
-        (args: RillValue[]) => ({
-          collection: args[0],
-          count: args[1],
+        (args: Record<string, RillValue>) => ({
+          collection: args['collection'],
+          count: args['count'],
         })
       );
 
-      await wrappedFn(['my-collection', 5], ctx);
+      await wrappedFn({ collection: 'my-collection', count: 5 }, ctx);
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -191,7 +191,7 @@ describe('createFunctionWrapper', () => {
 
       const wrappedFn = wrap('delete', async () => null, undefined);
 
-      await wrappedFn([], ctx);
+      await wrappedFn({}, ctx);
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -211,7 +211,7 @@ describe('createFunctionWrapper', () => {
       const wrappedFn = wrap('query', async () => 'result', undefined);
 
       // Should not throw
-      await expect(wrappedFn([], ctx)).resolves.toBe('result');
+      await expect(wrappedFn({}, ctx)).resolves.toBe('result');
     });
   });
 
@@ -234,7 +234,7 @@ describe('createFunctionWrapper', () => {
         undefined
       );
 
-      await wrappedFn([], ctx);
+      await wrappedFn({}, ctx);
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -255,7 +255,7 @@ describe('createFunctionWrapper', () => {
       const wrappedFn = wrap('query', async () => 'success', undefined);
 
       const ctx = createMockContext();
-      const result = await wrappedFn([], ctx);
+      const result = await wrappedFn({}, ctx);
 
       expect(result).toBe('success');
     });
@@ -268,7 +268,7 @@ describe('createFunctionWrapper', () => {
       const wrappedFn = wrap('query', async () => expected, undefined);
 
       const ctx = createMockContext();
-      const result = await wrappedFn([], ctx);
+      const result = await wrappedFn({}, ctx);
 
       expect(result).toEqual(expected);
     });
@@ -284,8 +284,8 @@ describe('createFunctionWrapper', () => {
 
       const ctx = createMockContext();
 
-      expect(await query([], ctx)).toBe('query-result');
-      expect(await upsert([], ctx)).toBe('upsert-result');
+      expect(await query({}, ctx)).toBe('query-result');
+      expect(await upsert({}, ctx)).toBe('upsert-result');
     });
 
     it('all wrapped functions check same disposal state', async () => {
@@ -301,8 +301,8 @@ describe('createFunctionWrapper', () => {
       state.isDisposed = true;
 
       // Both should throw
-      await expect(query([], ctx)).rejects.toThrow('operation cancelled');
-      await expect(upsert([], ctx)).rejects.toThrow('operation cancelled');
+      await expect(query({}, ctx)).rejects.toThrow('operation cancelled');
+      await expect(upsert({}, ctx)).rejects.toThrow('operation cancelled');
     });
   });
 });

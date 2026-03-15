@@ -92,7 +92,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await ext.message.fn(['Test'], ctx);
+      await ext.message.fn({ text: 'Test' }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -130,7 +130,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(ext.message.fn(['Test'], ctx)).rejects.toThrow();
+      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -164,7 +164,7 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await ext.messages.fn([messages], ctx);
+      await ext.messages.fn({ messages }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -201,7 +201,7 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await expect(ext.messages.fn([messages], ctx)).rejects.toThrow();
+      await expect(ext.messages.fn({ messages }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);

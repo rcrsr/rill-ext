@@ -148,7 +148,7 @@ describe('Vector CRUD operations', () => {
 
       // Upsert vector
       const upsertResult = (await ext.upsert.fn(
-        ['doc-1', testVector, metadata],
+        { id: 'doc-1', vector: testVector, metadata: metadata },
         ctx
       )) as Record<string, unknown>;
 
@@ -162,7 +162,7 @@ describe('Vector CRUD operations', () => {
       );
 
       // Get vector back
-      const getResult = (await ext.get.fn(['doc-1'], ctx)) as Record<
+      const getResult = (await ext.get.fn({ id: 'doc-1' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -190,13 +190,13 @@ describe('Vector CRUD operations', () => {
       );
 
       const upsertResult = (await ext.upsert.fn(
-        ['doc-empty', testVector, {}],
+        { id: 'doc-empty', vector: testVector, metadata: {} },
         ctx
       )) as Record<string, unknown>;
 
       expect(upsertResult['success']).toBe(true);
 
-      const getResult = (await ext.get.fn(['doc-empty'], ctx)) as Record<
+      const getResult = (await ext.get.fn({ id: 'doc-empty' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -226,13 +226,13 @@ describe('Vector CRUD operations', () => {
       );
 
       const upsertResult = (await ext.upsert.fn(
-        ['doc-large', testVector, largeMetadata],
+        { id: 'doc-large', vector: testVector, metadata: largeMetadata },
         ctx
       )) as Record<string, unknown>;
 
       expect(upsertResult['success']).toBe(true);
 
-      const getResult = (await ext.get.fn(['doc-large'], ctx)) as Record<
+      const getResult = (await ext.get.fn({ id: 'doc-large' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -262,7 +262,7 @@ describe('Vector CRUD operations', () => {
 
       mockUpsert.mockResolvedValue(undefined);
 
-      const result = (await ext.upsert_batch.fn([items], ctx)) as Record<
+      const result = (await ext.upsert_batch.fn({ items: items }, ctx)) as Record<
         string,
         unknown
       >;
@@ -273,7 +273,7 @@ describe('Vector CRUD operations', () => {
     });
 
     it('returns { succeeded: 0 } for empty batch (AC-22)', async () => {
-      const result = (await ext.upsert_batch.fn([[]], ctx)) as Record<
+      const result = (await ext.upsert_batch.fn({ items: [] }, ctx)) as Record<
         string,
         unknown
       >;
@@ -294,7 +294,7 @@ describe('Vector CRUD operations', () => {
 
       mockUpsert.mockRejectedValue(new Error('Network error'));
 
-      const result = (await ext.upsert_batch.fn([items], ctx)) as Record<
+      const result = (await ext.upsert_batch.fn({ items: items }, ctx)) as Record<
         string,
         unknown
       >;
@@ -329,7 +329,7 @@ describe('Vector CRUD operations', () => {
         new Error('dimension mismatch (expected 4, got 2)')
       );
 
-      const result = (await ext.upsert_batch.fn([items], ctx)) as Record<
+      const result = (await ext.upsert_batch.fn({ items: items }, ctx)) as Record<
         string,
         unknown
       >;
@@ -360,7 +360,7 @@ describe('Vector CRUD operations', () => {
       );
 
       const firstResult = (await ext.upsert_batch.fn(
-        [badItems],
+        { items: badItems },
         ctx
       )) as Record<string, unknown>;
 
@@ -385,7 +385,7 @@ describe('Vector CRUD operations', () => {
       mockUpsert.mockResolvedValueOnce(undefined);
 
       const secondResult = (await ext.upsert_batch.fn(
-        [fixedItems],
+        { items: fixedItems },
         ctx
       )) as Record<string, unknown>;
 
@@ -409,7 +409,7 @@ describe('Vector CRUD operations', () => {
         ])
       );
 
-      const results = (await ext.search.fn([queryVector, {}], ctx)) as Array<
+      const results = (await ext.search.fn({ vector: queryVector, options: {} }, ctx)) as Array<
         Record<string, unknown>
       >;
 
@@ -427,7 +427,7 @@ describe('Vector CRUD operations', () => {
 
       mockQuery.mockResolvedValue(createMockQueryResponse([]));
 
-      const results = (await ext.search.fn([queryVector, {}], ctx)) as Array<
+      const results = (await ext.search.fn({ vector: queryVector, options: {} }, ctx)) as Array<
         Record<string, unknown>
       >;
 
@@ -444,7 +444,7 @@ describe('Vector CRUD operations', () => {
       mockQuery.mockResolvedValue(createMockQueryResponse([]));
 
       const results = (await ext.search.fn(
-        [queryVector, options],
+        { vector: queryVector, options },
         ctx
       )) as Array<Record<string, unknown>>;
 
@@ -465,7 +465,7 @@ describe('Vector CRUD operations', () => {
       // ChromaDB would filter server-side or we filter client-side
       mockQuery.mockResolvedValue(createMockQueryResponse([]));
 
-      const results = (await ext.search.fn([queryVector, {}], ctx)) as Array<
+      const results = (await ext.search.fn({ vector: queryVector, options: {} }, ctx)) as Array<
         Record<string, unknown>
       >;
 
@@ -477,7 +477,7 @@ describe('Vector CRUD operations', () => {
     it('deletes single vector', async () => {
       mockDelete.mockResolvedValue(undefined);
 
-      const result = (await ext.delete.fn(['doc-1'], ctx)) as Record<
+      const result = (await ext.delete.fn({ id: 'doc-1' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -493,7 +493,7 @@ describe('Vector CRUD operations', () => {
       mockDelete.mockResolvedValue(undefined);
 
       const ids = ['doc-1', 'doc-2', 'doc-3'];
-      const result = (await ext.delete_batch.fn([ids], ctx)) as Record<
+      const result = (await ext.delete_batch.fn({ ids: ids }, ctx)) as Record<
         string,
         unknown
       >;
@@ -507,7 +507,7 @@ describe('Vector CRUD operations', () => {
     it('returns vector count', async () => {
       mockCount.mockResolvedValue(42);
 
-      const count = (await ext.count.fn([], ctx)) as number;
+      const count = (await ext.count.fn({}, ctx)) as number;
 
       expect(count).toBe(42);
     });
@@ -545,7 +545,7 @@ describe('Collection lifecycle operations', () => {
       mockCreateCollection.mockResolvedValue(undefined);
 
       const result = (await ext.create_collection.fn(
-        ['my_vectors', { metadata: { description: 'Test collection' } }],
+        { name: 'my_vectors', options: { metadata: { description: 'Test collection' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -560,7 +560,7 @@ describe('Collection lifecycle operations', () => {
     it('describes collection', async () => {
       mockCount.mockResolvedValue(100);
 
-      const result = (await ext.describe.fn([], ctx)) as Record<
+      const result = (await ext.describe.fn({}, ctx)) as Record<
         string,
         unknown
       >;
@@ -572,7 +572,7 @@ describe('Collection lifecycle operations', () => {
     it('describes empty collection (AC-29)', async () => {
       mockCount.mockResolvedValue(0);
 
-      const result = (await ext.describe.fn([], ctx)) as Record<
+      const result = (await ext.describe.fn({}, ctx)) as Record<
         string,
         unknown
       >;
@@ -587,7 +587,7 @@ describe('Collection lifecycle operations', () => {
         { name: 'collection-3' },
       ]);
 
-      const result = await ext.list_collections.fn([], ctx);
+      const result = await ext.list_collections.fn({}, ctx);
 
       expect(result).toEqual(['collection-1', 'collection-2', 'collection-3']);
     });
@@ -595,7 +595,7 @@ describe('Collection lifecycle operations', () => {
     it('lists no collections (AC-30)', async () => {
       mockListCollections.mockResolvedValue([]);
 
-      const result = (await ext.list_collections.fn([], ctx)) as Array<
+      const result = (await ext.list_collections.fn({}, ctx)) as Array<
         Record<string, unknown>
       >;
 
@@ -606,7 +606,7 @@ describe('Collection lifecycle operations', () => {
       mockDeleteCollection.mockResolvedValue(undefined);
 
       const result = (await ext.delete_collection.fn(
-        ['old_collection'],
+        { name: 'old_collection' },
         ctx
       )) as Record<string, unknown>;
 
@@ -627,7 +627,7 @@ describe('Collection lifecycle operations', () => {
       mockUpsert.mockResolvedValue(undefined);
 
       const result = (await ext.upsert.fn(
-        ['doc-max', testVector, {}],
+        { id: 'doc-max', vector: testVector, metadata: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -672,7 +672,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn([queryVector, {}], ctx)).rejects.toThrow(
+    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'chroma: authentication failed (401)'
     );
   });
@@ -685,7 +685,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn([queryVector, {}], ctx)).rejects.toThrow(
+    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'chroma: collection not found'
     );
   });
@@ -698,7 +698,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn([queryVector, {}], ctx)).rejects.toThrow(
+    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'chroma: rate limit exceeded'
     );
   });
@@ -713,7 +713,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn([queryVector, {}], ctx)).rejects.toThrow(
+    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'chroma: request timeout'
     );
   });
@@ -726,7 +726,7 @@ describe('Error handling contracts', () => {
     const wrongVector = createVector(new Float32Array(128).fill(0.1), 'test');
 
     await expect(
-      ext.upsert.fn(['doc-1', wrongVector, {}], ctx)
+      ext.upsert.fn({ id: 'doc-1', vector: wrongVector, metadata: {} }, ctx)
     ).rejects.toThrow('chroma: dimension mismatch (expected 384, got 128)');
   });
 
@@ -736,14 +736,14 @@ describe('Error handling contracts', () => {
     );
 
     await expect(
-      ext.create_collection.fn(['test_collection', {}], ctx)
+      ext.create_collection.fn({ name: 'test_collection', options: {} }, ctx)
     ).rejects.toThrow('chroma: collection already exists');
   });
 
   it('get non-existent ID produces "id not found" (EC-7, AC-15)', async () => {
     mockGet.mockResolvedValue(createMockGetResponse([]));
 
-    await expect(ext.get.fn(['nonexistent'], ctx)).rejects.toThrow(
+    await expect(ext.get.fn({ id: 'nonexistent' }, ctx)).rejects.toThrow(
       'chroma: id not found'
     );
   });
@@ -756,7 +756,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn([queryVector, {}], ctx)).rejects.toThrow(
+    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'chroma: operation cancelled'
     );
   });
@@ -769,7 +769,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn([queryVector, {}], ctx)).rejects.toThrow(
+    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'chroma: Something unexpected happened'
     );
   });
@@ -818,7 +818,7 @@ describe('Event emission', () => {
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
       'test'
     );
-    await ext.search.fn([queryVector, { k: 5 }], ctx);
+    await ext.search.fn({ vector: queryVector, options: { k: 5 } }, ctx);
 
     const searchEvent = events.find((e) => e['event'] === 'chroma:search');
     expect(searchEvent).toBeDefined();
@@ -900,7 +900,7 @@ describe('Request cancellation', () => {
     });
 
     // Start batch operation
-    const batchPromise = ext.upsert_batch.fn([items], ctx);
+    const batchPromise = ext.upsert_batch.fn({ items: items }, ctx);
 
     // After disposal, subsequent operations should fail
     await expect(batchPromise).resolves.toBeDefined();
@@ -910,7 +910,7 @@ describe('Request cancellation', () => {
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
       'test'
     );
-    await expect(ext.search.fn([queryVector, {}], ctx)).rejects.toThrow(
+    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'chroma: operation cancelled'
     );
   });
@@ -953,7 +953,7 @@ describe('Concurrent operations', () => {
         new Float32Array([i / 10, 0.2, 0.3, 0.4]),
         'test'
       );
-      return ext.search.fn([queryVector, {}], ctx);
+      return ext.search.fn({ vector: queryVector, options: {} }, ctx);
     });
 
     const results = await Promise.all(searches);

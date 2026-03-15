@@ -3,15 +3,18 @@
  * Verifies IC-16, IC-18, IC-21, IC-22, IC-23 requirements.
  */
 
+import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
 import * as openaiExtension from './index.js';
 import type { LLMExtensionConfig, OpenAIExtensionConfig } from './types.js';
 
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+
 describe('OpenAI Extension Package', () => {
   describe('Barrel Exports (IC-16)', () => {
-    it('exports VERSION constant', () => {
-      expect(openaiExtension.VERSION).toBe('0.0.1');
-      expect(typeof openaiExtension.VERSION).toBe('string');
+    it('exports VERSION matching package.json', () => {
+      expect(openaiExtension.VERSION).toBe(_pkg.version);
     });
 
     it('exports createOpenAIExtension factory', () => {

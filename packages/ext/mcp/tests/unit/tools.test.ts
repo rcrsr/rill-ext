@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { anyTypeValue } from '@rcrsr/rill';
 import { generateToolFunctions } from '../../src/tools.js';
 import type {
   McpTool,
@@ -126,8 +127,8 @@ describe('generateToolFunctions', () => {
         type: { type: 'string' },
         annotations: { description: 'Height in meters' },
       });
-      expect(fn.description).toBe('Calculate Body Mass Index');
-      expect(fn.returnType).toEqual({ type: 'any' });
+      expect(fn.annotations?.description).toBe('Calculate Body Mass Index');
+      expect(fn.returnType).toEqual(anyTypeValue);
       expect(typeof fn.fn).toBe('function');
     });
 
@@ -139,7 +140,7 @@ describe('generateToolFunctions', () => {
       const fn = functions.get_status!;
 
       expect(fn.params).toHaveLength(0);
-      expect(fn.returnType).toEqual({ type: 'any' });
+      expect(fn.returnType).toEqual(anyTypeValue);
     });
 
     it('generates function with optional params', () => {
@@ -190,7 +191,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
 
       expect(result).toEqual(mockData);
     });
@@ -202,7 +203,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
 
       expect(result).toBe('success');
     });
@@ -218,7 +219,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
 
       expect(result).toEqual({
         type: 'image',
@@ -236,7 +237,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
 
       expect(result).toBe('line 1\nline 2\nline 3');
     });
@@ -252,7 +253,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
 
       expect(result).toEqual({
         content: [
@@ -269,7 +270,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
 
       expect(result).toBe('');
     });
@@ -282,7 +283,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
 
       expect(result).toEqual(arrayData);
     });
@@ -294,7 +295,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
 
       expect(result).toBe(42);
     });
@@ -314,7 +315,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'mcp tool "get-status": invalid input'
       );
     });
@@ -329,7 +330,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expect(
-        functions.calculate_bmi!.fn([70, 1.75], {} as any)
+        functions.calculate_bmi!.fn({ weight_kg: 70, height_m: 1.75 }, {} as any)
       ).rejects.toThrow('mcp tool "calculate-bmi"');
     });
   });
@@ -350,7 +351,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'mcp: protocol error'
       );
     });
@@ -364,7 +365,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'mcp: protocol error'
       );
     });
@@ -387,7 +388,7 @@ describe('generateToolFunctions', () => {
         50 // 50ms timeout
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'mcp tool "get-status": timeout after 50ms'
       );
     });
@@ -405,7 +406,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expect(
-        functions.calculate_bmi!.fn([70, 1.75], {} as any)
+        functions.calculate_bmi!.fn({ weight_kg: 70, height_m: 1.75 }, {} as any)
       ).rejects.toThrow('timeout after 100ms');
     });
 
@@ -424,7 +425,7 @@ describe('generateToolFunctions', () => {
         100
       );
 
-      const result = await functions.get_status!.fn([], {} as any);
+      const result = await functions.get_status!.fn({}, {} as any);
       expect(result).toBe('ok');
     });
   });
@@ -443,7 +444,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'mcp: connection lost'
       );
     });
@@ -459,7 +460,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'mcp: connection lost'
       );
     });
@@ -479,7 +480,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'mcp: authentication failed'
       );
     });
@@ -493,7 +494,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'token may be expired'
       );
     });
@@ -507,7 +508,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await expect(functions.get_status!.fn([], {} as any)).rejects.toThrow(
+      await expect(functions.get_status!.fn({}, {} as any)).rejects.toThrow(
         'mcp: authentication failed'
       );
     });
@@ -527,7 +528,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await functions.calculate_bmi!.fn([70, 1.75], {} as any);
+      await functions.calculate_bmi!.fn({ weight_kg: 70, height_m: 1.75 }, {} as any);
 
       expect(mockClient.callTool).toHaveBeenCalledWith({
         name: 'calculate-bmi',
@@ -547,7 +548,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await functions.search!.fn(['test'], {} as any);
+      await functions.search!.fn({ query: 'test' }, {} as any);
 
       expect(mockClient.callTool).toHaveBeenCalledWith({
         name: 'search',
@@ -629,7 +630,7 @@ describe('generateToolFunctions', () => {
       );
 
       // Call all 10 tools simultaneously
-      const calls = Object.values(functions).map((fn) => fn!.fn([], {} as any));
+      const calls = Object.values(functions).map((fn) => fn!.fn({}, {} as any));
       const results = await Promise.all(calls);
 
       // Verify all completed independently

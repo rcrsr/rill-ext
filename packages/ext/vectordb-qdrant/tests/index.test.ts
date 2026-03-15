@@ -3,12 +3,16 @@
  * Validates that all required exports are available from the package entry point
  */
 
+import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
 import {
   VERSION,
   createQdrantExtension,
   type QdrantConfig,
 } from '../src/index.js';
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
 
 // ============================================================
 // VERSION CONSTANT TESTS
@@ -24,7 +28,7 @@ describe('VERSION constant', () => {
   });
 
   it('VERSION matches package.json version (IC-1)', () => {
-    expect(VERSION).toBe('0.0.1');
+    expect(VERSION).toBe(_pkg.version);
   });
 });
 

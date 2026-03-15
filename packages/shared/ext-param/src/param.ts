@@ -5,7 +5,7 @@
  * RillParam descriptors used in extension host function parameter lists.
  */
 
-import { RuntimeError, type RillParam, type RillType, type RillValue } from '@rcrsr/rill';
+import { RuntimeError, type RillFieldDef, type RillParam, type RillType, type RillValue } from '@rcrsr/rill';
 
 // ============================================================
 // NAME VALIDATION
@@ -110,13 +110,17 @@ export const p = {
    * @param name - Parameter name (must be a valid identifier)
    * @param desc - Optional description
    * @param def - Optional default value
-   * @returns RillParam with type 'dict'
+   * @param fields - Optional structural field definitions (RillFieldDef with type and optional defaultValue)
+   * @returns RillParam with type 'dict' (with fields if provided)
    */
-  dict(name: string, desc?: string, def?: RillValue): RillParam {
+  dict(name: string, desc?: string, def?: RillValue, fields?: Record<string, RillFieldDef>): RillParam {
     validateParamName(name);
+    const type: RillType = fields !== undefined
+      ? { type: 'dict', fields }
+      : { type: 'dict' };
     return {
       name,
-      type: { type: 'dict' },
+      type,
       defaultValue: def,
       annotations: buildAnnotations(desc),
     };

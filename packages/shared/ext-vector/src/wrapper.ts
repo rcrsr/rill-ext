@@ -33,7 +33,7 @@ import { mapVectorError } from './errors.js';
  * const query = wrap(
  *   'query',
  *   async (args, ctx) => { return results; },
- *   (args) => ({ collection: args[0] })
+ *   (args) => ({ collection: args['collection'] })
  * );
  * ```
  */
@@ -42,12 +42,12 @@ export function createFunctionWrapper(
   state: DisposalState
 ): (
   operation: string,
-  fn: (args: RillValue[], ctx: RuntimeContext) => Promise<RillValue>,
-  metadata?: (args: RillValue[]) => Record<string, unknown>
-) => (args: RillValue[], ctx: RuntimeContext) => Promise<RillValue> {
+  fn: (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue>,
+  metadata?: (args: Record<string, RillValue>) => Record<string, unknown>
+) => (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue> {
   return (operation, fn, metadata) => {
     return async (
-      args: RillValue[],
+      args: Record<string, RillValue>,
       ctx: RuntimeContext
     ): Promise<RillValue> => {
       // EC-20: Check disposal state first

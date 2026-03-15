@@ -7,6 +7,7 @@
  */
 
 import type { RillFunction, RillValue } from '@rcrsr/rill';
+import { rillTypeToTypeValue } from '@rcrsr/rill';
 
 // ============================================================
 // MCP CAPABILITY TYPES (subset from SDK)
@@ -136,24 +137,24 @@ export function createIntrospectionFunctions(
   const listTools: RillFunction = {
     params: [],
     fn: async (): Promise<RillValue> => toolsList,
-    description: 'List all available tools from MCP server',
-    returnType: { type: 'list' },
+    annotations: { description: 'List all available tools from MCP server' },
+    returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } } } } }),
   };
 
   // Create list_resources function
   const listResources: RillFunction = {
     params: [],
     fn: async (): Promise<RillValue> => resourcesList,
-    description: 'List all available resources from MCP server',
-    returnType: { type: 'list' },
+    annotations: { description: 'List all available resources from MCP server' },
+    returnType: rillTypeToTypeValue({ type: 'list' }),
   };
 
   // Create list_prompts function
   const listPrompts: RillFunction = {
     params: [],
     fn: async (): Promise<RillValue> => promptsList,
-    description: 'List all available prompts from MCP server',
-    returnType: { type: 'list' },
+    annotations: { description: 'List all available prompts from MCP server' },
+    returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } }, arguments: { type: { type: 'list', element: { type: 'string' } } } } } }),
   };
 
   return {

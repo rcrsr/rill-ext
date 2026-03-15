@@ -4,7 +4,25 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { rillTypeToTypeValue } from '@rcrsr/rill';
 import { createClaudeCodeExtension } from '../src/factory.js';
+
+const EXPECTED_RETURN_TYPE = rillTypeToTypeValue({
+  type: 'dict',
+  fields: {
+    result: { type: { type: 'string' } },
+    tokens: { type: { type: 'dict', fields: {
+      prompt: { type: { type: 'number' } },
+      cacheWrite5m: { type: { type: 'number' } },
+      cacheWrite1h: { type: { type: 'number' } },
+      cacheRead: { type: { type: 'number' } },
+      output: { type: { type: 'number' } },
+    } } },
+    cost: { type: { type: 'number' } },
+    exitCode: { type: { type: 'number' } },
+    duration: { type: { type: 'number' } },
+  },
+});
 
 // Mock which module
 vi.mock('which', () => ({
@@ -39,17 +57,17 @@ describe('createClaudeCodeExtension', () => {
       // Verify host function structure
       expect(ext.prompt).toHaveProperty('params');
       expect(ext.prompt).toHaveProperty('fn');
-      expect(ext.prompt).toHaveProperty('description');
+      expect(ext.prompt).toHaveProperty('annotations');
       expect(ext.prompt).toHaveProperty('returnType');
 
       expect(ext.skill).toHaveProperty('params');
       expect(ext.skill).toHaveProperty('fn');
-      expect(ext.skill).toHaveProperty('description');
+      expect(ext.skill).toHaveProperty('annotations');
       expect(ext.skill).toHaveProperty('returnType');
 
       expect(ext.command).toHaveProperty('params');
       expect(ext.command).toHaveProperty('fn');
-      expect(ext.command).toHaveProperty('description');
+      expect(ext.command).toHaveProperty('annotations');
       expect(ext.command).toHaveProperty('returnType');
     });
 
@@ -58,9 +76,9 @@ describe('createClaudeCodeExtension', () => {
 
       expect(ext.prompt.params).toEqual([
         { name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
+        { name: 'options', type: { type: 'dict', fields: { timeout: { type: { type: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.prompt.returnType).toEqual({ type: 'dict' });
+      expect(ext.prompt.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
 
     it('creates skill function with correct parameter signature', () => {
@@ -68,9 +86,9 @@ describe('createClaudeCodeExtension', () => {
 
       expect(ext.skill.params).toEqual([
         { name: 'name', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'args', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
+        { name: 'args', type: { type: 'dict', fields: { timeout: { type: { type: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.skill.returnType).toEqual({ type: 'dict' });
+      expect(ext.skill.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
 
     it('creates command function with correct parameter signature', () => {
@@ -78,9 +96,9 @@ describe('createClaudeCodeExtension', () => {
 
       expect(ext.command.params).toEqual([
         { name: 'name', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'args', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
+        { name: 'args', type: { type: 'dict', fields: { timeout: { type: { type: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.command.returnType).toEqual({ type: 'dict' });
+      expect(ext.command.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
 
     it('validates prompt text before processing', async () => {
@@ -93,13 +111,13 @@ describe('createClaudeCodeExtension', () => {
 
       // Empty string validation tested in separate suite
       // This verifies that functions are callable (not stubbed as "Not implemented")
-      await expect(ext.prompt.fn(['', {}], ctx)).rejects.toThrow(
+      await expect(ext.prompt.fn({ text: '', options: {} }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
-      await expect(ext.skill.fn(['', {}], ctx)).rejects.toThrow(
+      await expect(ext.skill.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
         'skill name cannot be empty'
       );
-      await expect(ext.command.fn(['', {}], ctx)).rejects.toThrow(
+      await expect(ext.command.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
         'command name cannot be empty'
       );
     });
@@ -290,11 +308,11 @@ describe('createClaudeCodeExtension', () => {
     it('throws RuntimeError for empty prompt text (EC-3)', async () => {
       const ext = createClaudeCodeExtension();
 
-      await expect(ext.prompt.fn(['', {}], ctx)).rejects.toThrow(
+      await expect(ext.prompt.fn({ text: '', options: {} }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
 
-      await expect(ext.prompt.fn(['   ', {}], ctx)).rejects.toThrow(
+      await expect(ext.prompt.fn({ text: '   ', options: {} }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
@@ -302,11 +320,11 @@ describe('createClaudeCodeExtension', () => {
     it('throws RuntimeError for empty skill name (EC-10)', async () => {
       const ext = createClaudeCodeExtension();
 
-      await expect(ext.skill.fn(['', {}], ctx)).rejects.toThrow(
+      await expect(ext.skill.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
         'skill name cannot be empty'
       );
 
-      await expect(ext.skill.fn(['   ', {}], ctx)).rejects.toThrow(
+      await expect(ext.skill.fn({ name: '   ', args: {} }, ctx)).rejects.toThrow(
         'skill name cannot be empty'
       );
     });
@@ -314,11 +332,11 @@ describe('createClaudeCodeExtension', () => {
     it('throws RuntimeError for empty command name (EC-13)', async () => {
       const ext = createClaudeCodeExtension();
 
-      await expect(ext.command.fn(['', {}], ctx)).rejects.toThrow(
+      await expect(ext.command.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
         'command name cannot be empty'
       );
 
-      await expect(ext.command.fn(['   ', {}], ctx)).rejects.toThrow(
+      await expect(ext.command.fn({ name: '   ', args: {} }, ctx)).rejects.toThrow(
         'command name cannot be empty'
       );
     });

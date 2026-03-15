@@ -4,13 +4,16 @@
  * Extension for OpenAI API integration with rill scripts.
  */
 
-import type { ExtensionConfigSchema } from '@rcrsr/rill';
+import { createRequire } from 'node:module';
+import type { ExtensionConfigSchema, ExtensionManifest } from '@rcrsr/rill';
 
 // ============================================================
 // VERSION
 // ============================================================
 
-export const VERSION = '0.0.1';
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+export const VERSION = _pkg.version;
 
 // ============================================================
 // CONFIG SCHEMA
@@ -40,3 +43,15 @@ export type { OpenAIExtensionConfig } from './types.js';
 // ============================================================
 
 export { createOpenAIExtension } from './factory.js';
+
+// ============================================================
+// EXTENSION MANIFEST
+// ============================================================
+
+import { createOpenAIExtension as _factory } from './factory.js';
+
+export const extensionManifest: ExtensionManifest = {
+  factory: _factory,
+  configSchema,
+  version: VERSION,
+};

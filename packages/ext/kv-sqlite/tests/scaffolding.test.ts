@@ -3,12 +3,16 @@
  * Verifies package structure and exports.
  */
 
+import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
 import {
   createSqliteKvExtension,
-  SQLITE_KV_EXTENSION_VERSION,
+  VERSION,
   type SqliteKvConfig,
 } from '../src/index.js';
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
 
 describe('Package scaffolding', () => {
   describe('exports', () => {
@@ -17,10 +21,10 @@ describe('Package scaffolding', () => {
       expect(typeof createSqliteKvExtension).toBe('function');
     });
 
-    it('exports SQLITE_KV_EXTENSION_VERSION constant', () => {
-      expect(SQLITE_KV_EXTENSION_VERSION).toBeDefined();
-      expect(typeof SQLITE_KV_EXTENSION_VERSION).toBe('string');
-      expect(SQLITE_KV_EXTENSION_VERSION).toBe('0.0.1');
+    it('exports VERSION matching package.json', () => {
+      expect(VERSION).toBeDefined();
+      expect(typeof VERSION).toBe('string');
+      expect(VERSION).toBe(_pkg.version);
     });
 
     it('exports SqliteKvConfig type', () => {

@@ -504,7 +504,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['name', { type: 'string' }]],
+          params: [{ name: 'name', type: { type: 'string' } }],
         },
         params
       );
@@ -526,7 +526,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['count', { type: 'number' }]],
+          params: [{ name: 'count', type: { type: 'number' } }],
         },
         params
       );
@@ -546,7 +546,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['active', { type: 'bool' }]],
+          params: [{ name: 'active', type: { type: 'bool' } }],
         },
         params
       );
@@ -565,7 +565,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['meta', { type: 'dict' }]],
+          params: [{ name: 'meta', type: { type: 'dict' } }],
         },
         params
       );
@@ -585,7 +585,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['limit', { type: 'number' }]],
+          params: [{ name: 'limit', type: { type: 'number' } }],
         },
         params
       );
@@ -604,7 +604,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['offset', { type: 'number' }]],
+          params: [{ name: 'offset', type: { type: 'number' } }],
         },
         params
       );
@@ -623,7 +623,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['query', { type: 'string' }]],
+          params: [{ name: 'query', type: { type: 'string' } }],
         },
         params
       );
@@ -642,7 +642,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['status', { type: 'string' }]],
+          params: [{ name: 'status', type: { type: 'string' } }],
         },
         params
       );
@@ -671,7 +671,7 @@ describe('buildJsonSchema', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           type: 'closure',
-          params: [['tags', { type: 'list', element: { type: 'string' } }]],
+          params: [{ name: 'tags', type: { type: 'list', element: { type: 'string' } } }],
         },
         params
       );
@@ -682,7 +682,7 @@ describe('buildJsonSchema', () => {
     it('list type without element produces array with no items', () => {
       const result = buildJsonSchemaFromStructuralType({
         type: 'closure',
-        params: [['items', { type: 'list' }]],
+        params: [{ name: 'items', type: { type: 'list' } }],
       });
       expect(result.properties['items']?.type).toBe('array');
       expect(result.properties['items']?.items).toBeUndefined();
@@ -691,7 +691,7 @@ describe('buildJsonSchema', () => {
     it('nested list element type recurses correctly', () => {
       const result = buildJsonSchemaFromStructuralType({
         type: 'closure',
-        params: [['matrix', { type: 'list', element: { type: 'list', element: { type: 'number' } } }]],
+        params: [{ name: 'matrix', type: { type: 'list', element: { type: 'list', element: { type: 'number' } } } }],
       });
       expect(result.properties['matrix']?.type).toBe('array');
       expect(result.properties['matrix']?.items?.type).toBe('array');
@@ -705,7 +705,7 @@ describe('buildJsonSchema', () => {
         buildJsonSchemaFromStructuralType({
           type: 'closure',
           params: [
-            ['fn', { type: 'closure', params: [] }],
+            { name: 'fn', type: { type: 'closure', params: [] } },
           ],
         });
       } catch (e) {
@@ -720,7 +720,7 @@ describe('buildJsonSchema', () => {
       try {
         buildJsonSchemaFromStructuralType({
           type: 'closure',
-          params: [['t', { type: 'tuple', elements: [] }]],
+          params: [{ name: 't', type: { type: 'tuple', elements: [] } }],
         });
       } catch (e) {
         thrown = e as RuntimeError;

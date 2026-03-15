@@ -45,3 +45,9 @@ Thumbs.db
 .codanna/
 .fastembed_cache
 conduct/
+
+# extension bindings
+**/bindings/
+
+# test databases 
+**/test-data

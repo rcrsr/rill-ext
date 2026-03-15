@@ -3,14 +3,18 @@
  * Validates package structure, types, and barrel exports.
  */
 
+import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
 import { VERSION } from './index.js';
 import type { LLMExtensionConfig, GeminiExtensionConfig } from './types.js';
 
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+
 describe('Google Extension Scaffolding (Task 4.1)', () => {
   describe('IC-24: Barrel exports VERSION, types, factory', () => {
-    it('exports VERSION constant', () => {
-      expect(VERSION).toBe('0.0.1');
+    it('exports VERSION matching package.json', () => {
+      expect(VERSION).toBe(_pkg.version);
     });
 
     it('exports type LLMExtensionConfig', () => {

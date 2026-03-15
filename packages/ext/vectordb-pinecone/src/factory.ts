@@ -8,6 +8,7 @@ import {
   RuntimeError,
   emitExtensionEvent,
   createVector,
+  rillTypeToTypeValue,
   type ExtensionResult,
   type VectorExtensionContract,
   type RillValue,
@@ -147,9 +148,9 @@ export function createPineconeExtension(
         checkDisposed();
 
         // Extract arguments
-        const id = args[0] as string;
-        const vector = args[1] as RillVector;
-        const metadataArg = (args[2] ?? {}) as Record<string, unknown>;
+        const id = args['id'] as string;
+        const vector = args['vector'] as RillVector;
+        const metadataArg = (args['metadata'] ?? {}) as Record<string, unknown>;
 
         // Convert metadata
         const metadata = convertMetadata(metadataArg);
@@ -183,8 +184,8 @@ export function createPineconeExtension(
           }
         );
       },
-      description: 'Insert or update single vector with metadata',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Insert or update single vector with metadata' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, success: { type: { type: 'bool' } } } }),
     },
 
     // IR-2: pinecone::upsert_batch
@@ -197,7 +198,7 @@ export function createPineconeExtension(
           checkDisposed();
 
           // Extract arguments
-          const items = args[0] as Array<Record<string, RillValue>>;
+          const items = args['items'] as Array<Record<string, RillValue>>;
 
           let succeeded = 0;
 
@@ -295,22 +296,26 @@ export function createPineconeExtension(
           throw rillError;
         }
       },
-      description: 'Batch insert/update vectors',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Batch insert/update vectors' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { succeeded: { type: { type: 'number' } }, failed: { type: { type: 'string' } }, error: { type: { type: 'string' } } } }),
     },
 
     // IR-3: pinecone::search
     search: {
       params: [
         vectorParam('vector'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          k: { type: { type: 'number' }, defaultValue: 10 },
+          filter: { type: { type: 'dict' }, defaultValue: {} },
+          score_threshold: { type: { type: 'number' }, defaultValue: 0 },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed();
 
         // Extract arguments
-        const vector = args[0] as RillVector;
-        const options = (args[1] ?? {}) as Record<string, unknown>;
+        const vector = args['vector'] as RillVector;
+        const options = (args['options'] ?? {}) as Record<string, unknown>;
 
         // Extract options with defaults
         const k = typeof options['k'] === 'number' ? options['k'] : 10;
@@ -405,8 +410,8 @@ export function createPineconeExtension(
           throw rillError;
         }
       },
-      description: 'Search k nearest neighbors',
-      returnType: { type: 'list' },
+      annotations: { description: 'Search k nearest neighbors' },
+      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { id: { type: { type: 'string' } }, score: { type: { type: 'number' } }, metadata: { type: { type: 'dict' } } } } }),
     },
 
     // IR-4: pinecone::get
@@ -416,7 +421,7 @@ export function createPineconeExtension(
         checkDisposed();
 
         // Extract arguments
-        const id = args[0] as string;
+        const id = args['id'] as string;
 
         // Use shared withEventEmission wrapper (IR-2)
         return withEventEmission(
@@ -461,8 +466,8 @@ export function createPineconeExtension(
           }
         );
       },
-      description: 'Fetch vector by ID',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Fetch vector by ID' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, vector: { type: { type: 'vector' } }, metadata: { type: { type: 'dict' } } } }),
     },
 
     // IR-5: pinecone::delete
@@ -472,7 +477,7 @@ export function createPineconeExtension(
         checkDisposed();
 
         // Extract arguments
-        const id = args[0] as string;
+        const id = args['id'] as string;
 
         // Use shared withEventEmission wrapper (IR-2)
         return withEventEmission(
@@ -496,8 +501,8 @@ export function createPineconeExtension(
           }
         );
       },
-      description: 'Delete vector by ID',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Delete vector by ID' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, deleted: { type: { type: 'bool' } } } }),
     },
 
     // IR-6: pinecone::delete_batch
@@ -510,7 +515,7 @@ export function createPineconeExtension(
           checkDisposed();
 
           // Extract arguments
-          const ids = args[0] as Array<string>;
+          const ids = args['ids'] as Array<string>;
 
           let succeeded = 0;
 
@@ -572,8 +577,8 @@ export function createPineconeExtension(
           throw rillError;
         }
       },
-      description: 'Batch delete vectors',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Batch delete vectors' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { succeeded: { type: { type: 'number' } }, failed: { type: { type: 'string' } }, error: { type: { type: 'string' } } } }),
     },
 
     // IR-7: pinecone::count
@@ -603,22 +608,25 @@ export function createPineconeExtension(
           }
         );
       },
-      description: 'Return total vector count in collection',
-      returnType: { type: 'number' },
+      annotations: { description: 'Return total vector count in collection' },
+      returnType: rillTypeToTypeValue({ type: 'number' }),
     },
 
     // IR-8: pinecone::create_collection
     create_collection: {
       params: [
         p.str('name'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          dimensions: { type: { type: 'number' } },
+          distance: { type: { type: 'string' }, defaultValue: 'cosine' },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         checkDisposed();
 
         // Extract arguments
-        const name = args[0] as string;
-        const options = (args[1] ?? {}) as Record<string, unknown>;
+        const name = args['name'] as string;
+        const options = (args['options'] ?? {}) as Record<string, unknown>;
 
         // Extract options
         const dimensions = options['dimensions'] as number;
@@ -671,8 +679,8 @@ export function createPineconeExtension(
           }
         );
       },
-      description: 'Create new vector collection',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Create new vector collection' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, created: { type: { type: 'bool' } } } }),
     },
 
     // IR-9: pinecone::delete_collection
@@ -682,7 +690,7 @@ export function createPineconeExtension(
         checkDisposed();
 
         // Extract arguments
-        const name = args[0] as string;
+        const name = args['name'] as string;
 
         // Use shared withEventEmission wrapper (IR-2)
         return withEventEmission(
@@ -702,8 +710,8 @@ export function createPineconeExtension(
           }
         );
       },
-      description: 'Delete vector collection',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Delete vector collection' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, deleted: { type: { type: 'bool' } } } }),
     },
 
     // IR-10: pinecone::list_collections
@@ -730,8 +738,8 @@ export function createPineconeExtension(
           }
         );
       },
-      description: 'List all collection names',
-      returnType: { type: 'list' },
+      annotations: { description: 'List all collection names' },
+      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
     },
 
     // IR-11: pinecone::describe
@@ -782,8 +790,8 @@ export function createPineconeExtension(
           }
         );
       },
-      description: 'Describe configured collection',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Describe configured collection' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, count: { type: { type: 'number' } }, dimensions: { type: { type: 'number' } }, distance: { type: { type: 'string' } } } }),
     },
   }) satisfies VectorExtensionContract;
 

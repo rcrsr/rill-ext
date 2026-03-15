@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { rillTypeToTypeValue } from '@rcrsr/rill';
 import { createIntrospectionFunctions } from '../../src/introspection.js';
 import type { RillValue } from '@rcrsr/rill';
 
@@ -47,11 +48,11 @@ describe('introspection integration', () => {
 
       // Assert - function metadata
       expect(functions.list_tools.params).toEqual([]);
-      expect(functions.list_tools.returnType).toEqual({ type: 'list' });
+      expect(functions.list_tools.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } } } } }));
       expect(functions.list_resources.params).toEqual([]);
-      expect(functions.list_resources.returnType).toEqual({ type: 'list' });
+      expect(functions.list_resources.returnType).toEqual(rillTypeToTypeValue({ type: 'list' }));
       expect(functions.list_prompts.params).toEqual([]);
-      expect(functions.list_prompts.returnType).toEqual({ type: 'list' });
+      expect(functions.list_prompts.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } }, arguments: { type: { type: 'list', element: { type: 'string' } } } } } }));
     });
 
     it('list_tools returns all tools regardless of filters', async () => {
@@ -66,7 +67,7 @@ describe('introspection integration', () => {
       const functions = createIntrospectionFunctions(allTools, [], [], []);
 
       // Act
-      const result = (await functions.list_tools.fn([])) as RillValue[];
+      const result = (await functions.list_tools.fn({})) as RillValue[];
 
       // Assert - all tools returned (not filtered)
       expect(result).toHaveLength(3);
@@ -86,7 +87,7 @@ describe('introspection integration', () => {
       const functions = createIntrospectionFunctions([], allResources, [], []);
 
       // Act
-      const result = (await functions.list_resources.fn([])) as RillValue[];
+      const result = (await functions.list_resources.fn({})) as RillValue[];
 
       // Assert - all resources returned
       expect(result).toHaveLength(2);
@@ -101,7 +102,7 @@ describe('introspection integration', () => {
       const functions = createIntrospectionFunctions([], [], [], allPrompts);
 
       // Act
-      const result = (await functions.list_prompts.fn([])) as RillValue[];
+      const result = (await functions.list_prompts.fn({})) as RillValue[];
 
       // Assert - all prompts returned
       expect(result).toHaveLength(2);
@@ -115,8 +116,8 @@ describe('introspection integration', () => {
       const functions = createIntrospectionFunctions(tools, [], [], []);
 
       // Act
-      const result1 = (await functions.list_tools.fn([])) as RillValue[];
-      const result2 = (await functions.list_tools.fn([])) as RillValue[];
+      const result1 = (await functions.list_tools.fn({})) as RillValue[];
+      const result2 = (await functions.list_tools.fn({})) as RillValue[];
 
       // Assert - same reference (static data)
       expect(result1).toBe(result2);
@@ -131,7 +132,7 @@ describe('introspection integration', () => {
       tools.push({ name: 'tool2', description: 'Second' });
 
       // Act
-      const result = (await functions.list_tools.fn([])) as RillValue[];
+      const result = (await functions.list_tools.fn({})) as RillValue[];
 
       // Assert - still returns original data (captured at creation)
       expect(result).toHaveLength(1);
@@ -145,9 +146,9 @@ describe('introspection integration', () => {
       const functions = createIntrospectionFunctions([], [], [], []);
 
       // Act
-      const tools = (await functions.list_tools.fn([])) as RillValue[];
-      const resources = (await functions.list_resources.fn([])) as RillValue[];
-      const prompts = (await functions.list_prompts.fn([])) as RillValue[];
+      const tools = (await functions.list_tools.fn({})) as RillValue[];
+      const resources = (await functions.list_resources.fn({})) as RillValue[];
+      const prompts = (await functions.list_prompts.fn({})) as RillValue[];
 
       // Assert - all empty
       expect(tools).toEqual([]);

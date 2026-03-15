@@ -26,7 +26,13 @@ export { createMcpExtension } from './factory.js';
 // CONFIG SCHEMA
 // ============================================================
 
-import type { ExtensionConfigSchema } from '@rcrsr/rill';
+import { createRequire } from 'node:module';
+import type { ExtensionConfigSchema, ExtensionManifest } from '@rcrsr/rill';
+import { createMcpExtension as _factory } from './factory.js';
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+export const VERSION = _pkg.version;
 
 export const configSchema: ExtensionConfigSchema = {
   timeout: { type: 'number' },
@@ -48,3 +54,13 @@ export {
   createConnectionLostError,
   createAuthFailedError,
 } from './errors.js';
+
+// ============================================================
+// EXTENSION MANIFEST
+// ============================================================
+
+export const extensionManifest: ExtensionManifest = {
+  factory: _factory,
+  configSchema,
+  version: VERSION,
+};

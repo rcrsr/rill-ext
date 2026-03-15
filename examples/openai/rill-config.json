@@ -1,0 +1,16 @@
+{
+  "runtime": "^0.13.0",
+  "main": "hello.rill",
+  "extensions": {
+    "mounts": {
+      "llm": "../../packages/ext/llm-openai/dist/index.js"
+    },
+    "config": {
+      "llm": {
+        "api_key": "${LLM_OPENAI_API_KEY}",
+        "model": "${LLM_OPENAI_MODEL}",
+        "base_url": "${LLM_OPENAI_BASE_URL}"
+      }
+    }
+  }
+}

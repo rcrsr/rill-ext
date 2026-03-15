@@ -71,7 +71,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.prompt.fn(
-        ['Hello Claude', {}],
+        { text: 'Hello Claude', options: {} },
         ctx
       )) as ClaudeCodeResult;
 
@@ -125,14 +125,14 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ctx = createRuntimeContext();
 
       const result = await ext.skill.fn(
-        [
-          'test-skill',
-          {
+        {
+          name: 'test-skill',
+          args: {
             verbose: true,
             config: { level: 'debug', output: 'json' },
             retries: 3,
           },
-        ],
+        },
         ctx
       );
 
@@ -188,7 +188,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn(['Test prompt', { timeout: 60000 }], ctx);
+      await ext.prompt.fn({ text: 'Test prompt', options: { timeout: 60000 } }, ctx);
 
       // Verify custom timeout was passed (AC-3)
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -235,7 +235,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({ defaultTimeout: 45000 });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn(['Test prompt', {}], ctx);
+      await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify default timeout was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -286,7 +286,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.prompt.fn(
-        ['Test', {}],
+        { text: 'Test', options: {} },
         ctx
       )) as ClaudeCodeResult;
 
@@ -340,7 +340,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.prompt.fn(
-        ['Test', {}],
+        { text: 'Test', options: {} },
         ctx
       )) as ClaudeCodeResult;
 
@@ -390,7 +390,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.prompt.fn(
-        ['Test', {}],
+        { text: 'Test', options: {} },
         ctx
       )) as ClaudeCodeResult;
 
@@ -440,7 +440,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.prompt.fn(
-        ['Test', {}],
+        { text: 'Test', options: {} },
         ctx
       )) as ClaudeCodeResult;
 

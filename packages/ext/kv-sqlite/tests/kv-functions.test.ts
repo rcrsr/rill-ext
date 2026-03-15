@@ -36,8 +36,8 @@ describe('kv functions', () => {
       const ext = createSqliteKvExtension(config);
 
       // Set then get
-      ext.set?.fn(['test', 'name', 'Alice']);
-      const result = ext.get?.fn(['test', 'name']);
+      ext.set?.fn({ mount: 'test', key: 'name', value: 'Alice' });
+      const result = ext.get?.fn({ mount: 'test', key: 'name' });
 
       expect(result).toBe('Alice');
       ext.dispose?.();
@@ -59,7 +59,7 @@ describe('kv functions', () => {
       };
 
       const ext = createSqliteKvExtension(config);
-      const result = ext.get?.fn(['test', 'count']);
+      const result = ext.get?.fn({ mount: 'test', key: 'count' });
 
       expect(result).toBe(0);
       ext.dispose?.();
@@ -78,7 +78,7 @@ describe('kv functions', () => {
       };
 
       const ext = createSqliteKvExtension(config);
-      const result = ext.get?.fn(['test', 'missing']);
+      const result = ext.get?.fn({ mount: 'test', key: 'missing' });
 
       expect(result).toBe('');
       ext.dispose?.();
@@ -98,7 +98,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.get?.fn(['unknown', 'key'])).toThrow('not found');
+      expect(() => ext.get?.fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
       ext.dispose?.();
     });
 
@@ -119,7 +119,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.get?.fn(['test', 'age'])).toThrow('not declared');
+      expect(() => ext.get?.fn({ mount: 'test', key: 'age' })).toThrow('not declared');
       ext.dispose?.();
     });
   });
@@ -139,8 +139,8 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'name', 'Bob']);
-      const result = ext.get_or?.fn(['test', 'name', 'fallback']);
+      ext.set?.fn({ mount: 'test', key: 'name', value: 'Bob' });
+      const result = ext.get_or?.fn({ mount: 'test', key: 'name', fallback: 'fallback' });
 
       expect(result).toBe('Bob');
       ext.dispose?.();
@@ -159,7 +159,7 @@ describe('kv functions', () => {
       };
 
       const ext = createSqliteKvExtension(config);
-      const result = ext.get_or?.fn(['test', 'missing', 'default-value']);
+      const result = ext.get_or?.fn({ mount: 'test', key: 'missing', fallback: 'default-value' });
 
       expect(result).toBe('default-value');
       ext.dispose?.();
@@ -179,7 +179,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.get_or?.fn(['unknown', 'key', 'fallback'])).toThrow(
+      expect(() => ext.get_or?.fn({ mount: 'unknown', key: 'key', fallback: 'fallback' })).toThrow(
         'not found'
       );
       ext.dispose?.();
@@ -201,10 +201,10 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.set?.fn(['test', 'name', 'Charlie']);
+      const result = ext.set?.fn({ mount: 'test', key: 'name', value: 'Charlie' });
       expect(result).toBe(true);
 
-      const value = ext.get?.fn(['test', 'name']);
+      const value = ext.get?.fn({ mount: 'test', key: 'name' });
       expect(value).toBe('Charlie');
 
       ext.dispose?.();
@@ -224,7 +224,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.set?.fn(['test', 'name', 'value'])).toThrow('read-only');
+      expect(() => ext.set?.fn({ mount: 'test', key: 'name', value: 'value' })).toThrow('read-only');
       ext.dispose?.();
     });
 
@@ -244,7 +244,7 @@ describe('kv functions', () => {
       const ext = createSqliteKvExtension(config);
 
       const largeValue = 'x'.repeat(100);
-      expect(() => ext.set?.fn(['test', 'key', largeValue])).toThrow(
+      expect(() => ext.set?.fn({ mount: 'test', key: 'key', value: largeValue })).toThrow(
         'exceeds size limit'
       );
       ext.dispose?.();
@@ -267,7 +267,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.set?.fn(['test', 'count', 'not-a-number'])).toThrow(
+      expect(() => ext.set?.fn({ mount: 'test', key: 'count', value: 'not-a-number' })).toThrow(
         'expects number'
       );
       ext.dispose?.();
@@ -288,10 +288,10 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'key1', 'value1']);
-      ext.set?.fn(['test', 'key2', 'value2']);
+      ext.set?.fn({ mount: 'test', key: 'key1', value: 'value1' });
+      ext.set?.fn({ mount: 'test', key: 'key2', value: 'value2' });
 
-      expect(() => ext.set?.fn(['test', 'key3', 'value3'])).toThrow(
+      expect(() => ext.set?.fn({ mount: 'test', key: 'key3', value: 'value3' })).toThrow(
         'entry limit'
       );
       ext.dispose?.();
@@ -312,13 +312,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'key1', 'value1']);
-      ext.set?.fn(['test', 'key2', 'value2']);
+      ext.set?.fn({ mount: 'test', key: 'key1', value: 'value1' });
+      ext.set?.fn({ mount: 'test', key: 'key2', value: 'value2' });
 
       // Update existing key should work
-      expect(() => ext.set?.fn(['test', 'key1', 'updated'])).not.toThrow();
+      expect(() => ext.set?.fn({ mount: 'test', key: 'key1', value: 'updated' })).not.toThrow();
 
-      const value = ext.get?.fn(['test', 'key1']);
+      const value = ext.get?.fn({ mount: 'test', key: 'key1' });
       expect(value).toBe('updated');
 
       ext.dispose?.();
@@ -338,7 +338,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.set?.fn(['unknown', 'key', 'value'])).toThrow(
+      expect(() => ext.set?.fn({ mount: 'unknown', key: 'key', value: 'value' })).toThrow(
         'not found'
       );
       ext.dispose?.();
@@ -360,12 +360,12 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'user', { name: 'Alice', age: 30 }]);
-      const result = ext.merge?.fn(['test', 'user', { age: 31, city: 'NYC' }]);
+      ext.set?.fn({ mount: 'test', key: 'user', value: { name: 'Alice', age: 30 } });
+      const result = ext.merge?.fn({ mount: 'test', key: 'user', partial: { age: 31, city: 'NYC' } });
 
       expect(result).toBe(true);
 
-      const value = ext.get?.fn(['test', 'user']);
+      const value = ext.get?.fn({ mount: 'test', key: 'user' });
       expect(value).toEqual({ name: 'Alice', age: 31, city: 'NYC' });
 
       ext.dispose?.();
@@ -385,11 +385,11 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.merge?.fn(['test', 'user', { name: 'Bob' }]);
+      const result = ext.merge?.fn({ mount: 'test', key: 'user', partial: { name: 'Bob' } });
 
       expect(result).toBe(true);
 
-      const value = ext.get?.fn(['test', 'user']);
+      const value = ext.get?.fn({ mount: 'test', key: 'user' });
       expect(value).toEqual({ name: 'Bob' });
 
       ext.dispose?.();
@@ -409,9 +409,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'name', 'Alice']);
+      ext.set?.fn({ mount: 'test', key: 'name', value: 'Alice' });
 
-      expect(() => ext.merge?.fn(['test', 'name', { age: 30 }])).toThrow(
+      expect(() => ext.merge?.fn({ mount: 'test', key: 'name', partial: { age: 30 } })).toThrow(
         'non-dict'
       );
       ext.dispose?.();
@@ -431,7 +431,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.merge?.fn(['test', 'user', { name: 'Alice' }])).toThrow(
+      expect(() => ext.merge?.fn({ mount: 'test', key: 'user', partial: { name: 'Alice' } })).toThrow(
         'read-only'
       );
       ext.dispose?.();
@@ -452,15 +452,15 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'user', { name: 'Alice' }]);
+      ext.set?.fn({ mount: 'test', key: 'user', value: { name: 'Alice' } });
 
       // Merge that exceeds size limit should not partially apply
       const largePatch = { name: 'Alice', data: 'x'.repeat(100) };
 
-      expect(() => ext.merge?.fn(['test', 'user', largePatch])).toThrow();
+      expect(() => ext.merge?.fn({ mount: 'test', key: 'user', partial: largePatch })).toThrow();
 
       // Original value should be unchanged
-      const value = ext.get?.fn(['test', 'user']);
+      const value = ext.get?.fn({ mount: 'test', key: 'user' });
       expect(value).toEqual({ name: 'Alice' });
 
       ext.dispose?.();
@@ -480,7 +480,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.merge?.fn(['unknown', 'key', { a: 1 }])).toThrow(
+      expect(() => ext.merge?.fn({ mount: 'unknown', key: 'key', partial: { a: 1 } })).toThrow(
         'not found'
       );
       ext.dispose?.();
@@ -502,11 +502,11 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'name', 'Alice']);
-      const result = ext.delete?.fn(['test', 'name']);
+      ext.set?.fn({ mount: 'test', key: 'name', value: 'Alice' });
+      const result = ext.delete?.fn({ mount: 'test', key: 'name' });
 
       expect(result).toBe(true);
-      expect(ext.has?.fn(['test', 'name'])).toBe(false);
+      expect(ext.has?.fn({ mount: 'test', key: 'name' })).toBe(false);
 
       ext.dispose?.();
     });
@@ -525,7 +525,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.delete?.fn(['test', 'nonexistent']);
+      const result = ext.delete?.fn({ mount: 'test', key: 'nonexistent' });
 
       expect(result).toBe(false);
       ext.dispose?.();
@@ -545,7 +545,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.delete?.fn(['unknown', 'key'])).toThrow('not found');
+      expect(() => ext.delete?.fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -565,11 +565,11 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'key1', 'value1']);
-      ext.set?.fn(['test', 'key2', 'value2']);
-      ext.set?.fn(['test', 'key3', 'value3']);
+      ext.set?.fn({ mount: 'test', key: 'key1', value: 'value1' });
+      ext.set?.fn({ mount: 'test', key: 'key2', value: 'value2' });
+      ext.set?.fn({ mount: 'test', key: 'key3', value: 'value3' });
 
-      const result = ext.keys?.fn(['test']);
+      const result = ext.keys?.fn({ mount: 'test' });
 
       expect(result).toHaveLength(3);
       expect(result).toContain('key1');
@@ -593,7 +593,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.keys?.fn(['test']);
+      const result = ext.keys?.fn({ mount: 'test' });
 
       expect(result).toEqual([]);
       ext.dispose?.();
@@ -613,7 +613,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.keys?.fn(['unknown'])).toThrow('not found');
+      expect(() => ext.keys?.fn({ mount: 'unknown' })).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -633,8 +633,8 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'name', 'Alice']);
-      const result = ext.has?.fn(['test', 'name']);
+      ext.set?.fn({ mount: 'test', key: 'name', value: 'Alice' });
+      const result = ext.has?.fn({ mount: 'test', key: 'name' });
 
       expect(result).toBe(true);
       ext.dispose?.();
@@ -654,7 +654,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.has?.fn(['test', 'missing']);
+      const result = ext.has?.fn({ mount: 'test', key: 'missing' });
 
       expect(result).toBe(false);
       ext.dispose?.();
@@ -674,7 +674,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.has?.fn(['unknown', 'key'])).toThrow('not found');
+      expect(() => ext.has?.fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -694,13 +694,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'key1', 'value1']);
-      ext.set?.fn(['test', 'key2', 'value2']);
+      ext.set?.fn({ mount: 'test', key: 'key1', value: 'value1' });
+      ext.set?.fn({ mount: 'test', key: 'key2', value: 'value2' });
 
-      const result = ext.clear?.fn(['test']);
+      const result = ext.clear?.fn({ mount: 'test' });
 
       expect(result).toBe(true);
-      expect(ext.keys?.fn(['test'])).toEqual([]);
+      expect(ext.keys?.fn({ mount: 'test' })).toEqual([]);
 
       ext.dispose?.();
     });
@@ -723,13 +723,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'name', 'Alice']);
-      ext.set?.fn(['test', 'count', 42]);
+      ext.set?.fn({ mount: 'test', key: 'name', value: 'Alice' });
+      ext.set?.fn({ mount: 'test', key: 'count', value: 42 });
 
-      ext.clear?.fn(['test']);
+      ext.clear?.fn({ mount: 'test' });
 
-      expect(ext.get?.fn(['test', 'name'])).toBe('Anonymous');
-      expect(ext.get?.fn(['test', 'count'])).toBe(0);
+      expect(ext.get?.fn({ mount: 'test', key: 'name' })).toBe('Anonymous');
+      expect(ext.get?.fn({ mount: 'test', key: 'count' })).toBe(0);
 
       ext.dispose?.();
     });
@@ -748,7 +748,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.clear?.fn(['unknown'])).toThrow('not found');
+      expect(() => ext.clear?.fn({ mount: 'unknown' })).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -768,10 +768,10 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn(['test', 'name', 'Alice']);
-      ext.set?.fn(['test', 'age', 30]);
+      ext.set?.fn({ mount: 'test', key: 'name', value: 'Alice' });
+      ext.set?.fn({ mount: 'test', key: 'age', value: 30 });
 
-      const result = ext.getAll?.fn(['test']);
+      const result = ext.getAll?.fn({ mount: 'test' });
 
       expect(result).toEqual({
         name: 'Alice',
@@ -795,7 +795,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.getAll?.fn(['test']);
+      const result = ext.getAll?.fn({ mount: 'test' });
 
       expect(result).toEqual({});
       ext.dispose?.();
@@ -815,7 +815,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.getAll?.fn(['unknown'])).toThrow('not found');
+      expect(() => ext.getAll?.fn({ mount: 'unknown' })).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -839,7 +839,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.schema?.fn(['test']);
+      const result = ext.schema?.fn({ mount: 'test' });
 
       expect(result).toHaveLength(2);
       expect(result).toContainEqual({
@@ -870,7 +870,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.schema?.fn(['test']);
+      const result = ext.schema?.fn({ mount: 'test' });
 
       expect(result).toEqual([]);
       ext.dispose?.();
@@ -890,7 +890,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      expect(() => ext.schema?.fn(['unknown'])).toThrow('not found');
+      expect(() => ext.schema?.fn({ mount: 'unknown' })).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -921,7 +921,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.mounts?.fn([]);
+      const result = ext.mounts?.fn({});
 
       expect(result).toHaveLength(2);
       expect(result).toContainEqual({
@@ -962,7 +962,7 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.mounts?.fn([]);
+      const result = ext.mounts?.fn({});
 
       expect(result).toHaveLength(1);
       ext.dispose?.();

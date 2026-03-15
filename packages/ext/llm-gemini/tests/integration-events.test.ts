@@ -90,7 +90,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await ext.message.fn(['Test'], ctx);
+      await ext.message.fn({ text: 'Test' }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -127,7 +127,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(ext.message.fn(['Test'], ctx)).rejects.toThrow();
+      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -163,7 +163,7 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await ext.messages.fn([messages], ctx);
+      await ext.messages.fn({ messages: messages }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -201,7 +201,7 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await expect(ext.messages.fn([messages], ctx)).rejects.toThrow();
+      await expect(ext.messages.fn({ messages: messages }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -235,7 +235,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await ext.embed.fn(['Test text'], ctx);
+      await ext.embed.fn({ text: 'Test text' }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -269,7 +269,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(ext.embed.fn(['Test text'], ctx)).rejects.toThrow();
+      await expect(ext.embed.fn({ text: 'Test text' }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -310,7 +310,7 @@ describe('extension event emission', () => {
       });
 
       const texts = ['Text 1', 'Text 2', 'Text 3'];
-      await ext.embed_batch.fn([texts], ctx);
+      await ext.embed_batch.fn({ texts: texts }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -346,7 +346,7 @@ describe('extension event emission', () => {
       });
 
       const texts = ['Text 1', 'Text 2'];
-      await expect(ext.embed_batch.fn([texts], ctx)).rejects.toThrow();
+      await expect(ext.embed_batch.fn({ texts: texts }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -404,7 +404,7 @@ describe('extension event emission', () => {
         max_turns: 5,
       };
 
-      await ext.tool_loop.fn(['Test prompt', options], ctx);
+      await ext.tool_loop.fn({ prompt: 'Test prompt', options }, ctx);
 
       // Verify event sequence (§4.10)
       expect(events.length).toBeGreaterThanOrEqual(3);
@@ -477,7 +477,7 @@ describe('extension event emission', () => {
       };
 
       await expect(
-        ext.tool_loop.fn(['Test prompt', options], ctx)
+        ext.tool_loop.fn({ prompt: 'Test prompt', options }, ctx)
       ).rejects.toThrow();
 
       // Verify error event structure (§4.10)
@@ -538,7 +538,7 @@ describe('extension event emission', () => {
         max_errors: 3,
       };
 
-      await ext.tool_loop.fn(['Test prompt', options], ctx);
+      await ext.tool_loop.fn({ prompt: 'Test prompt', options }, ctx);
 
       // Find tool_result event
       const toolResultEvents = events.filter(

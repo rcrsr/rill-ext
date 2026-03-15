@@ -9,8 +9,8 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
+import { emitExtensionEvent, rillTypeToTypeValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
-import { emitExtensionEvent } from '@rcrsr/rill';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
 type RuntimeContextLike = {
@@ -172,7 +172,7 @@ function createPromptFunction(
 
   // Create async function wrapper
   const fn = async (
-    args: RillValue[],
+    args: Record<string, RillValue>,
     ctx: RuntimeContextLike
   ): Promise<RillValue> => {
     // Emit mcp:connect on first prompt call [IR-1]
@@ -188,7 +188,7 @@ function createPromptFunction(
 
     for (let i = 0; i < promptArgs.length; i++) {
       const promptArg = promptArgs[i]!;
-      const value = args[i];
+      const value = args[promptArg.name];
 
       // Validate argument is string (or undefined for optional args)
       if (value !== undefined && typeof value !== 'string') {
@@ -291,9 +291,9 @@ function createPromptFunction(
     params,
     fn,
     ...(prompt.description !== undefined && {
-      description: prompt.description,
+      annotations: { description: prompt.description },
     }),
-    returnType: { type: 'list' },
+    returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }),
   };
 }
 

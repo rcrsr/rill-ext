@@ -1,10 +1,14 @@
-import type { ExtensionConfigSchema } from '@rcrsr/rill';
+import { createRequire } from 'node:module';
+import type { ExtensionConfigSchema, ExtensionManifest } from '@rcrsr/rill';
+import { createPineconeExtension as _factory } from './factory.js';
 
 // ============================================================
 // VERSION
 // ============================================================
 
-export const VERSION = '0.0.1';
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+export const VERSION = _pkg.version;
 
 // ============================================================
 // CONFIGURATION
@@ -24,4 +28,14 @@ export const configSchema: ExtensionConfigSchema = {
   index: { type: 'string', required: true },
   namespace: { type: 'string' },
   timeout: { type: 'number' },
+};
+
+// ============================================================
+// EXTENSION MANIFEST
+// ============================================================
+
+export const extensionManifest: ExtensionManifest = {
+  factory: _factory,
+  configSchema,
+  version: VERSION,
 };

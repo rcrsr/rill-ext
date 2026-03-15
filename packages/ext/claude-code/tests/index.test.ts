@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { describe, it, expect, vi } from 'vitest';
 import { execute, createRuntimeContext } from '@rcrsr/rill';
 
@@ -8,10 +9,13 @@ vi.mock('../src/process.js', () => ({
 
 import { VERSION } from '../src/index.js';
 
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+
 describe('claude-code package', () => {
   describe('package structure', () => {
-    it('exports VERSION constant', () => {
-      expect(VERSION).toBe('0.1.0');
+    it('exports VERSION matching package.json', () => {
+      expect(VERSION).toBe(_pkg.version);
     });
 
     it('can import from @rcrsr/rill', () => {

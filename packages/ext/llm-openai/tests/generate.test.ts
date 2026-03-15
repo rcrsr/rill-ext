@@ -102,7 +102,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['describe a person', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -121,7 +121,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['rate something', { schema: { score: 'number' } }],
+        { prompt: 'rate something', options: { schema: { score: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -138,7 +138,7 @@ describe('generate() function', () => {
 
       await expect(
         ext.generate.fn(
-          ['prompt', { schema: { field: 'unsupported_type' } }],
+          { prompt: 'prompt', options: { schema: { field: 'unsupported_type' } } },
           ctx
         )
       ).rejects.toThrow();
@@ -155,7 +155,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx);
+        await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -172,7 +172,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx);
+        await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -189,13 +189,13 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow('generate: failed to parse response JSON:');
 
       // Verify message contains the native JSON parse error detail
       let thrown: unknown;
       try {
-        await ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx);
+        await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -216,7 +216,7 @@ describe('generate() function', () => {
 
       // Must reject, never resolve to a value
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow();
     });
 
@@ -226,7 +226,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['prompt', {}], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('schema'),
@@ -252,7 +252,7 @@ describe('generate() function', () => {
       });
 
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow();
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');

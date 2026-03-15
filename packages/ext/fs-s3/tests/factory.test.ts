@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { rillTypeToTypeValue } from '@rcrsr/rill';
 import { createS3FsExtension } from '../src/index.js';
 import type { S3FsConfig } from '../src/types.js';
 
@@ -345,23 +346,35 @@ describe('createS3FsExtension', () => {
       expect(Array.isArray(ext.read.params)).toBe(true);
       expect(ext.read.params.length).toBeGreaterThan(0);
       expect(ext.read.fn).toBeTypeOf('function');
-      expect(ext.read.description).toBeTypeOf('string');
-      expect(ext.read.returnType).toEqual({ type: 'string' });
+      expect(ext.read.annotations?.['description']).toBeTypeOf('string');
+      expect(ext.read.returnType).toEqual(rillTypeToTypeValue({ type: 'string' }));
 
       // Verify structure for write function
       expect(ext.write.params).toBeDefined();
       expect(Array.isArray(ext.write.params)).toBe(true);
       expect(ext.write.fn).toBeTypeOf('function');
-      expect(ext.write.description).toBeTypeOf('string');
-      expect(ext.write.returnType).toEqual({ type: 'string' });
+      expect(ext.write.annotations?.['description']).toBeTypeOf('string');
+      expect(ext.write.returnType).toEqual(rillTypeToTypeValue({ type: 'string' }));
 
       // Verify structure for mounts function (no params)
       expect(ext.mounts.params).toBeDefined();
       expect(Array.isArray(ext.mounts.params)).toBe(true);
       expect(ext.mounts.params.length).toBe(0);
       expect(ext.mounts.fn).toBeTypeOf('function');
-      expect(ext.mounts.description).toBeTypeOf('string');
-      expect(ext.mounts.returnType).toEqual({ type: 'list' });
+      expect(ext.mounts.annotations?.['description']).toBeTypeOf('string');
+      expect(ext.mounts.returnType).toEqual(rillTypeToTypeValue({
+        type: 'list',
+        element: {
+          type: 'dict',
+          fields: {
+            name: { type: { type: 'string' } },
+            mode: { type: { type: 'string' } },
+            glob: { type: { type: 'string' } },
+            bucket: { type: { type: 'string' } },
+            prefix: { type: { type: 'string' } },
+          },
+        },
+      }));
 
       ext.dispose?.();
     });

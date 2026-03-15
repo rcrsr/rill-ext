@@ -7,9 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-03-15
+
+### Changed (Breaking)
+
+- All 14 packages require rill v0.16 (`peerDependency: ~0.16.0`)
+- Host function args use named `Record<string, RillValue>` instead of positional `RillValue[]`
+- Dict field definitions use `RillFieldDef` instead of `RillType | { type, defaultValue }` union
+- `p.dict()` field specs accept `Record<string, RillFieldDef>`
+- Shared `ext-llm` closure params use `RillFieldDef` objects instead of `[name, type]` tuples
+- Shared `ext-llm` tool loop passes named args dict to runtime/application callables
+
+### Added
+
+- Typed `returnType` declarations on all host functions using `rillTypeToTypeValue()`
+- Typed dict fields with defaults on `options` params (`system`, `max_tokens`, `tools`, etc.)
+- `LlmExtensionContract` and `KvExtensionContract` type satisfaction checks on factory returns
+- `generate()` host function on all 3 LLM extensions for structured output with JSON Schema
+
 ### Changed
 
-- All 14 extensions now support rill v0.11 runtime API
+- All 14 extensions upgraded from rill v0.11 through v0.16 runtime API
+- `p.dict()` options params use `{}` default instead of `undefined` for optional dict coercion
 
 ## [0.9.0] - 2026-03-06
 
