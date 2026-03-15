@@ -114,7 +114,7 @@ async function executeToolCall(
             : (undefined as unknown as RillValue);
         });
       } else {
-        args = [inputDict];
+        args = [];
       }
       return await invokeCallable(callable, args, context as RuntimeContext);
     }
