@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `buildResponseMessages()` shared helper in ext-llm for consistent response messages across providers
+- `tools` promoted to positional argument in `tool_loop()` across all 3 LLM extensions
+
+### Fixed
+
+- Anthropic `tool_loop()` now includes the assistant message in response `messages` array
+- 0-parameter tools no longer fail with "Function expects 0 arguments, got 1"
+- `max_tokens: 0` treated as unset, falls through to factory default
+
 ## [0.16.0] - 2026-03-15
 
 ### Changed (Breaking)
