@@ -165,8 +165,8 @@ describe('createAnthropicExtension', () => {
           { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
-        description: expect.any(String),
-        returnType: { type: 'dict' },
+        annotations: { description: expect.any(String) },
+        returnType: { typeName: 'dict' },
       });
     });
 
@@ -180,12 +180,12 @@ describe('createAnthropicExtension', () => {
 
       expect(result.messages).toMatchObject({
         params: [
-          { name: 'messages', type: { type: 'list' }, defaultValue: undefined, annotations: {} },
+          { name: 'messages', type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: undefined, annotations: {} },
           { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
-        description: expect.any(String),
-        returnType: { type: 'dict' },
+        annotations: { description: expect.any(String) },
+        returnType: { typeName: 'dict' },
       });
     });
 
@@ -200,7 +200,7 @@ describe('createAnthropicExtension', () => {
       expect(result.embed).toMatchObject({
         params: [{ name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} }],
         fn: expect.any(Function),
-        description: expect.any(String),
+        annotations: { description: expect.any(String) },
       });
     });
 
@@ -215,7 +215,7 @@ describe('createAnthropicExtension', () => {
       expect(result.embed_batch).toMatchObject({
         params: [{ name: 'texts', type: { type: 'list' }, defaultValue: undefined, annotations: {} }],
         fn: expect.any(Function),
-        description: expect.any(String),
+        annotations: { description: expect.any(String) },
       });
     });
 
@@ -233,7 +233,7 @@ describe('createAnthropicExtension', () => {
           { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
-        description: expect.any(String),
+        annotations: { description: expect.any(String) },
       });
     });
   });

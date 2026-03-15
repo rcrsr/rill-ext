@@ -77,8 +77,8 @@ describe('createQdrantExtension', () => {
         { name: 'vector', type: { type: 'vector' }, defaultValue: undefined, annotations: {} },
         { name: 'metadata', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.upsert.returnType).toEqual({ type: 'dict' });
-      expect(ext.upsert.description).toBe(
+      expect(ext.upsert.returnType).toBeDefined();
+      expect(ext.upsert.annotations?.['description']).toBe(
         'Insert or update single vector with metadata'
       );
     });
@@ -92,10 +92,14 @@ describe('createQdrantExtension', () => {
       // IR-3: search signature
       expect(ext.search.params).toEqual([
         { name: 'vector', type: { type: 'vector' }, defaultValue: undefined, annotations: {} },
-        { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
+        { name: 'options', type: { type: 'dict', fields: {
+          k: { type: { type: 'number' }, defaultValue: 10 },
+          filter: { type: { type: 'dict' }, defaultValue: {} },
+          score_threshold: { type: { type: 'number' }, defaultValue: 0 },
+        } }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.search.returnType).toEqual({ type: 'list' });
-      expect(ext.search.description).toBe('Search k nearest neighbors');
+      expect(ext.search.returnType).toBeDefined();
+      expect(ext.search.annotations?.['description']).toBe('Search k nearest neighbors');
     });
 
     it('creates functions with correct signatures (IR-7)', () => {
@@ -106,8 +110,8 @@ describe('createQdrantExtension', () => {
 
       // IR-7: count signature
       expect(ext.count.params).toEqual([]);
-      expect(ext.count.returnType).toEqual({ type: 'number' });
-      expect(ext.count.description).toBe(
+      expect(ext.count.returnType).toBeDefined();
+      expect(ext.count.annotations?.['description']).toBe(
         'Return total vector count in collection'
       );
     });

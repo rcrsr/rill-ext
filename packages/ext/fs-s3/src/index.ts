@@ -14,8 +14,12 @@ import {
   type GetObjectCommandOutput,
 } from '@aws-sdk/client-s3';
 import type { S3FsConfig, S3FsMountConfig } from './types.js';
-import type { ExtensionConfigSchema, FsExtensionContract, RillValue } from '@rcrsr/rill';
+import { createRequire } from 'node:module';
+import { rillTypeToTypeValue, type ExtensionConfigSchema, type ExtensionManifest, type FsExtensionContract, type RillValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
 
 // ============================================================
 // PUBLIC TYPES
@@ -233,9 +237,9 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Read file contents from S3.
    * IR-12, EC-8 (not found), EC-9 (size limit)
    */
-  const read = async (args: RillValue[]): Promise<string> => {
-    const mountName = args[0] as string;
-    const filePath = args[1] as string;
+  const read = async (args: Record<string, RillValue>): Promise<string> => {
+    const mountName = args['mount'] as string;
+    const filePath = args['path'] as string;
 
     const mount = getMount(mountName);
     checkMode(mount, 'read');
@@ -278,10 +282,10 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Write file contents to S3.
    * IR-13, EC-10 (read-only mode)
    */
-  const write = async (args: RillValue[]): Promise<string> => {
-    const mountName = args[0] as string;
-    const filePath = args[1] as string;
-    const content = args[2] as string;
+  const write = async (args: Record<string, RillValue>): Promise<string> => {
+    const mountName = args['mount'] as string;
+    const filePath = args['path'] as string;
+    const content = args['content'] as string;
 
     const mount = getMount(mountName);
     checkMode(mount, 'write'); // EC-10
@@ -306,10 +310,10 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Append content to file in S3.
    * IR-14: Read-then-write (not atomic)
    */
-  const append = async (args: RillValue[]): Promise<string> => {
-    const mountName = args[0] as string;
-    const filePath = args[1] as string;
-    const content = args[2] as string;
+  const append = async (args: Record<string, RillValue>): Promise<string> => {
+    const mountName = args['mount'] as string;
+    const filePath = args['path'] as string;
+    const content = args['content'] as string;
 
     const mount = getMount(mountName);
     checkMode(mount, 'write');
@@ -358,9 +362,9 @@ export function createS3FsExtension(config: S3FsConfig) {
    * List objects in directory (non-recursive).
    * IR-15: Uses delimiter '/' to list directory contents
    */
-  const list = async (args: RillValue[]): Promise<RillValue[]> => {
-    const mountName = args[0] as string;
-    const dirPath = (args[1] as string | undefined) ?? '';
+  const list = async (args: Record<string, RillValue>): Promise<RillValue[]> => {
+    const mountName = args['mount'] as string;
+    const dirPath = (args['path'] as string | undefined) ?? '';
 
     const mount = getMount(mountName);
     checkMode(mount, 'read');
@@ -418,9 +422,9 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Find files matching glob pattern (recursive).
    * IR-16: Recursive search with client-side glob filtering
    */
-  const find = async (args: RillValue[]): Promise<RillValue[]> => {
-    const mountName = args[0] as string;
-    const pattern = (args[1] as string | undefined) ?? '*';
+  const find = async (args: Record<string, RillValue>): Promise<RillValue[]> => {
+    const mountName = args['mount'] as string;
+    const pattern = (args['pattern'] as string | undefined) ?? '*';
 
     const mount = getMount(mountName);
     checkMode(mount, 'read');
@@ -466,9 +470,9 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Check if file exists in S3.
    * IR-17: Uses HeadObject
    */
-  const exists = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
-    const filePath = args[1] as string;
+  const exists = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
+    const filePath = args['path'] as string;
 
     const mount = getMount(mountName);
     checkMode(mount, 'read');
@@ -497,9 +501,9 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Delete file from S3.
    * IR-18: Uses DeleteObject
    */
-  const remove = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
-    const filePath = args[1] as string;
+  const remove = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
+    const filePath = args['path'] as string;
 
     const mount = getMount(mountName);
     checkMode(mount, 'write');
@@ -507,7 +511,7 @@ export function createS3FsExtension(config: S3FsConfig) {
     const key = mapPath(mount, filePath);
 
     // Check if file exists before deleting
-    const fileExists = await exists([mountName, filePath]);
+    const fileExists = await exists({ mount: mountName, path: filePath });
     if (!fileExists) {
       return false;
     }
@@ -527,10 +531,10 @@ export function createS3FsExtension(config: S3FsConfig) {
    * IR-19: Uses HeadObject, returns size and modified
    */
   const stat = async (
-    args: RillValue[]
+    args: Record<string, RillValue>
   ): Promise<Record<string, RillValue>> => {
-    const mountName = args[0] as string;
-    const filePath = args[1] as string;
+    const mountName = args['mount'] as string;
+    const filePath = args['path'] as string;
 
     const mount = getMount(mountName);
     checkMode(mount, 'read');
@@ -567,9 +571,9 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Create directory (no-op for S3).
    * IR-20, EC-12: S3 has no directories, returns true
    */
-  const mkdir = async (args: RillValue[]): Promise<boolean> => {
+  const mkdir = async (args: Record<string, RillValue>): Promise<boolean> => {
     // Validate mount exists (for consistency with other functions)
-    const mountName = args[0] as string;
+    const mountName = args['mount'] as string;
     getMount(mountName);
 
     // S3 has no directories - this is a no-op
@@ -580,10 +584,10 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Copy file within S3.
    * IR-21: Uses CopyObject
    */
-  const copy = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
-    const srcPath = args[1] as string;
-    const destPath = args[2] as string;
+  const copy = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
+    const srcPath = args['src'] as string;
+    const destPath = args['dest'] as string;
 
     const mount = getMount(mountName);
     checkMode(mount, 'read'); // Need read for source
@@ -618,9 +622,9 @@ export function createS3FsExtension(config: S3FsConfig) {
    * Move file within S3.
    * IR-22: CopyObject + DeleteObject
    */
-  const move = async (args: RillValue[]): Promise<boolean> => {
-    const mountName = args[0] as string;
-    const srcPath = args[1] as string;
+  const move = async (args: Record<string, RillValue>): Promise<boolean> => {
+    const mountName = args['mount'] as string;
+    const srcPath = args['src'] as string;
 
     // Copy file
     await copy(args);
@@ -684,8 +688,8 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('path', 'File path relative to mount'),
       ],
       fn: read,
-      description: 'Read file contents from S3',
-      returnType: { type: 'string' },
+      annotations: { description: 'Read file contents from S3' },
+      returnType: rillTypeToTypeValue({ type: 'string' }),
     },
     write: {
       params: [
@@ -694,8 +698,8 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('content', 'Content to write'),
       ],
       fn: write,
-      description: 'Write file to S3, replacing if exists',
-      returnType: { type: 'string' },
+      annotations: { description: 'Write file to S3, replacing if exists' },
+      returnType: rillTypeToTypeValue({ type: 'string' }),
     },
     append: {
       params: [
@@ -704,8 +708,8 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('content', 'Content to append'),
       ],
       fn: append,
-      description: 'Append content to file in S3',
-      returnType: { type: 'string' },
+      annotations: { description: 'Append content to file in S3' },
+      returnType: rillTypeToTypeValue({ type: 'string' }),
     },
     list: {
       params: [
@@ -713,8 +717,18 @@ export function createS3FsExtension(config: S3FsConfig) {
         { ...p.str('path', 'Directory path relative to mount'), defaultValue: '' },
       ],
       fn: list,
-      description: 'List directory contents in S3',
-      returnType: { type: 'list' },
+      annotations: { description: 'List directory contents in S3' },
+      returnType: rillTypeToTypeValue({
+        type: 'list',
+        element: {
+          type: 'dict',
+          fields: {
+            name: { type: { type: 'string' } },
+            type: { type: { type: 'string' } },
+            size: { type: { type: 'number' } },
+          },
+        },
+      }),
     },
     find: {
       params: [
@@ -722,8 +736,8 @@ export function createS3FsExtension(config: S3FsConfig) {
         { ...p.str('pattern', 'Glob pattern for filtering'), defaultValue: '*' },
       ],
       fn: find,
-      description: 'Recursive file search in S3',
-      returnType: { type: 'list' },
+      annotations: { description: 'Recursive file search in S3' },
+      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
     },
     exists: {
       params: [
@@ -731,8 +745,8 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('path', 'File path relative to mount'),
       ],
       fn: exists,
-      description: 'Check if file exists in S3',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Check if file exists in S3' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     remove: {
       params: [
@@ -740,8 +754,8 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('path', 'File path relative to mount'),
       ],
       fn: remove,
-      description: 'Delete file from S3',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Delete file from S3' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     stat: {
       params: [
@@ -749,8 +763,16 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('path', 'File path relative to mount'),
       ],
       fn: stat,
-      description: 'Get file metadata from S3',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Get file metadata from S3' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          name: { type: { type: 'string' } },
+          type: { type: { type: 'string' } },
+          size: { type: { type: 'number' } },
+          modified: { type: { type: 'string' } },
+        },
+      }),
     },
     mkdir: {
       params: [
@@ -758,8 +780,8 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('path', 'Directory path relative to mount'),
       ],
       fn: mkdir,
-      description: 'Create directory (no-op for S3)',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Create directory (no-op for S3)' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     copy: {
       params: [
@@ -768,8 +790,8 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('dest', 'Destination file path'),
       ],
       fn: copy,
-      description: 'Copy file within S3',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Copy file within S3' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     move: {
       params: [
@@ -778,14 +800,26 @@ export function createS3FsExtension(config: S3FsConfig) {
         p.str('dest', 'Destination file path'),
       ],
       fn: move,
-      description: 'Move file within S3',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Move file within S3' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     mounts: {
       params: [],
       fn: mountsList,
-      description: 'List configured S3 mounts',
-      returnType: { type: 'list' },
+      annotations: { description: 'List configured S3 mounts' },
+      returnType: rillTypeToTypeValue({
+        type: 'list',
+        element: {
+          type: 'dict',
+          fields: {
+            name: { type: { type: 'string' } },
+            mode: { type: { type: 'string' } },
+            glob: { type: { type: 'string' } },
+            bucket: { type: { type: 'string' } },
+            prefix: { type: { type: 'string' } },
+          },
+        },
+      }),
     },
     dispose,
   }) satisfies FsExtensionContract;
@@ -805,4 +839,14 @@ export const configSchema: ExtensionConfigSchema = {
 // ============================================================
 // VERSION
 // ============================================================
-export const S3_FS_EXTENSION_VERSION = '0.0.1';
+export const VERSION = _pkg.version;
+
+// ============================================================
+// EXTENSION MANIFEST
+// ============================================================
+
+export const extensionManifest: ExtensionManifest = {
+  factory: createS3FsExtension,
+  configSchema,
+  version: VERSION,
+};

@@ -1,6 +1,6 @@
 {
   "name": "rill-ext",
-  "version": "0.11.0",
+  "version": "0.16.0",
   "description": "rill extension ecosystem — vendor extensions for rill",
   "private": true,
   "packageManager": "pnpm@10.29.2",

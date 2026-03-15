@@ -44,7 +44,7 @@ async function testParseToolResult(result: McpToolResult): Promise<any> {
   );
 
   // Call the generated function with empty args
-  return await functions.test_tool!.fn([], mockContext);
+  return await functions.test_tool!.fn({}, mockContext);
 }
 
 describe('AC-8: Type conversion', () => {

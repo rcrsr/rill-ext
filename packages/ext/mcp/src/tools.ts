@@ -7,7 +7,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { emitExtensionEvent } from '@rcrsr/rill';
+import { anyTypeValue, emitExtensionEvent } from '@rcrsr/rill';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
 type RuntimeContextLike = {
@@ -177,7 +177,7 @@ function generateToolFunction(
 
   // Create async function wrapper
   const fn = async (
-    args: RillValue[],
+    args: Record<string, RillValue>,
     ctx: RuntimeContextLike
   ): Promise<RillValue> => {
     // Emit mcp:connect on first tool call [IR-1]
@@ -188,11 +188,11 @@ function generateToolFunction(
       });
       lifecycleState.connectEmitted = true;
     }
-    // Build arguments object from positional args array
+    // Build arguments object from named args record
     const toolArgs: Record<string, unknown> = {};
     for (let i = 0; i < params.length; i++) {
       const param = params[i]!;
-      const value = args[i];
+      const value = args[param.name];
       // Use actual argument value or default from param
       toolArgs[param.name] = value !== undefined ? value : param.defaultValue;
     }
@@ -292,8 +292,8 @@ function generateToolFunction(
   return {
     params,
     fn,
-    ...(tool.description !== undefined && { description: tool.description }),
-    returnType: { type: 'any' },
+    ...(tool.description !== undefined && { annotations: { description: tool.description } }),
+    returnType: anyTypeValue,
   };
 }
 

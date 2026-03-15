@@ -7,8 +7,25 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, prefixFunctions, rillTypeToTypeValue } from '@rcrsr/rill';
 import type { ClaudeCodeResult } from '../src/types.js';
+
+const EXPECTED_RETURN_TYPE = rillTypeToTypeValue({
+  type: 'dict',
+  fields: {
+    result: { type: { type: 'string' } },
+    tokens: { type: { type: 'dict', fields: {
+      prompt: { type: { type: 'number' } },
+      cacheWrite5m: { type: { type: 'number' } },
+      cacheWrite1h: { type: { type: 'number' } },
+      cacheRead: { type: { type: 'number' } },
+      output: { type: { type: 'number' } },
+    } } },
+    cost: { type: { type: 'number' } },
+    exitCode: { type: { type: 'number' } },
+    duration: { type: { type: 'number' } },
+  },
+});
 
 // ============================================================
 // MOCKS
@@ -92,10 +109,10 @@ describe('IR-1: Factory result works with prefixFunctions', () => {
     expect(promptDef.params[0].name).toBe('text');
     expect(promptDef.params[0].type).toEqual({ type: 'string' });
     expect(promptDef.params[1].name).toBe('options');
-    expect(promptDef.params[1].type).toEqual({ type: 'dict' });
+    expect(promptDef.params[1].type).toEqual({ type: 'dict', fields: { timeout: { type: { type: 'number' }, defaultValue: 0 } } });
     expect(promptDef.fn).toBeInstanceOf(Function);
-    expect(promptDef.description).toBeTruthy();
-    expect(promptDef.returnType).toEqual({ type: 'dict' });
+    expect(promptDef.annotations?.['description']).toBeTruthy();
+    expect(promptDef.returnType).toEqual(EXPECTED_RETURN_TYPE);
   });
 
   it('allows prefixed functions to be called via runtime context', async () => {
@@ -144,7 +161,7 @@ describe('IR-1: Factory result works with prefixFunctions', () => {
 
     // Call prefixed function
     const result = await prefixed['claude-code::prompt'].fn(
-      ['Test prompt', {}],
+      { text: 'Test prompt', options: {} },
       ctx
     );
 
@@ -209,7 +226,7 @@ describe('IR-5: dispose terminates active child processes', () => {
     const ctx = createRuntimeContext();
 
     // Start prompt but don't await completion
-    const promise = ext.prompt.fn(['Test', {}], ctx);
+    const promise = ext.prompt.fn({ text: 'Test', options: {} }, ctx);
 
     // Wait briefly for process to start
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -280,7 +297,7 @@ describe('IR-5: dispose terminates active child processes', () => {
 
     // Start 5 concurrent prompts
     const promises = Array.from({ length: 5 }, (_, i) =>
-      ext.prompt.fn([`Prompt ${i}`, {}], ctx)
+      ext.prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
     );
 
     // Wait briefly for processes to start
@@ -371,7 +388,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     const ctx = createRuntimeContext();
 
     // Start process
-    const promise = ext.prompt.fn(['Test', {}], ctx);
+    const promise = ext.prompt.fn({ text: 'Test', options: {} }, ctx);
 
     // Wait briefly
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -439,9 +456,9 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
 
     // Start 3 processes
     const promises = [
-      ext.prompt.fn(['Test 1', {}], ctx),
-      ext.prompt.fn(['Test 2', {}], ctx),
-      ext.prompt.fn(['Test 3', {}], ctx),
+      ext.prompt.fn({ text: 'Test 1', options: {} }, ctx),
+      ext.prompt.fn({ text: 'Test 2', options: {} }, ctx),
+      ext.prompt.fn({ text: 'Test 3', options: {} }, ctx),
     ];
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -525,7 +542,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     const ctx = createRuntimeContext();
 
     // Start process
-    const promise = ext.prompt.fn(['Test', {}], ctx);
+    const promise = ext.prompt.fn({ text: 'Test', options: {} }, ctx);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Call dispose - should not throw despite error
@@ -590,7 +607,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    const promise = ext.prompt.fn(['Test', {}], ctx);
+    const promise = ext.prompt.fn({ text: 'Test', options: {} }, ctx);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Call dispose
@@ -664,9 +681,9 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
 
     // Start 3 processes
     const promises = [
-      ext.prompt.fn(['Test 1', {}], ctx),
-      ext.prompt.fn(['Test 2', {}], ctx),
-      ext.prompt.fn(['Test 3', {}], ctx),
+      ext.prompt.fn({ text: 'Test 1', options: {} }, ctx),
+      ext.prompt.fn({ text: 'Test 2', options: {} }, ctx),
+      ext.prompt.fn({ text: 'Test 3', options: {} }, ctx),
     ];
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -770,9 +787,9 @@ describe('IR-1: Factory creation is idempotent', () => {
     const ctx = createRuntimeContext();
 
     // Start process on each instance
-    const promise1 = ext1.prompt.fn(['Test 1', {}], ctx);
-    const promise2 = ext2.prompt.fn(['Test 2', {}], ctx);
-    const promise3 = ext3.prompt.fn(['Test 3', {}], ctx);
+    const promise1 = ext1.prompt.fn({ text: 'Test 1', options: {} }, ctx);
+    const promise2 = ext2.prompt.fn({ text: 'Test 2', options: {} }, ctx);
+    const promise3 = ext3.prompt.fn({ text: 'Test 3', options: {} }, ctx);
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 

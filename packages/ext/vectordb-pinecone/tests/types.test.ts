@@ -293,7 +293,10 @@ describe('PineconeConfig', () => {
 
       expect(config).toBeDefined();
       expect(barrel).toBeDefined();
-      expect(barrel.VERSION).toBe('0.0.1');
+      const { createRequire } = await import('node:module');
+      const _require = createRequire(import.meta.url);
+      const _pkg = _require('../package.json') as { version: string };
+      expect(barrel.VERSION).toBe(_pkg.version);
     });
   });
 });

@@ -83,7 +83,7 @@ describe('mcp:connect event', () => {
     );
 
     const ctx = createMockContext();
-    await functions['test_tool']!.fn([], ctx);
+    await functions['test_tool']!.fn({}, ctx);
 
     // Verify mcp:connect emitted
     expect(emitExtensionEvent).toHaveBeenCalledWith(ctx, {
@@ -129,9 +129,9 @@ describe('mcp:connect event', () => {
     const ctx = createMockContext();
 
     // Call tool three times
-    await functions['test_tool']!.fn([], ctx);
-    await functions['test_tool']!.fn([], ctx);
-    await functions['test_tool']!.fn([], ctx);
+    await functions['test_tool']!.fn({}, ctx);
+    await functions['test_tool']!.fn({}, ctx);
+    await functions['test_tool']!.fn({}, ctx);
 
     // Verify mcp:connect emitted only once
     const connectCalls = vi
@@ -162,7 +162,7 @@ describe('mcp:connect event', () => {
     const func = createReadResourceFunction(mockClient, 30000, lifecycleState);
 
     const ctx = createMockContext();
-    await func.fn(['test://resource'], ctx);
+    await func.fn({ uri: 'test://resource' }, ctx);
 
     // Verify mcp:connect emitted
     expect(emitExtensionEvent).toHaveBeenCalledWith(ctx, {
@@ -197,7 +197,7 @@ describe('mcp:connect event', () => {
     );
 
     const ctx = createMockContext();
-    await functions['prompt_test_prompt']!.fn([], ctx);
+    await functions['prompt_test_prompt']!.fn({}, ctx);
 
     // Verify mcp:connect emitted
     expect(emitExtensionEvent).toHaveBeenCalledWith(ctx, {
@@ -253,11 +253,11 @@ describe('mcp:connect event', () => {
     const ctx = createMockContext();
 
     // First call to tool emits connect
-    await toolFunctions['test_tool']!.fn([], ctx);
+    await toolFunctions['test_tool']!.fn({}, ctx);
 
     // Second call to resource does not emit connect
     vi.clearAllMocks();
-    await resourceFunction.fn(['test://resource'], ctx);
+    await resourceFunction.fn({ uri: 'test://resource' }, ctx);
 
     // Verify mcp:connect NOT emitted on second operation
     const connectCalls = vi
@@ -267,7 +267,7 @@ describe('mcp:connect event', () => {
 
     // Third call to prompt does not emit connect
     vi.clearAllMocks();
-    await promptFunctions['prompt_test_prompt']!.fn([], ctx);
+    await promptFunctions['prompt_test_prompt']!.fn({}, ctx);
 
     // Verify mcp:connect NOT emitted on third operation
     const connectCallsAfterPrompt = vi
@@ -308,7 +308,7 @@ describe('mcp:tool_call event', () => {
     const functions = generateToolFunctions(tools, mockClient, 30000);
     const ctx = createMockContext();
 
-    await functions['test_tool']!.fn(['value1', 42], ctx);
+    await functions['test_tool']!.fn({ arg1: 'value1', arg2: 42 }, ctx);
 
     // Verify mcp:tool_call emitted with correct structure
     expect(emitExtensionEvent).toHaveBeenCalledWith(
@@ -340,7 +340,7 @@ describe('mcp:tool_call event', () => {
     const functions = generateToolFunctions(tools, mockClient, 30000);
     const ctx = createMockContext();
 
-    await functions['no_arg_tool']!.fn([], ctx);
+    await functions['no_arg_tool']!.fn({}, ctx);
 
     // Verify mcp:tool_call emitted with empty params
     expect(emitExtensionEvent).toHaveBeenCalledWith(
@@ -377,9 +377,9 @@ describe('mcp:tool_call event', () => {
     const ctx = createMockContext();
 
     // Call different tools
-    await functions['tool1']!.fn([], ctx);
-    await functions['tool2']!.fn([], ctx);
-    await functions['tool1']!.fn([], ctx);
+    await functions['tool1']!.fn({}, ctx);
+    await functions['tool2']!.fn({}, ctx);
+    await functions['tool1']!.fn({}, ctx);
 
     // Verify three tool_call events
     const toolCallEvents = vi
@@ -416,7 +416,7 @@ describe('mcp:resource_read event', () => {
     });
     const ctx = createMockContext();
 
-    await func.fn(['config://app'], ctx);
+    await func.fn({ uri: 'config://app' }, ctx);
 
     // Verify mcp:resource_read emitted with URI
     expect(emitExtensionEvent).toHaveBeenCalledWith(
@@ -457,7 +457,7 @@ describe('mcp:resource_read event', () => {
     );
     const ctx = createMockContext();
 
-    await functions['resource_read_table']!.fn(['users'], ctx);
+    await functions['resource_read_table']!.fn({ tableName: 'users' }, ctx);
 
     // Verify mcp:resource_read emitted with resolved URI
     expect(emitExtensionEvent).toHaveBeenCalledWith(
@@ -487,8 +487,8 @@ describe('mcp:resource_read event', () => {
     });
     const ctx = createMockContext();
 
-    await func.fn(['resource1'], ctx);
-    await func.fn(['resource2'], ctx);
+    await func.fn({ uri: 'resource1' }, ctx);
+    await func.fn({ uri: 'resource2' }, ctx);
 
     // Verify two resource_read events
     const resourceReadEvents = vi
@@ -530,7 +530,7 @@ describe('mcp:prompt_get event', () => {
     const functions = generatePromptFunctions(prompts, mockClient, 30000);
     const ctx = createMockContext();
 
-    await functions['prompt_test_prompt']!.fn(['value1', 'value2'], ctx);
+    await functions['prompt_test_prompt']!.fn({ arg1: 'value1', arg2: 'value2' }, ctx);
 
     // Verify mcp:prompt_get emitted with correct structure
     expect(emitExtensionEvent).toHaveBeenCalledWith(
@@ -563,7 +563,7 @@ describe('mcp:prompt_get event', () => {
     const functions = generatePromptFunctions(prompts, mockClient, 30000);
     const ctx = createMockContext();
 
-    await functions['prompt_no_arg_prompt']!.fn([], ctx);
+    await functions['prompt_no_arg_prompt']!.fn({}, ctx);
 
     // Verify mcp:prompt_get emitted with empty params
     expect(emitExtensionEvent).toHaveBeenCalledWith(
@@ -594,9 +594,9 @@ describe('mcp:prompt_get event', () => {
     const functions = generatePromptFunctions(prompts, mockClient, 30000);
     const ctx = createMockContext();
 
-    await functions['prompt_prompt1']!.fn([], ctx);
-    await functions['prompt_prompt2']!.fn([], ctx);
-    await functions['prompt_prompt1']!.fn([], ctx);
+    await functions['prompt_prompt1']!.fn({}, ctx);
+    await functions['prompt_prompt2']!.fn({}, ctx);
+    await functions['prompt_prompt1']!.fn({}, ctx);
 
     // Verify three prompt_get events
     const promptGetEvents = vi
@@ -635,7 +635,7 @@ describe('mcp:error event', () => {
     const functions = generateToolFunctions(tools, mockClient, 100);
     const ctx = createMockContext();
 
-    await expect(functions['slow_tool']!.fn([], ctx)).rejects.toThrow();
+    await expect(functions['slow_tool']!.fn({}, ctx)).rejects.toThrow();
 
     // Verify mcp:error emitted
     const errorEvents = vi
@@ -667,7 +667,7 @@ describe('mcp:error event', () => {
     const functions = generateToolFunctions(tools, mockClient, 30000);
     const ctx = createMockContext();
 
-    await expect(functions['test_tool']!.fn([], ctx)).rejects.toThrow();
+    await expect(functions['test_tool']!.fn({}, ctx)).rejects.toThrow();
 
     // Verify mcp:error emitted
     const errorEvents = vi
@@ -692,7 +692,7 @@ describe('mcp:error event', () => {
     const functions = generateToolFunctions(tools, mockClient, 30000);
     const ctx = createMockContext();
 
-    await expect(functions['test_tool']!.fn([], ctx)).rejects.toThrow();
+    await expect(functions['test_tool']!.fn({}, ctx)).rejects.toThrow();
 
     // Verify mcp:error emitted
     const errorEvents = vi
@@ -717,7 +717,7 @@ describe('mcp:error event', () => {
     const functions = generateToolFunctions(tools, mockClient, 30000);
     const ctx = createMockContext();
 
-    await expect(functions['test_tool']!.fn([], ctx)).rejects.toThrow();
+    await expect(functions['test_tool']!.fn({}, ctx)).rejects.toThrow();
 
     // Verify mcp:error emitted
     const errorEvents = vi
@@ -737,7 +737,7 @@ describe('mcp:error event', () => {
     });
     const ctx = createMockContext();
 
-    await expect(func.fn(['missing://resource'], ctx)).rejects.toThrow();
+    await expect(func.fn({ uri: 'missing://resource' }, ctx)).rejects.toThrow();
 
     // Verify mcp:error emitted
     const errorEvents = vi
@@ -763,7 +763,7 @@ describe('mcp:error event', () => {
     const ctx = createMockContext();
 
     await expect(
-      functions['prompt_test_prompt']!.fn([], ctx)
+      functions['prompt_test_prompt']!.fn({}, ctx)
     ).rejects.toThrow();
 
     // Verify mcp:error emitted
@@ -790,7 +790,7 @@ describe('mcp:error event', () => {
     const ctx = createMockContext();
 
     // Verify that error event is emitted AND exception is thrown
-    await expect(functions['test_tool']!.fn([], ctx)).rejects.toThrow();
+    await expect(functions['test_tool']!.fn({}, ctx)).rejects.toThrow();
 
     const errorEvents = vi
       .mocked(emitExtensionEvent)

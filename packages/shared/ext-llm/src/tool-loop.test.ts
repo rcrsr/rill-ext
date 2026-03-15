@@ -17,12 +17,12 @@ import type { ToolLoopCallbacks } from './types.js';
  * Create a mock Rill callable function for testing
  */
 function createMockTool(
-  implementation: (args: RillValue[]) => RillValue | Promise<RillValue>,
+  implementation: (args: Record<string, RillValue>) => RillValue | Promise<RillValue>,
   description?: string
 ): RillValue {
   const baseCallable = callable(implementation, false);
   if (description !== undefined) {
-    (baseCallable as { description?: string }).description = description;
+    (baseCallable as { annotations: Record<string, unknown> }).annotations['description'] = description;
   }
   return baseCallable;
 }
@@ -767,9 +767,8 @@ describe('executeToolLoop', () => {
         ],
         body: {} as never, // Not invoked in schema-build step
         definingScope: {} as never,
-        annotations: {},
+        annotations: { description: 'Weather lookup tool' },
         paramAnnotations: {},
-        description: 'Weather lookup tool',
       };
 
       const tools = { get_weather: scriptTool };
@@ -849,7 +848,7 @@ describe('executeToolLoop', () => {
           },
         ],
         fn: () => 'result',
-        description: 'Tool with params',
+        annotations: { description: 'Tool with params' },
       };
 
       const tools = {
@@ -917,7 +916,7 @@ describe('executeToolLoop', () => {
           },
         ],
         fn: () => 'result',
-        description: 'Tool with unconstrained param',
+        annotations: { description: 'Tool with unconstrained param' },
       };
 
       const buildTools = vi.fn((tools) => tools);
@@ -954,7 +953,7 @@ describe('executeToolLoop', () => {
           },
         ],
         fn: () => 'result',
-        description: 'Tool',
+        annotations: { description: 'Tool' },
       };
 
       const buildTools = vi.fn((tools) => tools);
@@ -990,7 +989,7 @@ describe('executeToolLoop', () => {
           },
         ],
         fn: () => 'result',
-        description: 'Tool',
+        annotations: { description: 'Tool' },
       };
 
       const buildTools = vi.fn((tools) => tools);
@@ -1025,7 +1024,7 @@ describe('executeToolLoop', () => {
           },
         ],
         fn: () => 'result',
-        description: 'Tool',
+        annotations: { description: 'Tool' },
       };
 
       const buildTools = vi.fn((tools) => tools);
@@ -1048,11 +1047,11 @@ describe('executeToolLoop', () => {
   });
 
   describe('argument conversion', () => {
-    it('converts dict input to positional args using param order', async () => {
-      // IC-11: Dict input converted to positional args
-      const mockFn = vi.fn((args: RillValue[]) => {
-        // Verify positional args received in correct order
-        expect(args).toEqual(['value_a', 42]);
+    it('passes dict input as named args to application callable', async () => {
+      // IC-11: Dict input passed as named args
+      const mockFn = vi.fn((args: Record<string, RillValue>) => {
+        // Verify named args received correctly
+        expect(args).toEqual({ param_a: 'value_a', param_b: 42 });
         return 'success';
       });
 
@@ -1107,14 +1106,14 @@ describe('executeToolLoop', () => {
       );
 
       expect(mockFn).toHaveBeenCalledTimes(1);
-      expect(mockFn).toHaveBeenCalledWith(['value_a', 42], expect.anything());
+      expect(mockFn).toHaveBeenCalledWith({ param_a: 'value_a', param_b: 42 }, expect.anything());
     });
 
-    it('preserves param order during conversion', async () => {
-      // IC-11: Param order preserved during conversion
-      const mockFn = vi.fn((args: RillValue[]) => {
-        // Verify order: first, second, third
-        expect(args).toEqual(['first_value', 'second_value', 'third_value']);
+    it('passes all named args regardless of input key order', async () => {
+      // IC-11: Named args passed correctly regardless of input key order
+      const mockFn = vi.fn((args: Record<string, RillValue>) => {
+        // Verify all named args received
+        expect(args).toEqual({ first: 'first_value', second: 'second_value', third: 'third_value' });
         return 'success';
       });
 
@@ -1182,10 +1181,10 @@ describe('executeToolLoop', () => {
       expect(mockFn).toHaveBeenCalledTimes(1);
     });
 
-    it('passes correct positional args to tool execution', async () => {
-      // AC-5: Tool execution passes correct positional args
-      const mockFn = vi.fn((args: RillValue[]) => {
-        return `received: ${args.join(', ')}`;
+    it('passes correct named args to tool execution', async () => {
+      // AC-5: Tool execution passes correct named args
+      const mockFn = vi.fn((args: Record<string, RillValue>) => {
+        return `received: ${args['name']}, ${args['age']}`;
       });
 
       const toolFn: RillValue = {
@@ -1244,7 +1243,7 @@ describe('executeToolLoop', () => {
 
     it('rejects runtime callables at validation (EC-3)', async () => {
       // EC-3: RuntimeCallable (builtins) cannot be used as tools — must wrap in closure
-      const mockFn = vi.fn((args: RillValue[]) => args[0]);
+      const mockFn = vi.fn((args: Record<string, RillValue>) => args['value']);
 
       const toolFn: RillValue = {
         __type: 'callable',
@@ -1271,10 +1270,9 @@ describe('executeToolLoop', () => {
     });
 
     it('handles application callable without params metadata', async () => {
-      // Fallback: application callable without params gets dict as single arg
-      const mockFn = vi.fn((args: RillValue[]) => {
-        expect(args).toHaveLength(1);
-        expect(args[0]).toEqual({ param: 'value' });
+      // Application callable without params gets dict as named args
+      const mockFn = vi.fn((args: Record<string, RillValue>) => {
+        expect(args).toEqual({ param: 'value' });
         return 'success';
       });
 
@@ -1772,8 +1770,8 @@ describe('executeToolLoop', () => {
           annotations: {},
         },
       ],
-      fn: (args: RillValue[]) => args[0],
-      description: 'My tool description',
+      fn: (args: Record<string, RillValue>) => args['q'],
+      annotations: { description: 'My tool description' },
       isProperty: false,
     };
 
@@ -1781,7 +1779,7 @@ describe('executeToolLoop', () => {
     const mockRuntimeCallable: RillValue = {
       __type: 'callable' as const,
       kind: 'runtime' as const,
-      fn: (args: RillValue[]) => args[0],
+      fn: (args: Record<string, RillValue>) => args['value'],
       isProperty: false,
     };
 
@@ -1858,8 +1856,8 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-4: ApplicationCallable description from .description', () => {
-      it('extracts description from ApplicationCallable .description field', async () => {
+    describe('AC-4: ApplicationCallable description from annotations', () => {
+      it('extracts description from ApplicationCallable annotations field', async () => {
         const tools = { my_tool: mockAppCallable } as unknown as RillValue;
 
         const buildTools = vi.fn((descriptors) => descriptors);

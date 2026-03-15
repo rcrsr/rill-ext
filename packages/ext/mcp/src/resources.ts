@@ -8,7 +8,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { emitExtensionEvent } from '@rcrsr/rill';
+import { emitExtensionEvent, rillTypeToTypeValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
@@ -106,13 +106,13 @@ export function extractTemplateVariables(uriTemplate: string): string[] {
 function expandUriTemplate(
   uriTemplate: string,
   variables: string[],
-  args: RillValue[]
+  args: Record<string, RillValue>
 ): string {
   let expanded = uriTemplate;
 
   for (let i = 0; i < variables.length; i++) {
     const varName = variables[i]!;
-    const value = args[i];
+    const value = args[varName];
     // Convert value to string for URI expansion
     const stringValue = value !== undefined ? String(value) : '';
     expanded = expanded.replace(`{${varName}}`, stringValue);
@@ -142,7 +142,7 @@ export function createReadResourceFunction(
   lifecycleState: { connectEmitted: boolean }
 ): RillFunction {
   const fn = async (
-    args: RillValue[],
+    args: Record<string, RillValue>,
     ctx: RuntimeContextLike
   ): Promise<RillValue> => {
     // Emit mcp:connect on first resource read [IR-1]
@@ -154,7 +154,7 @@ export function createReadResourceFunction(
       lifecycleState.connectEmitted = true;
     }
 
-    const uri = args[0];
+    const uri = args['uri'];
 
     // Validate URI parameter
     if (typeof uri !== 'string') {
@@ -247,8 +247,8 @@ export function createReadResourceFunction(
   return {
     params: [p.str('uri', 'Resource URI to read')],
     fn,
-    description: 'Read an MCP resource by URI',
-    returnType: { type: 'dict' },
+    annotations: { description: 'Read an MCP resource by URI' },
+    returnType: rillTypeToTypeValue({ type: 'dict' }),
   };
 }
 
@@ -284,7 +284,7 @@ function createResourceTemplateFunction(
 
   // Create async function wrapper
   const fn = async (
-    args: RillValue[],
+    args: Record<string, RillValue>,
     ctx: RuntimeContextLike
   ): Promise<RillValue> => {
     // Emit mcp:connect on first resource template call [IR-1]
@@ -296,12 +296,13 @@ function createResourceTemplateFunction(
       lifecycleState.connectEmitted = true;
     }
     // Validate all arguments are strings
-    for (let i = 0; i < args.length; i++) {
-      const arg = args[i];
+    for (let i = 0; i < variables.length; i++) {
+      const varName = variables[i]!;
+      const arg = args[varName];
       if (typeof arg !== 'string') {
         throw createToolError(
           template.name,
-          `expected string for parameter ${variables[i]}, got ${typeof arg}`
+          `expected string for parameter ${varName}, got ${typeof arg}`
         );
       }
     }
@@ -391,9 +392,9 @@ function createResourceTemplateFunction(
     params,
     fn,
     ...(template.description !== undefined && {
-      description: template.description,
+      annotations: { description: template.description },
     }),
-    returnType: { type: 'dict' },
+    returnType: rillTypeToTypeValue({ type: 'dict' }),
   };
 }
 

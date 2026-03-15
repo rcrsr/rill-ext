@@ -52,8 +52,8 @@ importers:
         version: 6.0.1
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.5
@@ -80,8 +80,8 @@ importers:
         version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.5
@@ -105,8 +105,8 @@ importers:
         version: 5.10.0
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.5
@@ -130,8 +130,8 @@ importers:
         version: 12.6.2
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
@@ -158,8 +158,8 @@ importers:
         version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -186,8 +186,8 @@ importers:
         version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -214,8 +214,8 @@ importers:
         version: 6.27.0(ws@8.19.0)(zod@4.3.6)
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -242,8 +242,8 @@ importers:
         version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.5
@@ -267,8 +267,8 @@ importers:
         version: 3.3.1
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@rcrsr/rill-ext-vector-shared':
         specifier: workspace:^
         version: link:../../shared/ext-vector
@@ -295,8 +295,8 @@ importers:
         version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@rcrsr/rill-ext-vector-shared':
         specifier: workspace:^
         version: link:../../shared/ext-vector
@@ -323,8 +323,8 @@ importers:
         version: link:../../shared/ext-param
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
       '@rcrsr/rill-ext-vector-shared':
         specifier: workspace:^
         version: link:../../shared/ext-vector
@@ -344,20 +344,20 @@ importers:
   packages/shared/ext-llm:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
 
   packages/shared/ext-param:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
 
   packages/shared/ext-vector:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: ~0.16.0
+        version: 0.16.0
 
 packages:
 
@@ -837,8 +837,8 @@ packages:
     resolution: {integrity: sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==}
     engines: {node: '>=18.0.0', pnpm: '>=8'}
 
-  '@rcrsr/rill@0.11.0':
-    resolution: {integrity: sha512-nNM/fBiILTfKi6NNlkKVANNDY5ZWWekTUf+ZnC5075A/kSUES8spKLH6WuKEFyWth22iGNKboNGz+WFkJEPPRQ==}
+  '@rcrsr/rill@0.16.0':
+    resolution: {integrity: sha512-hpWTr9McY8NR1522Jt8iTzFO0avWDDvdZaht9bk40j3gD+fPePgZLKPsZz0H080dpBUfI6vH4Go73jciRblSNQ==}
     engines: {node: '>=20.0.0'}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
@@ -3334,7 +3334,7 @@ snapshots:
 
   '@qdrant/openapi-typescript-fetch@1.2.6': {}
 
-  '@rcrsr/rill@0.11.0': {}
+  '@rcrsr/rill@0.16.0': {}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     optional: true

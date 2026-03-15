@@ -1,0 +1,11 @@
+# import the llm extension and mount it as $llm
+# use<module:ext.llm> => $llm
+
+^("Returns elapsed time")
+|unused: string|{ [hours: 0, minutes: 0, seconds: 12] } => $get_elapsed_time
+
+# use the message function to send a prompt to the LLM and get a response
+# $llm.tool_loop("how many seconds have elapsed?", [tools: [get_elapsed_time: $get_elapsed_time]])
+
+use<ext:llm.tool_loop> -> .^description
+

@@ -89,7 +89,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.message.fn(['Hello'], ctx)) as Record<
+      const result = (await ext.message.fn({ text: 'Hello' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -118,7 +118,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn(['What is 2+2?'], ctx);
+      await ext.message.fn({ text: 'What is 2+2?' }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith({
         model: 'gpt-4-turbo',
@@ -141,7 +141,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn(['What is 2+2?'], ctx);
+      await ext.message.fn({ text: 'What is 2+2?' }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith({
         model: 'gpt-4-turbo',
@@ -166,7 +166,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn(['Test', { system: 'Override system.' }], ctx);
+      await ext.message.fn({ text: 'Test', options: { system: 'Override system.' } }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -190,7 +190,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn(['Test', { max_tokens: 2000 }], ctx);
+      await ext.message.fn({ text: 'Test', options: { max_tokens: 2000 } }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -210,7 +210,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn(['Test'], ctx);
+      await ext.message.fn({ text: 'Test' }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -231,7 +231,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn([''], ctx)).rejects.toThrow(
+      await expect(ext.message.fn({ text: '' }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
@@ -245,7 +245,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn(['   '], ctx)).rejects.toThrow(
+      await expect(ext.message.fn({ text: '   ' }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
@@ -265,7 +265,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn(['Test'], ctx)).rejects.toThrow(
+      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow(
         'OpenAI API error (HTTP 401): Invalid API key'
       );
     });
@@ -283,7 +283,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn(['Test'], ctx)).rejects.toThrow(
+      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow(
         'OpenAI API error (HTTP 429): Rate limit'
       );
     });
@@ -302,7 +302,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn(['Test'], ctx)).rejects.toThrow(
+      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow(
         'OpenAI error: Request timeout'
       );
     });
@@ -322,7 +322,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn(['Test'], ctx)).rejects.toThrow(
+      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow(
         'OpenAI API error (HTTP 500): Internal server error'
       );
     });
@@ -357,7 +357,7 @@ describe('messages() function', () => {
         { role: 'user', content: 'Can you help me?' },
       ];
 
-      const result = (await ext.messages.fn([inputMessages], ctx)) as Record<
+      const result = (await ext.messages.fn({ messages: inputMessages }, ctx)) as Record<
         string,
         unknown
       >;
@@ -385,7 +385,7 @@ describe('messages() function', () => {
 
       const inputMessages = [{ role: 'user', content: 'Hello' }];
 
-      await ext.messages.fn([inputMessages], ctx);
+      await ext.messages.fn({ messages: inputMessages }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -412,7 +412,7 @@ describe('messages() function', () => {
       const inputMessages = [{ role: 'user', content: 'Test' }];
 
       await ext.messages.fn(
-        [inputMessages, { system: 'Override system.' }],
+        { messages: inputMessages, options: { system: 'Override system.' } },
         ctx
       );
 
@@ -439,7 +439,7 @@ describe('messages() function', () => {
 
       const inputMessages = [{ role: 'user', content: 'Test' }];
 
-      await ext.messages.fn([inputMessages, { max_tokens: 2000 }], ctx);
+      await ext.messages.fn({ messages: inputMessages, options: { max_tokens: 2000 } }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -460,7 +460,7 @@ describe('messages() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.messages.fn([[]], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages: [] }, ctx)).rejects.toThrow(
         'messages list cannot be empty'
       );
     });
@@ -477,7 +477,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ content: 'Hello' }];
 
-      await expect(ext.messages.fn([invalidMessages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "message missing required 'role' field"
       );
     });
@@ -494,7 +494,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'system', content: 'Hello' }];
 
-      await expect(ext.messages.fn([invalidMessages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "invalid role 'system'"
       );
     });
@@ -511,7 +511,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'user' }];
 
-      await expect(ext.messages.fn([invalidMessages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "user message requires 'content'"
       );
     });
@@ -528,7 +528,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'assistant' }];
 
-      await expect(ext.messages.fn([invalidMessages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "assistant message requires 'content' or 'tool_calls'"
       );
     });
@@ -550,7 +550,7 @@ describe('messages() function', () => {
       ];
 
       await expect(
-        ext.messages.fn([validMessages], ctx)
+        ext.messages.fn({ messages: validMessages }, ctx)
       ).resolves.toBeDefined();
     });
 
@@ -571,7 +571,7 @@ describe('messages() function', () => {
       ];
 
       await expect(
-        ext.messages.fn([validMessages], ctx)
+        ext.messages.fn({ messages: validMessages }, ctx)
       ).resolves.toBeDefined();
     });
 
@@ -586,7 +586,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'tool' }];
 
-      await expect(ext.messages.fn([invalidMessages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "tool message requires 'content'"
       );
     });
@@ -610,7 +610,7 @@ describe('messages() function', () => {
 
       const messages = [{ role: 'user', content: 'Test' }];
 
-      await expect(ext.messages.fn([messages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages }, ctx)).rejects.toThrow(
         'OpenAI API error (HTTP 401): Invalid API key'
       );
     });
@@ -629,7 +629,7 @@ describe('messages() function', () => {
 
       const messages = [{ role: 'user', content: 'Test' }];
 
-      await expect(ext.messages.fn([messages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages }, ctx)).rejects.toThrow(
         'OpenAI API error (HTTP 429): Rate limit'
       );
     });
@@ -649,7 +649,7 @@ describe('messages() function', () => {
 
       const messages = [{ role: 'user', content: 'Test' }];
 
-      await expect(ext.messages.fn([messages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages }, ctx)).rejects.toThrow(
         'OpenAI error: Request timeout'
       );
     });
@@ -670,7 +670,7 @@ describe('messages() function', () => {
 
       const messages = [{ role: 'user', content: 'Test' }];
 
-      await expect(ext.messages.fn([messages], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages }, ctx)).rejects.toThrow(
         'OpenAI API error (HTTP 500): Internal server error'
       );
     });
@@ -705,7 +705,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.embed.fn(['test text'], ctx)) as any;
+      const result = (await ext.embed.fn({ text: 'test text' }, ctx)) as any;
 
       expect(result.__rill_vector).toBe(true);
       expect(result.model).toBe('text-embedding-3-small');
@@ -730,7 +730,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.embed.fn(['different size'], ctx)) as any;
+      const result = (await ext.embed.fn({ text: 'different size' }, ctx)) as any;
 
       expect(result.data.length).toBe(768);
     });
@@ -748,7 +748,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn([''], ctx)).rejects.toThrow(
+      await expect(ext.embed.fn({ text: '' }, ctx)).rejects.toThrow(
         'embed text cannot be empty'
       );
     });
@@ -763,7 +763,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn(['   \n\t  '], ctx)).rejects.toThrow(
+      await expect(ext.embed.fn({ text: '   \n\t  ' }, ctx)).rejects.toThrow(
         'embed text cannot be empty'
       );
     });
@@ -779,7 +779,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn(['test'], ctx)).rejects.toThrow(
+      await expect(ext.embed.fn({ text: 'test' }, ctx)).rejects.toThrow(
         'embed_model not configured'
       );
     });
@@ -799,7 +799,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn(['test'], ctx)).rejects.toThrow(
+      await expect(ext.embed.fn({ text: 'test' }, ctx)).rejects.toThrow(
         'OpenAI API error (HTTP 401): Invalid API key'
       );
     });
@@ -819,7 +819,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn(['test'], ctx)).rejects.toThrow(
+      await expect(ext.embed.fn({ text: 'test' }, ctx)).rejects.toThrow(
         'OpenAI API error (HTTP 429): Rate limit exceeded'
       );
     });
@@ -856,7 +856,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.embed_batch.fn(
-        [['text1', 'text2']],
+        { texts: ['text1', 'text2'] },
         ctx
       )) as any[];
 
@@ -879,7 +879,7 @@ describe('embed_batch() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.embed_batch.fn([[]], ctx)) as any[];
+      const result = (await ext.embed_batch.fn({ texts: [] }, ctx)) as any[];
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(0);
@@ -897,7 +897,7 @@ describe('embed_batch() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed_batch.fn([['test']], ctx)).rejects.toThrow(
+      await expect(ext.embed_batch.fn({ texts: ['test'] }, ctx)).rejects.toThrow(
         'embed_model not configured'
       );
     });
@@ -914,7 +914,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn([['valid', 123, 'text']], ctx)
+        ext.embed_batch.fn({ texts: ['valid', 123, 'text'] }, ctx)
       ).rejects.toThrow('embed_batch requires list of strings');
     });
 
@@ -930,7 +930,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn([['valid', '', 'text']], ctx)
+        ext.embed_batch.fn({ texts: ['valid', '', 'text'] }, ctx)
       ).rejects.toThrow('embed text cannot be empty at index 1');
     });
 
@@ -947,7 +947,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn([['valid', '   ', 'text']], ctx)
+        ext.embed_batch.fn({ texts: ['valid', '   ', 'text'] }, ctx)
       ).rejects.toThrow('embed text cannot be empty at index 1');
     });
   });
@@ -957,7 +957,7 @@ describe('embed_batch() function', () => {
  * Create an ApplicationCallable with description and param metadata for tool_loop tests.
  */
 function makeTool(
-  fn: (args: RillValue[]) => RillValue | Promise<RillValue>,
+  fn: (args: Record<string, RillValue>) => RillValue | Promise<RillValue>,
   options?: {
     description?: string;
     params?: Array<{ name: string; type: string; description?: string }>;
@@ -1021,7 +1021,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        ['test prompt', { tools }],
+        { prompt: 'test prompt', options: { tools } },
         ctx
       )) as Record<string, unknown>;
 
@@ -1076,7 +1076,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        ['test prompt', { tools, max_turns: 1 }],
+        { prompt: 'test prompt', options: { tools, max_turns: 1 } },
         ctx
       )) as Record<string, unknown>;
 
@@ -1114,7 +1114,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        ['test prompt', { tools }],
+        { prompt: 'test prompt', options: { tools } },
         ctx
       )) as Record<string, unknown>;
 
@@ -1193,14 +1193,14 @@ describe('tool_loop() function', () => {
       };
 
       const result = (await ext.tool_loop.fn(
-        ['What is the weather?', { tools }],
+        { prompt: 'What is the weather?', options: { tools } },
         ctx
       )) as Record<string, unknown>;
 
       expect(result['content']).toBe('The weather is sunny');
       expect(result['turns']).toBe(2);
       expect(result['usage']).toEqual({ input: 30, output: 15 });
-      expect(mockToolFn).toHaveBeenCalledWith(['NYC'], ctx);
+      expect(mockToolFn).toHaveBeenCalledWith({ location: 'NYC' }, ctx);
     });
   });
 
@@ -1215,7 +1215,7 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.tool_loop.fn(['', { tools: {} }], ctx)).rejects.toThrow(
+      await expect(ext.tool_loop.fn({ prompt: '', options: { tools: {} } }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
@@ -1230,7 +1230,7 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.tool_loop.fn(['test', {}], ctx)).rejects.toThrow(
+      await expect(ext.tool_loop.fn({ prompt: 'test', options: {} }, ctx)).rejects.toThrow(
         "tool_loop requires 'tools' option"
       );
     });
@@ -1328,7 +1328,7 @@ describe('tool_loop() function', () => {
       };
 
       await expect(
-        ext.tool_loop.fn(['test prompt', { tools }], ctx)
+        ext.tool_loop.fn({ prompt: 'test prompt', options: { tools } }, ctx)
       ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
     });
 
@@ -1426,7 +1426,7 @@ describe('tool_loop() function', () => {
       };
 
       await expect(
-        ext.tool_loop.fn(['test prompt', { tools, max_errors: 3 }], ctx)
+        ext.tool_loop.fn({ prompt: 'test prompt', options: { tools, max_errors: 3 } }, ctx)
       ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
     });
   });
@@ -1473,7 +1473,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['describe a person', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -1491,7 +1491,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['describe a person', { schema: { name: 'string' } }],
+        { prompt: 'describe a person', options: { schema: { name: 'string' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -1507,7 +1507,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['score this', { schema: { name: 'string', score: 'number' } }],
+        { prompt: 'score this', options: { schema: { name: 'string', score: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -1526,7 +1526,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await ext.generate.fn(
-        ['prompt', { schema: { ok: 'bool' }, system: 'override system' }],
+        { prompt: 'prompt', options: { schema: { ok: 'bool' }, system: 'override system' } },
         ctx
       );
 
@@ -1546,7 +1546,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await ext.generate.fn(
-        ['prompt', { schema: { result: 'string' }, max_tokens: 128 }],
+        { prompt: 'prompt', options: { schema: { result: 'string' }, max_tokens: 128 } },
         ctx
       );
 
@@ -1570,10 +1570,7 @@ describe('generate() function', () => {
       ];
 
       await ext.generate.fn(
-        [
-          'final prompt',
-          { schema: { answer: 'number' }, messages: prependedMessages },
-        ],
+        { prompt: 'final prompt', options: { schema: { answer: 'number' }, messages: prependedMessages } },
         ctx
       );
 
@@ -1608,7 +1605,7 @@ describe('generate() function', () => {
       });
       const ctx = createRuntimeContext();
 
-      await ext.generate.fn(['prompt', { schema: { val: 'number' } }], ctx);
+      await ext.generate.fn({ prompt: 'prompt', options: { schema: { val: 'number' } } }, ctx);
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         messages: Array<{ role: string; content: string }>;
@@ -1625,7 +1622,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx);
+      await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         response_format: {
@@ -1654,7 +1651,7 @@ describe('generate() function', () => {
         },
       });
 
-      await ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx);
+      await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
 
       const generateEvent = events.find(
         (e) => e['event'] === 'openai:generate'
@@ -1672,7 +1669,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(ext.generate.fn(['prompt', {}], ctx)).rejects.toThrow(
+      await expect(ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow(
         "generate requires 'schema' option"
       );
     });
@@ -1682,7 +1679,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(ext.generate.fn(['prompt', {}], ctx)).rejects.toThrow();
+      await expect(ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow();
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
@@ -1693,7 +1690,7 @@ describe('generate() function', () => {
 
       await expect(
         ext.generate.fn(
-          ['prompt', { schema: { field: 'unsupported_type' } }],
+          { prompt: 'prompt', options: { schema: { field: 'unsupported_type' } } },
           ctx
         )
       ).rejects.toThrow('unsupported type: unsupported_type');
@@ -1709,7 +1706,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow('generate: failed to parse response JSON:');
     });
 
@@ -1726,7 +1723,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow('Rate limit exceeded');
     });
 
@@ -1743,7 +1740,7 @@ describe('generate() function', () => {
         },
       });
 
-      await expect(ext.generate.fn(['prompt', {}], ctx)).rejects.toThrow();
+      await expect(ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow();
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');
       expect(errorEvent).toBeDefined();

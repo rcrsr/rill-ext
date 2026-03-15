@@ -92,7 +92,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.message.fn(['Hello Claude', {}], ctx);
+      await ext.message.fn({ text: 'Hello Claude', options: {} }, ctx);
 
       // Verify event was emitted
       expect(events).toHaveLength(1);
@@ -147,7 +147,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         { role: 'user', content: 'How are you?' },
       ];
 
-      await ext.messages.fn([messages, {}], ctx);
+      await ext.messages.fn({ messages, options: {} }, ctx);
 
       expect(events).toHaveLength(1);
 
@@ -181,7 +181,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // embed() throws "embeddings API not available"
-      await expect(ext.embed.fn(['test text'], ctx)).rejects.toThrow(
+      await expect(ext.embed.fn({ text: 'test text' }, ctx)).rejects.toThrow(
         'embeddings API not available'
       );
 
@@ -214,7 +214,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       await expect(
-        ext.embed_batch.fn([['text1', 'text2']], ctx)
+        ext.embed_batch.fn({ texts: ['text1', 'text2'] }, ctx)
       ).rejects.toThrow('embeddings API not available');
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -286,7 +286,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       ];
 
       await ext.tool_loop.fn(
-        ['What is the weather in San Francisco?', { tools: { get_weather: weatherFn } }],
+        { prompt: 'What is the weather in San Francisco?', options: { tools: { get_weather: weatherFn } } },
         ctx
       );
 
@@ -365,7 +365,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       ];
 
       await ext.tool_loop.fn(
-        ['Calculate 5 + 3', { tools: { calculate: calculateFn } }],
+        { prompt: 'Calculate 5 + 3', options: { tools: { calculate: calculateFn } } },
         ctx
       );
 
@@ -436,7 +436,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       (failingTool as Record<string, unknown>)['description'] = 'Always fails';
 
       await ext.tool_loop.fn(
-        ['Test failing tool', { tools: { failing_tool: failingTool } }],
+        { prompt: 'Test failing tool', options: { tools: { failing_tool: failingTool } } },
         ctx
       );
 
@@ -482,7 +482,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.tool_loop.fn(['Simple question', { tools: {} }], ctx);
+      await ext.tool_loop.fn({ prompt: 'Simple question', options: { tools: {} } }, ctx);
 
       // Find tool_loop event
       const toolLoopEvents = events.filter(
@@ -573,7 +573,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       (step2Fn as Record<string, unknown>)['description'] = 'Second step';
 
       await ext.tool_loop.fn(
-        ['Multi-step task', { tools: { step1: step1Fn, step2: step2Fn } }],
+        { prompt: 'Multi-step task', options: { tools: { step1: step1Fn, step2: step2Fn } } },
         ctx
       );
 
@@ -618,7 +618,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect(ext.message.fn(['Test', {}], ctx)).rejects.toThrow();
+      await expect(ext.message.fn({ text: 'Test', options: {} }, ctx)).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -646,7 +646,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Empty messages list triggers validation error
-      await expect(ext.messages.fn([[], {}], ctx)).rejects.toThrow(
+      await expect(ext.messages.fn({ messages: [], options: {} }, ctx)).rejects.toThrow(
         'messages list cannot be empty'
       );
 
@@ -672,7 +672,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Missing tools option triggers validation error
-      await expect(ext.tool_loop.fn(['Test', {}], ctx)).rejects.toThrow(
+      await expect(ext.tool_loop.fn({ prompt: 'Test', options: {} }, ctx)).rejects.toThrow(
         "tool_loop requires 'tools' option"
       );
 
@@ -712,7 +712,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.message.fn(['Test', {}], ctx);
+      await ext.message.fn({ text: 'Test', options: {} }, ctx);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -778,9 +778,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Test all three main functions
-      await ext.message.fn(['Test message', {}], ctx);
-      await ext.messages.fn([[{ role: 'user', content: 'Test' }], {}], ctx);
-      await ext.tool_loop.fn(['Test tool loop', { tools: {} }], ctx);
+      await ext.message.fn({ text: 'Test message', options: {} }, ctx);
+      await ext.messages.fn({ messages: [{ role: 'user', content: 'Test' }], options: {} }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Test tool loop', options: { tools: {} } }, ctx);
 
       expect(mockCreate).toHaveBeenCalledTimes(3);
 

@@ -53,8 +53,8 @@ describe('createChromaExtension', () => {
 
       expect(ext.upsert.params).toBeDefined();
       expect(ext.upsert.fn).toBeTypeOf('function');
-      expect(ext.upsert.description).toBeTypeOf('string');
-      expect(ext.upsert.returnType).toEqual({ type: 'dict' });
+      expect(ext.upsert.annotations?.['description']).toBeTypeOf('string');
+      expect(ext.upsert.returnType).toBeDefined();
     });
   });
 

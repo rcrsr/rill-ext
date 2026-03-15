@@ -99,7 +99,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension();
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn(['Test prompt', {}], ctx);
+      await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify default timeout 1800000 was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -178,7 +178,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension({ binaryPath: 'custom-claude' });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn(['Test', {}], ctx);
+      await ext.prompt.fn({ text: 'Test', options: {} }, ctx);
 
       // Verify custom binary path was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -227,7 +227,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension({ defaultTimeout: 60000 });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn(['Test prompt', {}], ctx);
+      await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify custom default timeout 60000 was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -274,7 +274,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension({ defaultTimeout: 3600000 });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn(['Test prompt', {}], ctx);
+      await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify maximum timeout was accepted
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -328,7 +328,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
     const ctx = createRuntimeContext();
 
-    await ext.prompt.fn(['Test prompt', { timeout: 90000 }], ctx);
+    await ext.prompt.fn({ text: 'Test prompt', options: { timeout: 90000 } }, ctx);
 
     // Verify timeout option overrides default
     expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -375,7 +375,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
     const ctx = createRuntimeContext();
 
-    await ext.skill.fn(['test-skill', { timeout: 120000 }], ctx);
+    await ext.skill.fn({ name: 'test-skill', args: { timeout: 120000 } }, ctx);
 
     // Verify timeout option overrides default for skill
     expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -422,7 +422,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
     const ctx = createRuntimeContext();
 
-    await ext.command.fn(['test-command', { timeout: 150000 }], ctx);
+    await ext.command.fn({ name: 'test-command', args: { timeout: 150000 } }, ctx);
 
     // Verify timeout option overrides default for command
     expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -469,7 +469,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     const ext = createClaudeCodeExtension({ defaultTimeout: 45000 });
     const ctx = createRuntimeContext();
 
-    await ext.prompt.fn(['Test prompt', {}], ctx);
+    await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
     // Verify default timeout was used when option not provided
     expect(spawnClaudeCli).toHaveBeenCalledWith(

@@ -17,6 +17,7 @@ import {
   createVector,
   isVector,
   isDict,
+  rillTypeToTypeValue,
   type ExtensionResult,
   type LlmExtensionContract,
   type RillValue,
@@ -197,15 +198,18 @@ export function createGeminiExtension(
     message: {
       params: [
         p.str('text'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const text = args[0] as string;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const text = args['text'] as string;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-5: Validate text is non-empty
           if (text.trim().length === 0) {
@@ -311,23 +315,36 @@ export function createGeminiExtension(
           throw rillError;
         }
       },
-      description: 'Send single message to Gemini API',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Send single message to Gemini API' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          content: { type: { type: 'string' } },
+          model: { type: { type: 'string' } },
+          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+          stop_reason: { type: { type: 'string' } },
+          id: { type: { type: 'string' } },
+          messages: { type: { type: 'list', element: { type: 'dict' } } },
+        },
+      }),
     },
 
     // IR-5: gemini::messages
     messages: {
       params: [
-        p.list('messages'),
-        p.dict('options', undefined, {}),
+        p.list('messages', { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } }),
+        p.dict('options', undefined, {}, {
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const messages = args[0] as Array<Record<string, unknown>>;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const messages = args['messages'] as Array<Record<string, unknown>>;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // AC-23: Empty messages list raises error
           if (messages.length === 0) {
@@ -496,8 +513,18 @@ export function createGeminiExtension(
           throw rillError;
         }
       },
-      description: 'Send multi-turn conversation to Gemini API',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Send multi-turn conversation to Gemini API' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          content: { type: { type: 'string' } },
+          model: { type: { type: 'string' } },
+          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+          stop_reason: { type: { type: 'string' } },
+          id: { type: { type: 'string' } },
+          messages: { type: { type: 'list', element: { type: 'dict' } } },
+        },
+      }),
     },
 
     // IR-6: gemini::embed
@@ -508,7 +535,7 @@ export function createGeminiExtension(
 
         try {
           // Extract arguments
-          const text = args[0] as string;
+          const text = args['text'] as string;
 
           // Validate using shared functions
           validateEmbedText(text);
@@ -566,8 +593,8 @@ export function createGeminiExtension(
           throw rillError;
         }
       },
-      description: 'Generate embedding vector for text',
-      returnType: { type: 'vector' },
+      annotations: { description: 'Generate embedding vector for text' },
+      returnType: rillTypeToTypeValue({ type: 'vector' }),
     },
 
     // IR-7: gemini::embed_batch
@@ -578,7 +605,7 @@ export function createGeminiExtension(
 
         try {
           // Extract arguments
-          const texts = args[0] as Array<RillValue>;
+          const texts = args['texts'] as Array<RillValue>;
 
           // AC-24: Empty list returns empty list
           if (texts.length === 0) {
@@ -653,23 +680,30 @@ export function createGeminiExtension(
           throw rillError;
         }
       },
-      description: 'Generate embedding vectors for multiple texts',
-      returnType: { type: 'list' },
+      annotations: { description: 'Generate embedding vectors for multiple texts' },
+      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'vector' } }),
     },
 
     // IR-8: gemini::tool_loop
     tool_loop: {
       params: [
         p.str('prompt'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          tools: { type: { type: 'dict' } },
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+          max_errors: { type: { type: 'number' }, defaultValue: 3 },
+          max_turns: { type: { type: 'number' }, defaultValue: 10 },
+          messages: { type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: [] },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const prompt = args[0] as string;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const prompt = args['prompt'] as string;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-22: Validate prompt is non-empty
           if (prompt.trim().length === 0) {
@@ -977,23 +1011,38 @@ export function createGeminiExtension(
           throw rillError;
         }
       },
-      description: 'Execute tool-use loop with Gemini API',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Execute tool-use loop with Gemini API' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          content: { type: { type: 'string' } },
+          model: { type: { type: 'string' } },
+          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+          stop_reason: { type: { type: 'string' } },
+          turns: { type: { type: 'number' } },
+          messages: { type: { type: 'list', element: { type: 'dict' } } },
+        },
+      }),
     },
 
     // IR-3: gemini::generate
     generate: {
       params: [
         p.str('prompt'),
-        p.dict('options'),
+        p.dict('options', undefined, {}, {
+          schema: { type: { type: 'dict' } },
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+          messages: { type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: [] },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const prompt = args[0] as string;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const prompt = args['prompt'] as string;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-3: Validate schema option is present
           if (
@@ -1168,8 +1217,18 @@ export function createGeminiExtension(
           throw rillError;
         }
       },
-      description: 'Generate structured output from Gemini API',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Generate structured output from Gemini API' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          data: { type: { type: 'any' } },
+          raw: { type: { type: 'string' } },
+          model: { type: { type: 'string' } },
+          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+          stop_reason: { type: { type: 'string' } },
+          id: { type: { type: 'string' } },
+        },
+      }),
     },
   }) satisfies LlmExtensionContract;
 

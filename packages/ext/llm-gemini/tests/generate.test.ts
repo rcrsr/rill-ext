@@ -81,7 +81,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['describe a person', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -102,7 +102,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['describe a person', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -128,7 +128,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['rate something', { schema: { score: 'number' } }],
+        { prompt: 'rate something', options: { schema: { score: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -151,7 +151,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['describe a person', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -174,10 +174,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await ext.generate.fn(
-        [
-          'question',
-          { schema: { answer: 'string' }, system: 'Override system.' },
-        ],
+        { prompt: 'question', options: { schema: { answer: 'string' }, system: 'Override system.' } },
         ctx
       );
 
@@ -200,7 +197,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await ext.generate.fn(
-        ['prompt', { schema: { result: 'string' }, max_tokens: 512 }],
+        { prompt: 'prompt', options: { schema: { result: 'string' }, max_tokens: 512 } },
         ctx
       );
 
@@ -228,13 +225,7 @@ describe('generate() function', () => {
       ];
 
       await ext.generate.fn(
-        [
-          'final prompt',
-          {
-            schema: { summary: 'string' },
-            messages: priorMessages,
-          },
-        ],
+        { prompt: 'final prompt', options: { schema: { summary: 'string' }, messages: priorMessages } },
         ctx
       );
 
@@ -271,7 +262,7 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(configWithSystem);
       const ctx = createRuntimeContext();
 
-      await ext.generate.fn(['prompt', { schema: { value: 'number' } }], ctx);
+      await ext.generate.fn({ prompt: 'prompt', options: { schema: { value: 'number' } } }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -289,7 +280,7 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(ext.generate.fn(['prompt', {}], ctx)).rejects.toThrow(
+      await expect(ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow(
         "generate requires 'schema' option"
       );
     });
@@ -301,7 +292,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await ext.generate.fn(['prompt', {}], ctx);
+        await ext.generate.fn({ prompt: 'prompt', options: {} }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -315,7 +306,7 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(ext.generate.fn(['prompt', {}], ctx)).rejects.toThrow();
+      await expect(ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow();
 
       expect(mockGenerateContent).not.toHaveBeenCalled();
     });
@@ -327,7 +318,7 @@ describe('generate() function', () => {
 
       await expect(
         ext.generate.fn(
-          ['prompt', { schema: { field: 'unsupported_type' } }],
+          { prompt: 'prompt', options: { schema: { field: 'unsupported_type' } } },
           ctx
         )
       ).rejects.toThrow('unsupported type: unsupported_type');
@@ -345,7 +336,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow('generate: failed to parse response JSON:');
     });
 
@@ -360,7 +351,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx);
+        await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -384,7 +375,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx);
+        await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -403,7 +394,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow();
     });
 
@@ -413,7 +404,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['prompt', {}], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('schema'),
@@ -438,7 +429,7 @@ describe('generate() function', () => {
       });
 
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow();
 
       const errorEvent = events.find((e) => e['event'] === 'gemini:error');
@@ -467,7 +458,7 @@ describe('generate() function', () => {
       });
 
       await ext.generate.fn(
-        ['describe a person', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       );
 
@@ -498,7 +489,7 @@ describe('generate() function', () => {
       });
 
       await expect(
-        ext.generate.fn(['prompt', { schema: { x: 'number' } }], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow();
 
       expect(events).toHaveLength(1);
@@ -523,7 +514,7 @@ describe('generate() function', () => {
         },
       });
 
-      await expect(ext.generate.fn(['prompt', {}], ctx)).rejects.toThrow();
+      await expect(ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow();
 
       const errorEvent = events.find((e) => e['event'] === 'gemini:error');
       expect(errorEvent).toBeDefined();

@@ -6,7 +6,17 @@
  * @packageDocumentation
  */
 
-import type { ExtensionConfigSchema } from '@rcrsr/rill';
+import { createRequire } from 'node:module';
+import type { ExtensionConfigSchema, ExtensionManifest } from '@rcrsr/rill';
+import { createRedisKvExtension as _factory } from './factory.js';
+
+// ============================================================
+// VERSION
+// ============================================================
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+export const VERSION = _pkg.version;
 
 export type {
   RedisKvMountConfig,
@@ -22,4 +32,14 @@ export { createRedisKvExtension } from './factory.js';
 export const configSchema: ExtensionConfigSchema = {
   url: { type: 'string', required: true, secret: true },
   mounts: { type: 'string' },
+};
+
+// ============================================================
+// EXTENSION MANIFEST
+// ============================================================
+
+export const extensionManifest: ExtensionManifest = {
+  factory: _factory,
+  configSchema,
+  version: VERSION,
 };

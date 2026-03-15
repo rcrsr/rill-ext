@@ -1,8 +1,12 @@
+import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
-import { CHROMA_EXTENSION_VERSION } from '../src/index.js';
+import { VERSION } from '../src/index.js';
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
 
 describe('ChromaDB Extension Scaffold', () => {
-  it('exports version constant', () => {
-    expect(CHROMA_EXTENSION_VERSION).toBe('0.0.1');
+  it('exports VERSION matching package.json', () => {
+    expect(VERSION).toBe(_pkg.version);
   });
 });

@@ -6,7 +6,7 @@
 import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { ExtensionResult, KvExtensionContract, RillValue } from '@rcrsr/rill';
+import { anyTypeValue, rillTypeToTypeValue, type ExtensionResult, type KvExtensionContract, type RillValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { SqliteKvConfig, SqliteKvMountConfig } from './types.js';
 
@@ -214,9 +214,9 @@ export function createSqliteKvExtension(
    * EC-1: Returns schema default if key missing.
    * EC-2: Throws if mount unknown (handled by getMountDb).
    */
-  const get = (args: RillValue[]): RillValue => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
+  const get = (args: Record<string, RillValue>): RillValue => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
 
     const { mountDb, mountConfig } = getMountDb(mountName);
 
@@ -247,10 +247,10 @@ export function createSqliteKvExtension(
   /**
    * IR-2: Get value or fallback.
    */
-  const get_or = (args: RillValue[]): RillValue => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
-    const fallback = args[2] as RillValue;
+  const get_or = (args: Record<string, RillValue>): RillValue => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const fallback = args['fallback'] as RillValue;
 
     const { mountDb } = getMountDb(mountName);
 
@@ -272,10 +272,10 @@ export function createSqliteKvExtension(
    * EC-3: Throws if mode is read-only.
    * EC-4: Throws if value exceeds maxValueSize.
    */
-  const set = (args: RillValue[]): boolean => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
-    const value = args[2] as RillValue;
+  const set = (args: Record<string, RillValue>): boolean => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const value = args['value'] as RillValue;
 
     const { mountDb, mountConfig } = getMountDb(mountName);
 
@@ -335,10 +335,10 @@ export function createSqliteKvExtension(
    * EC-5: Throws if existing value is not a dict.
    * EC-6: Throws if mode is read-only.
    */
-  const merge = (args: RillValue[]): boolean => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
-    const partial = args[2] as Record<string, RillValue>;
+  const merge = (args: Record<string, RillValue>): boolean => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const partial = args['partial'] as Record<string, RillValue>;
 
     const { mountDb, mountConfig } = getMountDb(mountName);
 
@@ -397,9 +397,9 @@ export function createSqliteKvExtension(
   /**
    * IR-5: Delete key.
    */
-  const deleteKey = (args: RillValue[]): boolean => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
+  const deleteKey = (args: Record<string, RillValue>): boolean => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
 
     const { mountDb, mountConfig } = getMountDb(mountName);
 
@@ -417,8 +417,8 @@ export function createSqliteKvExtension(
   /**
    * IR-6: Get all keys.
    */
-  const keys = (args: RillValue[]): string[] => {
-    const mountName = args[0] as string;
+  const keys = (args: Record<string, RillValue>): string[] => {
+    const mountName = args['mount'] as string;
     const { mountDb } = getMountDb(mountName);
 
     const stmt = mountDb.db.prepare(`SELECT key FROM ${mountDb.table}`);
@@ -430,9 +430,9 @@ export function createSqliteKvExtension(
   /**
    * IR-7: Check key existence.
    */
-  const has = (args: RillValue[]): boolean => {
-    const mountName = args[0] as string;
-    const key = args[1] as string;
+  const has = (args: Record<string, RillValue>): boolean => {
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
 
     const { mountDb } = getMountDb(mountName);
 
@@ -447,8 +447,8 @@ export function createSqliteKvExtension(
   /**
    * IR-8: Clear all keys (restores schema defaults if declared mode).
    */
-  const clear = (args: RillValue[]): boolean => {
-    const mountName = args[0] as string;
+  const clear = (args: Record<string, RillValue>): boolean => {
+    const mountName = args['mount'] as string;
     const { mountDb, mountConfig } = getMountDb(mountName);
 
     // Check write permission
@@ -475,8 +475,8 @@ export function createSqliteKvExtension(
   /**
    * IR-9: Get all entries as dict.
    */
-  const getAll = (args: RillValue[]): Record<string, RillValue> => {
-    const mountName = args[0] as string;
+  const getAll = (args: Record<string, RillValue>): Record<string, RillValue> => {
+    const mountName = args['mount'] as string;
     const { mountDb } = getMountDb(mountName);
 
     const stmt = mountDb.db.prepare(`SELECT key, value FROM ${mountDb.table}`);
@@ -493,8 +493,8 @@ export function createSqliteKvExtension(
   /**
    * IR-10: Get schema information (empty list in open mode).
    */
-  const schema = (args: RillValue[]): RillValue[] => {
-    const mountName = args[0] as string;
+  const schema = (args: Record<string, RillValue>): RillValue[] => {
+    const mountName = args['mount'] as string;
     const { mountConfig } = getMountDb(mountName);
 
     if (!mountConfig.schema) {
@@ -547,8 +547,8 @@ export function createSqliteKvExtension(
         p.str('key', 'Key to retrieve'),
       ],
       fn: get,
-      description: 'Get value or schema default',
-      returnType: { type: 'any' },
+      annotations: { description: 'Get value or schema default' },
+      returnType: anyTypeValue,
     },
     get_or: {
       params: [
@@ -557,8 +557,8 @@ export function createSqliteKvExtension(
         p.dict('fallback', 'Fallback value if key missing'),
       ],
       fn: get_or,
-      description: 'Get value or return fallback if key missing',
-      returnType: { type: 'any' },
+      annotations: { description: 'Get value or return fallback if key missing' },
+      returnType: anyTypeValue,
     },
     set: {
       params: [
@@ -567,8 +567,8 @@ export function createSqliteKvExtension(
         p.str('value', 'Value to store'),
       ],
       fn: set,
-      description: 'Set value with validation',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Set value with validation' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     merge: {
       params: [
@@ -577,8 +577,8 @@ export function createSqliteKvExtension(
         p.dict('partial', 'Partial dict to merge'),
       ],
       fn: merge,
-      description: 'Merge partial dict into existing dict value',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Merge partial dict into existing dict value' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     delete: {
       params: [
@@ -586,14 +586,14 @@ export function createSqliteKvExtension(
         p.str('key', 'Key to delete'),
       ],
       fn: deleteKey,
-      description: 'Delete key',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Delete key' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     keys: {
       params: [p.str('mount', 'Mount name')],
       fn: keys,
-      description: 'Get all keys in mount',
-      returnType: { type: 'list' },
+      annotations: { description: 'Get all keys in mount' },
+      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
     },
     has: {
       params: [
@@ -601,32 +601,56 @@ export function createSqliteKvExtension(
         p.str('key', 'Key to check'),
       ],
       fn: has,
-      description: 'Check key existence',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Check key existence' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     clear: {
       params: [p.str('mount', 'Mount name')],
       fn: clear,
-      description: 'Clear all keys in mount',
-      returnType: { type: 'bool' },
+      annotations: { description: 'Clear all keys in mount' },
+      returnType: rillTypeToTypeValue({ type: 'bool' }),
     },
     getAll: {
       params: [p.str('mount', 'Mount name')],
       fn: getAll,
-      description: 'Get all entries as dict',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Get all entries as dict' },
+      returnType: rillTypeToTypeValue({ type: 'dict' }),
     },
     schema: {
       params: [p.str('mount', 'Mount name')],
       fn: schema,
-      description: 'Get schema information',
-      returnType: { type: 'list' },
+      annotations: { description: 'Get schema information' },
+      returnType: rillTypeToTypeValue({
+        type: 'list',
+        element: {
+          type: 'dict',
+          fields: {
+            key: { type: { type: 'string' } },
+            type: { type: { type: 'string' } },
+            description: { type: { type: 'string' } },
+          },
+        },
+      }),
     },
     mounts: {
       params: [],
       fn: mountsList,
-      description: 'Get list of mount metadata',
-      returnType: { type: 'list' },
+      annotations: { description: 'Get list of mount metadata' },
+      returnType: rillTypeToTypeValue({
+        type: 'list',
+        element: {
+          type: 'dict',
+          fields: {
+            name: { type: { type: 'string' } },
+            mode: { type: { type: 'string' } },
+            schema: { type: { type: 'string' } },
+            maxEntries: { type: { type: 'number' } },
+            maxValueSize: { type: { type: 'number' } },
+            database: { type: { type: 'string' } },
+            table: { type: { type: 'string' } },
+          },
+        },
+      }),
     },
   }) satisfies KvExtensionContract;
 

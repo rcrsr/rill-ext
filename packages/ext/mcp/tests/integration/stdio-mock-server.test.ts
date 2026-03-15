@@ -83,7 +83,7 @@ describe('Integration: stdio mock server', () => {
       expect(typeof ext.list_prompts.fn).toBe('function');
 
       // List discovered tools
-      const tools = await ext.list_tools.fn([], mockContext);
+      const tools = await ext.list_tools.fn({}, mockContext);
       expect(Array.isArray(tools)).toBe(true);
       expect(tools.length).toBeGreaterThan(0);
 
@@ -108,7 +108,7 @@ describe('Integration: stdio mock server', () => {
 
       // Call echo tool
       const result = await ext.echo.fn(
-        [{ message: 'Hello, MCP!' }],
+        { message: 'Hello, MCP!' },
         mockContext
       );
 
@@ -128,7 +128,7 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
 
       // Call add tool with parameters
-      const result = await ext.add.fn([{ a: 5, b: 7 }], mockContext);
+      const result = await ext.add.fn({ a: 5, b: 7 }, mockContext);
 
       // Verify result (should be string "12")
       expect(result).toBe('12');
@@ -148,7 +148,7 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
 
       // Call get_status which returns JSON text
-      const result = await ext.get_status.fn([{}], mockContext);
+      const result = await ext.get_status.fn({}, mockContext);
 
       // AC-8: JSON text {"status": "ok"} → dict [status: "ok"]
       expect(typeof result).toBe('object');
@@ -170,7 +170,7 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
 
       // Call echo which returns plain text
-      const result = await ext.echo.fn([{ message: 'success' }], mockContext);
+      const result = await ext.echo.fn({ message: 'success' }, mockContext);
 
       // AC-8: Plain text "success" → string "success"
       expect(typeof result).toBe('string');
@@ -189,7 +189,7 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
 
       // Call get_image which returns base64 image
-      const result = await ext.get_image.fn([{}], mockContext);
+      const result = await ext.get_image.fn({}, mockContext);
 
       // AC-8: Image → dict [type: "image", data: base64, mime: "image/png"]
       expect(typeof result).toBe('object');
@@ -213,7 +213,7 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
 
       // List resources
-      const resources = await ext.list_resources.fn([], mockContext);
+      const resources = await ext.list_resources.fn({}, mockContext);
 
       expect(Array.isArray(resources)).toBe(true);
       expect(resources.length).toBeGreaterThan(0);
@@ -237,7 +237,7 @@ describe('Integration: stdio mock server', () => {
 
       // Read test-doc resource
       const result = await ext.read_resource.fn(
-        [{ uri: 'file:///test/doc.txt' }],
+        { uri: 'file:///test/doc.txt' },
         mockContext
       );
 
@@ -269,7 +269,7 @@ describe('Integration: stdio mock server', () => {
 
       // Read user profile resource with ID
       const result = await ext.resource_user_profile.fn(
-        [{ id: '123' }],
+        { id: '123' },
         mockContext
       );
 
@@ -299,7 +299,7 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
 
       // List prompts
-      const prompts = await ext.list_prompts.fn([], mockContext);
+      const prompts = await ext.list_prompts.fn({}, mockContext);
 
       expect(Array.isArray(prompts)).toBe(true);
       expect(prompts.length).toBeGreaterThan(0);
@@ -322,7 +322,7 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
 
       // Get greeting prompt
-      const result = await ext.prompt_greeting.fn([{}], mockContext);
+      const result = await ext.prompt_greeting.fn({}, mockContext);
 
       // Verify result structure
       expect(typeof result).toBe('object');
@@ -352,12 +352,10 @@ describe('Integration: stdio mock server', () => {
 
       // Get code_review prompt with arguments
       const result = await ext.prompt_code_review.fn(
-        [
-          {
-            language: 'TypeScript',
-            code: 'function hello() { return "world"; }',
-          },
-        ],
+        {
+          language: 'TypeScript',
+          code: 'function hello() { return "world"; }',
+        },
         mockContext
       );
 
@@ -405,18 +403,18 @@ describe('Integration: stdio mock server', () => {
 
       // Call tools from different extensions
       const result1 = await ext1.echo.fn(
-        [{ message: 'from server 1' }],
+        { message: 'from server 1' },
         mockContext
       );
-      const result2 = await ext2.get_status.fn([{}], mockContext);
+      const result2 = await ext2.get_status.fn({}, mockContext);
 
       expect(result1).toBe('from server 1');
       expect(typeof result2).toBe('object');
       expect((result2 as Record<string, unknown>).status).toBe('ok');
 
       // Verify both extensions work independently
-      const add1 = await ext1.add.fn([{ a: 1, b: 2 }], mockContext);
-      const add2 = await ext2.add.fn([{ a: 10, b: 20 }], mockContext);
+      const add1 = await ext1.add.fn({ a: 1, b: 2 }, mockContext);
+      const add2 = await ext2.add.fn({ a: 10, b: 20 }, mockContext);
 
       expect(add1).toBe('3');
       expect(add2).toBe('30');
@@ -435,7 +433,7 @@ describe('Integration: stdio mock server', () => {
       });
 
       // Verify extension works
-      const result = await ext.echo.fn([{ message: 'test' }], mockContext);
+      const result = await ext.echo.fn({ message: 'test' }, mockContext);
       expect(result).toBe('test');
 
       // Dispose extension
@@ -444,7 +442,7 @@ describe('Integration: stdio mock server', () => {
       // After dispose, calling functions should fail
       // (The exact error depends on transport state)
       await expect(
-        ext.echo.fn([{ message: 'test' }], mockContext)
+        ext.echo.fn({ message: 'test' }, mockContext)
       ).rejects.toThrow();
     }, 15000);
 

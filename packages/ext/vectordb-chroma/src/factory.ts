@@ -8,6 +8,7 @@ import {
   RuntimeError,
   emitExtensionEvent,
   createVector,
+  rillTypeToTypeValue,
   type ExtensionResult,
   type VectorExtensionContract,
   type RillValue,
@@ -92,9 +93,9 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           checkDisposed(disposalState, 'chroma');
 
           // Extract arguments
-          const id = args[0] as string;
-          const vector = args[1] as RillVector;
-          const metadata = (args[2] ?? {}) as Record<string, unknown>;
+          const id = args['id'] as string;
+          const vector = args['vector'] as RillVector;
+          const metadata = (args['metadata'] ?? {}) as Record<string, unknown>;
 
           // Get or create collection
           const collection = await client.getOrCreateCollection({
@@ -139,8 +140,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Insert or update single vector with metadata',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Insert or update single vector with metadata' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, success: { type: { type: 'bool' } } } }),
     },
 
     // IR-2: chroma::upsert_batch
@@ -153,7 +154,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           checkDisposed(disposalState, 'chroma');
 
           // Extract arguments
-          const items = args[0] as Array<Record<string, RillValue>>;
+          const items = args['items'] as Array<Record<string, RillValue>>;
 
           let succeeded = 0;
 
@@ -249,15 +250,18 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Batch insert/update vectors',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Batch insert/update vectors' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { succeeded: { type: { type: 'number' } }, failed: { type: { type: 'string' } }, error: { type: { type: 'string' } } } }),
     },
 
     // IR-3: chroma::search
     search: {
       params: [
         vectorParam('vector'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          k: { type: { type: 'number' }, defaultValue: 10 },
+          filter: { type: { type: 'dict' }, defaultValue: {} },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -266,8 +270,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           checkDisposed(disposalState, 'chroma');
 
           // Extract arguments
-          const vector = args[0] as RillVector;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const vector = args['vector'] as RillVector;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // Extract options with defaults
           const k = typeof options['k'] === 'number' ? options['k'] : 10;
@@ -328,8 +332,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Search k nearest neighbors',
-      returnType: { type: 'list' },
+      annotations: { description: 'Search k nearest neighbors' },
+      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { id: { type: { type: 'string' } }, score: { type: { type: 'number' } }, metadata: { type: { type: 'dict' } } } } }),
     },
 
     // IR-4: chroma::get
@@ -342,7 +346,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           checkDisposed(disposalState, 'chroma');
 
           // Extract arguments
-          const id = args[0] as string;
+          const id = args['id'] as string;
 
           // Get or create collection
           const collection = await client.getOrCreateCollection({
@@ -405,8 +409,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Fetch vector by ID',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Fetch vector by ID' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, vector: { type: { type: 'vector' } }, metadata: { type: { type: 'dict' } } } }),
     },
 
     // IR-5: chroma::delete
@@ -419,7 +423,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           checkDisposed(disposalState, 'chroma');
 
           // Extract arguments
-          const id = args[0] as string;
+          const id = args['id'] as string;
 
           // Get or create collection
           const collection = await client.getOrCreateCollection({
@@ -462,8 +466,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Delete vector by ID',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Delete vector by ID' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, deleted: { type: { type: 'bool' } } } }),
     },
 
     // IR-6: chroma::delete_batch
@@ -476,7 +480,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           checkDisposed(disposalState, 'chroma');
 
           // Extract arguments
-          const ids = args[0] as Array<string>;
+          const ids = args['ids'] as Array<string>;
 
           let succeeded = 0;
 
@@ -543,8 +547,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Batch delete vectors',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Batch delete vectors' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { succeeded: { type: { type: 'number' } }, failed: { type: { type: 'string' } }, error: { type: { type: 'string' } } } }),
     },
 
     // IR-7: chroma::count
@@ -589,15 +593,17 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Return total vector count in collection',
-      returnType: { type: 'number' },
+      annotations: { description: 'Return total vector count in collection' },
+      returnType: rillTypeToTypeValue({ type: 'number' }),
     },
 
     // IR-8: chroma::create_collection
     create_collection: {
       params: [
         p.str('name'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          metadata: { type: { type: 'dict' }, defaultValue: {} },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -606,8 +612,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           checkDisposed(disposalState, 'chroma');
 
           // Extract arguments
-          const name = args[0] as string;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const name = args['name'] as string;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // Extract metadata options
           const metadata = (options['metadata'] ?? {}) as Record<
@@ -652,8 +658,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Create new vector collection',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Create new vector collection' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, created: { type: { type: 'bool' } } } }),
     },
 
     // IR-9: chroma::delete_collection
@@ -666,7 +672,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           checkDisposed(disposalState, 'chroma');
 
           // Extract arguments
-          const name = args[0] as string;
+          const name = args['name'] as string;
 
           // Call ChromaDB API
           await client.deleteCollection({ name });
@@ -702,8 +708,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Delete vector collection',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Delete vector collection' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, deleted: { type: { type: 'bool' } } } }),
     },
 
     // IR-10: chroma::list_collections
@@ -743,8 +749,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'List all collection names',
-      returnType: { type: 'list' },
+      annotations: { description: 'List all collection names' },
+      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
     },
 
     // IR-11: chroma::describe
@@ -795,8 +801,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
           throw rillError;
         }
       },
-      description: 'Describe configured collection',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Describe configured collection' },
+      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, count: { type: { type: 'number' } } } }),
     },
   }) satisfies VectorExtensionContract;
 

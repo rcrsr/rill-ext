@@ -89,7 +89,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       // Execute prompt
-      await ext.prompt.fn(['Hello Claude', {}], ctx);
+      await ext.prompt.fn({ text: 'Hello Claude', options: {} }, ctx);
 
       // Verify event was emitted
       expect(events).toHaveLength(1);
@@ -148,7 +148,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.prompt.fn([longPrompt, {}], ctx);
+      await ext.prompt.fn({ text: longPrompt, options: {} }, ctx);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -203,7 +203,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const skillArgs = { verbose: true, retries: 3 };
-      await ext.skill.fn(['test-skill', skillArgs], ctx);
+      await ext.skill.fn({ name: 'test-skill', args: skillArgs }, ctx);
 
       expect(events).toHaveLength(1);
 
@@ -261,7 +261,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.skill.fn(['test-skill', {}], ctx);
+      await ext.skill.fn({ name: 'test-skill', args: {} }, ctx);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -315,7 +315,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const commandArgs = { config: { format: 'json' }, priority: 'high' };
-      await ext.command.fn(['test-command', commandArgs], ctx);
+      await ext.command.fn({ name: 'test-command', args: commandArgs }, ctx);
 
       expect(events).toHaveLength(1);
 
@@ -361,7 +361,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect(ext.prompt.fn(['Test', {}], ctx)).rejects.toThrow();
+      await expect(ext.prompt.fn({ text: 'Test', options: {} }, ctx)).rejects.toThrow();
 
       // Find error event
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
@@ -403,7 +403,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect(ext.skill.fn(['failing-skill', {}], ctx)).rejects.toThrow();
+      await expect(ext.skill.fn({ name: 'failing-skill', args: {} }, ctx)).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
       expect(errorEvents).toHaveLength(1);
@@ -442,7 +442,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       await expect(
-        ext.command.fn(['failing-command', {}], ctx)
+        ext.command.fn({ name: 'failing-command', args: {} }, ctx)
       ).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
@@ -482,7 +482,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect(ext.prompt.fn(['Test', {}], ctx)).rejects.toBeDefined();
+      await expect(ext.prompt.fn({ text: 'Test', options: {} }, ctx)).rejects.toBeDefined();
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
       expect(errorEvents).toHaveLength(1);
@@ -547,7 +547,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.prompt.fn(['Test', {}], ctx);
+      await ext.prompt.fn({ text: 'Test', options: {} }, ctx);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -605,9 +605,9 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       // Test all three functions
-      await ext.prompt.fn(['Test', {}], ctx);
-      await ext.skill.fn(['skill', {}], ctx);
-      await ext.command.fn(['command', {}], ctx);
+      await ext.prompt.fn({ text: 'Test', options: {} }, ctx);
+      await ext.skill.fn({ name: 'skill', args: {} }, ctx);
+      await ext.command.fn({ name: 'command', args: {} }, ctx);
 
       expect(events).toHaveLength(3);
       events.forEach((event) => {

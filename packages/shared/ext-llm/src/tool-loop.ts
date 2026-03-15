@@ -93,36 +93,10 @@ async function executeToolCall(
   }
 
   try {
-    // Convert dict input to positional args using param metadata
-    // LLM providers send params as dict, but Rill callables expect positional args
-    let args: RillValue[];
+    const inputDict = toolInput as Record<string, RillValue>;
 
-    if (
-      (callable.kind === 'application' || callable.kind === 'script') &&
-      callable.params &&
-      callable.params.length > 0
-    ) {
-      // Extract param order from metadata
-      // Works for both ApplicationCallable (host fns) and ScriptCallable (closures)
-      const params = callable.params;
-      const inputDict = toolInput as Record<string, RillValue>;
-      args = params.map((param) => {
-        const value = inputDict[param.name];
-        // LLM should provide all params, but use undefined if missing
-        // Runtime will handle validation of required params
-        return value !== undefined
-          ? value
-          : (undefined as unknown as RillValue);
-      });
-    } else {
-      // Fallback: No param metadata, pass dict as single arg
-      // This preserves backward compatibility with runtime callables
-      args = [toolInput as Record<string, RillValue>];
-    }
-
-    // Invoke the tool with its arguments.
     // ScriptCallable requires a full RuntimeContext via invokeCallable.
-    // Runtime/Application callables use .fn with the minimal context.
+    // invokeCallable takes positional RillValue[] — convert dict to positional args.
     if (callable.kind === 'script') {
       if (!context) {
         throw new RuntimeError(
@@ -130,16 +104,29 @@ async function executeToolCall(
           `Invalid tool input for ${toolName}: script callable requires a runtime context`
         );
       }
+
+      let args: RillValue[];
+      if (callable.params && callable.params.length > 0) {
+        args = callable.params.map((param) => {
+          const value = inputDict[param.name];
+          return value !== undefined
+            ? value
+            : (undefined as unknown as RillValue);
+        });
+      } else {
+        args = [inputDict];
+      }
       return await invokeCallable(callable, args, context as RuntimeContext);
     }
 
-    // If no context provided, create minimal context-like object for callable signature
+    // Runtime/Application callables use .fn directly with named args (Record<string, RillValue>).
+    // If no context provided, create minimal context-like object for callable signature.
     const ctx: RuntimeContextLike = context ?? {
       parent: undefined,
       variables: new Map<string, RillValue>(),
       pipeValue: null,
     };
-    const result = callable.fn(args, ctx);
+    const result = callable.fn(inputDict, ctx);
     return result instanceof Promise ? await result : result;
   } catch (error: unknown) {
     // Re-throw RuntimeErrors directly
@@ -338,17 +325,10 @@ export async function executeToolLoop(
       );
     }
 
-    // Extract description based on callable kind (IR-2, IR-3)
+    // Extract description from callable annotations (IR-2, IR-3)
     const callable = fnValue as RillCallable;
-    let description: string;
-    if (callable.kind === 'script') {
-      description =
-        ((callable as ScriptCallable).annotations['description'] as
-          | string
-          | undefined) ?? '';
-    } else {
-      description = (callable as ApplicationCallable).description ?? '';
-    }
+    const description =
+      (callable.annotations?.['description'] as string | undefined) ?? '';
 
     // Extract parameter metadata and generate JSON Schema
     let inputSchema: {
@@ -370,7 +350,7 @@ export async function executeToolLoop(
       // param.annotations['description'] used for all callable kinds (AC-10, AC-11, AC-30).
       const closureType: RillType = {
         type: 'closure',
-        params: params.map((p) => [p.name, p.type ?? { type: 'any' }] as [string, RillType]),
+        params: params.map((p) => ({ name: p.name, type: p.type ?? { type: 'any' } as RillType })),
       };
       const builtSchema = buildJsonSchemaFromStructuralType(closureType, [...params]);
 

@@ -151,7 +151,7 @@ describe('dispose() functionality', () => {
       const result = await createMcpExtension(config);
 
       // Start a long-running tool call
-      const toolCallResultPromise = result.long_running_tool!.fn([], {
+      const toolCallResultPromise = result.long_running_tool!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
@@ -224,7 +224,7 @@ describe('dispose() functionality', () => {
       expect(typeof result.test_tool.fn).toBe('function');
 
       // IR-2: Tool function is callable
-      const toolResult = await result.test_tool.fn(['value1'], {
+      const toolResult = await result.test_tool.fn({ param1: 'value1' }, {
         _lifecycle: { connectEmitted: false },
       } as any);
       expect(toolResult).toBe('success');

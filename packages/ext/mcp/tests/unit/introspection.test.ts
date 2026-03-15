@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { rillTypeToTypeValue } from '@rcrsr/rill';
 import {
   createIntrospectionFunctions,
   type McpTool,
@@ -30,7 +31,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions(tools, [], [], []);
-      const result = (await functions.list_tools.fn([])) as RillValue[];
+      const result = (await functions.list_tools.fn({})) as RillValue[];
 
       // Assert
       expect(result).toHaveLength(2);
@@ -47,7 +48,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions(tools, [], [], []);
-      const result = (await functions.list_tools.fn([])) as RillValue[];
+      const result = (await functions.list_tools.fn({})) as RillValue[];
 
       // Assert
       expect(result[0]).toEqual({ name: 'echo', description: '' });
@@ -59,7 +60,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions(tools, [], [], []);
-      const result = (await functions.list_tools.fn([])) as RillValue[];
+      const result = (await functions.list_tools.fn({})) as RillValue[];
 
       // Assert
       expect(result).toEqual([]);
@@ -71,10 +72,10 @@ describe('createIntrospectionFunctions', () => {
 
       // Assert
       expect(functions.list_tools.params).toEqual([]);
-      expect(functions.list_tools.description).toBe(
+      expect(functions.list_tools.annotations?.description).toBe(
         'List all available tools from MCP server'
       );
-      expect(functions.list_tools.returnType).toEqual({ type: 'list' });
+      expect(functions.list_tools.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } } } } }));
     });
   });
 
@@ -98,7 +99,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], resources, [], []);
-      const result = (await functions.list_resources.fn([])) as RillValue[];
+      const result = (await functions.list_resources.fn({})) as RillValue[];
 
       // Assert
       expect(result).toHaveLength(2);
@@ -127,7 +128,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], resources, [], []);
-      const result = (await functions.list_resources.fn([])) as RillValue[];
+      const result = (await functions.list_resources.fn({})) as RillValue[];
 
       // Assert
       expect(result[0]).toEqual({
@@ -144,7 +145,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], resources, [], []);
-      const result = (await functions.list_resources.fn([])) as RillValue[];
+      const result = (await functions.list_resources.fn({})) as RillValue[];
 
       // Assert
       expect(result).toEqual([]);
@@ -156,10 +157,10 @@ describe('createIntrospectionFunctions', () => {
 
       // Assert
       expect(functions.list_resources.params).toEqual([]);
-      expect(functions.list_resources.description).toBe(
+      expect(functions.list_resources.annotations?.description).toBe(
         'List all available resources from MCP server'
       );
-      expect(functions.list_resources.returnType).toEqual({ type: 'list' });
+      expect(functions.list_resources.returnType).toEqual(rillTypeToTypeValue({ type: 'list' }));
     });
   });
 
@@ -181,7 +182,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn([])) as RillValue[];
+      const result = (await functions.list_prompts.fn({})) as RillValue[];
 
       // Assert
       expect(result).toHaveLength(2);
@@ -203,7 +204,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn([])) as RillValue[];
+      const result = (await functions.list_prompts.fn({})) as RillValue[];
 
       // Assert
       expect(result[0]).toEqual({
@@ -225,7 +226,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn([])) as RillValue[];
+      const result = (await functions.list_prompts.fn({})) as RillValue[];
 
       // Assert
       expect(result[0]).toEqual({
@@ -241,7 +242,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn([])) as RillValue[];
+      const result = (await functions.list_prompts.fn({})) as RillValue[];
 
       // Assert
       expect(result).toEqual([]);
@@ -253,10 +254,10 @@ describe('createIntrospectionFunctions', () => {
 
       // Assert
       expect(functions.list_prompts.params).toEqual([]);
-      expect(functions.list_prompts.description).toBe(
+      expect(functions.list_prompts.annotations?.description).toBe(
         'List all available prompts from MCP server'
       );
-      expect(functions.list_prompts.returnType).toEqual({ type: 'list' });
+      expect(functions.list_prompts.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } }, arguments: { type: { type: 'list', element: { type: 'string' } } } } } }));
     });
   });
 
@@ -267,8 +268,8 @@ describe('createIntrospectionFunctions', () => {
       const functions = createIntrospectionFunctions(tools, [], [], []);
 
       // Act
-      const result1 = (await functions.list_tools.fn([])) as RillValue[];
-      const result2 = (await functions.list_tools.fn([])) as RillValue[];
+      const result1 = (await functions.list_tools.fn({})) as RillValue[];
+      const result2 = (await functions.list_tools.fn({})) as RillValue[];
 
       // Assert
       expect(result1).toEqual(result2);
@@ -282,9 +283,9 @@ describe('createIntrospectionFunctions', () => {
       const functions = createIntrospectionFunctions([], [], [], []);
 
       // Act
-      const tools = (await functions.list_tools.fn([])) as RillValue[];
-      const resources = (await functions.list_resources.fn([])) as RillValue[];
-      const prompts = (await functions.list_prompts.fn([])) as RillValue[];
+      const tools = (await functions.list_tools.fn({})) as RillValue[];
+      const resources = (await functions.list_resources.fn({})) as RillValue[];
+      const prompts = (await functions.list_prompts.fn({})) as RillValue[];
 
       // Assert
       expect(Object.keys(functions)).toEqual([
@@ -309,7 +310,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions(tools, [], [], []);
-      const result = (await functions.list_tools.fn([])) as RillValue[];
+      const result = (await functions.list_tools.fn({})) as RillValue[];
 
       // Assert - all three tools returned regardless of filter settings
       expect(result).toHaveLength(3);
@@ -329,7 +330,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], resources, [], []);
-      const result = (await functions.list_resources.fn([])) as RillValue[];
+      const result = (await functions.list_resources.fn({})) as RillValue[];
 
       // Assert - all resources returned
       expect(result).toHaveLength(2);
@@ -341,7 +342,7 @@ describe('createIntrospectionFunctions', () => {
 
       // Act
       const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn([])) as RillValue[];
+      const result = (await functions.list_prompts.fn({})) as RillValue[];
 
       // Assert - all prompts returned
       expect(result).toHaveLength(2);

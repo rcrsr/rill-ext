@@ -3,7 +3,17 @@
  * Provides vector database operations using ChromaDB.
  */
 
-import type { ExtensionConfigSchema } from '@rcrsr/rill';
+import { createRequire } from 'node:module';
+import type { ExtensionConfigSchema, ExtensionManifest } from '@rcrsr/rill';
+import { createChromaExtension as _factory } from './factory.js';
+
+// ============================================================
+// VERSION
+// ============================================================
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+export const VERSION = _pkg.version;
 
 // ============================================================
 // PUBLIC TYPES
@@ -26,6 +36,11 @@ export const configSchema: ExtensionConfigSchema = {
 };
 
 // ============================================================
-// VERSION
+// EXTENSION MANIFEST
 // ============================================================
-export const CHROMA_EXTENSION_VERSION = '0.0.1';
+
+export const extensionManifest: ExtensionManifest = {
+  factory: _factory,
+  configSchema,
+  version: VERSION,
+};

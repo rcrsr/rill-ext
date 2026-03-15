@@ -7,6 +7,7 @@ import which from 'which';
 import {
   RuntimeError,
   emitExtensionEvent,
+  rillTypeToTypeValue,
   type ExtensionResult,
   type RillValue,
   type RuntimeContext,
@@ -179,15 +180,17 @@ export function createClaudeCodeExtension(
     prompt: {
       params: [
         p.str('text'),
-        p.dict('options', undefined, {}),
+        p.dict('options', undefined, {}, {
+          timeout: { type: { type: 'number' }, defaultValue: 0 },
+        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const text = args[0] as string;
-          const options = (args[1] ?? {}) as Record<string, unknown>;
+          const text = args['text'] as string;
+          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-3: Validate text is non-empty
           if (text.trim().length === 0) {
@@ -257,24 +260,40 @@ export function createClaudeCodeExtension(
           throw error;
         }
       },
-      description:
-        'Execute Claude Code prompt and return result text and token usage',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Execute Claude Code prompt and return result text and token usage' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          result: { type: { type: 'string' } },
+          tokens: { type: { type: 'dict', fields: {
+            prompt: { type: { type: 'number' } },
+            cacheWrite5m: { type: { type: 'number' } },
+            cacheWrite1h: { type: { type: 'number' } },
+            cacheRead: { type: { type: 'number' } },
+            output: { type: { type: 'number' } },
+          } } },
+          cost: { type: { type: 'number' } },
+          exitCode: { type: { type: 'number' } },
+          duration: { type: { type: 'number' } },
+        },
+      }),
     },
 
     // IR-3: claude-code::skill
     skill: {
       params: [
         p.str('name'),
-        p.dict('args', undefined, {}),
+        p.dict('args', undefined, {}, {
+          timeout: { type: { type: 'number' }, defaultValue: 0 },
+        }),
       ],
       fn: async (fnArgs, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const name = fnArgs[0] as string;
-          const args = (fnArgs[1] ?? {}) as Record<string, unknown>;
+          const name = fnArgs['name'] as string;
+          const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
           // EC-10: Validate name is non-empty
           if (name.trim().length === 0) {
@@ -349,24 +368,40 @@ export function createClaudeCodeExtension(
           throw error;
         }
       },
-      description:
-        'Execute Claude Code skill with instruction and return structured result',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Execute Claude Code skill with instruction and return structured result' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          result: { type: { type: 'string' } },
+          tokens: { type: { type: 'dict', fields: {
+            prompt: { type: { type: 'number' } },
+            cacheWrite5m: { type: { type: 'number' } },
+            cacheWrite1h: { type: { type: 'number' } },
+            cacheRead: { type: { type: 'number' } },
+            output: { type: { type: 'number' } },
+          } } },
+          cost: { type: { type: 'number' } },
+          exitCode: { type: { type: 'number' } },
+          duration: { type: { type: 'number' } },
+        },
+      }),
     },
 
     // IR-4: claude-code::command
     command: {
       params: [
         p.str('name'),
-        p.dict('args', undefined, {}),
+        p.dict('args', undefined, {}, {
+          timeout: { type: { type: 'number' }, defaultValue: 0 },
+        }),
       ],
       fn: async (fnArgs, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const name = fnArgs[0] as string;
-          const args = (fnArgs[1] ?? {}) as Record<string, unknown>;
+          const name = fnArgs['name'] as string;
+          const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
           // EC-13: Validate name is non-empty
           if (name.trim().length === 0) {
@@ -441,9 +476,23 @@ export function createClaudeCodeExtension(
           throw error;
         }
       },
-      description:
-        'Execute Claude Code command with task description and return execution summary',
-      returnType: { type: 'dict' },
+      annotations: { description: 'Execute Claude Code command with task description and return execution summary' },
+      returnType: rillTypeToTypeValue({
+        type: 'dict',
+        fields: {
+          result: { type: { type: 'string' } },
+          tokens: { type: { type: 'dict', fields: {
+            prompt: { type: { type: 'number' } },
+            cacheWrite5m: { type: { type: 'number' } },
+            cacheWrite1h: { type: { type: 'number' } },
+            cacheRead: { type: { type: 'number' } },
+            output: { type: { type: 'number' } },
+          } } },
+          cost: { type: { type: 'number' } },
+          exitCode: { type: { type: 'number' } },
+          duration: { type: { type: 'number' } },
+        },
+      }),
     },
   };
 

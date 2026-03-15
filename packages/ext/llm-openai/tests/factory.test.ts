@@ -185,8 +185,8 @@ describe('createOpenAIExtension', () => {
           { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
-        description: expect.any(String),
-        returnType: { type: 'dict' },
+        annotations: { description: expect.any(String) },
+        returnType: { typeName: 'dict' },
       });
     });
 
@@ -200,12 +200,12 @@ describe('createOpenAIExtension', () => {
 
       expect(result.messages).toMatchObject({
         params: [
-          { name: 'messages', type: { type: 'list' }, defaultValue: undefined, annotations: {} },
+          { name: 'messages', type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: undefined, annotations: {} },
           { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
-        description: expect.any(String),
-        returnType: { type: 'dict' },
+        annotations: { description: expect.any(String) },
+        returnType: { typeName: 'dict' },
       });
     });
 
@@ -220,8 +220,8 @@ describe('createOpenAIExtension', () => {
       expect(result.embed).toMatchObject({
         params: [{ name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} }],
         fn: expect.any(Function),
-        description: expect.any(String),
-        returnType: { type: 'vector' },
+        annotations: { description: expect.any(String) },
+        returnType: { typeName: 'vector' },
       });
     });
 
@@ -236,8 +236,8 @@ describe('createOpenAIExtension', () => {
       expect(result.embed_batch).toMatchObject({
         params: [{ name: 'texts', type: { type: 'list' }, defaultValue: undefined, annotations: {} }],
         fn: expect.any(Function),
-        description: expect.any(String),
-        returnType: { type: 'list' },
+        annotations: { description: expect.any(String) },
+        returnType: { typeName: 'list' },
       });
     });
 
@@ -255,8 +255,8 @@ describe('createOpenAIExtension', () => {
           { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
-        description: expect.any(String),
-        returnType: { type: 'dict' },
+        annotations: { description: expect.any(String) },
+        returnType: { typeName: 'dict' },
       });
     });
   });

@@ -102,10 +102,10 @@ function buildPropertyFromStructuralType(rillType: RillType): JsonSchemaProperty
 }
 
 /**
- * Build a JSON Schema object from a RillType (v0.11).
+ * Build a JSON Schema object from a RillType.
  *
  * For the closure variant:
- * - Iterates type.params (array of [name, RillType]).
+ * - Iterates type.params (array of RillFieldDef).
  * - Matches each entry to params[i] by position for metadata.
  * - annotations.description from rillParam.annotations['description'].
  * - annotations.enum from rillParam.annotations['enum'].
@@ -126,7 +126,9 @@ export function buildJsonSchemaFromStructuralType(
   if (type.type === 'closure') {
     const closureParams = type.params ?? [];
     for (let i = 0; i < closureParams.length; i++) {
-      const [paramName, paramType] = closureParams[i]!;
+      const fieldDef = closureParams[i]!;
+      const paramName = fieldDef.name ?? `param${i}`;
+      const paramType = fieldDef.type;
       const rillParam = params?.[i];
 
       const property = buildPropertyFromStructuralType(paramType);

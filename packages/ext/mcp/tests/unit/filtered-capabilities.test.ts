@@ -89,7 +89,7 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Assert - Introspection lists all 10 tools
       expect(result.list_tools).toBeDefined();
-      const allToolsList = (await result.list_tools.fn([])) as Array<{
+      const allToolsList = (await result.list_tools.fn({})) as Array<{
         name: string;
       }>;
       expect(allToolsList).toHaveLength(10);
@@ -148,7 +148,7 @@ describe('Filtered Capabilities End-to-End', () => {
       expect(result.tool5).toBeDefined();
 
       // Assert - Introspection lists all 5 tools
-      const allToolsList = (await result.list_tools.fn([])) as Array<{
+      const allToolsList = (await result.list_tools.fn({})) as Array<{
         name: string;
       }>;
       expect(allToolsList).toHaveLength(5);
@@ -193,7 +193,7 @@ describe('Filtered Capabilities End-to-End', () => {
       expect(result.tool3).toBeUndefined();
 
       // Assert - Introspection still lists all 3 tools
-      const allToolsList = (await result.list_tools.fn([])) as Array<{
+      const allToolsList = (await result.list_tools.fn({})) as Array<{
         name: string;
       }>;
       expect(allToolsList).toHaveLength(3);
@@ -247,7 +247,7 @@ describe('Filtered Capabilities End-to-End', () => {
       expect(result.other_tool).toBeUndefined();
 
       // Assert - Introspection lists all 3 tools
-      const allToolsList = (await result.list_tools.fn([])) as Array<{
+      const allToolsList = (await result.list_tools.fn({})) as Array<{
         name: string;
       }>;
       expect(allToolsList).toHaveLength(3);
@@ -301,7 +301,7 @@ describe('Filtered Capabilities End-to-End', () => {
       expect(result.other_tool).toBeUndefined();
 
       // Assert - Introspection lists all 4 tools
-      const allToolsList = (await result.list_tools.fn([])) as Array<{
+      const allToolsList = (await result.list_tools.fn({})) as Array<{
         name: string;
       }>;
       expect(allToolsList).toHaveLength(4);
@@ -403,17 +403,17 @@ describe('Filtered Capabilities End-to-End', () => {
       expect(result.prompt_prompt2).toBeDefined();
 
       // Assert - Introspection lists all capabilities
-      const toolsList = (await result.list_tools.fn([])) as Array<{
+      const toolsList = (await result.list_tools.fn({})) as Array<{
         name: string;
       }>;
       expect(toolsList).toHaveLength(3);
 
-      const resourcesList = (await result.list_resources.fn([])) as Array<{
+      const resourcesList = (await result.list_resources.fn({})) as Array<{
         uri: string;
       }>;
       expect(resourcesList).toHaveLength(2);
 
-      const promptsList = (await result.list_prompts.fn([])) as Array<{
+      const promptsList = (await result.list_prompts.fn({})) as Array<{
         name: string;
       }>;
       expect(promptsList).toHaveLength(2);
@@ -472,17 +472,17 @@ describe('Filtered Capabilities End-to-End', () => {
       expect(result.read_resource).toBeDefined();
 
       // Assert - Introspection lists ALL capabilities despite filters
-      const toolsList = (await result.list_tools.fn([])) as Array<{
+      const toolsList = (await result.list_tools.fn({})) as Array<{
         name: string;
       }>;
       expect(toolsList).toHaveLength(2);
 
-      const resourcesList = (await result.list_resources.fn([])) as Array<{
+      const resourcesList = (await result.list_resources.fn({})) as Array<{
         uri: string;
       }>;
       expect(resourcesList).toHaveLength(2);
 
-      const promptsList = (await result.list_prompts.fn([])) as Array<{
+      const promptsList = (await result.list_prompts.fn({})) as Array<{
         name: string;
       }>;
       expect(promptsList).toHaveLength(2);

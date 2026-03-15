@@ -109,7 +109,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['Generate a person', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'Generate a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -130,9 +130,9 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        [
-          'Generate an address',
-          {
+        {
+          prompt: 'Generate an address',
+          options: {
             schema: {
               addr: {
                 type: 'dict',
@@ -140,7 +140,7 @@ describe('generate() function', () => {
               },
             },
           },
-        ],
+        },
         ctx
       )) as Record<string, unknown>;
 
@@ -161,10 +161,10 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        [
-          'Generate tags',
-          { schema: { tags: { type: 'list', items: 'string' } } },
-        ],
+        {
+          prompt: 'Generate tags',
+          options: { schema: { tags: { type: 'list', items: 'string' } } },
+        },
         ctx
       )) as Record<string, unknown>;
 
@@ -183,9 +183,9 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await ext.generate.fn(
-        [
-          'Get status',
-          {
+        {
+          prompt: 'Get status',
+          options: {
             schema: {
               status: {
                 type: 'string',
@@ -193,7 +193,7 @@ describe('generate() function', () => {
               },
             },
           },
-        ],
+        },
         ctx
       );
 
@@ -217,7 +217,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['Generate', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -237,7 +237,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['Generate', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -257,7 +257,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await ext.generate.fn(
-        ['Generate', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
 
@@ -277,13 +277,13 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await ext.generate.fn(
-        [
-          'Generate',
-          {
+        {
+          prompt: 'Generate',
+          options: {
             schema: { name: 'string' },
             system: 'Override system prompt.',
           },
-        ],
+        },
         ctx
       );
 
@@ -302,7 +302,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await ext.generate.fn(
-        ['Generate', { schema: { name: 'string' }, max_tokens: 512 }],
+        { prompt: 'Generate', options: { schema: { name: 'string' }, max_tokens: 512 } },
         ctx
       );
 
@@ -326,10 +326,10 @@ describe('generate() function', () => {
       ];
 
       await ext.generate.fn(
-        [
-          'Generate a name',
-          { schema: { name: 'string' }, messages: prependedMessages },
-        ],
+        {
+          prompt: 'Generate a name',
+          options: { schema: { name: 'string' }, messages: prependedMessages },
+        },
         ctx
       );
 
@@ -360,7 +360,7 @@ describe('generate() function', () => {
       });
       const ctx = createRuntimeContext();
 
-      await ext.generate.fn(['Generate', { schema: { name: 'string' } }], ctx);
+      await ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({ system: 'Factory system prompt.' })
@@ -379,7 +379,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['Generate something', {}], ctx)
+        ext.generate.fn({ prompt: 'Generate something', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: "generate requires 'schema' option",
@@ -392,7 +392,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['Generate something', {}], ctx)
+        ext.generate.fn({ prompt: 'Generate something', options: {} }, ctx)
       ).rejects.toThrow();
 
       expect(mockCreate).not.toHaveBeenCalled();
@@ -404,7 +404,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['Generate', { schema: { ts: 'timestamp' } }], ctx)
+        ext.generate.fn({ prompt: 'Generate', options: { schema: { ts: 'timestamp' } } }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('timestamp'),
@@ -418,7 +418,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['Generate', { schema: { count: 'integer' } }], ctx)
+        ext.generate.fn({ prompt: 'Generate', options: { schema: { count: 'integer' } } }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('integer'),
@@ -434,14 +434,14 @@ describe('generate() function', () => {
 
       await expect(
         ext.generate.fn(
-          [
-            'Generate',
-            {
+          {
+            prompt: 'Generate',
+            options: {
               schema: {
                 code: { type: 'number', enum: ['1', '2', '3'] },
               },
             },
-          ],
+          },
           ctx
         )
       ).rejects.toMatchObject({
@@ -460,7 +460,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['Generate', { schema: { name: 'string' } }], ctx)
+        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
       });
@@ -474,7 +474,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['Generate', { schema: { name: 'string' } }], ctx)
+        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('failed to parse response JSON'),
@@ -491,7 +491,7 @@ describe('generate() function', () => {
       let thrown: unknown;
       try {
         await ext.generate.fn(
-          ['Generate', { schema: { name: 'string' } }],
+          { prompt: 'Generate', options: { schema: { name: 'string' } } },
           ctx
         );
       } catch (e) {
@@ -512,7 +512,7 @@ describe('generate() function', () => {
       let result: unknown = undefined;
       try {
         result = await ext.generate.fn(
-          ['Generate', { schema: { name: 'string' } }],
+          { prompt: 'Generate', options: { schema: { name: 'string' } } },
           ctx
         );
       } catch {
@@ -533,7 +533,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        ext.generate.fn(['Generate', { schema: { name: 'string' } }], ctx)
+        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -547,7 +547,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(['prompt', {}], ctx)
+        ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('schema'),
@@ -571,7 +571,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await ext.generate.fn(
-        ['Generate', { schema: { name: 'string', age: 'number' } }],
+        { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       );
 
@@ -597,7 +597,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        ext.generate.fn(['Generate', { schema: { name: 'string' } }], ctx)
+        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -617,7 +617,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        ext.generate.fn(['Generate', { schema: { name: 'string' } }], ctx)
+        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toThrow();
 
       const generateEvents = events.filter(
@@ -637,21 +637,40 @@ describe('generate() function', () => {
 
       expect(ext.generate.params).toEqual([
         { name: 'prompt', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'options', type: { type: 'dict' }, defaultValue: undefined, annotations: {} },
+        { name: 'options', type: { type: 'dict', fields: {
+          schema: { type: { type: 'dict' } },
+          system: { type: { type: 'string' }, defaultValue: '' },
+          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+          messages: { type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: [] },
+        } }, defaultValue: {}, annotations: {} },
       ]);
     });
 
     it('has correct return type', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
-      expect(ext.generate.returnType).toEqual({ type: 'dict' });
+      expect(ext.generate.returnType).toEqual({
+        __rill_type: true,
+        typeName: 'dict',
+        structure: {
+          type: 'dict',
+          fields: {
+            data: { type: { type: 'any' } },
+            raw: { type: { type: 'string' } },
+            model: { type: { type: 'string' } },
+            usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
+            stop_reason: { type: { type: 'string' } },
+            id: { type: { type: 'string' } },
+          },
+        },
+      });
     });
 
     it('has description string', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
-      expect(typeof ext.generate.description).toBe('string');
-      expect(ext.generate.description.length).toBeGreaterThan(0);
+      expect(typeof ext.generate.annotations?.['description']).toBe('string');
+      expect((ext.generate.annotations?.['description'] as string).length).toBeGreaterThan(0);
     });
   });
 });
