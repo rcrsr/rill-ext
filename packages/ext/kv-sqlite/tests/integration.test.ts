@@ -9,6 +9,14 @@ import { join } from 'node:path';
 import { createSqliteKvExtension } from '../src/factory.js';
 import type { SqliteKvConfig } from '../src/types.js';
 
+/**
+ * Extract a named callable from an ExtensionFactoryResult value dict.
+ */
+function getCallable(ext: { value: unknown }, name: string): { fn: (args: Record<string, unknown>) => unknown } {
+  const value = ext.value as Record<string, { fn: (args: Record<string, unknown>) => unknown }>;
+  return value[name]!;
+}
+
 // Test database directory
 const TEST_DATA_DIR = join(process.cwd(), 'test-data-integration');
 
@@ -42,31 +50,31 @@ describe('Integration Tests', () => {
       const ext = createSqliteKvExtension(config);
 
       // Perform series of operations
-      ext.set?.fn({ mount: 'state', key: 'phase', value: 'active' });
-      ext.set?.fn({ mount: 'state', key: 'count', value: 42 });
-      ext.set?.fn({ mount: 'state', key: 'config', value: { enabled: true, timeout: 5000 } });
+      getCallable(ext, 'set').fn({ mount: 'state', key: 'phase', value: 'active' });
+      getCallable(ext, 'set').fn({ mount: 'state', key: 'count', value: 42 });
+      getCallable(ext, 'set').fn({ mount: 'state', key: 'config', value: { enabled: true, timeout: 5000 } });
 
       // Verify results
-      expect(ext.get?.fn({ mount: 'state', key: 'phase' })).toBe('active');
-      expect(ext.get?.fn({ mount: 'state', key: 'count' })).toBe(42);
-      expect(ext.get?.fn({ mount: 'state', key: 'config' })).toEqual({
+      expect(getCallable(ext, 'get').fn({ mount: 'state', key: 'phase' })).toBe('active');
+      expect(getCallable(ext, 'get').fn({ mount: 'state', key: 'count' })).toBe(42);
+      expect(getCallable(ext, 'get').fn({ mount: 'state', key: 'config' })).toEqual({
         enabled: true,
         timeout: 5000,
       });
 
       // Verify collection operations
-      const keys = ext.keys?.fn({ mount: 'state' });
+      const keys = getCallable(ext, 'keys').fn({ mount: 'state' });
       expect(keys).toHaveLength(3);
       expect(keys).toContain('phase');
       expect(keys).toContain('count');
       expect(keys).toContain('config');
 
       // Verify has operation
-      expect(ext.has?.fn({ mount: 'state', key: 'phase' })).toBe(true);
-      expect(ext.has?.fn({ mount: 'state', key: 'missing' })).toBe(false);
+      expect(getCallable(ext, 'has').fn({ mount: 'state', key: 'phase' })).toBe(true);
+      expect(getCallable(ext, 'has').fn({ mount: 'state', key: 'missing' })).toBe(false);
 
       // Verify getAll operation
-      const allEntries = ext.getAll?.fn({ mount: 'state' });
+      const allEntries = getCallable(ext, 'getAll').fn({ mount: 'state' });
       expect(allEntries).toEqual({
         phase: 'active',
         count: 42,
@@ -92,13 +100,13 @@ describe('Integration Tests', () => {
 
       // Setup: populate database with test data
       const ext = createSqliteKvExtension(config);
-      ext.set?.fn({ mount: 'state', key: 'data', value: 'test-value' });
+      getCallable(ext, 'set').fn({ mount: 'state', key: 'data', value: 'test-value' });
       ext.dispose?.();
 
       // Execute 10 concurrent reads
       const readPromises = Array.from({ length: 10 }, async () => {
         const reader = createSqliteKvExtension(config);
-        const value = reader.get?.fn({ mount: 'state', key: 'data' });
+        const value = getCallable(reader, 'get').fn({ mount: 'state', key: 'data' });
         reader.dispose?.();
         return value;
       });
@@ -138,7 +146,7 @@ describe('Integration Tests', () => {
       // Seed database with 100K entries
       console.log('Seeding 100K entries...');
       for (let i = 0; i < 100000; i++) {
-        ext.set?.fn({ mount: 'state', key: `key-${i}`, value: `value-${i}` });
+        getCallable(ext, 'set').fn({ mount: 'state', key: `key-${i}`, value: `value-${i}` });
 
         if (i % 10000 === 0) {
           console.log(`  Seeded ${i} entries...`);
@@ -153,7 +161,7 @@ describe('Integration Tests', () => {
       for (let i = 0; i < iterations; i++) {
         const randomKey = `key-${Math.floor(Math.random() * 100000)}`;
         const start = performance.now();
-        ext.get?.fn({ mount: 'state', key: randomKey });
+        getCallable(ext, 'get').fn({ mount: 'state', key: randomKey });
         const end = performance.now();
         latencies.push(end - start);
       }
@@ -196,22 +204,22 @@ describe('Integration Tests', () => {
       const ext = createSqliteKvExtension(config);
 
       // Test all functions throw for unknown mount
-      expect(() => ext.get?.fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
-      expect(() => ext.get_or?.fn({ mount: 'unknown', key: 'key', fallback: 'fallback' })).toThrow(
+      expect(() => getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
+      expect(() => getCallable(ext, 'get_or').fn({ mount: 'unknown', key: 'key', fallback: 'fallback' })).toThrow(
         'not found'
       );
-      expect(() => ext.set?.fn({ mount: 'unknown', key: 'key', value: 'value' })).toThrow(
+      expect(() => getCallable(ext, 'set').fn({ mount: 'unknown', key: 'key', value: 'value' })).toThrow(
         'not found'
       );
-      expect(() => ext.merge?.fn({ mount: 'unknown', key: 'key', partial: { a: 1 } })).toThrow(
+      expect(() => getCallable(ext, 'merge').fn({ mount: 'unknown', key: 'key', partial: { a: 1 } })).toThrow(
         'not found'
       );
-      expect(() => ext.delete?.fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
-      expect(() => ext.keys?.fn({ mount: 'unknown' })).toThrow('not found');
-      expect(() => ext.has?.fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
-      expect(() => ext.clear?.fn({ mount: 'unknown' })).toThrow('not found');
-      expect(() => ext.getAll?.fn({ mount: 'unknown' })).toThrow('not found');
-      expect(() => ext.schema?.fn({ mount: 'unknown' })).toThrow('not found');
+      expect(() => getCallable(ext, 'delete').fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
+      expect(() => getCallable(ext, 'keys').fn({ mount: 'unknown' })).toThrow('not found');
+      expect(() => getCallable(ext, 'has').fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
+      expect(() => getCallable(ext, 'clear').fn({ mount: 'unknown' })).toThrow('not found');
+      expect(() => getCallable(ext, 'getAll').fn({ mount: 'unknown' })).toThrow('not found');
+      expect(() => getCallable(ext, 'schema').fn({ mount: 'unknown' })).toThrow('not found');
 
       ext.dispose?.();
     });
@@ -236,7 +244,7 @@ describe('Integration Tests', () => {
       const ext = createSqliteKvExtension(config);
 
       try {
-        ext.get?.fn({ mount: 'unknown', key: 'key' });
+        getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' });
         expect.fail('Should have thrown error');
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
@@ -265,16 +273,16 @@ describe('Integration Tests', () => {
       const ext = createSqliteKvExtension(config);
 
       // Test all write operations throw
-      expect(() => ext.set?.fn({ mount: 'readonly-mount', key: 'key', value: 'value' })).toThrow(
+      expect(() => getCallable(ext, 'set').fn({ mount: 'readonly-mount', key: 'key', value: 'value' })).toThrow(
         'read-only'
       );
-      expect(() => ext.merge?.fn({ mount: 'readonly-mount', key: 'key', partial: { a: 1 } })).toThrow(
+      expect(() => getCallable(ext, 'merge').fn({ mount: 'readonly-mount', key: 'key', partial: { a: 1 } })).toThrow(
         'read-only'
       );
-      expect(() => ext.delete?.fn({ mount: 'readonly-mount', key: 'key' })).toThrow(
+      expect(() => getCallable(ext, 'delete').fn({ mount: 'readonly-mount', key: 'key' })).toThrow(
         'read-only'
       );
-      expect(() => ext.clear?.fn({ mount: 'readonly-mount' })).toThrow('read-only');
+      expect(() => getCallable(ext, 'clear').fn({ mount: 'readonly-mount' })).toThrow('read-only');
 
       ext.dispose?.();
     });
@@ -294,7 +302,7 @@ describe('Integration Tests', () => {
       };
 
       const writer = createSqliteKvExtension(writeConfig);
-      writer.set?.fn({ mount: 'test', key: 'name', value: 'Alice' });
+      getCallable(writer, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
       writer.dispose?.();
 
       // Open as read-only
@@ -311,10 +319,10 @@ describe('Integration Tests', () => {
       const reader = createSqliteKvExtension(readConfig);
 
       // Read operations should succeed
-      expect(reader.get?.fn({ mount: 'readonly-mount', key: 'name' })).toBe('Alice');
-      expect(reader.has?.fn({ mount: 'readonly-mount', key: 'name' })).toBe(true);
-      expect(reader.keys?.fn({ mount: 'readonly-mount' })).toEqual(['name']);
-      expect(reader.getAll?.fn({ mount: 'readonly-mount' })).toEqual({ name: 'Alice' });
+      expect(getCallable(reader, 'get').fn({ mount: 'readonly-mount', key: 'name' })).toBe('Alice');
+      expect(getCallable(reader, 'has').fn({ mount: 'readonly-mount', key: 'name' })).toBe(true);
+      expect(getCallable(reader, 'keys').fn({ mount: 'readonly-mount' })).toEqual(['name']);
+      expect(getCallable(reader, 'getAll').fn({ mount: 'readonly-mount' })).toEqual({ name: 'Alice' });
 
       reader.dispose?.();
     });
@@ -335,7 +343,7 @@ describe('Integration Tests', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.keys?.fn({ mount: 'empty-mount' });
+      const result = getCallable(ext, 'keys').fn({ mount: 'empty-mount' });
       expect(result).toEqual([]);
 
       ext.dispose?.();
@@ -355,7 +363,7 @@ describe('Integration Tests', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.getAll?.fn({ mount: 'empty-mount' });
+      const result = getCallable(ext, 'getAll').fn({ mount: 'empty-mount' });
       expect(result).toEqual({});
 
       ext.dispose?.();
@@ -375,7 +383,7 @@ describe('Integration Tests', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      const result = ext.schema?.fn({ mount: 'empty-mount' });
+      const result = getCallable(ext, 'schema').fn({ mount: 'empty-mount' });
       expect(result).toEqual([]);
 
       ext.dispose?.();
@@ -410,7 +418,7 @@ describe('Integration Tests', () => {
       expect(actualSize).toBe(sizeLimit);
 
       // Should succeed
-      expect(() => ext.set?.fn({ mount: 'test', key: 'key', value })).not.toThrow();
+      expect(() => getCallable(ext, 'set').fn({ mount: 'test', key: 'key', value })).not.toThrow();
 
       ext.dispose?.();
     });
@@ -441,7 +449,7 @@ describe('Integration Tests', () => {
       expect(actualSize).toBe(sizeLimit + 1);
 
       // Should throw
-      expect(() => ext.set?.fn({ mount: 'test', key: 'key', value })).toThrow(
+      expect(() => getCallable(ext, 'set').fn({ mount: 'test', key: 'key', value })).toThrow(
         'exceeds size limit'
       );
 
@@ -470,7 +478,7 @@ describe('Integration Tests', () => {
         nested: { items: Array.from({ length: 100 }, (_, i) => i) },
       };
 
-      expect(() => ext.set?.fn({ mount: 'test', key: 'key', value: largeObject })).toThrow(
+      expect(() => getCallable(ext, 'set').fn({ mount: 'test', key: 'key', value: largeObject })).toThrow(
         'exceeds size limit'
       );
 
@@ -494,7 +502,7 @@ describe('Integration Tests', () => {
       // Execute 5 concurrent writes to same key
       const writePromises = Array.from({ length: 5 }, async (_, index) => {
         const writer = createSqliteKvExtension(config);
-        writer.set?.fn({ mount: 'shared', key: 'counter', value: index });
+        getCallable(writer, 'set').fn({ mount: 'shared', key: 'counter', value: index });
         writer.dispose?.();
       });
 
@@ -502,14 +510,14 @@ describe('Integration Tests', () => {
 
       // Verify database integrity: last writer wins
       const reader = createSqliteKvExtension(config);
-      const value = reader.get?.fn({ mount: 'shared', key: 'counter' });
+      const value = getCallable(reader, 'get').fn({ mount: 'shared', key: 'counter' });
 
       // Value should be one of the written values (0-4)
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThan(5);
 
       // Verify database is not corrupted
-      expect(() => reader.keys?.fn({ mount: 'shared' })).not.toThrow();
+      expect(() => getCallable(reader, 'keys').fn({ mount: 'shared' })).not.toThrow();
 
       reader.dispose?.();
     });
@@ -529,7 +537,7 @@ describe('Integration Tests', () => {
       // Execute 5 concurrent writes to different keys
       const writePromises = Array.from({ length: 5 }, async (_, index) => {
         const writer = createSqliteKvExtension(config);
-        writer.set?.fn({ mount: 'shared', key: `key-${index}`, value: `value-${index}` });
+        getCallable(writer, 'set').fn({ mount: 'shared', key: `key-${index}`, value: `value-${index}` });
         writer.dispose?.();
       });
 
@@ -537,12 +545,12 @@ describe('Integration Tests', () => {
 
       // Verify all writes succeeded
       const reader = createSqliteKvExtension(config);
-      const keys = reader.keys?.fn({ mount: 'shared' });
+      const keys = getCallable(reader, 'keys').fn({ mount: 'shared' });
 
       expect(keys).toHaveLength(5);
       for (let i = 0; i < 5; i++) {
         expect(keys).toContain(`key-${i}`);
-        expect(reader.get?.fn({ mount: 'shared', key: `key-${i}` })).toBe(`value-${i}`);
+        expect(getCallable(reader, 'get').fn({ mount: 'shared', key: `key-${i}` })).toBe(`value-${i}`);
       }
 
       reader.dispose?.();
@@ -565,10 +573,10 @@ describe('Integration Tests', () => {
       const ext = createSqliteKvExtension(config);
 
       // Set non-dict value
-      ext.set?.fn({ mount: 'test', key: 'name', value: 'Alice' });
+      getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
 
       // Attempt to merge should throw
-      expect(() => ext.merge?.fn({ mount: 'test', key: 'name', partial: { age: 30 } })).toThrow(
+      expect(() => getCallable(ext, 'merge').fn({ mount: 'test', key: 'name', partial: { age: 30 } })).toThrow(
         'non-dict'
       );
 
@@ -589,9 +597,9 @@ describe('Integration Tests', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn({ mount: 'test', key: 'count', value: 42 });
+      getCallable(ext, 'set').fn({ mount: 'test', key: 'count', value: 42 });
 
-      expect(() => ext.merge?.fn({ mount: 'test', key: 'count', partial: { increment: 1 } })).toThrow(
+      expect(() => getCallable(ext, 'merge').fn({ mount: 'test', key: 'count', partial: { increment: 1 } })).toThrow(
         'non-dict'
       );
 
@@ -612,9 +620,9 @@ describe('Integration Tests', () => {
 
       const ext = createSqliteKvExtension(config);
 
-      ext.set?.fn({ mount: 'test', key: 'items', value: [1, 2, 3] });
+      getCallable(ext, 'set').fn({ mount: 'test', key: 'items', value: [1, 2, 3] });
 
-      expect(() => ext.merge?.fn({ mount: 'test', key: 'items', partial: { extra: 4 } })).toThrow(
+      expect(() => getCallable(ext, 'merge').fn({ mount: 'test', key: 'items', partial: { extra: 4 } })).toThrow(
         'non-dict'
       );
 

@@ -7,8 +7,10 @@ import which from 'which';
 import {
   RuntimeError,
   emitExtensionEvent,
-  rillTypeToTypeValue,
-  type ExtensionResult,
+  structureToTypeValue,
+  toCallable,
+  type ExtensionFactoryResult,
+  type RillFunction,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -137,7 +139,7 @@ function validateTimeout(timeout: number): void {
  */
 export function createClaudeCodeExtension(
   config: ClaudeCodeConfig = {}
-): ExtensionResult {
+): ExtensionFactoryResult {
   // Extract config with defaults
   const binaryPath = config.binaryPath ?? DEFAULT_BINARY_PATH;
   const defaultTimeout = config.defaultTimeout ?? DEFAULT_TIMEOUT;
@@ -175,13 +177,13 @@ export function createClaudeCodeExtension(
   };
 
   // Return extension result with implementations
-  const result: ExtensionResult = {
+  const fnDict: { prompt: RillFunction; skill: RillFunction; command: RillFunction } = {
     // IR-2: claude-code::prompt
     prompt: {
       params: [
         p.str('text'),
         p.dict('options', undefined, {}, {
-          timeout: { type: { type: 'number' }, defaultValue: 0 },
+          timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -261,20 +263,20 @@ export function createClaudeCodeExtension(
         }
       },
       annotations: { description: 'Execute Claude Code prompt and return result text and token usage' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
+      returnType: structureToTypeValue({
+        kind: 'dict',
         fields: {
-          result: { type: { type: 'string' } },
-          tokens: { type: { type: 'dict', fields: {
-            prompt: { type: { type: 'number' } },
-            cacheWrite5m: { type: { type: 'number' } },
-            cacheWrite1h: { type: { type: 'number' } },
-            cacheRead: { type: { type: 'number' } },
-            output: { type: { type: 'number' } },
+          result: { type: { kind: 'string' } },
+          tokens: { type: { kind: 'dict', fields: {
+            prompt: { type: { kind: 'number' } },
+            cacheWrite5m: { type: { kind: 'number' } },
+            cacheWrite1h: { type: { kind: 'number' } },
+            cacheRead: { type: { kind: 'number' } },
+            output: { type: { kind: 'number' } },
           } } },
-          cost: { type: { type: 'number' } },
-          exitCode: { type: { type: 'number' } },
-          duration: { type: { type: 'number' } },
+          cost: { type: { kind: 'number' } },
+          exitCode: { type: { kind: 'number' } },
+          duration: { type: { kind: 'number' } },
         },
       }),
     },
@@ -284,7 +286,7 @@ export function createClaudeCodeExtension(
       params: [
         p.str('name'),
         p.dict('args', undefined, {}, {
-          timeout: { type: { type: 'number' }, defaultValue: 0 },
+          timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
       fn: async (fnArgs, ctx): Promise<RillValue> => {
@@ -369,20 +371,20 @@ export function createClaudeCodeExtension(
         }
       },
       annotations: { description: 'Execute Claude Code skill with instruction and return structured result' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
+      returnType: structureToTypeValue({
+        kind: 'dict',
         fields: {
-          result: { type: { type: 'string' } },
-          tokens: { type: { type: 'dict', fields: {
-            prompt: { type: { type: 'number' } },
-            cacheWrite5m: { type: { type: 'number' } },
-            cacheWrite1h: { type: { type: 'number' } },
-            cacheRead: { type: { type: 'number' } },
-            output: { type: { type: 'number' } },
+          result: { type: { kind: 'string' } },
+          tokens: { type: { kind: 'dict', fields: {
+            prompt: { type: { kind: 'number' } },
+            cacheWrite5m: { type: { kind: 'number' } },
+            cacheWrite1h: { type: { kind: 'number' } },
+            cacheRead: { type: { kind: 'number' } },
+            output: { type: { kind: 'number' } },
           } } },
-          cost: { type: { type: 'number' } },
-          exitCode: { type: { type: 'number' } },
-          duration: { type: { type: 'number' } },
+          cost: { type: { kind: 'number' } },
+          exitCode: { type: { kind: 'number' } },
+          duration: { type: { kind: 'number' } },
         },
       }),
     },
@@ -392,7 +394,7 @@ export function createClaudeCodeExtension(
       params: [
         p.str('name'),
         p.dict('args', undefined, {}, {
-          timeout: { type: { type: 'number' }, defaultValue: 0 },
+          timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
       fn: async (fnArgs, ctx): Promise<RillValue> => {
@@ -477,27 +479,30 @@ export function createClaudeCodeExtension(
         }
       },
       annotations: { description: 'Execute Claude Code command with task description and return execution summary' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
+      returnType: structureToTypeValue({
+        kind: 'dict',
         fields: {
-          result: { type: { type: 'string' } },
-          tokens: { type: { type: 'dict', fields: {
-            prompt: { type: { type: 'number' } },
-            cacheWrite5m: { type: { type: 'number' } },
-            cacheWrite1h: { type: { type: 'number' } },
-            cacheRead: { type: { type: 'number' } },
-            output: { type: { type: 'number' } },
+          result: { type: { kind: 'string' } },
+          tokens: { type: { kind: 'dict', fields: {
+            prompt: { type: { kind: 'number' } },
+            cacheWrite5m: { type: { kind: 'number' } },
+            cacheWrite1h: { type: { kind: 'number' } },
+            cacheRead: { type: { kind: 'number' } },
+            output: { type: { kind: 'number' } },
           } } },
-          cost: { type: { type: 'number' } },
-          exitCode: { type: { type: 'number' } },
-          duration: { type: { type: 'number' } },
+          cost: { type: { kind: 'number' } },
+          exitCode: { type: { kind: 'number' } },
+          duration: { type: { kind: 'number' } },
         },
       }),
     },
   };
 
-  // IR-5: Dispose function for process cleanup
-  result.dispose = dispose;
+  const callableDict = {
+    prompt: toCallable(fnDict.prompt),
+    skill: toCallable(fnDict.skill),
+    command: toCallable(fnDict.command),
+  };
 
-  return result;
+  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
 }

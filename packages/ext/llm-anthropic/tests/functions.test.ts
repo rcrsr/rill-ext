@@ -4,13 +4,21 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 
 // ============================================================
 // TEST HELPERS
 // ============================================================
+
+/**
+ * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
+ */
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
+
 
 /**
  * Create mock Anthropic API response.
@@ -85,7 +93,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.message.fn({ text: 'Hello' }, ctx)) as Record<
+      const result = (await getCallable(ext, 'message').fn({ text: 'Hello' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -115,7 +123,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'What is 2+2?' }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'What is 2+2?' }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith({
         model: 'claude-sonnet-4-5-20250929',
@@ -138,7 +146,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'Test', options: { system: 'Override system.' } }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test', options: { system: 'Override system.' } }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -159,7 +167,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'Test', options: { max_tokens: 2000 } }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test', options: { max_tokens: 2000 } }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -179,7 +187,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'Test' }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -200,7 +208,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: '' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'message').fn({ text: '' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('prompt text cannot be empty'),
       });
@@ -215,7 +223,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: '   \n\t  ' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'message').fn({ text: '   \n\t  ' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('prompt text cannot be empty'),
       });
@@ -234,7 +242,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic API error (HTTP 429): Rate limit exceeded',
       });
@@ -253,7 +261,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic API error (HTTP 401): Invalid API key',
       });
@@ -273,7 +281,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic error: Request timeout',
       });
@@ -292,7 +300,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic API error (HTTP 500): Internal server error',
       });
@@ -310,7 +318,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic error: Unknown error',
       });
@@ -346,7 +354,7 @@ describe('messages() function', () => {
         { role: 'user', content: 'How are you?' },
       ];
 
-      const result = (await ext.messages.fn(
+      const result = (await getCallable(ext, 'messages').fn(
         { messages: conversationHistory },
         ctx
       )) as Record<string, unknown>;
@@ -385,7 +393,7 @@ describe('messages() function', () => {
         { role: 'user', content: 'Second message' },
       ];
 
-      await ext.messages.fn({ messages: conversationHistory }, ctx);
+      await getCallable(ext, 'messages').fn({ messages: conversationHistory }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith({
         model: 'claude-sonnet-4-5-20250929',
@@ -412,7 +420,7 @@ describe('messages() function', () => {
 
       const conversationHistory = [{ role: 'user', content: 'Hello' }];
 
-      const result = (await ext.messages.fn(
+      const result = (await getCallable(ext, 'messages').fn(
         { messages: conversationHistory },
         ctx
       )) as Record<string, unknown>;
@@ -432,7 +440,7 @@ describe('messages() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.messages.fn(
+      await getCallable(ext, 'messages').fn(
         { messages: [{ role: 'user', content: 'Test' }], options: { system: 'Override system.' } },
         ctx
       );
@@ -456,7 +464,7 @@ describe('messages() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.messages.fn({ messages: [] }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'messages').fn({ messages: [] }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('messages list cannot be empty'),
       });
@@ -475,7 +483,7 @@ describe('messages() function', () => {
       const invalidMessages = [{ content: 'Hello' }];
 
       await expect(
-        ext.messages.fn({ messages: invalidMessages }, ctx)
+        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining(
@@ -497,7 +505,7 @@ describe('messages() function', () => {
       const invalidMessages = [{ role: 'system', content: 'Hello' }];
 
       await expect(
-        ext.messages.fn({ messages: invalidMessages }, ctx)
+        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining("invalid role 'system'"),
@@ -517,7 +525,7 @@ describe('messages() function', () => {
       const invalidMessages = [{ role: 'user' }];
 
       await expect(
-        ext.messages.fn({ messages: invalidMessages }, ctx)
+        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining("user message requires 'content'"),
@@ -536,7 +544,7 @@ describe('messages() function', () => {
       const invalidMessages = [{ role: 'user', content: 123 }];
 
       await expect(
-        ext.messages.fn({ messages: invalidMessages }, ctx)
+        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining("user message requires 'content'"),
@@ -559,7 +567,7 @@ describe('messages() function', () => {
       ];
 
       await expect(
-        ext.messages.fn({ messages: invalidMessages }, ctx)
+        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining(
@@ -586,7 +594,7 @@ describe('messages() function', () => {
       ];
 
       await expect(
-        ext.messages.fn({ messages: validMessages }, ctx)
+        getCallable(ext, 'messages').fn({ messages: validMessages }, ctx)
       ).resolves.toBeDefined();
     });
 
@@ -604,7 +612,7 @@ describe('messages() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.messages.fn({ messages: [{ role: 'user', content: 'Test' }] }, ctx)
+        getCallable(ext, 'messages').fn({ messages: [{ role: 'user', content: 'Test' }] }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic API error (HTTP 429): Rate limit exceeded',
@@ -624,7 +632,7 @@ describe('messages() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.messages.fn({ messages: [{ role: 'user', content: 'Test' }] }, ctx)
+        getCallable(ext, 'messages').fn({ messages: [{ role: 'user', content: 'Test' }] }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic API error (HTTP 401): Invalid API key',
@@ -645,7 +653,7 @@ describe('messages() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.messages.fn({ messages: [{ role: 'user', content: 'Test' }] }, ctx)
+        getCallable(ext, 'messages').fn({ messages: [{ role: 'user', content: 'Test' }] }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic error: Request timeout',
@@ -671,7 +679,7 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn({ text: '' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'embed').fn({ text: '' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'embed text cannot be empty',
       });
@@ -688,7 +696,7 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn({ text: 'test text' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'embed_model not configured',
       });
@@ -705,7 +713,7 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn({ text: 'test text' }, ctx)).rejects.toMatchObject({
+      await expect(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx)).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic: embeddings API not available',
       });
@@ -722,7 +730,7 @@ describe('embed() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed.params).toEqual([{ name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} }]);
+      expect(getCallable(ext, 'embed').params).toEqual([{ name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} }]);
     });
 
     it('has correct description', () => {
@@ -734,7 +742,7 @@ describe('embed() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed.annotations?.['description']).toBe('Generate embedding vector for text');
+      expect(getCallable(ext, 'embed').annotations?.['description']).toBe('Generate embedding vector for text');
     });
 
     it('has correct return type', () => {
@@ -746,7 +754,7 @@ describe('embed() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed.returnType).toEqual({ __rill_type: true, typeName: 'vector', structure: { type: 'vector' } });
+      expect(getCallable(ext, 'embed').returnType).toEqual({ __rill_type: true, typeName: 'vector', structure: { kind: 'vector' } });
     });
   });
 });
@@ -768,7 +776,7 @@ describe('embed_batch() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = await ext.embed_batch.fn({ texts: [] }, ctx);
+      const result = await getCallable(ext, 'embed_batch').fn({ texts: [] }, ctx);
 
       expect(result).toEqual([]);
     });
@@ -787,7 +795,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn({ texts: ['text1', 123, 'text3'] }, ctx)
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 123, 'text3'] }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'embed_batch requires list of strings',
@@ -806,7 +814,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn({ texts: ['text1', '', 'text3'] }, ctx)
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', '', 'text3'] }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'embed text cannot be empty at index 1',
@@ -825,7 +833,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn({ texts: ['text1', 'text2'] }, ctx)
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'embed_model not configured',
@@ -844,7 +852,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn({ texts: ['text1', 'text2'] }, ctx)
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: 'Anthropic: embeddings API not available',
@@ -862,7 +870,7 @@ describe('embed_batch() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed_batch.params).toEqual([{ name: 'texts', type: { type: 'list' }, defaultValue: undefined, annotations: {} }]);
+      expect(getCallable(ext, 'embed_batch').params).toEqual([{ name: 'texts', type: { kind: 'list' }, defaultValue: undefined, annotations: {} }]);
     });
 
     it('has correct description', () => {
@@ -874,7 +882,7 @@ describe('embed_batch() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed_batch.annotations?.['description']).toBe(
+      expect(getCallable(ext, 'embed_batch').annotations?.['description']).toBe(
         'Generate embedding vectors for multiple texts'
       );
     });
@@ -888,7 +896,7 @@ describe('embed_batch() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(ext.embed_batch.returnType).toEqual({ __rill_type: true, typeName: 'list', structure: { type: 'list' } });
+      expect(getCallable(ext, 'embed_batch').returnType).toEqual({ __rill_type: true, typeName: 'list', structure: { kind: 'list' } });
     });
   });
 });

@@ -11,7 +11,7 @@ import {
   RuntimeError,
   type ApplicationCallable,
   type RillCallable,
-  type RillType,
+  type TypeStructure,
   type RillValue,
   type RuntimeContext,
   type ScriptCallable,
@@ -348,9 +348,9 @@ export async function executeToolLoop(
       // Build a synthetic closure type to delegate to buildJsonSchemaFromStructuralType.
       // param.type undefined → treated as 'any' (unconstrained, produces {} property).
       // param.annotations['description'] used for all callable kinds (AC-10, AC-11, AC-30).
-      const closureType: RillType = {
-        type: 'closure',
-        params: params.map((p) => ({ name: p.name, type: p.type ?? { type: 'any' } as RillType })),
+      const closureType: TypeStructure = {
+        kind: 'closure',
+        params: params.map((p) => ({ name: p.name, type: p.type ?? { kind: 'any' } as TypeStructure })),
       };
       const builtSchema = buildJsonSchemaFromStructuralType(closureType, [...params]);
 

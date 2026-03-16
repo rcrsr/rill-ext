@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { type ApplicationCallable } from '@rcrsr/rill';
 import { createQdrantExtension } from '../src/factory.js';
+
+/**
+ * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
+ */
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 
 describe('createQdrantExtension', () => {
   describe('configuration validation', () => {
@@ -48,17 +56,17 @@ describe('createQdrantExtension', () => {
       });
 
       // Verify all 11 functions are present
-      expect(ext.upsert).toBeDefined();
-      expect(ext.upsert_batch).toBeDefined();
-      expect(ext.search).toBeDefined();
-      expect(ext.get).toBeDefined();
-      expect(ext.delete).toBeDefined();
-      expect(ext.delete_batch).toBeDefined();
-      expect(ext.count).toBeDefined();
-      expect(ext.create_collection).toBeDefined();
-      expect(ext.delete_collection).toBeDefined();
-      expect(ext.list_collections).toBeDefined();
-      expect(ext.describe).toBeDefined();
+      expect(getCallable(ext, 'upsert')).toBeDefined();
+      expect(getCallable(ext, 'upsert_batch')).toBeDefined();
+      expect(getCallable(ext, 'search')).toBeDefined();
+      expect(getCallable(ext, 'get')).toBeDefined();
+      expect(getCallable(ext, 'delete')).toBeDefined();
+      expect(getCallable(ext, 'delete_batch')).toBeDefined();
+      expect(getCallable(ext, 'count')).toBeDefined();
+      expect(getCallable(ext, 'create_collection')).toBeDefined();
+      expect(getCallable(ext, 'delete_collection')).toBeDefined();
+      expect(getCallable(ext, 'list_collections')).toBeDefined();
+      expect(getCallable(ext, 'describe')).toBeDefined();
 
       // Verify dispose is present
       expect(ext.dispose).toBeDefined();
@@ -72,13 +80,14 @@ describe('createQdrantExtension', () => {
       });
 
       // IR-1: upsert signature
-      expect(ext.upsert.params).toEqual([
-        { name: 'id', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'vector', type: { type: 'vector' }, defaultValue: undefined, annotations: {} },
-        { name: 'metadata', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
+      const upsert = getCallable(ext, 'upsert');
+      expect(upsert.params).toEqual([
+        { name: 'id', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'vector', type: { kind: 'vector' }, defaultValue: undefined, annotations: {} },
+        { name: 'metadata', type: { kind: 'dict' }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.upsert.returnType).toBeDefined();
-      expect(ext.upsert.annotations?.['description']).toBe(
+      expect(upsert.returnType).toBeDefined();
+      expect(upsert.annotations?.['description']).toBe(
         'Insert or update single vector with metadata'
       );
     });
@@ -90,16 +99,17 @@ describe('createQdrantExtension', () => {
       });
 
       // IR-3: search signature
-      expect(ext.search.params).toEqual([
-        { name: 'vector', type: { type: 'vector' }, defaultValue: undefined, annotations: {} },
-        { name: 'options', type: { type: 'dict', fields: {
-          k: { type: { type: 'number' }, defaultValue: 10 },
-          filter: { type: { type: 'dict' }, defaultValue: {} },
-          score_threshold: { type: { type: 'number' }, defaultValue: 0 },
+      const search = getCallable(ext, 'search');
+      expect(search.params).toEqual([
+        { name: 'vector', type: { kind: 'vector' }, defaultValue: undefined, annotations: {} },
+        { name: 'options', type: { kind: 'dict', fields: {
+          k: { type: { kind: 'number' }, defaultValue: 10 },
+          filter: { type: { kind: 'dict' }, defaultValue: {} },
+          score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
         } }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.search.returnType).toBeDefined();
-      expect(ext.search.annotations?.['description']).toBe('Search k nearest neighbors');
+      expect(search.returnType).toBeDefined();
+      expect(search.annotations?.['description']).toBe('Search k nearest neighbors');
     });
 
     it('creates functions with correct signatures (IR-7)', () => {
@@ -109,9 +119,10 @@ describe('createQdrantExtension', () => {
       });
 
       // IR-7: count signature
-      expect(ext.count.params).toEqual([]);
-      expect(ext.count.returnType).toBeDefined();
-      expect(ext.count.annotations?.['description']).toBe(
+      const count = getCallable(ext, 'count');
+      expect(count.params).toEqual([]);
+      expect(count.returnType).toBeDefined();
+      expect(count.annotations?.['description']).toBe(
         'Return total vector count in collection'
       );
     });

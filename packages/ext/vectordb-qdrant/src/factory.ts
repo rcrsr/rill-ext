@@ -7,9 +7,11 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import {
   RuntimeError,
   createVector,
-  rillTypeToTypeValue,
-  type ExtensionResult,
+  structureToTypeValue,
+  toCallable,
+  type ExtensionFactoryResult,
   type VectorExtensionContract,
+  type RillFunction,
   type RillValue,
   type RuntimeContext,
   type RillVector,
@@ -48,7 +50,7 @@ import type { QdrantConfig } from './types.js';
  * await ext.dispose();
  * ```
  */
-export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
+export function createQdrantExtension(config: QdrantConfig): ExtensionFactoryResult {
   // Validate required fields (AC-10)
   assertRequired(config.url, 'url');
   assertRequired(config.collection, 'collection');
@@ -84,8 +86,8 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
     });
   };
 
-  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
-  const result: ExtensionResult = ({
+  // Build function dict — satisfies verifies contract shape at compile time (IR-8)
+  const fnDict: { upsert: RillFunction; upsert_batch: RillFunction; search: RillFunction; get: RillFunction; delete: RillFunction; delete_batch: RillFunction; count: RillFunction; create_collection: RillFunction; delete_collection: RillFunction; list_collections: RillFunction; describe: RillFunction } = ({
     // IR-1: qdrant::upsert
     upsert: {
       params: [
@@ -128,7 +130,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Insert or update single vector with metadata' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, success: { type: { type: 'bool' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, success: { type: { kind: 'bool' } } } }),
     },
 
     // IR-2: qdrant::upsert_batch
@@ -199,7 +201,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Batch insert/update vectors' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { succeeded: { type: { type: 'number' } }, failed: { type: { type: 'string' } }, error: { type: { type: 'string' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { succeeded: { type: { kind: 'number' } }, failed: { type: { kind: 'string' } }, error: { type: { kind: 'string' } } } }),
     },
 
     // IR-3: qdrant::search
@@ -207,9 +209,9 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
       params: [
         vectorParam('vector'),
         p.dict('options', undefined, {}, {
-          k: { type: { type: 'number' }, defaultValue: 10 },
-          filter: { type: { type: 'dict' }, defaultValue: {} },
-          score_threshold: { type: { type: 'number' }, defaultValue: 0 },
+          k: { type: { kind: 'number' }, defaultValue: 10 },
+          filter: { type: { kind: 'dict' }, defaultValue: {} },
+          score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -277,7 +279,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Search k nearest neighbors' },
-      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { id: { type: { type: 'string' } }, score: { type: { type: 'number' } }, metadata: { type: { type: 'dict' } } } } }),
+      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { id: { type: { kind: 'string' } }, score: { type: { kind: 'number' } }, metadata: { type: { kind: 'dict' } } } } }),
     },
 
     // IR-4: qdrant::get
@@ -340,7 +342,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Fetch vector by ID' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, vector: { type: { type: 'vector' } }, metadata: { type: { type: 'dict' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, vector: { type: { kind: 'vector' } }, metadata: { type: { kind: 'dict' } } } }),
     },
 
     // IR-5: qdrant::delete
@@ -373,7 +375,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Delete vector by ID' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, deleted: { type: { type: 'bool' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } } }),
     },
 
     // IR-6: qdrant::delete_batch
@@ -422,7 +424,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Batch delete vectors' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { succeeded: { type: { type: 'number' } }, failed: { type: { type: 'string' } }, error: { type: { type: 'string' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { succeeded: { type: { kind: 'number' } }, failed: { type: { kind: 'string' } }, error: { type: { kind: 'string' } } } }),
     },
 
     // IR-7: qdrant::count
@@ -448,7 +450,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Return total vector count in collection' },
-      returnType: rillTypeToTypeValue({ type: 'number' }),
+      returnType: structureToTypeValue({ kind: 'number' }),
     },
 
     // IR-8: qdrant::create_collection
@@ -456,8 +458,8 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
       params: [
         p.str('name'),
         p.dict('options', undefined, {}, {
-          dimensions: { type: { type: 'number' } },
-          distance: { type: { type: 'string' }, defaultValue: 'cosine' },
+          dimensions: { type: { kind: 'number' } },
+          distance: { type: { kind: 'string' }, defaultValue: 'cosine' },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -505,7 +507,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Create new vector collection' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, created: { type: { type: 'bool' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, created: { type: { kind: 'bool' } } } }),
     },
 
     // IR-9: qdrant::delete_collection
@@ -535,7 +537,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Delete vector collection' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, deleted: { type: { type: 'bool' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } } }),
     },
 
     // IR-10: qdrant::list_collections
@@ -561,7 +563,7 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'List all collection names' },
-      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
+      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
     },
 
     // IR-11: qdrant::describe
@@ -607,12 +609,23 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionResult {
         );
       },
       annotations: { description: 'Describe configured collection' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, count: { type: { type: 'number' } }, dimensions: { type: { type: 'number' } }, distance: { type: { type: 'string' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, count: { type: { kind: 'number' } }, dimensions: { type: { kind: 'number' } }, distance: { type: { kind: 'string' } } } }),
     },
-  }) satisfies VectorExtensionContract;
+  });
 
-  // Attach dispose lifecycle method
-  result.dispose = disposeExtension;
+  const callableDict = {
+    upsert: toCallable(fnDict.upsert),
+    upsert_batch: toCallable(fnDict.upsert_batch),
+    search: toCallable(fnDict.search),
+    get: toCallable(fnDict.get),
+    delete: toCallable(fnDict.delete),
+    delete_batch: toCallable(fnDict.delete_batch),
+    count: toCallable(fnDict.count),
+    create_collection: toCallable(fnDict.create_collection),
+    delete_collection: toCallable(fnDict.delete_collection),
+    list_collections: toCallable(fnDict.list_collections),
+    describe: toCallable(fnDict.describe),
+  } satisfies VectorExtensionContract;
 
-  return result;
+  return { value: callableDict as unknown as RillValue, dispose: disposeExtension } satisfies ExtensionFactoryResult;
 }

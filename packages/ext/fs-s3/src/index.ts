@@ -15,7 +15,7 @@ import {
 } from '@aws-sdk/client-s3';
 import type { S3FsConfig, S3FsMountConfig } from './types.js';
 import { createRequire } from 'node:module';
-import { rillTypeToTypeValue, type ExtensionConfigSchema, type ExtensionManifest, type FsExtensionContract, type RillValue } from '@rcrsr/rill';
+import { structureToTypeValue, toCallable, type ExtensionConfigSchema, type ExtensionFactoryResult, type ExtensionManifest, type FsExtensionContract, type RillFunction, type RillValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 const _require = createRequire(import.meta.url);
@@ -77,7 +77,7 @@ export type { S3FsMountConfig, S3Credentials, S3FsConfig } from './types.js';
  * });
  * ```
  */
-export function createS3FsExtension(config: S3FsConfig) {
+export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult {
   // AC-10: Configuration validation - region required
   if (!config.region || config.region.trim() === '') {
     throw new Error('S3 configuration requires non-empty region');
@@ -681,7 +681,11 @@ export function createS3FsExtension(config: S3FsConfig) {
   // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
   // ============================================================
 
-  return ({
+  const fnDict: {
+    read: RillFunction; write: RillFunction; append: RillFunction; list: RillFunction;
+    find: RillFunction; exists: RillFunction; remove: RillFunction; stat: RillFunction;
+    mkdir: RillFunction; copy: RillFunction; move: RillFunction; mounts: RillFunction;
+  } = {
     read: {
       params: [
         p.str('mount', 'Mount name'),
@@ -689,7 +693,7 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: read,
       annotations: { description: 'Read file contents from S3' },
-      returnType: rillTypeToTypeValue({ type: 'string' }),
+      returnType: structureToTypeValue({ kind: 'string' }),
     },
     write: {
       params: [
@@ -699,7 +703,7 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: write,
       annotations: { description: 'Write file to S3, replacing if exists' },
-      returnType: rillTypeToTypeValue({ type: 'string' }),
+      returnType: structureToTypeValue({ kind: 'string' }),
     },
     append: {
       params: [
@@ -709,7 +713,7 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: append,
       annotations: { description: 'Append content to file in S3' },
-      returnType: rillTypeToTypeValue({ type: 'string' }),
+      returnType: structureToTypeValue({ kind: 'string' }),
     },
     list: {
       params: [
@@ -718,14 +722,14 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: list,
       annotations: { description: 'List directory contents in S3' },
-      returnType: rillTypeToTypeValue({
-        type: 'list',
+      returnType: structureToTypeValue({
+        kind: 'list',
         element: {
-          type: 'dict',
+          kind: 'dict',
           fields: {
-            name: { type: { type: 'string' } },
-            type: { type: { type: 'string' } },
-            size: { type: { type: 'number' } },
+            name: { type: { kind: 'string' } },
+            type: { type: { kind: 'string' } },
+            size: { type: { kind: 'number' } },
           },
         },
       }),
@@ -737,7 +741,7 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: find,
       annotations: { description: 'Recursive file search in S3' },
-      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
+      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
     },
     exists: {
       params: [
@@ -746,7 +750,7 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: exists,
       annotations: { description: 'Check if file exists in S3' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     remove: {
       params: [
@@ -755,7 +759,7 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: remove,
       annotations: { description: 'Delete file from S3' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     stat: {
       params: [
@@ -764,13 +768,13 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: stat,
       annotations: { description: 'Get file metadata from S3' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
+      returnType: structureToTypeValue({
+        kind: 'dict',
         fields: {
-          name: { type: { type: 'string' } },
-          type: { type: { type: 'string' } },
-          size: { type: { type: 'number' } },
-          modified: { type: { type: 'string' } },
+          name: { type: { kind: 'string' } },
+          type: { type: { kind: 'string' } },
+          size: { type: { kind: 'number' } },
+          modified: { type: { kind: 'string' } },
         },
       }),
     },
@@ -781,7 +785,7 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: mkdir,
       annotations: { description: 'Create directory (no-op for S3)' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     copy: {
       params: [
@@ -791,7 +795,7 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: copy,
       annotations: { description: 'Copy file within S3' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     move: {
       params: [
@@ -801,28 +805,44 @@ export function createS3FsExtension(config: S3FsConfig) {
       ],
       fn: move,
       annotations: { description: 'Move file within S3' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     mounts: {
       params: [],
       fn: mountsList,
       annotations: { description: 'List configured S3 mounts' },
-      returnType: rillTypeToTypeValue({
-        type: 'list',
+      returnType: structureToTypeValue({
+        kind: 'list',
         element: {
-          type: 'dict',
+          kind: 'dict',
           fields: {
-            name: { type: { type: 'string' } },
-            mode: { type: { type: 'string' } },
-            glob: { type: { type: 'string' } },
-            bucket: { type: { type: 'string' } },
-            prefix: { type: { type: 'string' } },
+            name: { type: { kind: 'string' } },
+            mode: { type: { kind: 'string' } },
+            glob: { type: { kind: 'string' } },
+            bucket: { type: { kind: 'string' } },
+            prefix: { type: { kind: 'string' } },
           },
         },
       }),
     },
-    dispose,
-  }) satisfies FsExtensionContract;
+  };
+
+  const callableDict = {
+    read: toCallable(fnDict.read),
+    write: toCallable(fnDict.write),
+    append: toCallable(fnDict.append),
+    list: toCallable(fnDict.list),
+    find: toCallable(fnDict.find),
+    exists: toCallable(fnDict.exists),
+    remove: toCallable(fnDict.remove),
+    stat: toCallable(fnDict.stat),
+    mkdir: toCallable(fnDict.mkdir),
+    copy: toCallable(fnDict.copy),
+    move: toCallable(fnDict.move),
+    mounts: toCallable(fnDict.mounts),
+  } satisfies FsExtensionContract;
+
+  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
 }
 
 // ============================================================

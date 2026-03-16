@@ -145,7 +145,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     const ctx = createRuntimeContext();
 
     // Execute prompt
-    const result = (await ext.prompt.fn(
+    const result = (await (ext.value as any).prompt.fn(
       { text: 'Process large output', options: {} },
       ctx
     )) as ClaudeCodeResult;
@@ -248,7 +248,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    const result = (await ext.prompt.fn(
+    const result = (await (ext.value as any).prompt.fn(
       { text: 'Mixed content test', options: {} },
       ctx
     )) as ClaudeCodeResult;
@@ -353,7 +353,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
 
     // Execute 10 concurrent prompts
     const promises = Array.from({ length: 10 }, (_, i) =>
-      ext.prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
+      (ext.value as any).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
     );
 
     // Wait for all to complete
@@ -459,16 +459,16 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
 
     // Execute mixed concurrent calls
     const promises = [
-      ext.prompt.fn({ text: 'Prompt 1', options: {} }, ctx),
-      ext.prompt.fn({ text: 'Prompt 2', options: {} }, ctx),
-      ext.skill.fn({ name: 'skill-1', args: {} }, ctx),
-      ext.skill.fn({ name: 'skill-2', args: {} }, ctx),
-      ext.command.fn({ name: 'command-1', args: {} }, ctx),
-      ext.prompt.fn({ text: 'Prompt 3', options: {} }, ctx),
-      ext.skill.fn({ name: 'skill-3', args: {} }, ctx),
-      ext.command.fn({ name: 'command-2', args: {} }, ctx),
-      ext.prompt.fn({ text: 'Prompt 4', options: {} }, ctx),
-      ext.prompt.fn({ text: 'Prompt 5', options: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Prompt 1', options: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Prompt 2', options: {} }, ctx),
+      (ext.value as any).skill.fn({ name: 'skill-1', args: {} }, ctx),
+      (ext.value as any).skill.fn({ name: 'skill-2', args: {} }, ctx),
+      (ext.value as any).command.fn({ name: 'command-1', args: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Prompt 3', options: {} }, ctx),
+      (ext.value as any).skill.fn({ name: 'skill-3', args: {} }, ctx),
+      (ext.value as any).command.fn({ name: 'command-2', args: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Prompt 4', options: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Prompt 5', options: {} }, ctx),
     ];
 
     const results = await Promise.all(promises);
@@ -572,7 +572,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     const ctx = createRuntimeContext();
 
     const promises = Array.from({ length: 10 }, (_, i) =>
-      ext.prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
+      (ext.value as any).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
     );
 
     // Use Promise.allSettled to capture both successes and failures
@@ -683,7 +683,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
     // Execute 1000 sequential prompts
     for (let i = 0; i < 1000; i++) {
-      const result = (await ext.prompt.fn(
+      const result = (await (ext.value as any).prompt.fn(
         { text: `Prompt ${i}`, options: {} },
         ctx
       )) as ClaudeCodeResult;
@@ -790,7 +790,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
     // Execute 1000 sequential prompts with varying sizes
     for (let i = 0; i < 1000; i++) {
-      const result = (await ext.prompt.fn(
+      const result = (await (ext.value as any).prompt.fn(
         { text: `Prompt ${i}`, options: {} },
         ctx
       )) as ClaudeCodeResult;
@@ -888,7 +888,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
     // Execute 1000 sequential prompts
     for (let i = 0; i < 1000; i++) {
-      await ext.prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx);
+      await (ext.value as any).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx);
     }
 
     // Verify all PTY instances had kill called (cleanup)

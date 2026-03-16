@@ -352,19 +352,20 @@ describe('createSqliteKvExtension', () => {
       };
 
       const ext = createSqliteKvExtension(config);
+      const value = ext.value as Record<string, unknown>;
 
       // Verify all 11 functions exist
-      expect(ext.get).toBeDefined();
-      expect(ext.get_or).toBeDefined();
-      expect(ext.set).toBeDefined();
-      expect(ext.merge).toBeDefined();
-      expect(ext.delete).toBeDefined();
-      expect(ext.keys).toBeDefined();
-      expect(ext.has).toBeDefined();
-      expect(ext.clear).toBeDefined();
-      expect(ext.getAll).toBeDefined();
-      expect(ext.schema).toBeDefined();
-      expect(ext.mounts).toBeDefined();
+      expect(value['get']).toBeDefined();
+      expect(value['get_or']).toBeDefined();
+      expect(value['set']).toBeDefined();
+      expect(value['merge']).toBeDefined();
+      expect(value['delete']).toBeDefined();
+      expect(value['keys']).toBeDefined();
+      expect(value['has']).toBeDefined();
+      expect(value['clear']).toBeDefined();
+      expect(value['getAll']).toBeDefined();
+      expect(value['schema']).toBeDefined();
+      expect(value['mounts']).toBeDefined();
 
       ext.dispose?.();
     });
@@ -382,12 +383,13 @@ describe('createSqliteKvExtension', () => {
       };
 
       const ext = createSqliteKvExtension(config);
+      const value = ext.value as Record<string, { fn: unknown; params: unknown; annotations?: Record<string, unknown>; returnType: unknown }>;
 
       // Verify structure for one function (all follow same pattern)
-      expect(ext.get.params).toBeDefined();
-      expect(ext.get.fn).toBeTypeOf('function');
-      expect(ext.get.annotations?.['description']).toBeTypeOf('string');
-      expect(ext.get.returnType).toEqual(anyTypeValue);
+      expect(value['get']?.params).toBeDefined();
+      expect(value['get']?.fn).toBeTypeOf('function');
+      expect(value['get']?.annotations?.['description']).toBeTypeOf('string');
+      expect(value['get']?.returnType).toEqual(anyTypeValue);
 
       ext.dispose?.();
     });

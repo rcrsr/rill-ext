@@ -4,9 +4,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, callable, type RillValue } from '@rcrsr/rill';
+import { createRuntimeContext, callable, type RillValue, type ApplicationCallable } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
+
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 
 // ============================================================
 // TEST HELPERS
@@ -96,7 +100,7 @@ function makeTool(
   if (options?.params !== undefined) {
     (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
       name: p.name,
-      type: { type: p.type },
+      type: { kind: p.type },
       defaultValue: undefined,
       annotations: p.description !== undefined ? { description: p.description } : {},
     }));
@@ -148,7 +152,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      const result = (await ext.tool_loop.fn(
+      const result = (await getCallable(ext, 'tool_loop').fn(
         { prompt: 'What is the weather in SF?', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
@@ -178,7 +182,7 @@ describe('tool_loop() function', () => {
         calculator: makeTool(() => 'result', { description: 'Calculate' }),
       };
 
-      const result = (await ext.tool_loop.fn(
+      const result = (await getCallable(ext, 'tool_loop').fn(
         { prompt: 'What is the answer?', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
@@ -211,7 +215,7 @@ describe('tool_loop() function', () => {
         }),
       };
 
-      const result = (await ext.tool_loop.fn(
+      const result = (await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Search for something', tools, options: { max_turns: 1 } },
         ctx
       )) as Record<string, unknown>;
@@ -260,7 +264,7 @@ describe('tool_loop() function', () => {
         tool_c: makeConcurrentTool('C'),
       };
 
-      await ext.tool_loop.fn({ prompt: 'Run tools', tools, options: {} }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'Run tools', tools, options: {} }, ctx);
 
       // All tools should start before any finish (parallel execution)
       expect(executionOrder.filter((e) => e.endsWith('-start')).length).toBe(3);
@@ -282,7 +286,7 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.tool_loop.fn({ prompt: '   ', tools: {}, options: {} }, ctx)
+        getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools: {}, options: {} }, ctx)
       ).rejects.toThrow('prompt text cannot be empty');
     });
 
@@ -297,7 +301,7 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.tool_loop.fn({ prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} }, ctx)
+        getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} }, ctx)
       ).rejects.toThrow('tools parameter is required');
     });
 
@@ -326,7 +330,7 @@ describe('tool_loop() function', () => {
       };
 
       // Should complete without throwing despite unknown tool error
-      const result = await ext.tool_loop.fn({ prompt: 'Test', tools, options: {} }, ctx);
+      const result = await getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: {} }, ctx);
 
       // Verify result structure
       expect(result).toHaveProperty('content');
@@ -373,7 +377,7 @@ describe('tool_loop() function', () => {
       };
 
       await expect(
-        ext.tool_loop.fn({ prompt: 'Test', tools, options: { max_errors: 3 } }, ctx)
+        getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: { max_errors: 3 } }, ctx)
       ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
     });
 
@@ -413,7 +417,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      const result = (await ext.tool_loop.fn(
+      const result = (await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Test', tools, options: { max_errors: 3 } },
         ctx
       )) as Record<string, unknown>;
@@ -446,7 +450,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test', tools, options: {} }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: {} }, ctx);
 
       // Check second API call includes error in tool_result
       const secondCall = mockCreate.mock.calls[1]?.[0] as any;
@@ -481,7 +485,7 @@ describe('tool_loop() function', () => {
         { role: 'assistant', content: 'Previous response 1' },
       ];
 
-      await ext.tool_loop.fn({ prompt: 'New prompt', tools, options: { messages } }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'New prompt', tools, options: { messages } }, ctx);
 
       const firstCall = mockCreate.mock.calls[0]?.[0] as any;
       expect(firstCall.messages.length).toBe(3);
@@ -518,7 +522,7 @@ describe('tool_loop() function', () => {
         tool: makeTool(() => 'tool result', { description: 'Tool' }),
       };
 
-      const result = (await ext.tool_loop.fn(
+      const result = (await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Test prompt', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
@@ -555,7 +559,7 @@ describe('tool_loop() function', () => {
         tool: makeTool(() => 'result', { description: 'Tool' }),
       };
 
-      const result = (await ext.tool_loop.fn(
+      const result = (await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Test', tools, options: {} },
         ctx
       )) as Record<string, unknown>;
@@ -592,7 +596,7 @@ describe('tool_loop() function', () => {
         }),
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test', tools, options: {} }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: {} }, ctx);
 
       const firstCall = mockCreate.mock.calls[0]?.[0] as any;
       const tool = firstCall.tools[0];
@@ -643,7 +647,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test', tools, options: {} }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: {} }, ctx);
 
       expect(capturedArgs).toEqual({ param_a: 'value_a', param_b: 42 });
     });
@@ -670,8 +674,8 @@ describe('tool_loop() function', () => {
       };
 
       const [result1, result2] = await Promise.all([
-        ext.tool_loop.fn({ prompt: 'Prompt 1', tools, options: {} }, ctx1),
-        ext.tool_loop.fn({ prompt: 'Prompt 2', tools, options: {} }, ctx2),
+        getCallable(ext, 'tool_loop').fn({ prompt: 'Prompt 1', tools, options: {} }, ctx1),
+        getCallable(ext, 'tool_loop').fn({ prompt: 'Prompt 2', tools, options: {} }, ctx2),
       ]);
 
       const r1 = result1 as Record<string, unknown>;

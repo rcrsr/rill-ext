@@ -7,9 +7,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import {
   RuntimeError,
   emitExtensionEvent,
-  rillTypeToTypeValue,
-  type ExtensionResult,
+  structureToTypeValue,
+  toCallable,
+  type ExtensionFactoryResult,
   type LlmExtensionContract,
+  type RillFunction,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -119,7 +121,7 @@ function wrapValidation<T extends unknown[]>(
  */
 export function createAnthropicExtension(
   config: AnthropicExtensionConfig
-): ExtensionResult {
+): ExtensionFactoryResult {
   // Validate required fields
   validateApiKey(config.api_key);
   validateModel(config.model);
@@ -154,14 +156,14 @@ export function createAnthropicExtension(
   };
 
   // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
-  const result: ExtensionResult = ({
+  const fnDict: { message: RillFunction; messages: RillFunction; embed: RillFunction; embed_batch: RillFunction; tool_loop: RillFunction; generate: RillFunction } = ({
     // IR-4: anthropic::message
     message: {
       params: [
         p.str('text'),
         p.dict('options', undefined, {}, {
-          system: { type: { type: 'string' }, defaultValue: '' },
-          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+          system: { type: { kind: 'string' }, defaultValue: '' },
+          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -263,15 +265,15 @@ export function createAnthropicExtension(
         }
       },
       annotations: { description: 'Send single message to Claude API' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
+      returnType: structureToTypeValue({
+        kind: 'dict',
         fields: {
-          content: { type: { type: 'string' } },
-          model: { type: { type: 'string' } },
-          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
-          stop_reason: { type: { type: 'string' } },
-          id: { type: { type: 'string' } },
-          messages: { type: { type: 'list', element: { type: 'dict' } } },
+          content: { type: { kind: 'string' } },
+          model: { type: { kind: 'string' } },
+          usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+          stop_reason: { type: { kind: 'string' } },
+          id: { type: { kind: 'string' } },
+          messages: { type: { kind: 'list', element: { kind: 'dict' } } },
         },
       }),
     },
@@ -279,10 +281,10 @@ export function createAnthropicExtension(
     // IR-5: anthropic::messages
     messages: {
       params: [
-        p.list('messages', { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } }),
+        p.list('messages', { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } }),
         p.dict('options', undefined, {}, {
-          system: { type: { type: 'string' }, defaultValue: '' },
-          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
+          system: { type: { kind: 'string' }, defaultValue: '' },
+          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -441,15 +443,15 @@ export function createAnthropicExtension(
         }
       },
       annotations: { description: 'Send multi-turn conversation to Claude API' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
+      returnType: structureToTypeValue({
+        kind: 'dict',
         fields: {
-          content: { type: { type: 'string' } },
-          model: { type: { type: 'string' } },
-          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
-          stop_reason: { type: { type: 'string' } },
-          id: { type: { type: 'string' } },
-          messages: { type: { type: 'list', element: { type: 'dict' } } },
+          content: { type: { kind: 'string' } },
+          model: { type: { kind: 'string' } },
+          usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+          stop_reason: { type: { kind: 'string' } },
+          id: { type: { kind: 'string' } },
+          messages: { type: { kind: 'list', element: { kind: 'dict' } } },
         },
       }),
     },
@@ -519,7 +521,7 @@ export function createAnthropicExtension(
         }
       },
       annotations: { description: 'Generate embedding vector for text' },
-      returnType: rillTypeToTypeValue({ type: 'vector' }),
+      returnType: structureToTypeValue({ kind: 'vector' }),
     },
 
     // IR-7: anthropic::embed_batch
@@ -590,7 +592,7 @@ export function createAnthropicExtension(
         }
       },
       annotations: { description: 'Generate embedding vectors for multiple texts' },
-      returnType: rillTypeToTypeValue({ type: 'list' }),
+      returnType: structureToTypeValue({ kind: 'list' }),
     },
 
     // IR-8: anthropic::tool_loop
@@ -599,16 +601,16 @@ export function createAnthropicExtension(
         p.str('prompt'),
         {
           name: 'tools',
-          type: { type: 'dict', valueType: { type: 'closure' } },
+          type: { kind: 'dict', valueType: { kind: 'closure' } },
           defaultValue: undefined,
           annotations: {},
         },
         p.dict('options', undefined, undefined, {
-          system: { type: { type: 'string' }, defaultValue: '' },
-          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
-          max_errors: { type: { type: 'number' }, defaultValue: 3 },
-          max_turns: { type: { type: 'number' }, defaultValue: 10 },
-          messages: { type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: [] },
+          system: { type: { kind: 'string' }, defaultValue: '' },
+          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
+          max_errors: { type: { kind: 'number' }, defaultValue: 3 },
+          max_turns: { type: { kind: 'number' }, defaultValue: 10 },
+          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -885,15 +887,15 @@ export function createAnthropicExtension(
         }
       },
       annotations: { description: 'Execute tool-use loop with Claude API' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
+      returnType: structureToTypeValue({
+        kind: 'dict',
         fields: {
-          content: { type: { type: 'string' } },
-          model: { type: { type: 'string' } },
-          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
-          stop_reason: { type: { type: 'string' } },
-          turns: { type: { type: 'number' } },
-          messages: { type: { type: 'list', element: { type: 'dict' } } },
+          content: { type: { kind: 'string' } },
+          model: { type: { kind: 'string' } },
+          usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+          stop_reason: { type: { kind: 'string' } },
+          turns: { type: { kind: 'number' } },
+          messages: { type: { kind: 'list', element: { kind: 'dict' } } },
         },
       }),
     },
@@ -903,10 +905,10 @@ export function createAnthropicExtension(
       params: [
         p.str('prompt'),
         p.dict('options', undefined, {}, {
-          schema: { type: { type: 'dict' } },
-          system: { type: { type: 'string' }, defaultValue: '' },
-          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
-          messages: { type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: [] },
+          schema: { type: { kind: 'dict' } },
+          system: { type: { kind: 'string' }, defaultValue: '' },
+          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
+          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -1069,22 +1071,28 @@ export function createAnthropicExtension(
         }
       },
       annotations: { description: 'Generate structured output from Anthropic API' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
+      returnType: structureToTypeValue({
+        kind: 'dict',
         fields: {
-          data: { type: { type: 'any' } },
-          raw: { type: { type: 'string' } },
-          model: { type: { type: 'string' } },
-          usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
-          stop_reason: { type: { type: 'string' } },
-          id: { type: { type: 'string' } },
+          data: { type: { kind: 'any' } },
+          raw: { type: { kind: 'string' } },
+          model: { type: { kind: 'string' } },
+          usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+          stop_reason: { type: { kind: 'string' } },
+          id: { type: { kind: 'string' } },
         },
       }),
     },
-  }) satisfies LlmExtensionContract;
+  });
 
-  // IR-11: Attach dispose lifecycle method
-  result.dispose = dispose;
+  const callableDict = {
+    message: toCallable(fnDict.message),
+    messages: toCallable(fnDict.messages),
+    embed: toCallable(fnDict.embed),
+    embed_batch: toCallable(fnDict.embed_batch),
+    tool_loop: toCallable(fnDict.tool_loop),
+    generate: toCallable(fnDict.generate),
+  } satisfies LlmExtensionContract;
 
-  return result;
+  return { value: callableDict as unknown as RillValue, dispose };
 }

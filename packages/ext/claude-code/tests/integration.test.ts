@@ -70,7 +70,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension();
       const ctx = createRuntimeContext();
 
-      const result = (await ext.prompt.fn(
+      const result = (await (ext.value as any).prompt.fn(
         { text: 'Hello Claude', options: {} },
         ctx
       )) as ClaudeCodeResult;
@@ -124,7 +124,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension();
       const ctx = createRuntimeContext();
 
-      const result = await ext.skill.fn(
+      const result = await (ext.value as any).skill.fn(
         {
           name: 'test-skill',
           args: {
@@ -188,7 +188,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn({ text: 'Test prompt', options: { timeout: 60000 } }, ctx);
+      await (ext.value as any).prompt.fn({ text: 'Test prompt', options: { timeout: 60000 } }, ctx);
 
       // Verify custom timeout was passed (AC-3)
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -235,7 +235,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({ defaultTimeout: 45000 });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
+      await (ext.value as any).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify default timeout was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -285,7 +285,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension();
       const ctx = createRuntimeContext();
 
-      const result = (await ext.prompt.fn(
+      const result = (await (ext.value as any).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       )) as ClaudeCodeResult;
@@ -339,7 +339,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension();
       const ctx = createRuntimeContext();
 
-      const result = (await ext.prompt.fn(
+      const result = (await (ext.value as any).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       )) as ClaudeCodeResult;
@@ -389,7 +389,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension();
       const ctx = createRuntimeContext();
 
-      const result = (await ext.prompt.fn(
+      const result = (await (ext.value as any).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       )) as ClaudeCodeResult;
@@ -439,7 +439,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension();
       const ctx = createRuntimeContext();
 
-      const result = (await ext.prompt.fn(
+      const result = (await (ext.value as any).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       )) as ClaudeCodeResult;

@@ -149,7 +149,7 @@ describe('createOpenAIExtension', () => {
     });
   });
 
-  // AC-1: Factory returns ExtensionResult with 6 functions
+  // AC-1: Factory returns ExtensionFactoryResult with 6 callables
   describe('extension result structure', () => {
     it('returns object with 6 function definitions', () => {
       const config: OpenAIExtensionConfig = {
@@ -158,31 +158,33 @@ describe('createOpenAIExtension', () => {
       };
 
       const result = createOpenAIExtension(config);
+      const value = result.value as Record<string, unknown>;
 
-      // Verify all 6 functions exist
-      expect(result.message).toBeDefined();
-      expect(result.messages).toBeDefined();
-      expect(result.embed).toBeDefined();
-      expect(result.embed_batch).toBeDefined();
-      expect(result.tool_loop).toBeDefined();
-      expect(result.generate).toBeDefined();
+      // Verify all 6 functions exist in the value dict
+      expect(value['message']).toBeDefined();
+      expect(value['messages']).toBeDefined();
+      expect(value['embed']).toBeDefined();
+      expect(value['embed_batch']).toBeDefined();
+      expect(value['tool_loop']).toBeDefined();
+      expect(value['generate']).toBeDefined();
 
-      // Verify dispose exists
+      // Verify dispose exists on the factory result
       expect(result.dispose).toBeDefined();
     });
 
-    it('message has correct structure', () => {
+    it('message callable has correct structure', () => {
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
         model: 'gpt-4-turbo',
       };
 
       const result = createOpenAIExtension(config);
+      const value = result.value as Record<string, Record<string, unknown>>;
 
-      expect(result.message).toMatchObject({
+      expect(value['message']).toMatchObject({
         params: [
-          { name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
+          { name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+          { name: 'options', type: { kind: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
@@ -190,18 +192,19 @@ describe('createOpenAIExtension', () => {
       });
     });
 
-    it('messages has correct structure', () => {
+    it('messages callable has correct structure', () => {
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
         model: 'gpt-4-turbo',
       };
 
       const result = createOpenAIExtension(config);
+      const value = result.value as Record<string, Record<string, unknown>>;
 
-      expect(result.messages).toMatchObject({
+      expect(value['messages']).toMatchObject({
         params: [
-          { name: 'messages', type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { type: 'dict' }, defaultValue: {}, annotations: {} },
+          { name: 'messages', type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: undefined, annotations: {} },
+          { name: 'options', type: { kind: 'dict' }, defaultValue: {}, annotations: {} },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
@@ -209,51 +212,54 @@ describe('createOpenAIExtension', () => {
       });
     });
 
-    it('embed has correct structure', () => {
+    it('embed callable has correct structure', () => {
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
         model: 'gpt-4-turbo',
       };
 
       const result = createOpenAIExtension(config);
+      const value = result.value as Record<string, Record<string, unknown>>;
 
-      expect(result.embed).toMatchObject({
-        params: [{ name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} }],
+      expect(value['embed']).toMatchObject({
+        params: [{ name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} }],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
         returnType: { typeName: 'vector' },
       });
     });
 
-    it('embed_batch has correct structure', () => {
+    it('embed_batch callable has correct structure', () => {
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
         model: 'gpt-4-turbo',
       };
 
       const result = createOpenAIExtension(config);
+      const value = result.value as Record<string, Record<string, unknown>>;
 
-      expect(result.embed_batch).toMatchObject({
-        params: [{ name: 'texts', type: { type: 'list' }, defaultValue: undefined, annotations: {} }],
+      expect(value['embed_batch']).toMatchObject({
+        params: [{ name: 'texts', type: { kind: 'list' }, defaultValue: undefined, annotations: {} }],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
         returnType: { typeName: 'list' },
       });
     });
 
-    it('tool_loop has correct structure', () => {
+    it('tool_loop callable has correct structure', () => {
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
         model: 'gpt-4-turbo',
       };
 
       const result = createOpenAIExtension(config);
+      const value = result.value as Record<string, Record<string, unknown>>;
 
-      expect(result.tool_loop).toMatchObject({
+      expect(value['tool_loop']).toMatchObject({
         params: [
-          { name: 'prompt', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-          { name: 'tools', type: { type: 'dict', valueType: { type: 'closure' } }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { type: 'dict' }, defaultValue: undefined, annotations: {} },
+          { name: 'prompt', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+          { name: 'tools', type: { kind: 'dict', valueType: { kind: 'closure' } }, defaultValue: undefined, annotations: {} },
+          { name: 'options', type: { kind: 'dict' }, defaultValue: undefined, annotations: {} },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },

@@ -4,13 +4,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
 
 // ============================================================
 // TEST HELPERS
 // ============================================================
+
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 
 /**
  * Create mock OpenAI API response.
@@ -92,7 +96,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await ext.message.fn({ text: 'Test' }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -130,7 +134,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -164,7 +168,7 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await ext.messages.fn({ messages }, ctx);
+      await getCallable(ext, 'messages').fn({ messages }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -201,7 +205,7 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await expect(ext.messages.fn({ messages }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'messages').fn({ messages }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);

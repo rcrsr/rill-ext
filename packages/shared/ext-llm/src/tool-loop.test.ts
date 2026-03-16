@@ -756,19 +756,19 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'city',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'count',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'optional_flag',
-            type: { type: 'bool' },
+            type: { kind: 'bool' },
             defaultValue: true,
             annotations: {},
           },
@@ -820,37 +820,37 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'str_param',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: { description: 'A string parameter' },
           },
           {
             name: 'num_param',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: undefined,
             annotations: { description: 'A number parameter' },
           },
           {
             name: 'bool_param',
-            type: { type: 'bool' },
+            type: { kind: 'bool' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'list_param',
-            type: { type: 'list' },
+            type: { kind: 'list' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'dict_param',
-            type: { type: 'dict' },
+            type: { kind: 'dict' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'optional_param',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: 'default value',
             annotations: {},
           },
@@ -955,7 +955,7 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'param',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -991,7 +991,7 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'required_param',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -1026,7 +1026,7 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'optional_num',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: 0,
             annotations: {},
           },
@@ -1069,13 +1069,13 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'param_a',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'param_b',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -1131,19 +1131,19 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'first',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'second',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'third',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -1201,13 +1201,13 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'name',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'age',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -1802,7 +1802,7 @@ describe('executeToolLoop', () => {
       params: [
         {
           name: 'query',
-          type: { type: 'string' } as const,
+          type: { kind: 'string' } as const,
           defaultValue: undefined,
           annotations: { description: 'Search query' },
         },
@@ -1824,7 +1824,7 @@ describe('executeToolLoop', () => {
       params: [
         {
           name: 'q',
-          type: { type: 'string' } as const,
+          type: { kind: 'string' } as const,
           defaultValue: undefined,
           annotations: {},
         },

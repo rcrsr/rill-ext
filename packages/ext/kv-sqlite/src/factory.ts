@@ -6,7 +6,7 @@
 import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { anyTypeValue, rillTypeToTypeValue, type ExtensionResult, type KvExtensionContract, type RillValue } from '@rcrsr/rill';
+import { anyTypeValue, structureToTypeValue, toCallable, type ExtensionFactoryResult, type KvExtensionContract, type RillFunction, type RillValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { SqliteKvConfig, SqliteKvMountConfig } from './types.js';
 
@@ -54,7 +54,7 @@ interface MountDatabase {
  */
 export function createSqliteKvExtension(
   config: SqliteKvConfig
-): ExtensionResult {
+): ExtensionFactoryResult {
   // Validate required configuration (AC-10)
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new Error(
@@ -540,7 +540,11 @@ export function createSqliteKvExtension(
   // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
   // ============================================================
 
-  const result: ExtensionResult = ({
+  const fnDict: {
+    get: RillFunction; get_or: RillFunction; set: RillFunction; merge: RillFunction;
+    delete: RillFunction; keys: RillFunction; has: RillFunction; clear: RillFunction;
+    getAll: RillFunction; schema: RillFunction; mounts: RillFunction;
+  } = {
     get: {
       params: [
         p.str('mount', 'Mount name'),
@@ -568,7 +572,7 @@ export function createSqliteKvExtension(
       ],
       fn: set,
       annotations: { description: 'Set value with validation' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     merge: {
       params: [
@@ -578,7 +582,7 @@ export function createSqliteKvExtension(
       ],
       fn: merge,
       annotations: { description: 'Merge partial dict into existing dict value' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     delete: {
       params: [
@@ -587,13 +591,13 @@ export function createSqliteKvExtension(
       ],
       fn: deleteKey,
       annotations: { description: 'Delete key' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     keys: {
       params: [p.str('mount', 'Mount name')],
       fn: keys,
       annotations: { description: 'Get all keys in mount' },
-      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
+      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
     },
     has: {
       params: [
@@ -602,32 +606,32 @@ export function createSqliteKvExtension(
       ],
       fn: has,
       annotations: { description: 'Check key existence' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     clear: {
       params: [p.str('mount', 'Mount name')],
       fn: clear,
       annotations: { description: 'Clear all keys in mount' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     getAll: {
       params: [p.str('mount', 'Mount name')],
       fn: getAll,
       annotations: { description: 'Get all entries as dict' },
-      returnType: rillTypeToTypeValue({ type: 'dict' }),
+      returnType: structureToTypeValue({ kind: 'dict' }),
     },
     schema: {
       params: [p.str('mount', 'Mount name')],
       fn: schema,
       annotations: { description: 'Get schema information' },
-      returnType: rillTypeToTypeValue({
-        type: 'list',
+      returnType: structureToTypeValue({
+        kind: 'list',
         element: {
-          type: 'dict',
+          kind: 'dict',
           fields: {
-            key: { type: { type: 'string' } },
-            type: { type: { type: 'string' } },
-            description: { type: { type: 'string' } },
+            key: { type: { kind: 'string' } },
+            type: { type: { kind: 'string' } },
+            description: { type: { kind: 'string' } },
           },
         },
       }),
@@ -636,26 +640,25 @@ export function createSqliteKvExtension(
       params: [],
       fn: mountsList,
       annotations: { description: 'Get list of mount metadata' },
-      returnType: rillTypeToTypeValue({
-        type: 'list',
+      returnType: structureToTypeValue({
+        kind: 'list',
         element: {
-          type: 'dict',
+          kind: 'dict',
           fields: {
-            name: { type: { type: 'string' } },
-            mode: { type: { type: 'string' } },
-            schema: { type: { type: 'string' } },
-            maxEntries: { type: { type: 'number' } },
-            maxValueSize: { type: { type: 'number' } },
-            database: { type: { type: 'string' } },
-            table: { type: { type: 'string' } },
+            name: { type: { kind: 'string' } },
+            mode: { type: { kind: 'string' } },
+            schema: { type: { kind: 'string' } },
+            maxEntries: { type: { kind: 'number' } },
+            maxValueSize: { type: { kind: 'number' } },
+            database: { type: { kind: 'string' } },
+            table: { type: { kind: 'string' } },
           },
         },
       }),
     },
-  }) satisfies KvExtensionContract;
+  };
 
-  // Attach dispose lifecycle method
-  result.dispose = (): void => {
+  const dispose = (): void => {
     // Close all database connections
     for (const { db } of databases.values()) {
       db.close();
@@ -663,5 +666,19 @@ export function createSqliteKvExtension(
     databases.clear();
   };
 
-  return result;
+  const callableDict = {
+    get: toCallable(fnDict.get),
+    get_or: toCallable(fnDict.get_or),
+    set: toCallable(fnDict.set),
+    merge: toCallable(fnDict.merge),
+    delete: toCallable(fnDict.delete),
+    keys: toCallable(fnDict.keys),
+    has: toCallable(fnDict.has),
+    clear: toCallable(fnDict.clear),
+    getAll: toCallable(fnDict.getAll),
+    schema: toCallable(fnDict.schema),
+    mounts: toCallable(fnDict.mounts),
+  } satisfies KvExtensionContract;
+
+  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
 }

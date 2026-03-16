@@ -4,13 +4,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, callable } from '@rcrsr/rill';
+import { createRuntimeContext, callable, type ApplicationCallable } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
 
 // ============================================================
 // TEST HELPERS
 // ============================================================
+
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 
 /**
  * Create mock Google API response for generateContent.
@@ -90,7 +94,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await ext.message.fn({ text: 'Test' }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -127,7 +131,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -163,7 +167,7 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await ext.messages.fn({ messages: messages }, ctx);
+      await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -201,7 +205,7 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await expect(ext.messages.fn({ messages: messages }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'messages').fn({ messages: messages }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -235,7 +239,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await ext.embed.fn({ text: 'Test text' }, ctx);
+      await getCallable(ext, 'embed').fn({ text: 'Test text' }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -269,7 +273,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(ext.embed.fn({ text: 'Test text' }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'embed').fn({ text: 'Test text' }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -310,7 +314,7 @@ describe('extension event emission', () => {
       });
 
       const texts = ['Text 1', 'Text 2', 'Text 3'];
-      await ext.embed_batch.fn({ texts: texts }, ctx);
+      await getCallable(ext, 'embed_batch').fn({ texts: texts }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -346,7 +350,7 @@ describe('extension event emission', () => {
       });
 
       const texts = ['Text 1', 'Text 2'];
-      await expect(ext.embed_batch.fn({ texts: texts }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'embed_batch').fn({ texts: texts }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -404,7 +408,7 @@ describe('extension event emission', () => {
         max_turns: 5,
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test prompt', tools, options }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools, options }, ctx);
 
       // Verify event sequence (§4.10)
       expect(events.length).toBeGreaterThanOrEqual(3);
@@ -475,7 +479,7 @@ describe('extension event emission', () => {
       const tools = { test_tool: testTool };
 
       await expect(
-        ext.tool_loop.fn({ prompt: 'Test prompt', tools }, ctx)
+        getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools }, ctx)
       ).rejects.toThrow();
 
       // Verify error event structure (§4.10)
@@ -536,7 +540,7 @@ describe('extension event emission', () => {
         max_errors: 3,
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test prompt', tools, options }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools, options }, ctx);
 
       // Find tool_result event
       const toolResultEvents = events.filter(

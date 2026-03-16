@@ -8,9 +8,14 @@ import { createAnthropicExtension } from '../src/factory.js';
 import {
   createRuntimeContext,
   callable,
+  type ApplicationCallable,
   type ExtensionEvent,
 } from '@rcrsr/rill';
 import Anthropic from '@anthropic-ai/sdk';
+
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 
 /**
  * Helper to create event collector for onLogEvent callback.
@@ -92,7 +97,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.message.fn({ text: 'Hello Claude', options: {} }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Hello Claude', options: {} }, ctx);
 
       // Verify event was emitted
       expect(events).toHaveLength(1);
@@ -147,7 +152,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         { role: 'user', content: 'How are you?' },
       ];
 
-      await ext.messages.fn({ messages, options: {} }, ctx);
+      await getCallable(ext, 'messages').fn({ messages, options: {} }, ctx);
 
       expect(events).toHaveLength(1);
 
@@ -181,7 +186,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // embed() throws "embeddings API not available"
-      await expect(ext.embed.fn({ text: 'test text' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx)).rejects.toThrow(
         'embeddings API not available'
       );
 
@@ -214,7 +219,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       await expect(
-        ext.embed_batch.fn({ texts: ['text1', 'text2'] }, ctx)
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
       ).rejects.toThrow('embeddings API not available');
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -281,11 +286,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const weatherFn = callable(vi.fn().mockReturnValue('18°C, partly cloudy'));
       (weatherFn as Record<string, unknown>)['description'] = 'Get weather for location';
       (weatherFn as Record<string, unknown>)['params'] = [
-        { name: 'location', type: { type: 'string' }, defaultValue: undefined, annotations: { description: 'City name' } },
-        { name: 'unit', type: { type: 'string' }, defaultValue: undefined, annotations: { description: 'Temperature unit' } },
+        { name: 'location', type: { kind: 'string' }, defaultValue: undefined, annotations: { description: 'City name' } },
+        { name: 'unit', type: { kind: 'string' }, defaultValue: undefined, annotations: { description: 'Temperature unit' } },
       ];
 
-      await ext.tool_loop.fn(
+      await getCallable(ext, 'tool_loop').fn(
         { prompt: 'What is the weather in San Francisco?', tools: { get_weather: weatherFn }, options: {} },
         ctx
       );
@@ -360,11 +365,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const calculateFn = callable(vi.fn().mockReturnValue(8));
       (calculateFn as Record<string, unknown>)['description'] = 'Add two numbers';
       (calculateFn as Record<string, unknown>)['params'] = [
-        { name: 'a', type: { type: 'number' }, defaultValue: undefined, annotations: {} },
-        { name: 'b', type: { type: 'number' }, defaultValue: undefined, annotations: {} },
+        { name: 'a', type: { kind: 'number' }, defaultValue: undefined, annotations: {} },
+        { name: 'b', type: { kind: 'number' }, defaultValue: undefined, annotations: {} },
       ];
 
-      await ext.tool_loop.fn(
+      await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Calculate 5 + 3', tools: { calculate: calculateFn }, options: {} },
         ctx
       );
@@ -435,7 +440,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
       (failingTool as Record<string, unknown>)['description'] = 'Always fails';
 
-      await ext.tool_loop.fn(
+      await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Test failing tool', tools: { failing_tool: failingTool }, options: {} },
         ctx
       );
@@ -482,7 +487,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.tool_loop.fn({ prompt: 'Simple question', tools: {}, options: {} }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'Simple question', tools: {}, options: {} }, ctx);
 
       // Find tool_loop event
       const toolLoopEvents = events.filter(
@@ -572,7 +577,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const step2Fn = callable(vi.fn().mockReturnValue('step2 done'));
       (step2Fn as Record<string, unknown>)['description'] = 'Second step';
 
-      await ext.tool_loop.fn(
+      await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Multi-step task', tools: { step1: step1Fn, step2: step2Fn }, options: {} },
         ctx
       );
@@ -618,7 +623,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect(ext.message.fn({ text: 'Test', options: {} }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx)).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -646,7 +651,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Empty messages list triggers validation error
-      await expect(ext.messages.fn({ messages: [], options: {} }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: [], options: {} }, ctx)).rejects.toThrow(
         'messages list cannot be empty'
       );
 
@@ -673,7 +678,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       // Missing tools argument triggers validation error
       await expect(
-        ext.tool_loop.fn({ prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} }, ctx)
+        getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} }, ctx)
       ).rejects.toThrow('tools parameter is required');
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -712,7 +717,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await ext.message.fn({ text: 'Test', options: {} }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -778,9 +783,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Test all three main functions
-      await ext.message.fn({ text: 'Test message', options: {} }, ctx);
-      await ext.messages.fn({ messages: [{ role: 'user', content: 'Test' }], options: {} }, ctx);
-      await ext.tool_loop.fn({ prompt: 'Test tool loop', tools: {}, options: {} }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test message', options: {} }, ctx);
+      await getCallable(ext, 'messages').fn({ messages: [{ role: 'user', content: 'Test' }], options: {} }, ctx);
+      await getCallable(ext, 'tool_loop').fn({ prompt: 'Test tool loop', tools: {}, options: {} }, ctx);
 
       expect(mockCreate).toHaveBeenCalledTimes(3);
 

@@ -4,13 +4,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, callable, type RillValue } from '@rcrsr/rill';
+import { createRuntimeContext, callable, type ApplicationCallable, type RillValue } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
 
 // ============================================================
 // TEST HELPERS
 // ============================================================
+
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 
 /**
  * Create mock Google API response.
@@ -68,7 +72,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.message.fn({ text: 'Hello' }, ctx)) as Record<
+      const result = (await getCallable(ext, 'message').fn({ text: 'Hello' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -97,7 +101,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'What is 2+2?' }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'What is 2+2?' }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith({
         model: 'gemini-2.0-flash',
@@ -127,7 +131,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'What is 2+2?' }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'What is 2+2?' }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith({
         model: 'gemini-2.0-flash',
@@ -157,7 +161,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'Test', options: { system: 'Override system.' } }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test', options: { system: 'Override system.' } }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -180,7 +184,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'Test', options: { max_tokens: 2000 } }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test', options: { max_tokens: 2000 } }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -202,7 +206,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.message.fn({ text: 'Test' }, ctx);
+      await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -225,7 +229,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.message.fn({ text: 'Test' }, ctx)) as Record<
+      const result = (await getCallable(ext, 'message').fn({ text: 'Test' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -249,7 +253,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: '' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'message').fn({ text: '' }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
@@ -263,7 +267,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: '   ' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'message').fn({ text: '   ' }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
@@ -282,7 +286,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toThrow(
         'Gemini API error (HTTP 401): authentication failed (401)'
       );
     });
@@ -299,7 +303,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toThrow(
         'Gemini API error: rate limit exceeded'
       );
     });
@@ -316,7 +320,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toThrow(
         'Gemini API error: Request timeout'
       );
     });
@@ -335,7 +339,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toThrow(
         'Gemini API error (HTTP 500): Internal server error (500)'
       );
     });
@@ -372,7 +376,7 @@ describe('messages() function', () => {
         { role: 'user', content: 'Can you help me?' },
       ];
 
-      const result = (await ext.messages.fn({ messages: inputMessages }, ctx)) as Record<
+      const result = (await getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx)) as Record<
         string,
         unknown
       >;
@@ -400,7 +404,7 @@ describe('messages() function', () => {
 
       const inputMessages = [{ role: 'user', content: 'Hello' }];
 
-      await ext.messages.fn({ messages: inputMessages }, ctx);
+      await getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -425,7 +429,7 @@ describe('messages() function', () => {
 
       const inputMessages = [{ role: 'user', content: 'Test' }];
 
-      await ext.messages.fn(
+      await getCallable(ext, 'messages').fn(
         { messages: inputMessages, options: { system: 'Override system.' } },
         ctx
       );
@@ -452,7 +456,7 @@ describe('messages() function', () => {
 
       const inputMessages = [{ role: 'user', content: 'Test' }];
 
-      await ext.messages.fn({ messages: inputMessages, options: { max_tokens: 2000 } }, ctx);
+      await getCallable(ext, 'messages').fn({ messages: inputMessages, options: { max_tokens: 2000 } }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -480,7 +484,7 @@ describe('messages() function', () => {
         { role: 'user', content: 'How are you?' },
       ];
 
-      await ext.messages.fn({ messages: inputMessages }, ctx);
+      await getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith({
         model: 'gemini-2.0-flash',
@@ -520,7 +524,7 @@ describe('messages() function', () => {
         { role: 'tool', content: 'Sunny, 72°F' },
       ];
 
-      await ext.messages.fn({ messages: inputMessages }, ctx);
+      await getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
 
       expect(mockGenerateContent).toHaveBeenCalledWith({
         model: 'gemini-2.0-flash',
@@ -552,7 +556,7 @@ describe('messages() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.messages.fn({ messages: [] }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: [] }, ctx)).rejects.toThrow(
         'messages list cannot be empty'
       );
     });
@@ -569,7 +573,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ content: 'Hello' }];
 
-      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "message missing required 'role' field"
       );
     });
@@ -586,7 +590,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'system', content: 'Hello' }];
 
-      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "invalid role 'system'"
       );
     });
@@ -603,7 +607,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'user' }];
 
-      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "user message requires 'content'"
       );
     });
@@ -620,7 +624,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'assistant' }];
 
-      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "assistant message requires 'content' or 'tool_calls'"
       );
     });
@@ -642,7 +646,7 @@ describe('messages() function', () => {
       ];
 
       await expect(
-        ext.messages.fn({ messages: validMessages }, ctx)
+        getCallable(ext, 'messages').fn({ messages: validMessages }, ctx)
       ).resolves.toBeDefined();
     });
 
@@ -663,7 +667,7 @@ describe('messages() function', () => {
       ];
 
       await expect(
-        ext.messages.fn({ messages: validMessages }, ctx)
+        getCallable(ext, 'messages').fn({ messages: validMessages }, ctx)
       ).resolves.toBeDefined();
     });
 
@@ -678,7 +682,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'tool' }];
 
-      await expect(ext.messages.fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
         "tool message requires 'content'"
       );
     });
@@ -701,7 +705,7 @@ describe('messages() function', () => {
 
       const messages = [{ role: 'user', content: 'Test' }];
 
-      await expect(ext.messages.fn({ messages: messages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: messages }, ctx)).rejects.toThrow(
         'Gemini API error (HTTP 401): authentication failed (401)'
       );
     });
@@ -719,7 +723,7 @@ describe('messages() function', () => {
 
       const messages = [{ role: 'user', content: 'Test' }];
 
-      await expect(ext.messages.fn({ messages: messages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: messages }, ctx)).rejects.toThrow(
         'Gemini API error: rate limit exceeded'
       );
     });
@@ -737,7 +741,7 @@ describe('messages() function', () => {
 
       const messages = [{ role: 'user', content: 'Test' }];
 
-      await expect(ext.messages.fn({ messages: messages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: messages }, ctx)).rejects.toThrow(
         'Gemini API error: Request timeout'
       );
     });
@@ -757,7 +761,7 @@ describe('messages() function', () => {
 
       const messages = [{ role: 'user', content: 'Test' }];
 
-      await expect(ext.messages.fn({ messages: messages }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'messages').fn({ messages: messages }, ctx)).rejects.toThrow(
         'Gemini API error (HTTP 500): Internal server error (500)'
       );
     });
@@ -790,7 +794,7 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.embed.fn({ text: 'Hello world' }, ctx)) as {
+      const result = (await getCallable(ext, 'embed').fn({ text: 'Hello world' }, ctx)) as {
         __rill_vector: true;
         data: Float32Array;
         model: string;
@@ -819,7 +823,7 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await ext.embed.fn({ text: 'Test text' }, ctx);
+      await getCallable(ext, 'embed').fn({ text: 'Test text' }, ctx);
 
       expect(mockEmbedContent).toHaveBeenCalledWith({
         model: 'text-embedding-004',
@@ -840,7 +844,7 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn({ text: '' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'embed').fn({ text: '' }, ctx)).rejects.toThrow(
         'embed text cannot be empty'
       );
     });
@@ -855,7 +859,7 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn({ text: 'Hello' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx)).rejects.toThrow(
         'embed_model not configured'
       );
     });
@@ -875,7 +879,7 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.embed.fn({ text: 'Hello' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx)).rejects.toThrow(
         'Gemini API error: 401: authentication failed'
       );
     });
@@ -912,7 +916,7 @@ describe('embed_batch() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.embed_batch.fn(
+      const result = (await getCallable(ext, 'embed_batch').fn(
         { texts: ['Hello', 'World', 'Test'] },
         ctx
       )) as Array<{
@@ -939,7 +943,7 @@ describe('embed_batch() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = await ext.embed_batch.fn({ texts: [] }, ctx);
+      const result = await getCallable(ext, 'embed_batch').fn({ texts: [] }, ctx);
 
       expect(result).toEqual([]);
       expect(mockEmbedContent).not.toHaveBeenCalled();
@@ -959,7 +963,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn({ texts: ['Hello', 123, 'World'] }, ctx)
+        getCallable(ext, 'embed_batch').fn({ texts: ['Hello', 123, 'World'] }, ctx)
       ).rejects.toThrow('embed_batch requires list of strings');
     });
 
@@ -975,7 +979,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn({ texts: ['Hello', '', 'World'] }, ctx)
+        getCallable(ext, 'embed_batch').fn({ texts: ['Hello', '', 'World'] }, ctx)
       ).rejects.toThrow('embed text cannot be empty at index 1');
     });
 
@@ -990,7 +994,7 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.embed_batch.fn({ texts: ['Hello', 'World'] }, ctx)
+        getCallable(ext, 'embed_batch').fn({ texts: ['Hello', 'World'] }, ctx)
       ).rejects.toThrow('embed_model not configured');
     });
   });
@@ -1013,7 +1017,7 @@ function makeTool(
   if (options?.params !== undefined) {
     (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
       name: p.name,
-      type: { type: p.type },
+      type: { kind: p.type },
       defaultValue: undefined,
       annotations: p.description !== undefined ? { description: p.description } : {},
     }));
@@ -1066,7 +1070,7 @@ describe('tool_loop() function', () => {
         }),
       };
 
-      const result = (await ext.tool_loop.fn(
+      const result = (await getCallable(ext, 'tool_loop').fn(
         { prompt: 'What is the weather in NYC?', tools },
         ctx
       )) as Record<string, unknown>;
@@ -1097,7 +1101,7 @@ describe('tool_loop() function', () => {
         get_weather: makeTool(mockToolFn),
       };
 
-      const result = (await ext.tool_loop.fn(
+      const result = (await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Hello', tools },
         ctx
       )) as Record<string, unknown>;
@@ -1132,7 +1136,7 @@ describe('tool_loop() function', () => {
         get_weather: makeTool(vi.fn().mockResolvedValue('sunny')),
       };
 
-      const result = (await ext.tool_loop.fn({ prompt: 'Test', tools, options: { max_turns: 1 } }, ctx)) as Record<
+      const result = (await getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: { max_turns: 1 } }, ctx)) as Record<
         string,
         unknown
       >;
@@ -1155,7 +1159,7 @@ describe('tool_loop() function', () => {
 
       const tools = { test: makeTool(vi.fn()) };
 
-      await expect(ext.tool_loop.fn({ prompt: '   ', tools }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools }, ctx)).rejects.toThrow(
         'prompt text cannot be empty'
       );
     });
@@ -1170,7 +1174,7 @@ describe('tool_loop() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(ext.tool_loop.fn({ prompt: 'Hello' }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'tool_loop').fn({ prompt: 'Hello' }, ctx)).rejects.toThrow(
         'tools parameter is required'
       );
     });
@@ -1200,7 +1204,7 @@ describe('tool_loop() function', () => {
         get_weather: makeTool(vi.fn()),
       };
 
-      await expect(ext.tool_loop.fn({ prompt: 'Test', tools, options: { max_errors: 3 } }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: { max_errors: 3 } }, ctx)).rejects.toThrow(
         'Tool execution failed: 3 consecutive errors'
       );
     });
@@ -1233,7 +1237,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      await expect(ext.tool_loop.fn({ prompt: 'Test', tools, options: { max_errors: 2 } }, ctx)).rejects.toThrow(
+      await expect(getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: { max_errors: 2 } }, ctx)).rejects.toThrow(
         'Tool execution failed: 2 consecutive errors'
       );
     });
@@ -1268,8 +1272,8 @@ describe('tool_loop() function', () => {
       };
 
       const [result1, result2] = await Promise.all([
-        ext1.tool_loop.fn({ prompt: 'Prompt 1', tools }, ctx1),
-        ext2.tool_loop.fn({ prompt: 'Prompt 2', tools }, ctx2),
+        getCallable(ext1, 'tool_loop').fn({ prompt: 'Prompt 1', tools }, ctx1),
+        getCallable(ext2, 'tool_loop').fn({ prompt: 'Prompt 2', tools }, ctx2),
       ]);
 
       const r1 = result1 as Record<string, unknown>;
