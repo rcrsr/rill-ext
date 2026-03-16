@@ -905,6 +905,21 @@ export function createOpenAIExtension(
               : (response?.choices[0]?.finish_reason ?? 'stop');
 
           // Build result dict
+          const inputMessages = messages
+            .filter((m) => 'role' in m && (m as unknown as Record<string, unknown>)['role'] !== 'system')
+            .map((m) => {
+              const msg = m as unknown as Record<string, unknown>;
+              return {
+                role: msg['role'] as string,
+                content:
+                  msg['content'] == null
+                    ? ''
+                    : typeof msg['content'] === 'string'
+                      ? msg['content']
+                      : JSON.stringify(msg['content']),
+              };
+            });
+
           const result = {
             content,
             model: factoryModel,
@@ -914,18 +929,9 @@ export function createOpenAIExtension(
             },
             stop_reason: stopReason,
             turns: loopResult.turns,
-            messages: buildResponseMessages(
-              messages
-                .filter((m) => 'role' in m && (m as unknown as Record<string, unknown>)['role'] !== 'system')
-                .map((m) => {
-                  const msg = m as unknown as Record<string, unknown>;
-                  return {
-                    role: msg['role'] as string,
-                    content: typeof msg['content'] === 'string' ? msg['content'] : JSON.stringify(msg['content'] ?? ''),
-                  };
-                }),
-              content
-            ),
+            messages: response
+              ? buildResponseMessages(inputMessages, content)
+              : inputMessages,
           };
 
           // Emit success event (§4.10)

@@ -219,7 +219,7 @@ The `tool_loop` result adds `turns` (number of LLM round-trips).
 - Invalid role → `RuntimeError RILL-R004: invalid role '{value}'`
 - Missing content → `RuntimeError RILL-R004: {role} message requires 'content'`
 - No embed_model → `RuntimeError RILL-R004: embed_model not configured`
-- Missing tools → `RuntimeError RILL-R004: tool_loop requires a tools argument`
+- Missing tools → `RuntimeError RILL-R004: tools parameter is required`
 
 **API errors** (from provider):
 

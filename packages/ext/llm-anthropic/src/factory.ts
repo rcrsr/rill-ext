@@ -834,22 +834,23 @@ export function createAnthropicExtension(
               )
             : '';
 
+          const inputMessages = messages.map((m) => ({
+            role: m.role,
+            content:
+              typeof m.content === 'string'
+                ? m.content
+                : JSON.stringify(m.content),
+          }));
+
           const result = {
             content,
             model: response ? response.model : factoryModel,
             usage: loopResult.totalTokens,
             stop_reason: response ? response.stop_reason : 'max_turns',
             turns: loopResult.turns,
-            messages: buildResponseMessages(
-              messages.map((m) => ({
-                role: m.role,
-                content:
-                  typeof m.content === 'string'
-                    ? m.content
-                    : JSON.stringify(m.content),
-              })),
-              content
-            ),
+            messages: response
+              ? buildResponseMessages(inputMessages, content)
+              : inputMessages,
           };
 
           // Emit tool_loop event

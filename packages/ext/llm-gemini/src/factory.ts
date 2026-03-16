@@ -960,22 +960,23 @@ export function createGeminiExtension(
               ? ((response as { text?: string }).text ?? '')
               : '';
 
+          const inputMessages = [
+            ...initialMessages.map((m) => ({
+              role: m['role'] as string,
+              content: (m['content'] as string) ?? '',
+            })),
+            { role: 'user', content: prompt },
+          ];
+
           const result = {
             content,
             model: factoryModel,
             usage: loopResult.totalTokens,
             stop_reason: response ? 'stop' : 'max_turns',
             turns: loopResult.turns,
-            messages: buildResponseMessages(
-              [
-                ...initialMessages.map((m) => ({
-                  role: m['role'] as string,
-                  content: (m['content'] as string) ?? '',
-                })),
-                { role: 'user', content: prompt },
-              ],
-              content
-            ),
+            messages: response
+              ? buildResponseMessages(inputMessages, content)
+              : inputMessages,
           };
 
           // Emit tool_loop event
