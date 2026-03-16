@@ -7,7 +7,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import {
   RuntimeError,
   emitExtensionEvent,
-  isDict,
   rillTypeToTypeValue,
   type ExtensionResult,
   type LlmExtensionContract,
@@ -24,6 +23,7 @@ import {
   mapProviderError,
   executeToolLoop,
   buildJsonSchema,
+  buildResponseMessages,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
 } from '@rcrsr/rill-ext-llm-shared';
@@ -183,7 +183,7 @@ export function createAnthropicExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
@@ -224,10 +224,10 @@ export function createAnthropicExtension(
             },
             stop_reason: response.stop_reason,
             id: response.id,
-            messages: [
-              { role: 'user', content: text },
-              { role: 'assistant', content },
-            ],
+            messages: buildResponseMessages(
+              [{ role: 'user', content: text }],
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -363,7 +363,7 @@ export function createAnthropicExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
@@ -389,15 +389,6 @@ export function createAnthropicExtension(
             response.content as Array<{ type: string; text?: string }>
           );
 
-          // Build full conversation history (§3.2)
-          const fullMessages = [
-            ...messages.map((m) => ({
-              role: m['role'] as string,
-              content: m['content'] as string,
-            })),
-            { role: 'assistant', content },
-          ];
-
           // Build normalized response dict (§3.2)
           const result = {
             content,
@@ -408,7 +399,13 @@ export function createAnthropicExtension(
             },
             stop_reason: response.stop_reason,
             id: response.id,
-            messages: fullMessages,
+            messages: buildResponseMessages(
+              messages.map((m) => ({
+                role: m['role'] as string,
+                content: m['content'] as string,
+              })),
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -600,8 +597,13 @@ export function createAnthropicExtension(
     tool_loop: {
       params: [
         p.str('prompt'),
-        p.dict('options', undefined, {}, {
-          tools: { type: { type: 'dict' } },
+        {
+          name: 'tools',
+          type: { type: 'dict', valueType: { type: 'closure' } },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        p.dict('options', undefined, undefined, {
           system: { type: { type: 'string' }, defaultValue: '' },
           max_tokens: { type: { type: 'number' }, defaultValue: 0 },
           max_errors: { type: { type: 'number' }, defaultValue: 3 },
@@ -615,6 +617,7 @@ export function createAnthropicExtension(
         try {
           // Extract arguments
           const prompt = args['prompt'] as string;
+          const toolsDict = args['tools'] as RillValue;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-22: Empty prompt raises error
@@ -622,23 +625,13 @@ export function createAnthropicExtension(
             throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
           }
 
-          // EC-23: Missing tools in options raises error
-          if (!('tools' in options) || !isDict(options['tools'] as RillValue)) {
-            throw new RuntimeError(
-              'RILL-R004',
-              "tool_loop requires 'tools' option"
-            );
-          }
-
-          const toolsDict = options['tools'] as RillValue;
-
           // Extract options
           const system =
             typeof options['system'] === 'string'
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
           const maxErrors =
@@ -841,19 +834,23 @@ export function createAnthropicExtension(
               )
             : '';
 
+          const inputMessages = messages.map((m) => ({
+            role: m.role,
+            content:
+              typeof m.content === 'string'
+                ? m.content
+                : JSON.stringify(m.content),
+          }));
+
           const result = {
             content,
             model: response ? response.model : factoryModel,
             usage: loopResult.totalTokens,
             stop_reason: response ? response.stop_reason : 'max_turns',
             turns: loopResult.turns,
-            messages: messages.map((m) => ({
-              role: m.role,
-              content:
-                typeof m.content === 'string'
-                  ? m.content
-                  : JSON.stringify(m.content),
-            })),
+            messages: response
+              ? buildResponseMessages(inputMessages, content)
+              : inputMessages,
           };
 
           // Emit tool_loop event
@@ -942,7 +939,7 @@ export function createAnthropicExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 

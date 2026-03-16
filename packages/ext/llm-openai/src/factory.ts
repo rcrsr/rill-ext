@@ -8,7 +8,6 @@ import {
   RuntimeError,
   emitExtensionEvent,
   createVector,
-  isDict,
   isVector,
   rillTypeToTypeValue,
   type ExtensionResult,
@@ -26,6 +25,7 @@ import {
   mapProviderError,
   executeToolLoop,
   buildJsonSchema,
+  buildResponseMessages,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
 } from '@rcrsr/rill-ext-llm-shared';
@@ -166,7 +166,7 @@ export function createOpenAIExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
@@ -212,11 +212,13 @@ export function createOpenAIExtension(
             },
             stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
             id: response.id,
-            messages: [
-              ...(system ? [{ role: 'system', content: system }] : []),
-              { role: 'user', content: text },
-              { role: 'assistant', content },
-            ],
+            messages: buildResponseMessages(
+              [
+                ...(system ? [{ role: 'system', content: system }] : []),
+                { role: 'user', content: text },
+              ],
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -296,7 +298,7 @@ export function createOpenAIExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
@@ -381,17 +383,6 @@ export function createOpenAIExtension(
           // Extract text content from response
           const content = response.choices[0]?.message?.content ?? '';
 
-          // Build full conversation history (§3.2)
-          const fullMessages = [
-            ...messages.map((m) => {
-              const normalized: Record<string, unknown> = { role: m['role'] };
-              if ('content' in m) normalized['content'] = m['content'];
-              if ('tool_calls' in m) normalized['tool_calls'] = m['tool_calls'];
-              return normalized;
-            }),
-            { role: 'assistant', content },
-          ];
-
           // Build normalized response dict (§3.2)
           const result = {
             content,
@@ -402,7 +393,13 @@ export function createOpenAIExtension(
             },
             stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
             id: response.id,
-            messages: fullMessages,
+            messages: buildResponseMessages(
+              messages.map((m) => ({
+                role: m['role'] as string,
+                content: (m['content'] as string) ?? '',
+              })),
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -606,8 +603,13 @@ export function createOpenAIExtension(
     tool_loop: {
       params: [
         p.str('prompt'),
-        p.dict('options', undefined, {}, {
-          tools: { type: { type: 'dict' } },
+        {
+          name: 'tools',
+          type: { type: 'dict', valueType: { type: 'closure' } },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        p.dict('options', undefined, undefined, {
           system: { type: { type: 'string' }, defaultValue: '' },
           max_tokens: { type: { type: 'number' }, defaultValue: 0 },
           max_errors: { type: { type: 'number' }, defaultValue: 3 },
@@ -621,19 +623,12 @@ export function createOpenAIExtension(
         try {
           // Extract arguments
           const prompt = args['prompt'] as string;
+          const toolsDict = args['tools'] as RillValue;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-20: Validate prompt is non-empty
           if (prompt.trim().length === 0) {
             throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
-          }
-
-          // EC-21: Validate tools option is present and is a dict
-          if (!('tools' in options) || !isDict(options['tools'] as RillValue)) {
-            throw new RuntimeError(
-              'RILL-R004',
-              "tool_loop requires 'tools' option"
-            );
           }
 
           // Extract options
@@ -642,7 +637,7 @@ export function createOpenAIExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
           const maxErrors =
@@ -880,7 +875,7 @@ export function createOpenAIExtension(
           // Execute shared tool loop
           const loopResult = await executeToolLoop(
             messages,
-            options['tools'] as RillValue,
+            toolsDict,
             maxErrors,
             callbacks,
             (event: string, data: Record<string, unknown>) => {
@@ -909,33 +904,22 @@ export function createOpenAIExtension(
               ? 'max_turns'
               : (response?.choices[0]?.finish_reason ?? 'stop');
 
-          // Build conversation history for response
-          // Reconstruct full message history from messages array
-          const fullMessages: Array<Record<string, unknown>> = [];
-          for (const msg of messages) {
-            if ('role' in msg && msg.role !== 'system') {
-              const historyMsg: Record<string, unknown> = {
-                role: msg.role,
-              };
-              if ('content' in msg && msg.content) {
-                historyMsg['content'] = msg.content;
-              }
-              if ('tool_calls' in msg && msg.tool_calls) {
-                historyMsg['tool_calls'] = msg.tool_calls;
-              }
-              fullMessages.push(historyMsg);
-            }
-          }
-
-          // Add final assistant response if present
-          if (response) {
-            fullMessages.push({
-              role: 'assistant',
-              content,
-            });
-          }
-
           // Build result dict
+          const inputMessages = messages
+            .filter((m) => 'role' in m && (m as unknown as Record<string, unknown>)['role'] !== 'system')
+            .map((m) => {
+              const msg = m as unknown as Record<string, unknown>;
+              return {
+                role: msg['role'] as string,
+                content:
+                  msg['content'] == null
+                    ? ''
+                    : typeof msg['content'] === 'string'
+                      ? msg['content']
+                      : JSON.stringify(msg['content']),
+              };
+            });
+
           const result = {
             content,
             model: factoryModel,
@@ -945,7 +929,9 @@ export function createOpenAIExtension(
             },
             stop_reason: stopReason,
             turns: loopResult.turns,
-            messages: fullMessages,
+            messages: response
+              ? buildResponseMessages(inputMessages, content)
+              : inputMessages,
           };
 
           // Emit success event (§4.10)
@@ -1035,7 +1021,7 @@ export function createOpenAIExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 

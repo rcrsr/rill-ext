@@ -399,12 +399,12 @@ describe('extension event emission', () => {
       const testToolFn = callable(vi.fn().mockResolvedValue('Tool result'));
       (testToolFn as Record<string, unknown>)['description'] = 'Test tool';
 
+      const tools = { test_tool: testToolFn };
       const options = {
-        tools: { test_tool: testToolFn },
         max_turns: 5,
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test prompt', options }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Test prompt', tools, options }, ctx);
 
       // Verify event sequence (§4.10)
       expect(events.length).toBeGreaterThanOrEqual(3);
@@ -472,12 +472,10 @@ describe('extension event emission', () => {
       const testTool = callable(vi.fn());
       (testTool as Record<string, unknown>)['description'] = 'Test tool';
 
-      const options = {
-        tools: { test_tool: testTool },
-      };
+      const tools = { test_tool: testTool };
 
       await expect(
-        ext.tool_loop.fn({ prompt: 'Test prompt', options }, ctx)
+        ext.tool_loop.fn({ prompt: 'Test prompt', tools }, ctx)
       ).rejects.toThrow();
 
       // Verify error event structure (§4.10)
@@ -532,13 +530,13 @@ describe('extension event emission', () => {
       );
       (failingTool as Record<string, unknown>)['description'] = 'Test tool';
 
+      const tools = { test_tool: failingTool };
       const options = {
-        tools: { test_tool: failingTool },
         max_turns: 5,
         max_errors: 3,
       };
 
-      await ext.tool_loop.fn({ prompt: 'Test prompt', options }, ctx);
+      await ext.tool_loop.fn({ prompt: 'Test prompt', tools, options }, ctx);
 
       // Find tool_result event
       const toolResultEvents = events.filter(

@@ -5,9 +5,17 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { RuntimeError, callable, type RillValue } from '@rcrsr/rill';
-import { executeToolLoop } from './tool-loop.js';
+import { RuntimeError, callable, createRuntimeContext, invokeCallable, type RillValue } from '@rcrsr/rill';
+import { executeToolLoop, buildResponseMessages } from './tool-loop.js';
 import type { ToolLoopCallbacks } from './types.js';
+
+vi.mock('@rcrsr/rill', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@rcrsr/rill')>();
+  return {
+    ...mod,
+    invokeCallable: vi.fn(mod.invokeCallable),
+  };
+});
 
 // ============================================================
 // TEST HELPERS
@@ -1315,6 +1323,57 @@ describe('executeToolLoop', () => {
 
       expect(mockFn).toHaveBeenCalledTimes(1);
     });
+
+    it('executes 0-parameter script callable tool successfully', async () => {
+      // A script callable with no params — like || { "result" } => $my_tool
+      // Provider sends {} as tool input; the else branch must pass [] not [{}].
+      // invokeCallable is mocked to capture args and return a known result.
+      const zeroParamScriptTool: RillValue = {
+        __type: 'callable' as const,
+        kind: 'script' as const,
+        params: [],
+        body: {} as never,
+        definingScope: { variables: new Map(), pipeValue: null } as never,
+        annotations: { description: 'A tool with no parameters' },
+        paramAnnotations: {},
+        isProperty: false,
+      };
+
+      const tools = { zero_param_tool: zeroParamScriptTool };
+      const ctx = createRuntimeContext();
+
+      vi.mocked(invokeCallable).mockResolvedValueOnce('zero param result');
+
+      let apiCallCount = 0;
+      const callbacks = createMockCallbacks({
+        extractToolCalls: vi.fn(() => {
+          apiCallCount++;
+          return apiCallCount === 1
+            ? [{ id: 'call_1', name: 'zero_param_tool', input: {} }]
+            : null;
+        }),
+      });
+
+      const result = await executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn(),
+        10,
+        ctx
+      );
+
+      expect(result.toolCalls).toHaveLength(1);
+      expect(result.toolCalls[0]?.name).toBe('zero_param_tool');
+      expect(result.toolCalls[0]?.result).toBe('zero param result');
+      // Verify invokeCallable was called with empty args [], not [{}]
+      expect(vi.mocked(invokeCallable)).toHaveBeenCalledWith(
+        zeroParamScriptTool,
+        [],
+        ctx
+      );
+    });
   });
 
   describe('multi-turn execution', () => {
@@ -2111,5 +2170,47 @@ describe('executeToolLoop', () => {
         expect(appDescriptor?.description).toBe('My tool description');
       });
     });
+  });
+});
+
+// ============================================================
+// BUILD RESPONSE MESSAGES
+// ============================================================
+
+describe('buildResponseMessages', () => {
+  it('returns array with assistant message appended', () => {
+    const input = [{ role: 'user', content: 'Hello' }];
+    const result = buildResponseMessages(input, 'Hi there');
+    expect(result).toEqual([
+      { role: 'user', content: 'Hello' },
+      { role: 'assistant', content: 'Hi there' },
+    ]);
+  });
+
+  it('works with empty input messages', () => {
+    const result = buildResponseMessages([], 'Hello');
+    expect(result).toEqual([{ role: 'assistant', content: 'Hello' }]);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [{ role: 'user', content: 'Hello' }];
+    const inputCopy = [...input];
+    buildResponseMessages(input, 'Hi there');
+    expect(input).toEqual(inputCopy);
+    expect(input).toHaveLength(1);
+  });
+
+  it('preserves all input message fields', () => {
+    const input = [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'user', content: 'Question' },
+      { role: 'assistant', content: 'Answer' },
+    ];
+    const result = buildResponseMessages(input, 'Final answer');
+    expect(result).toHaveLength(4);
+    expect(result[0]).toEqual({ role: 'system', content: 'You are a helpful assistant.' });
+    expect(result[1]).toEqual({ role: 'user', content: 'Question' });
+    expect(result[2]).toEqual({ role: 'assistant', content: 'Answer' });
+    expect(result[3]).toEqual({ role: 'assistant', content: 'Final answer' });
   });
 });

@@ -39,7 +39,7 @@ export { mapProviderError } from './errors.js';
 // ============================================================
 // TOOL ORCHESTRATION
 // ============================================================
-export { executeToolLoop } from './tool-loop.js';
+export { executeToolLoop, buildResponseMessages } from './tool-loop.js';
 
 // ============================================================
 // SCHEMA BUILDING

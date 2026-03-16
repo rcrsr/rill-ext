@@ -16,7 +16,6 @@ import {
   emitExtensionEvent,
   createVector,
   isVector,
-  isDict,
   rillTypeToTypeValue,
   type ExtensionResult,
   type LlmExtensionContract,
@@ -33,6 +32,7 @@ import {
   mapProviderError,
   executeToolLoop,
   buildJsonSchema,
+  buildResponseMessages,
   type JsonSchemaProperty,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
@@ -222,7 +222,7 @@ export function createGeminiExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
@@ -277,11 +277,13 @@ export function createGeminiExtension(
             },
             stop_reason: 'stop',
             id: '', // Gemini API doesn't provide request IDs in the same way
-            messages: [
-              ...(system ? [{ role: 'system', content: system }] : []),
-              { role: 'user', content: text },
-              { role: 'assistant', content },
-            ],
+            messages: buildResponseMessages(
+              [
+                ...(system ? [{ role: 'system', content: system }] : []),
+                { role: 'user', content: text },
+              ],
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -360,7 +362,7 @@ export function createGeminiExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
@@ -458,17 +460,6 @@ export function createGeminiExtension(
           // Extract text content from response
           const content = response.text ?? '';
 
-          // Build full conversation history (§3.2)
-          const fullMessages = [
-            ...messages.map((m) => {
-              const normalized: Record<string, unknown> = { role: m['role'] };
-              if ('content' in m) normalized['content'] = m['content'];
-              if ('tool_calls' in m) normalized['tool_calls'] = m['tool_calls'];
-              return normalized;
-            }),
-            { role: 'assistant', content },
-          ];
-
           // Build normalized response dict (§3.2)
           const result = {
             content,
@@ -479,7 +470,13 @@ export function createGeminiExtension(
             },
             stop_reason: 'stop',
             id: '', // Gemini API doesn't provide request IDs in the same way
-            messages: fullMessages,
+            messages: buildResponseMessages(
+              messages.map((m) => ({
+                role: m['role'] as string,
+                content: (m['content'] as string) ?? '',
+              })),
+              content
+            ),
           };
 
           // Emit success event (§4.10)
@@ -688,8 +685,13 @@ export function createGeminiExtension(
     tool_loop: {
       params: [
         p.str('prompt'),
-        p.dict('options', undefined, {}, {
-          tools: { type: { type: 'dict' } },
+        {
+          name: 'tools',
+          type: { type: 'dict', valueType: { type: 'closure' } },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        p.dict('options', undefined, undefined, {
           system: { type: { type: 'string' }, defaultValue: '' },
           max_tokens: { type: { type: 'number' }, defaultValue: 0 },
           max_errors: { type: { type: 'number' }, defaultValue: 3 },
@@ -703,6 +705,7 @@ export function createGeminiExtension(
         try {
           // Extract arguments
           const prompt = args['prompt'] as string;
+          const toolsDict = args['tools'] as RillValue;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-22: Validate prompt is non-empty
@@ -710,23 +713,13 @@ export function createGeminiExtension(
             throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
           }
 
-          // EC-23: Validate tools option is present and is a dict
-          if (!('tools' in options) || !isDict(options['tools'] as RillValue)) {
-            throw new RuntimeError(
-              'RILL-R004',
-              "tool_loop requires 'tools' option"
-            );
-          }
-
-          const toolsDict = options['tools'] as RillValue;
-
           // Extract options with defaults
           const system =
             typeof options['system'] === 'string'
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
           const maxTurns =
@@ -967,17 +960,23 @@ export function createGeminiExtension(
               ? ((response as { text?: string }).text ?? '')
               : '';
 
+          const inputMessages = [
+            ...initialMessages.map((m) => ({
+              role: m['role'] as string,
+              content: (m['content'] as string) ?? '',
+            })),
+            { role: 'user', content: prompt },
+          ];
+
           const result = {
             content,
             model: factoryModel,
             usage: loopResult.totalTokens,
             stop_reason: response ? 'stop' : 'max_turns',
             turns: loopResult.turns,
-            messages: [
-              ...initialMessages,
-              { role: 'user', content: prompt },
-              { role: 'assistant', content },
-            ],
+            messages: response
+              ? buildResponseMessages(inputMessages, content)
+              : inputMessages,
           };
 
           // Emit tool_loop event
@@ -1077,7 +1076,7 @@ export function createGeminiExtension(
               ? options['system']
               : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number'
+            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
