@@ -9,7 +9,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { emitExtensionEvent, rillTypeToTypeValue } from '@rcrsr/rill';
+import { emitExtensionEvent, structureToTypeValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
@@ -293,7 +293,7 @@ function createPromptFunction(
     ...(prompt.description !== undefined && {
       annotations: { description: prompt.description },
     }),
-    returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }),
+    returnType: structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }),
   };
 }
 

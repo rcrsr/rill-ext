@@ -33,7 +33,7 @@ const ctx = createRuntimeContext({
   callbacks: { onLog: (v) => console.log(v) },
 });
 
-const script = `fs::list_tools() -> log`;
+const script = `fs::tools() -> log`;
 const result = await execute(parse(script), ctx);
 
 dispose?.();

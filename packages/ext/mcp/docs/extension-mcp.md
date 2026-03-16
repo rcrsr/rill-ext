@@ -6,7 +6,7 @@ This extension allows rill scripts to access Model Context Protocol (MCP) server
 
 The extension supports stdio and HTTP transports. Stdio servers run as child processes (filesystem, database, GitHub). HTTP servers connect to remote endpoints with static or dynamic authentication. Multi-server composition lets scripts mix capabilities from different sources in a single namespace.
 
-Host functions generate dynamically from server metadata: one function per tool, resource template functions, prompt functions, and introspection helpers. Use `list_tools()`, `list_resources()`, and `list_prompts()` to discover capabilities at runtime.
+Host functions generate dynamically from server metadata: one function per tool, resource template functions, prompt functions, and introspection helpers. Call `tools()`, `resources()`, or `prompts()` to get a dict of callable closures for each capability type.
 
 ## Quick Start
 
@@ -34,20 +34,20 @@ Rill script — load the extension as a handle and call functions via dot-path:
 
 ```rill
 use<ext:fs> => $mcp
-$mcp.list_tools() => $tools
+$mcp.tools() => $tools
 $tools -> log
 ```
 
 Direct dot-path — no intermediate variable:
 
 ```rill
-use<ext:fs.list_tools>() => $tools
+use<ext:fs.tools>() => $tools
 ```
 
 Secondary pattern (still works, not primary):
 
 ```rill
-fs::list_tools() -> log
+fs::tools() -> log
 ```
 
 ## Configuration
@@ -157,13 +157,13 @@ The extension generates functions dynamically from server capabilities:
 | Resource functions | Static resources | `read_resource("file:///logs/app.log")` |
 | Template functions | Resource templates | `file_resource([path: "/tmp/data.json"])` |
 | Prompt functions | MCP prompts | `summarize([text: $content])` |
-| Introspection | Always present | `list_tools()`, `list_resources()`, `list_prompts()` |
+| Introspection | Always present | `tools()`, `resources()`, `prompts()` |
 
 Function names and parameters derive from server metadata. Use introspection to discover capabilities:
 
 ```rill
-fs::list_tools() => $tools
-$tools -> each { "{$.name}: {$.description}" -> log }
+fs::tools() => $tools
+$tools -> log
 ```
 
 ## Examples
@@ -181,7 +181,7 @@ const ext = await createMcpExtension({
 ```
 
 ```rill
-fs::list_tools() => $tools
+fs::tools() => $tools
 $tools -> log
 
 fs::read_file([path: "/tmp/test.txt"]) => $content
@@ -262,7 +262,7 @@ const ext = await createMcpExtension({
 });
 ```
 
-Introspection functions (`list_tools`, `list_resources`, `list_prompts`) return all server capabilities regardless of filter settings.
+`tools()`, `resources()`, and `prompts()` each return a dict of callable closures built from the filtered function set. Applying a filter reduces which callables appear in the returned dict.
 
 ## Error Behavior
 
@@ -284,10 +284,8 @@ Introspection functions (`list_tools`, `list_resources`, `list_prompts`) return 
 rill scripts have no exception handling. Design error-resilient workflows:
 
 ```rill
-fs::list_tools() => $tools
-$tools -> map { $.name } => $names
-$names -> .has("read_file") => $has_read
-$has_read ? {
+fs::tools() => $tools
+$tools.read_file ? {
   fs::read_file([path: "/tmp/test.txt"]) -> log
 } ! {
   "read_file tool not available" -> log

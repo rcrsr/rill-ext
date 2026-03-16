@@ -10,7 +10,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { HeadersInit } from 'undici-types';
-import type { ExtensionResult } from '@rcrsr/rill';
+import type { ExtensionFactoryResult, RillValue } from '@rcrsr/rill';
+import { toCallable } from '@rcrsr/rill';
 import type { McpExtensionConfig } from './types.js';
 import {
   createProcessExitError,
@@ -49,7 +50,7 @@ import { createIntrospectionFunctions } from './introspection.js';
  */
 export async function createMcpExtension(
   config: McpExtensionConfig
-): Promise<ExtensionResult> {
+): Promise<ExtensionFactoryResult> {
   // ============================================================
   // STEP 1: CONFIG VALIDATION (sync)
   // ============================================================
@@ -155,18 +156,11 @@ export async function createMcpExtension(
     lifecycleState
   );
 
-  // Generate introspection functions (use ALL capabilities, not filtered)
+  // Generate introspection functions (all three use filtered function dicts)
   const introspectionFunctions = createIntrospectionFunctions(
-    capabilities.allTools as Parameters<typeof createIntrospectionFunctions>[0],
-    capabilities.allResources as Parameters<
-      typeof createIntrospectionFunctions
-    >[1],
-    capabilities.allResourceTemplates as Parameters<
-      typeof createIntrospectionFunctions
-    >[2],
-    capabilities.allPrompts as Parameters<
-      typeof createIntrospectionFunctions
-    >[3]
+    toolFunctions,
+    { read_resource: readResourceFunction, ...resourceTemplateFunctions },
+    promptFunctions
   );
 
   // ============================================================
@@ -199,19 +193,21 @@ export async function createMcpExtension(
     }
   };
 
-  // Build result with proper typing
-  const result = {
+  // Build value dict: convert each RillFunction to ApplicationCallable
+  const allFunctions = {
     ...toolFunctions,
     read_resource: readResourceFunction,
     ...resourceTemplateFunctions,
     ...promptFunctions,
     ...introspectionFunctions,
-    dispose,
-    // Store capabilities for testing/introspection
-    _capabilities: capabilities,
-  } as unknown as ExtensionResult;
+  };
 
-  return result;
+  const value: Record<string, RillValue> = {};
+  for (const [name, rillFn] of Object.entries(allFunctions)) {
+    value[name] = toCallable(rillFn) as unknown as RillValue;
+  }
+
+  return { value, dispose };
 }
 
 /**
@@ -353,13 +349,16 @@ async function discoverCapabilities(
   client: Client,
   config: McpExtensionConfig
 ): Promise<DiscoveredCapabilities> {
-  // Parallel capability discovery [IR-1]
+  // Check server-declared capabilities to avoid calling unsupported methods
+  const caps = client.getServerCapabilities() ?? {};
+
+  // Parallel capability discovery — only call methods the server supports [IR-1]
   const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] =
     await Promise.all([
-      client.listTools(),
-      client.listResources(),
-      client.listResourceTemplates(),
-      client.listPrompts(),
+      caps.tools ? client.listTools() : { tools: [] },
+      caps.resources ? client.listResources() : { resources: [] },
+      caps.resources ? client.listResourceTemplates() : { resourceTemplates: [] },
+      caps.prompts ? client.listPrompts() : { prompts: [] },
     ]);
 
   // Extract lists from results

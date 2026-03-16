@@ -119,12 +119,12 @@ describe('generateToolFunctions', () => {
       expect(fn.params).toHaveLength(2);
       expect(fn.params[0]).toMatchObject({
         name: 'weight_kg',
-        type: { type: 'string' },
+        type: { kind: 'number' },
         annotations: { description: 'Weight in kilograms' },
       });
       expect(fn.params[1]).toMatchObject({
         name: 'height_m',
-        type: { type: 'string' },
+        type: { kind: 'number' },
         annotations: { description: 'Height in meters' },
       });
       expect(fn.annotations?.description).toBe('Calculate Body Mass Index');
@@ -595,7 +595,7 @@ describe('generateToolFunctions', () => {
       for (let i = 0; i < 100; i++) {
         const param = fn!.params[i]!;
         expect(param.name).toBe(`param${i}`);
-        expect(param.type).toEqual({ type: 'string' });
+        expect(param.type).toEqual({ kind: 'string' });
         expect(param.defaultValue).toBeUndefined();
       }
     });

@@ -157,12 +157,47 @@ export function sanitizeParameterName(name: string): string {
 // ============================================================
 
 /**
+ * Converts a single JSON Schema property to a RillParam.
+ *
+ * Maps the JSON Schema type to the correct rill type via `mapJsonSchemaTypeToRillType`,
+ * then dispatches to the matching `p.*` helper. All params get `defaultValue: undefined`
+ * (callers handle required/optional semantics).
+ *
+ * Portable utility: can be extracted to core without MCP-specific dependencies.
+ *
+ * @param name - Sanitized parameter name
+ * @param property - JSON Schema property definition
+ * @returns RillParam with correct rill type
+ */
+export function jsonSchemaPropertyToRillParam(
+  name: string,
+  property: JsonSchemaProperty,
+): RillParam {
+  const rillType = mapJsonSchemaTypeToRillType(property);
+  const desc = property.description;
+
+  switch (rillType) {
+    case 'number':
+      return p.num(name, desc);
+    case 'bool':
+      return p.bool(name, desc);
+    case 'dict':
+      return p.dict(name, desc);
+    case 'list':
+      return p.list(name, undefined, desc);
+    case 'string':
+    default:
+      return p.str(name, desc);
+  }
+}
+
+/**
  * Generates rill RillParam array from JSON Schema.
  *
  * Rules:
  * - Each `properties` entry → one RillParam
  * - Property key → `name` (sanitized)
- * - All parameters use string type (MCP tool arguments are string-typed)
+ * - Type mapped via `jsonSchemaPropertyToRillParam` (string→str, number/integer→num, etc.)
  * - `properties[key].description` → `annotations.description`
  * - Order: `Object.entries(properties)` iteration order
  * - Missing `properties` → empty array
@@ -183,7 +218,7 @@ export function generateParametersFromSchema(
   // Iterate properties in Object.entries order
   for (const [key, property] of Object.entries(schema.properties)) {
     const sanitizedName = sanitizeParameterName(key);
-    params.push(p.str(sanitizedName, property.description));
+    params.push(jsonSchemaPropertyToRillParam(sanitizedName, property));
   }
 
   return params;

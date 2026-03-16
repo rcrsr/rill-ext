@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { rillTypeToTypeValue } from '@rcrsr/rill';
+import { structureToTypeValue } from '@rcrsr/rill';
 import {
   extractTemplateVariables,
   createReadResourceFunction,
@@ -82,13 +82,13 @@ describe('createReadResourceFunction', () => {
     expect(func.params).toEqual([
       {
         name: 'uri',
-        type: { type: 'string' },
+        type: { kind: 'string' },
         defaultValue: undefined,
         annotations: { description: 'Resource URI to read' },
       },
     ]);
     expect(func.annotations?.description).toBe('Read an MCP resource by URI');
-    expect(func.returnType).toEqual(rillTypeToTypeValue({ type: 'dict' }));
+    expect(func.returnType).toEqual(structureToTypeValue({ kind: 'dict' }));
   });
 
   it('calls MCP readResource with provided URI', async () => {
@@ -334,13 +334,13 @@ describe('generateResourceTemplateFunctions', () => {
     expect(func.params).toEqual([
       {
         name: 'tableName',
-        type: { type: 'string' },
+        type: { kind: 'string' },
         defaultValue: undefined,
         annotations: { description: 'URI template variable: tableName' },
       },
     ]);
     expect(func.annotations?.description).toBe('Access database table');
-    expect(func.returnType).toEqual(rillTypeToTypeValue({ type: 'dict' }));
+    expect(func.returnType).toEqual(structureToTypeValue({ kind: 'dict' }));
   });
 
   it('generates function for multi-variable template (IR-4)', () => {
@@ -364,13 +364,13 @@ describe('generateResourceTemplateFunctions', () => {
     expect(func.params).toEqual([
       {
         name: 'tableName',
-        type: { type: 'string' },
+        type: { kind: 'string' },
         defaultValue: undefined,
         annotations: { description: 'URI template variable: tableName' },
       },
       {
         name: 'rowId',
-        type: { type: 'string' },
+        type: { kind: 'string' },
         defaultValue: undefined,
         annotations: { description: 'URI template variable: rowId' },
       },

@@ -61,6 +61,11 @@ afterEach(async () => {
   activeExtensions.length = 0;
 });
 
+/** Helper to get the value dict from an ExtensionFactoryResult */
+function fns(ext: Awaited<ReturnType<typeof createMcpExtension>>): Record<string, any> {
+  return ext.value as Record<string, any>;
+}
+
 describe('Integration: stdio mock server', () => {
   describe('AC-1: Connect stdio transport, call tool [AC-1]', () => {
     it('connects to stdio server and discovers capabilities', async () => {
@@ -73,26 +78,26 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
-      // Verify introspection functions exist
-      expect(ext.list_tools).toBeDefined();
-      expect(typeof ext.list_tools.fn).toBe('function');
-      expect(ext.list_resources).toBeDefined();
-      expect(typeof ext.list_resources.fn).toBe('function');
-      expect(ext.list_prompts).toBeDefined();
-      expect(typeof ext.list_prompts.fn).toBe('function');
+      // Verify introspection functions exist as callables
+      expect(v.tools).toBeDefined();
+      expect(typeof v.tools.fn).toBe('function');
+      expect(v.resources).toBeDefined();
+      expect(typeof v.resources.fn).toBe('function');
+      expect(v.prompts).toBeDefined();
+      expect(typeof v.prompts.fn).toBe('function');
 
-      // List discovered tools
-      const tools = await ext.list_tools.fn({}, mockContext);
-      expect(Array.isArray(tools)).toBe(true);
-      expect(tools.length).toBeGreaterThan(0);
+      // tools() returns a callable dict keyed by tool name
+      const toolsDict = (await v.tools.fn({})) as Record<string, unknown>;
+      expect(typeof toolsDict).toBe('object');
+      expect(Object.keys(toolsDict).length).toBeGreaterThan(0);
 
-      // Verify expected tools exist
-      const toolNames = tools.map((t: any) => t.name);
-      expect(toolNames).toContain('get_status');
-      expect(toolNames).toContain('echo');
-      expect(toolNames).toContain('add');
-      expect(toolNames).toContain('get_image');
+      // Verify expected tools exist as keys
+      expect(toolsDict['get_status']).toBeDefined();
+      expect(toolsDict['echo']).toBeDefined();
+      expect(toolsDict['add']).toBeDefined();
+      expect(toolsDict['get_image']).toBeDefined();
     }, 15000);
 
     it.skip('calls tool and receives response', async () => {
@@ -105,9 +110,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Call echo tool
-      const result = await ext.echo.fn(
+      const result = await v.echo.fn(
         { message: 'Hello, MCP!' },
         mockContext
       );
@@ -126,9 +132,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Call add tool with parameters
-      const result = await ext.add.fn({ a: 5, b: 7 }, mockContext);
+      const result = await v.add.fn({ a: 5, b: 7 }, mockContext);
 
       // Verify result (should be string "12")
       expect(result).toBe('12');
@@ -146,9 +153,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Call get_status which returns JSON text
-      const result = await ext.get_status.fn({}, mockContext);
+      const result = await v.get_status.fn({}, mockContext);
 
       // AC-8: JSON text {"status": "ok"} → dict [status: "ok"]
       expect(typeof result).toBe('object');
@@ -168,9 +176,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Call echo which returns plain text
-      const result = await ext.echo.fn({ message: 'success' }, mockContext);
+      const result = await v.echo.fn({ message: 'success' }, mockContext);
 
       // AC-8: Plain text "success" → string "success"
       expect(typeof result).toBe('string');
@@ -187,9 +196,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Call get_image which returns base64 image
-      const result = await ext.get_image.fn({}, mockContext);
+      const result = await v.get_image.fn({}, mockContext);
 
       // AC-8: Image → dict [type: "image", data: base64, mime: "image/png"]
       expect(typeof result).toBe('object');
@@ -211,17 +221,16 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
-      // List resources
-      const resources = await ext.list_resources.fn({}, mockContext);
+      // resources() returns a dict of callable closures keyed by function name
+      const resourcesDict = (await v.resources.fn({})) as Record<string, unknown>;
 
-      expect(Array.isArray(resources)).toBe(true);
-      expect(resources.length).toBeGreaterThan(0);
-
-      // Verify test-doc resource exists
-      const testDoc = resources.find((r: any) => r.name === 'test-doc');
-      expect(testDoc).toBeDefined();
-      expect(testDoc?.uri).toBe('file:///test/doc.txt');
+      expect(typeof resourcesDict).toBe('object');
+      expect(resourcesDict).not.toBe(null);
+      expect(Array.isArray(resourcesDict)).toBe(false);
+      // read_resource is always present as a callable
+      expect(resourcesDict['read_resource']).toBeDefined();
     }, 15000);
 
     it.skip('reads static resource', async () => {
@@ -234,9 +243,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Read test-doc resource
-      const result = await ext.read_resource.fn(
+      const result = await v.read_resource.fn(
         { uri: 'file:///test/doc.txt' },
         mockContext
       );
@@ -266,9 +276,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Read user profile resource with ID
-      const result = await ext.resource_user_profile.fn(
+      const result = await v.resource_user_profile.fn(
         { id: '123' },
         mockContext
       );
@@ -297,17 +308,19 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
-      // List prompts
-      const prompts = await ext.list_prompts.fn({}, mockContext);
+      // prompts() returns a dict of callable closures keyed by sanitized function name
+      const promptsDict = (await v.prompts.fn({})) as Record<string, unknown>;
 
-      expect(Array.isArray(prompts)).toBe(true);
-      expect(prompts.length).toBeGreaterThan(0);
+      expect(typeof promptsDict).toBe('object');
+      expect(promptsDict).not.toBe(null);
+      expect(Array.isArray(promptsDict)).toBe(false);
+      expect(Object.keys(promptsDict).length).toBeGreaterThan(0);
 
-      // Verify prompts exist
-      const promptNames = prompts.map((p: any) => p.name);
-      expect(promptNames).toContain('greeting');
-      expect(promptNames).toContain('code_review');
+      // Verify expected prompts exist as keys (sanitized: greeting → prompt_greeting)
+      expect(promptsDict['prompt_greeting']).toBeDefined();
+      expect(promptsDict['prompt_code_review']).toBeDefined();
     }, 15000);
 
     it.skip('gets prompt without arguments', async () => {
@@ -320,9 +333,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Get greeting prompt
-      const result = await ext.prompt_greeting.fn({}, mockContext);
+      const result = await v.prompt_greeting.fn({}, mockContext);
 
       // Verify result structure
       expect(typeof result).toBe('object');
@@ -349,9 +363,10 @@ describe('Integration: stdio mock server', () => {
         timeout: 10000,
       });
       activeExtensions.push(ext);
+      const v = fns(ext);
 
       // Get code_review prompt with arguments
-      const result = await ext.prompt_code_review.fn(
+      const result = await v.prompt_code_review.fn(
         {
           language: 'TypeScript',
           code: 'function hello() { return "world"; }',
@@ -401,20 +416,23 @@ describe('Integration: stdio mock server', () => {
       });
       activeExtensions.push(ext2);
 
+      const v1 = fns(ext1);
+      const v2 = fns(ext2);
+
       // Call tools from different extensions
-      const result1 = await ext1.echo.fn(
+      const result1 = await v1.echo.fn(
         { message: 'from server 1' },
         mockContext
       );
-      const result2 = await ext2.get_status.fn({}, mockContext);
+      const result2 = await v2.get_status.fn({}, mockContext);
 
       expect(result1).toBe('from server 1');
       expect(typeof result2).toBe('object');
       expect((result2 as Record<string, unknown>).status).toBe('ok');
 
       // Verify both extensions work independently
-      const add1 = await ext1.add.fn({ a: 1, b: 2 }, mockContext);
-      const add2 = await ext2.add.fn({ a: 10, b: 20 }, mockContext);
+      const add1 = await v1.add.fn({ a: 1, b: 2 }, mockContext);
+      const add2 = await v2.add.fn({ a: 10, b: 20 }, mockContext);
 
       expect(add1).toBe('3');
       expect(add2).toBe('30');
@@ -431,9 +449,10 @@ describe('Integration: stdio mock server', () => {
         },
         timeout: 10000,
       });
+      const v = fns(ext);
 
       // Verify extension works
-      const result = await ext.echo.fn({ message: 'test' }, mockContext);
+      const result = await v.echo.fn({ message: 'test' }, mockContext);
       expect(result).toBe('test');
 
       // Dispose extension
@@ -442,7 +461,7 @@ describe('Integration: stdio mock server', () => {
       // After dispose, calling functions should fail
       // (The exact error depends on transport state)
       await expect(
-        ext.echo.fn({ message: 'test' }, mockContext)
+        v.echo.fn({ message: 'test' }, mockContext)
       ).rejects.toThrow();
     }, 15000);
 

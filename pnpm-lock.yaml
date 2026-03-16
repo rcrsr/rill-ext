@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@rcrsr/rill': file:../rill/packages/core
+
 importers:
 
   .:
@@ -41,6 +44,9 @@ importers:
 
   packages/ext/claude-code:
     dependencies:
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -51,9 +57,6 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.5
@@ -75,13 +78,13 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.997.0
         version: 3.1003.0
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.5
@@ -97,6 +100,9 @@ importers:
 
   packages/ext/kv-redis:
     dependencies:
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -104,9 +110,6 @@ importers:
         specifier: ^5.9.3
         version: 5.10.0
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.5
@@ -122,6 +125,9 @@ importers:
 
   packages/ext/kv-sqlite:
     dependencies:
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -129,9 +135,6 @@ importers:
         specifier: ^12.6.2
         version: 12.6.2
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
@@ -153,13 +156,13 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.78.0
         version: 0.78.0(zod@4.3.6)
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -181,13 +184,13 @@ importers:
       '@google/genai':
         specifier: ^1.42.0
         version: 1.44.0(@modelcontextprotocol/sdk@1.27.1(zod@4.3.6))
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -206,6 +209,9 @@ importers:
 
   packages/ext/llm-openai:
     dependencies:
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -213,9 +219,6 @@ importers:
         specifier: ^6.25.0
         version: 6.27.0(ws@8.19.0)(zod@4.3.6)
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -237,13 +240,13 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.1
         version: 1.27.1(zod@4.3.6)
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.3.5
@@ -259,6 +262,9 @@ importers:
 
   packages/ext/vectordb-chroma:
     dependencies:
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -266,9 +272,6 @@ importers:
         specifier: ^3.3.1
         version: 3.3.1
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@rcrsr/rill-ext-vector-shared':
         specifier: workspace:^
         version: link:../../shared/ext-vector
@@ -290,13 +293,13 @@ importers:
       '@pinecone-database/pinecone':
         specifier: ^7.1.0
         version: 7.1.0
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@rcrsr/rill-ext-vector-shared':
         specifier: workspace:^
         version: link:../../shared/ext-vector
@@ -318,13 +321,13 @@ importers:
       '@qdrant/js-client-rest':
         specifier: ^1.17.0
         version: 1.17.0(typescript@5.9.3)
+      '@rcrsr/rill':
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
     devDependencies:
-      '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
       '@rcrsr/rill-ext-vector-shared':
         specifier: workspace:^
         version: link:../../shared/ext-vector
@@ -342,22 +345,22 @@ importers:
         version: 7.22.0
 
   packages/shared/ext-llm:
-    devDependencies:
+    dependencies:
       '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
 
   packages/shared/ext-param:
-    devDependencies:
+    dependencies:
       '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
 
   packages/shared/ext-vector:
-    devDependencies:
+    dependencies:
       '@rcrsr/rill':
-        specifier: ~0.16.0
-        version: 0.16.0
+        specifier: file:../../../../rill/packages/core
+        version: file:../rill/packages/core
 
 packages:
 
@@ -837,8 +840,8 @@ packages:
     resolution: {integrity: sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==}
     engines: {node: '>=18.0.0', pnpm: '>=8'}
 
-  '@rcrsr/rill@0.16.0':
-    resolution: {integrity: sha512-hpWTr9McY8NR1522Jt8iTzFO0avWDDvdZaht9bk40j3gD+fPePgZLKPsZz0H080dpBUfI6vH4Go73jciRblSNQ==}
+  '@rcrsr/rill@file:../rill/packages/core':
+    resolution: {directory: ../rill/packages/core, type: directory}
     engines: {node: '>=20.0.0'}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
@@ -3334,7 +3337,7 @@ snapshots:
 
   '@qdrant/openapi-typescript-fetch@1.2.6': {}
 
-  '@rcrsr/rill@0.16.0': {}
+  '@rcrsr/rill@file:../rill/packages/core': {}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     optional: true

@@ -15,6 +15,11 @@ import type { McpExtensionConfig } from '../../src/types.js';
 describe('dispose() functionality', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(Client.prototype, 'getServerCapabilities').mockReturnValue({
+      tools: {},
+      resources: {},
+      prompts: {},
+    });
   });
 
   afterEach(() => {
@@ -149,9 +154,10 @@ describe('dispose() functionality', () => {
       };
 
       const result = await createMcpExtension(config);
+      const fns = result.value as Record<string, any>;
 
       // Start a long-running tool call
-      const toolCallResultPromise = result.long_running_tool!.fn({}, {
+      const toolCallResultPromise = fns.long_running_tool!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
@@ -212,19 +218,20 @@ describe('dispose() functionality', () => {
       };
 
       const result = await createMcpExtension(config);
+      const fns = result.value as Record<string, any>;
 
       // IR-1: Result has dispose function
       expect(result.dispose).toBeDefined();
       expect(typeof result.dispose).toBe('function');
 
-      // IR-1: Result has tool function
-      expect(result.test_tool).toBeDefined();
-      expect(typeof result.test_tool).toBe('object');
-      expect(result.test_tool.fn).toBeDefined();
-      expect(typeof result.test_tool.fn).toBe('function');
+      // IR-1: Result has tool function in value
+      expect(fns.test_tool).toBeDefined();
+      expect(typeof fns.test_tool).toBe('object');
+      expect(fns.test_tool.fn).toBeDefined();
+      expect(typeof fns.test_tool.fn).toBe('function');
 
       // IR-2: Tool function is callable
-      const toolResult = await result.test_tool.fn({ param1: 'value1' }, {
+      const toolResult = await fns.test_tool.fn({ param1: 'value1' }, {
         _lifecycle: { connectEmitted: false },
       } as any);
       expect(toolResult).toBe('success');
@@ -275,11 +282,12 @@ describe('dispose() functionality', () => {
       };
 
       const result = await createMcpExtension(config);
+      const fns = result.value as Record<string, any>;
 
-      // Verify all three tools are present
-      expect(result.tool_one).toBeDefined();
-      expect(result.tool_two).toBeDefined();
-      expect(result.tool_three).toBeDefined();
+      // Verify all three tools are present in value
+      expect(fns.tool_one).toBeDefined();
+      expect(fns.tool_two).toBeDefined();
+      expect(fns.tool_three).toBeDefined();
 
       // Verify dispose exists
       expect(result.dispose).toBeDefined();
@@ -318,10 +326,9 @@ describe('dispose() functionality', () => {
       // Verify dispose exists even with no tools
       expect(result.dispose).toBeDefined();
 
-      // Count properties (dispose + _capabilities)
-      const keys = Object.keys(result);
-      expect(keys).toContain('dispose');
-      expect(keys).toContain('_capabilities');
+      // Result has value and dispose
+      expect(result.value).toBeDefined();
+      expect(typeof result.value).toBe('object');
 
       // Cleanup
       await result.dispose?.();

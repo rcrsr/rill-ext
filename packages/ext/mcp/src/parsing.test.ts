@@ -8,6 +8,7 @@ import {
   getDefaultValueForType,
   sanitizeParameterName,
   generateParametersFromSchema,
+  jsonSchemaPropertyToRillParam,
   parseResourceContent,
   type JsonSchema,
   type JsonSchemaProperty,
@@ -154,9 +155,66 @@ describe('sanitizeParameterName', () => {
   });
 });
 
+describe('jsonSchemaPropertyToRillParam', () => {
+  it('maps string property to p.str', () => {
+    const param = jsonSchemaPropertyToRillParam('name', { type: 'string', description: 'User name' });
+    expect(param).toEqual({
+      name: 'name',
+      type: { kind: 'string' },
+      defaultValue: undefined,
+      annotations: { description: 'User name' },
+    });
+  });
+
+  it('maps integer property to p.num', () => {
+    const param = jsonSchemaPropertyToRillParam('count', { type: 'integer', description: 'Item count' });
+    expect(param).toEqual({
+      name: 'count',
+      type: { kind: 'number' },
+      defaultValue: undefined,
+      annotations: { description: 'Item count' },
+    });
+  });
+
+  it('maps number property to p.num', () => {
+    const param = jsonSchemaPropertyToRillParam('score', { type: 'number' });
+    expect(param.type).toEqual({ kind: 'number' });
+  });
+
+  it('maps boolean property to p.bool', () => {
+    const param = jsonSchemaPropertyToRillParam('enabled', { type: 'boolean' });
+    expect(param.type).toEqual({ kind: 'bool' });
+  });
+
+  it('maps object property to p.dict', () => {
+    const param = jsonSchemaPropertyToRillParam('config', { type: 'object' });
+    expect(param.type).toEqual({ kind: 'dict' });
+  });
+
+  it('maps array property to p.list', () => {
+    const param = jsonSchemaPropertyToRillParam('items', { type: 'array' });
+    expect(param.type).toEqual({ kind: 'list' });
+  });
+
+  it('maps enum to p.str', () => {
+    const param = jsonSchemaPropertyToRillParam('status', { type: 'string', enum: ['a', 'b'] });
+    expect(param.type).toEqual({ kind: 'string' });
+  });
+
+  it('maps missing type to p.dict', () => {
+    const param = jsonSchemaPropertyToRillParam('data', {});
+    expect(param.type).toEqual({ kind: 'dict' });
+  });
+
+  it('omits description from annotations when absent', () => {
+    const param = jsonSchemaPropertyToRillParam('x', { type: 'string' });
+    expect(param.annotations).toEqual({});
+  });
+});
+
 describe('generateParametersFromSchema', () => {
   describe('AC-20: RillParam Output Shape', () => {
-    it('generates RillParam from properties', () => {
+    it('generates RillParam with correct types from properties', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -171,19 +229,19 @@ describe('generateParametersFromSchema', () => {
       expect(params).toHaveLength(2);
       expect(params[0]).toEqual({
         name: 'name',
-        type: { type: 'string' },
+        type: { kind: 'string' },
         defaultValue: undefined,
         annotations: { description: 'User name' },
       });
       expect(params[1]).toEqual({
         name: 'age',
-        type: { type: 'string' },
+        type: { kind: 'number' },
         defaultValue: undefined,
         annotations: { description: 'User age' },
       });
     });
 
-    it('outputs string type for all property types (AC-20)', () => {
+    it('maps each JSON Schema type to correct rill type', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -198,8 +256,12 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(5);
+      expect(params[0]!.type).toEqual({ kind: 'string' });
+      expect(params[1]!.type).toEqual({ kind: 'number' });
+      expect(params[2]!.type).toEqual({ kind: 'bool' });
+      expect(params[3]!.type).toEqual({ kind: 'list' });
+      expect(params[4]!.type).toEqual({ kind: 'dict' });
       for (const param of params) {
-        expect(param.type).toEqual({ type: 'string' });
         expect(param.defaultValue).toBeUndefined();
       }
     });
@@ -327,7 +389,7 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0]!.type).toEqual({ type: 'string' });
+      expect(params[0]!.type).toEqual({ kind: 'string' });
     });
 
     it('handles oneOf types as string params', () => {
@@ -341,7 +403,7 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0]!.type).toEqual({ type: 'string' });
+      expect(params[0]!.type).toEqual({ kind: 'string' });
     });
 
     it('handles anyOf types as string params', () => {
@@ -355,10 +417,10 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0]!.type).toEqual({ type: 'string' });
+      expect(params[0]!.type).toEqual({ kind: 'string' });
     });
 
-    it('handles missing type in property as string param', () => {
+    it('handles missing type in property as dict param', () => {
       const schema: JsonSchema = {
         type: 'object',
         properties: {
@@ -369,7 +431,7 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toHaveLength(1);
-      expect(params[0]!.type).toEqual({ type: 'string' });
+      expect(params[0]!.type).toEqual({ kind: 'dict' });
       expect(params[0]!.annotations).toEqual({ description: 'A value' });
     });
   });

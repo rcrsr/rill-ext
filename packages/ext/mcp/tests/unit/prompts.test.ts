@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { rillTypeToTypeValue } from '@rcrsr/rill';
+import { structureToTypeValue } from '@rcrsr/rill';
 import type { McpPrompt, McpPromptResult } from '../../src/prompts.js';
 import { generatePromptFunctions } from '../../src/prompts.js';
 
@@ -46,18 +46,18 @@ describe('Prompt Function Generation', () => {
       expect(fn.params).toHaveLength(2);
       expect(fn.params[0]).toMatchObject({
         name: 'code',
-        type: { type: 'string' },
+        type: { kind: 'string' },
       });
       expect(fn.params[0]?.defaultValue).toBeUndefined();
 
       expect(fn.params[1]).toMatchObject({
         name: 'language',
-        type: { type: 'string' },
+        type: { kind: 'string' },
       });
       expect(fn.params[1]?.defaultValue).toBeUndefined();
 
       expect(fn.annotations?.description).toBe('Review code for issues');
-      expect(fn.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }));
+      expect(fn.returnType).toEqual(structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }));
     });
 
     it('generates function with no parameters for prompt without arguments', () => {
@@ -74,7 +74,7 @@ describe('Prompt Function Generation', () => {
       const fn = functions.prompt_greeting!;
 
       expect(fn.params).toHaveLength(0);
-      expect(fn.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }));
+      expect(fn.returnType).toEqual(structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }));
     });
 
     it('sets defaultValue for optional arguments only', () => {

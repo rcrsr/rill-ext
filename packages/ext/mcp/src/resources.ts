@@ -8,7 +8,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { emitExtensionEvent, rillTypeToTypeValue } from '@rcrsr/rill';
+import { emitExtensionEvent, structureToTypeValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
@@ -248,7 +248,7 @@ export function createReadResourceFunction(
     params: [p.str('uri', 'Resource URI to read')],
     fn,
     annotations: { description: 'Read an MCP resource by URI' },
-    returnType: rillTypeToTypeValue({ type: 'dict' }),
+    returnType: structureToTypeValue({ kind: 'dict' }),
   };
 }
 
@@ -394,7 +394,7 @@ function createResourceTemplateFunction(
     ...(template.description !== undefined && {
       annotations: { description: template.description },
     }),
-    returnType: rillTypeToTypeValue({ type: 'dict' }),
+    returnType: structureToTypeValue({ kind: 'dict' }),
   };
 }
 

@@ -2,350 +2,283 @@
  * Unit tests for introspection function generation.
  *
  * Tests cover:
- * - IR-6: list_tools returns list of tool dicts
- * - IR-7: list_resources returns list of resource dicts
- * - IR-8: list_prompts returns list of prompt dicts
- * - BC-1: Empty capability lists return empty lists
- * - Optional fields default to empty string
- * - Lists ALL capabilities regardless of filters
+ * - IR-6: tools() returns dict of callable closures
+ * - IR-7: resources() returns dict of callable closures
+ * - IR-8: prompts() returns dict of callable closures
+ * - BC-1: Empty capability lists return empty dicts
+ * - Callable metadata (description, params) attached to each callable
  */
 
 import { describe, it, expect } from 'vitest';
-import { rillTypeToTypeValue } from '@rcrsr/rill';
-import {
-  createIntrospectionFunctions,
-  type McpTool,
-  type McpResource,
-  type McpPrompt,
-} from '../../src/introspection.js';
-import type { RillValue } from '@rcrsr/rill';
+import { structureToTypeValue, isCallable } from '@rcrsr/rill';
+import type { RillFunction, RillValue } from '@rcrsr/rill';
+import { createIntrospectionFunctions } from '../../src/introspection.js';
+import { p } from '@rcrsr/rill-ext-param-shared';
+
+// Helper to create a minimal RillFunction for testing
+function makeRillFn(description: string, params: ReturnType<typeof p.str>[] = []): RillFunction {
+  return {
+    fn: async () => 'result',
+    params,
+    annotations: { description },
+    returnType: structureToTypeValue({ kind: 'string' }),
+  };
+}
 
 describe('createIntrospectionFunctions', () => {
-  describe('list_tools', () => {
-    it('returns list of tool dicts with name and description [IR-6]', async () => {
+  describe('tools', () => {
+    it('returns dict of callables keyed by tool name [IR-6]', async () => {
       // Arrange
-      const tools: McpTool[] = [
-        { name: 'echo', description: 'Echo tool' },
-        { name: 'calculator', description: 'Perform calculations' },
-      ];
+      const toolFunctions: Record<string, RillFunction> = {
+        echo: makeRillFn('Echo tool'),
+        calculator: makeRillFn('Perform calculations'),
+      };
 
       // Act
-      const functions = createIntrospectionFunctions(tools, [], [], []);
-      const result = (await functions.list_tools.fn({})) as RillValue[];
+      const functions = createIntrospectionFunctions(toolFunctions, {}, {});
+      const result = (await functions.tools.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({ name: 'echo', description: 'Echo tool' });
-      expect(result[1]).toEqual({
-        name: 'calculator',
-        description: 'Perform calculations',
-      });
+      expect(Object.keys(result)).toEqual(['echo', 'calculator']);
+      expect(isCallable(result['echo'] as RillValue)).toBe(true);
+      expect(isCallable(result['calculator'] as RillValue)).toBe(true);
     });
 
-    it('defaults missing description to empty string', async () => {
+    it('attaches description to each callable', async () => {
       // Arrange
-      const tools: McpTool[] = [{ name: 'echo' }];
+      const toolFunctions: Record<string, RillFunction> = {
+        echo: makeRillFn('Echo tool'),
+      };
 
       // Act
-      const functions = createIntrospectionFunctions(tools, [], [], []);
-      const result = (await functions.list_tools.fn({})) as RillValue[];
+      const functions = createIntrospectionFunctions(toolFunctions, {}, {});
+      const result = (await functions.tools.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result[0]).toEqual({ name: 'echo', description: '' });
+      const echoCallable = result['echo'] as Record<string, unknown>;
+      const annotations = echoCallable['annotations'] as Record<string, unknown>;
+      expect(annotations['description']).toBe('Echo tool');
     });
 
-    it('returns empty list for zero tools [BC-1]', async () => {
+    it('defaults description to empty string when annotation is absent', async () => {
       // Arrange
-      const tools: McpTool[] = [];
+      const toolFunctions: Record<string, RillFunction> = {
+        no_desc: {
+          fn: async () => 'ok',
+          params: [],
+          annotations: {},
+          returnType: structureToTypeValue({ kind: 'string' }),
+        },
+      };
 
       // Act
-      const functions = createIntrospectionFunctions(tools, [], [], []);
-      const result = (await functions.list_tools.fn({})) as RillValue[];
+      const functions = createIntrospectionFunctions(toolFunctions, {}, {});
+      const result = (await functions.tools.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result).toEqual([]);
+      const toolCallable = result['no_desc'] as Record<string, unknown>;
+      const annotations = toolCallable['annotations'] as Record<string, unknown>;
+      expect(annotations['description']).toBe('');
+    });
+
+    it('attaches params to callable when tool has params', async () => {
+      // Arrange
+      const toolParams = [p.str('input')];
+      const toolFunctions: Record<string, RillFunction> = {
+        parameterized: makeRillFn('Tool with params', toolParams),
+      };
+
+      // Act
+      const functions = createIntrospectionFunctions(toolFunctions, {}, {});
+      const result = (await functions.tools.fn({})) as Record<string, unknown>;
+
+      // Assert
+      const toolCallable = result['parameterized'] as Record<string, unknown>;
+      expect(toolCallable['params']).toEqual(toolParams);
+    });
+
+    it('does not set params key on callable when tool has no params', async () => {
+      // Arrange
+      const toolFunctions: Record<string, RillFunction> = {
+        no_params: makeRillFn('No params tool'),
+      };
+
+      // Act
+      const functions = createIntrospectionFunctions(toolFunctions, {}, {});
+      const result = (await functions.tools.fn({})) as Record<string, unknown>;
+
+      // Assert
+      const toolCallable = result['no_params'] as Record<string, unknown>;
+      // Typed zero-param callable: params is empty array (not undefined)
+      expect(toolCallable['params']).toEqual([]);
+    });
+
+    it('returns empty dict for zero tools [BC-1]', async () => {
+      // Arrange & Act
+      const functions = createIntrospectionFunctions({}, {}, {});
+      const result = (await functions.tools.fn({})) as Record<string, unknown>;
+
+      // Assert
+      expect(Object.keys(result)).toHaveLength(0);
     });
 
     it('has correct function metadata', () => {
-      // Arrange
-      const functions = createIntrospectionFunctions([], [], [], []);
+      // Arrange & Act
+      const functions = createIntrospectionFunctions({}, {}, {});
 
-      // Assert
-      expect(functions.list_tools.params).toEqual([]);
-      expect(functions.list_tools.annotations?.description).toBe(
-        'List all available tools from MCP server'
+      // Assert - tools is a RillFunction with params, annotations, returnType
+      expect(functions.tools.params).toEqual([]);
+      expect(functions.tools.annotations?.description).toBe(
+        'Available MCP tools as callable closures'
       );
-      expect(functions.list_tools.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } } } } }));
+      expect(functions.tools.returnType).toEqual(structureToTypeValue({ kind: 'dict' }));
     });
   });
 
-  describe('list_resources', () => {
-    it('returns list of resource dicts with uri, name, description, mime [IR-7]', async () => {
+  describe('resources', () => {
+    it('returns dict of callables keyed by resource function name [IR-7]', async () => {
       // Arrange
-      const resources: McpResource[] = [
-        {
-          uri: 'file://test.txt',
-          name: 'test',
-          description: 'Test file',
-          mimeType: 'text/plain',
-        },
-        {
-          uri: 'db://users/1',
-          name: 'user1',
-          description: 'User record',
-          mimeType: 'application/json',
-        },
-      ];
+      const resourceFunctions: Record<string, RillFunction> = {
+        read_resource: makeRillFn('Read a resource by URI'),
+        resource_template1: makeRillFn('File resource template'),
+      };
 
       // Act
-      const functions = createIntrospectionFunctions([], resources, [], []);
-      const result = (await functions.list_resources.fn({})) as RillValue[];
+      const functions = createIntrospectionFunctions({}, resourceFunctions, {});
+      const result = (await functions.resources.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
-        uri: 'file://test.txt',
-        name: 'test',
-        description: 'Test file',
-        mime: 'text/plain',
-      });
-      expect(result[1]).toEqual({
-        uri: 'db://users/1',
-        name: 'user1',
-        description: 'User record',
-        mime: 'application/json',
-      });
+      expect(Object.keys(result)).toEqual(['read_resource', 'resource_template1']);
+      expect(isCallable(result['read_resource'] as RillValue)).toBe(true);
+      expect(isCallable(result['resource_template1'] as RillValue)).toBe(true);
     });
 
-    it('defaults missing optional fields to empty string', async () => {
+    it('attaches description to each resource callable', async () => {
       // Arrange
-      const resources: McpResource[] = [
-        {
-          uri: 'file://test.txt',
-          name: 'test',
-        },
-      ];
+      const resourceFunctions: Record<string, RillFunction> = {
+        read_resource: makeRillFn('Read a resource by URI'),
+      };
 
       // Act
-      const functions = createIntrospectionFunctions([], resources, [], []);
-      const result = (await functions.list_resources.fn({})) as RillValue[];
+      const functions = createIntrospectionFunctions({}, resourceFunctions, {});
+      const result = (await functions.resources.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result[0]).toEqual({
-        uri: 'file://test.txt',
-        name: 'test',
-        description: '',
-        mime: '',
-      });
+      const c = result['read_resource'] as Record<string, unknown>;
+      const annotations = c['annotations'] as Record<string, unknown>;
+      expect(annotations['description']).toBe('Read a resource by URI');
     });
 
-    it('returns empty list for zero resources [BC-1]', async () => {
-      // Arrange
-      const resources: McpResource[] = [];
-
-      // Act
-      const functions = createIntrospectionFunctions([], resources, [], []);
-      const result = (await functions.list_resources.fn({})) as RillValue[];
+    it('returns empty dict for zero resource functions [BC-1]', async () => {
+      // Arrange & Act
+      const functions = createIntrospectionFunctions({}, {}, {});
+      const result = (await functions.resources.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result).toEqual([]);
+      expect(Object.keys(result)).toHaveLength(0);
     });
 
     it('has correct function metadata', () => {
-      // Arrange
-      const functions = createIntrospectionFunctions([], [], [], []);
+      // Arrange & Act
+      const functions = createIntrospectionFunctions({}, {}, {});
 
       // Assert
-      expect(functions.list_resources.params).toEqual([]);
-      expect(functions.list_resources.annotations?.description).toBe(
-        'List all available resources from MCP server'
+      expect(functions.resources.params).toEqual([]);
+      expect(functions.resources.annotations?.description).toBe(
+        'Available MCP resources as callable closures'
       );
-      expect(functions.list_resources.returnType).toEqual(rillTypeToTypeValue({ type: 'list' }));
+      expect(functions.resources.returnType).toEqual(structureToTypeValue({ kind: 'dict' }));
     });
   });
 
-  describe('list_prompts', () => {
-    it('returns list of prompt dicts with name, description, arguments [IR-8]', async () => {
+  describe('prompts', () => {
+    it('returns dict of callables keyed by prompt function name [IR-8]', async () => {
       // Arrange
-      const prompts: McpPrompt[] = [
-        {
-          name: 'greet',
-          description: 'Greeting prompt',
-          arguments: [{ name: 'name' }, { name: 'language' }],
-        },
-        {
-          name: 'summarize',
-          description: 'Text summarization',
-          arguments: [{ name: 'text' }],
-        },
-      ];
+      const promptFunctions: Record<string, RillFunction> = {
+        prompt_greet: makeRillFn('Greeting prompt'),
+        prompt_summarize: makeRillFn('Text summarization'),
+      };
 
       // Act
-      const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn({})) as RillValue[];
+      const functions = createIntrospectionFunctions({}, {}, promptFunctions);
+      const result = (await functions.prompts.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
-        name: 'greet',
-        description: 'Greeting prompt',
-        arguments: ['name', 'language'],
-      });
-      expect(result[1]).toEqual({
-        name: 'summarize',
-        description: 'Text summarization',
-        arguments: ['text'],
-      });
+      expect(Object.keys(result)).toEqual(['prompt_greet', 'prompt_summarize']);
+      expect(isCallable(result['prompt_greet'] as RillValue)).toBe(true);
+      expect(isCallable(result['prompt_summarize'] as RillValue)).toBe(true);
     });
 
-    it('defaults missing optional fields to empty string and empty list', async () => {
+    it('attaches description to each prompt callable', async () => {
       // Arrange
-      const prompts: McpPrompt[] = [{ name: 'simple' }];
+      const promptFunctions: Record<string, RillFunction> = {
+        prompt_greet: makeRillFn('Greeting prompt'),
+      };
 
       // Act
-      const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn({})) as RillValue[];
+      const functions = createIntrospectionFunctions({}, {}, promptFunctions);
+      const result = (await functions.prompts.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result[0]).toEqual({
-        name: 'simple',
-        description: '',
-        arguments: [],
-      });
+      const c = result['prompt_greet'] as Record<string, unknown>;
+      const annotations = c['annotations'] as Record<string, unknown>;
+      expect(annotations['description']).toBe('Greeting prompt');
     });
 
-    it('handles prompts with no arguments', async () => {
-      // Arrange
-      const prompts: McpPrompt[] = [
-        {
-          name: 'static',
-          description: 'Static prompt',
-          arguments: [],
-        },
-      ];
-
-      // Act
-      const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn({})) as RillValue[];
+    it('returns empty dict for zero prompt functions [BC-1]', async () => {
+      // Arrange & Act
+      const functions = createIntrospectionFunctions({}, {}, {});
+      const result = (await functions.prompts.fn({})) as Record<string, unknown>;
 
       // Assert
-      expect(result[0]).toEqual({
-        name: 'static',
-        description: 'Static prompt',
-        arguments: [],
-      });
-    });
-
-    it('returns empty list for zero prompts [BC-1]', async () => {
-      // Arrange
-      const prompts: McpPrompt[] = [];
-
-      // Act
-      const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn({})) as RillValue[];
-
-      // Assert
-      expect(result).toEqual([]);
+      expect(Object.keys(result)).toHaveLength(0);
     });
 
     it('has correct function metadata', () => {
-      // Arrange
-      const functions = createIntrospectionFunctions([], [], [], []);
+      // Arrange & Act
+      const functions = createIntrospectionFunctions({}, {}, {});
 
       // Assert
-      expect(functions.list_prompts.params).toEqual([]);
-      expect(functions.list_prompts.annotations?.description).toBe(
-        'List all available prompts from MCP server'
+      expect(functions.prompts.params).toEqual([]);
+      expect(functions.prompts.annotations?.description).toBe(
+        'Available MCP prompts as callable closures'
       );
-      expect(functions.list_prompts.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } }, arguments: { type: { type: 'list', element: { type: 'string' } } } } } }));
+      expect(functions.prompts.returnType).toEqual(structureToTypeValue({ kind: 'dict' }));
     });
   });
 
   describe('static data (factory time)', () => {
-    it('returns same data on multiple invocations (static)', async () => {
+    it('tools() returns same reference on multiple calls (static)', async () => {
       // Arrange
-      const tools: McpTool[] = [{ name: 'echo', description: 'Echo tool' }];
-      const functions = createIntrospectionFunctions(tools, [], [], []);
+      const toolFunctions: Record<string, RillFunction> = {
+        echo: makeRillFn('Echo tool'),
+      };
+      const functions = createIntrospectionFunctions(toolFunctions, {}, {});
 
       // Act
-      const result1 = (await functions.list_tools.fn({})) as RillValue[];
-      const result2 = (await functions.list_tools.fn({})) as RillValue[];
+      const result1 = await functions.tools.fn({});
+      const result2 = await functions.tools.fn({});
 
-      // Assert
-      expect(result1).toEqual(result2);
-      expect(result1).toBe(result2); // Same reference (static data)
+      // Assert - same reference (static data)
+      expect(result1).toBe(result2);
     });
   });
 
   describe('BC-1: empty capability lists', () => {
-    it('returns only introspection functions with empty lists', async () => {
-      // Arrange
-      const functions = createIntrospectionFunctions([], [], [], []);
+    it('returns only introspection functions with empty dicts', async () => {
+      // Arrange & Act
+      const functions = createIntrospectionFunctions({}, {}, {});
 
-      // Act
-      const tools = (await functions.list_tools.fn({})) as RillValue[];
-      const resources = (await functions.list_resources.fn({})) as RillValue[];
-      const prompts = (await functions.list_prompts.fn({})) as RillValue[];
+      // Assert - exactly three functions
+      expect(Object.keys(functions)).toEqual(['tools', 'resources', 'prompts']);
 
-      // Assert
-      expect(Object.keys(functions)).toEqual([
-        'list_tools',
-        'list_resources',
-        'list_prompts',
-      ]);
-      expect(tools).toEqual([]);
-      expect(resources).toEqual([]);
-      expect(prompts).toEqual([]);
-    });
-  });
+      const tools = (await functions.tools.fn({})) as Record<string, unknown>;
+      const resources = (await functions.resources.fn({})) as Record<string, unknown>;
+      const prompts = (await functions.prompts.fn({})) as Record<string, unknown>;
 
-  describe('lists ALL capabilities regardless of filters', () => {
-    it('includes all tools even if filtered elsewhere', async () => {
-      // Arrange
-      const tools: McpTool[] = [
-        { name: 'tool1', description: 'First tool' },
-        { name: 'tool2', description: 'Second tool' },
-        { name: 'tool3', description: 'Third tool' },
-      ];
-
-      // Act
-      const functions = createIntrospectionFunctions(tools, [], [], []);
-      const result = (await functions.list_tools.fn({})) as RillValue[];
-
-      // Assert - all three tools returned regardless of filter settings
-      expect(result).toHaveLength(3);
-      expect(result.map((t) => (t as { name: string }).name)).toEqual([
-        'tool1',
-        'tool2',
-        'tool3',
-      ]);
-    });
-
-    it('includes all resources even if filtered elsewhere', async () => {
-      // Arrange
-      const resources: McpResource[] = [
-        { uri: 'file://a', name: 'a' },
-        { uri: 'file://b', name: 'b' },
-      ];
-
-      // Act
-      const functions = createIntrospectionFunctions([], resources, [], []);
-      const result = (await functions.list_resources.fn({})) as RillValue[];
-
-      // Assert - all resources returned
-      expect(result).toHaveLength(2);
-    });
-
-    it('includes all prompts even if filtered elsewhere', async () => {
-      // Arrange
-      const prompts: McpPrompt[] = [{ name: 'prompt1' }, { name: 'prompt2' }];
-
-      // Act
-      const functions = createIntrospectionFunctions([], [], [], prompts);
-      const result = (await functions.list_prompts.fn({})) as RillValue[];
-
-      // Assert - all prompts returned
-      expect(result).toHaveLength(2);
+      expect(Object.keys(tools)).toHaveLength(0);
+      expect(Object.keys(resources)).toHaveLength(0);
+      expect(Object.keys(prompts)).toHaveLength(0);
     });
   });
 });
