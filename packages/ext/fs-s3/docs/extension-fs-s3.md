@@ -8,30 +8,29 @@ Use S3 fs backend for cloud deployments, serverless environments, multi-region d
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createS3FsExtension } from '@rcrsr/rill-ext-fs-s3';
-
-const ext = createS3FsExtension({
-  mounts: {
-    data: {
-      mode: 'read-write',
-      region: 'us-east-1',
-      bucket: 'my-app-data',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+```json
+{
+  "extensions": {
+    "mounts": {
+      "fs": "@rcrsr/rill-ext-fs-s3"
+    },
+    "config": {
+      "fs": {
+        "mounts": {
+          "data": {
+            "mode": "read-write",
+            "region": "us-east-1",
+            "bucket": "my-app-data",
+            "credentials": {
+              "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+              "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+            }
+          }
+        }
       }
     }
   }
-});
-const { functions, dispose } = hoistExtension('fs', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { fs: functions } },
-  },
-});
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
@@ -56,26 +55,31 @@ fs::read("data", "report.txt")
 
 ## Configuration
 
-```typescript
-interface S3FsConfig {
-  mounts: Record<string, S3FsMountConfig>;
-  maxFileSize?: number;  // bytes (default: 10485760 = 10MB)
-  encoding?: 'utf-8' | 'utf8' | 'ascii';
-}
-
-interface S3FsMountConfig {
-  mode: 'read-only' | 'read-write';
-  region: string;
-  bucket: string;
-  prefix?: string;  // object key prefix
-  credentials: {
-    accessKeyId: string;
-    secretAccessKey: string;
-  };
-  endpoint?: string;  // for S3-compatible services (MinIO, R2)
-  forcePathStyle?: boolean;  // use path-style addressing (required for MinIO)
-  glob?: string;  // file filter pattern
-  maxFileSize?: number;
+```json
+{
+  "extensions": {
+    "config": {
+      "fs": {
+        "mounts": {
+          "data": {
+            "mode": "read-write",
+            "region": "us-east-1",
+            "bucket": "my-app-data",
+            "prefix": "uploads/",
+            "credentials": {
+              "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+              "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+            },
+            "endpoint": "https://custom.endpoint.com",
+            "forcePathStyle": false,
+            "glob": "*.csv"
+          }
+        },
+        "maxFileSize": 10485760,
+        "encoding": "utf-8"
+      }
+    }
+  }
 }
 ```
 
@@ -100,41 +104,53 @@ interface S3FsMountConfig {
 
 **Cloudflare R2:**
 
-```typescript
-const ext = createS3FsExtension({
-  mounts: {
-    storage: {
-      mode: 'read-write',
-      region: 'auto',
-      bucket: 'my-r2-bucket',
-      credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
-      },
-      endpoint: `https://<account-id>.r2.cloudflarestorage.com`
+```json
+{
+  "extensions": {
+    "config": {
+      "fs": {
+        "mounts": {
+          "storage": {
+            "mode": "read-write",
+            "region": "auto",
+            "bucket": "my-r2-bucket",
+            "credentials": {
+              "accessKeyId": "${R2_ACCESS_KEY_ID}",
+              "secretAccessKey": "${R2_SECRET_ACCESS_KEY}"
+            },
+            "endpoint": "https://<account-id>.r2.cloudflarestorage.com"
+          }
+        }
+      }
     }
   }
-});
+}
 ```
 
 **MinIO:**
 
-```typescript
-const ext = createS3FsExtension({
-  mounts: {
-    local: {
-      mode: 'read-write',
-      region: 'us-east-1',
-      bucket: 'test-bucket',
-      credentials: {
-        accessKeyId: 'minioadmin',
-        secretAccessKey: 'minioadmin'
-      },
-      endpoint: 'http://localhost:9000',
-      forcePathStyle: true  // MinIO requires path-style addressing
+```json
+{
+  "extensions": {
+    "config": {
+      "fs": {
+        "mounts": {
+          "local": {
+            "mode": "read-write",
+            "region": "us-east-1",
+            "bucket": "test-bucket",
+            "credentials": {
+              "accessKeyId": "minioadmin",
+              "secretAccessKey": "minioadmin"
+            },
+            "endpoint": "http://localhost:9000",
+            "forcePathStyle": true
+          }
+        }
+      }
     }
   }
-});
+}
 ```
 
 ## Key Differences from Core fs
