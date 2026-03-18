@@ -19,12 +19,12 @@ import {
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryResult,
-  type LlmExtensionContract,
   type RillFunction,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
 import {
+  type LlmExtensionContract,
   validateApiKey,
   validateModel,
   validateTemperature,

@@ -2,7 +2,7 @@
 
 *Gemini API integration for rill scripts*
 
-This extension allows rill scripts to access the Gemini API using the `@google/genai` SDK (preview). The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:gemini>`. Switching to Anthropic or OpenAI means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access the Gemini API using the `@google/genai` SDK (preview). The host declares it in `rill-config.json`, and scripts load it with `use<ext:gemini>`. Switching to Anthropic or OpenAI means changing the extension mount. Scripts stay identical.
 
 Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured data as a typed dict. `message`, `messages`, and `tool_loop` return the same dict shape (`content`, `model`, `usage`, `stop_reason`, `id`, `messages`), so scripts work across providers without changes. `generate` returns a separate shape with `data` and `raw` fields instead of `content` and `messages`. Google's API returns 0 for token counts and empty string for request IDs — see [Provider Notes](#provider-notes) for details.
 
@@ -10,21 +10,20 @@ The host sets API key, model, and temperature at creation time — scripts never
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createGeminiExtension } from '@rcrsr/rill-ext-gemini';
-
-const ext = createGeminiExtension({
-  api_key: process.env.GEMINI_API_KEY!,
-  model: 'gemini-2.0-flash',
-});
-const { functions, dispose } = hoistExtension('gemini', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { gemini: functions } },
-  },
-});
+```json
+{
+  "extensions": {
+    "mounts": {
+      "gemini": "@rcrsr/rill-ext-gemini"
+    },
+    "config": {
+      "gemini": {
+        "api_key": "${GEMINI_API_KEY}",
+        "model": "gemini-2.0-flash"
+      }
+    }
+  }
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
@@ -50,18 +49,24 @@ gemini::message("Explain TCP handshakes")
 
 ## Configuration
 
-```typescript
-const ext = createGeminiExtension({
-  api_key: process.env.GEMINI_API_KEY!,
-  model: 'gemini-2.0-flash',
-  temperature: 0.7,
-  max_tokens: 8192,
-  system: 'You are a helpful assistant.',
-  embed_model: 'text-embedding-004',
-  base_url: 'https://custom-endpoint.example.com',
-  max_retries: 3,
-  timeout: 30000,
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "gemini": {
+        "api_key": "${GEMINI_API_KEY}",
+        "model": "gemini-2.0-flash",
+        "temperature": 0.7,
+        "max_tokens": 8192,
+        "system": "You are a helpful assistant.",
+        "embed_model": "text-embedding-004",
+        "base_url": "https://custom-endpoint.example.com",
+        "max_retries": 3,
+        "timeout": 30000
+      }
+    }
+  }
+}
 ```
 
 | Parameter | Type | Default | Description |
@@ -277,26 +282,6 @@ Completion events (`gemini:message`, `gemini:messages`, `gemini:tool_loop`, `gem
 | `usage` | Token usage object (`input` and `output` counts) |
 | `request` | Messages array sent to the provider API |
 | `content` | Response text from the provider |
-
-## Test Host
-
-A runnable example at `examples/test-host.ts` demonstrates integration:
-
-```bash
-# Set API key
-export GEMINI_API_KEY="AIza..."
-
-# Built-in demo
-pnpm exec tsx examples/test-host.ts
-
-# Inline expression
-pnpm exec tsx examples/test-host.ts -e 'llm::message("Tell me a joke") -> $.content -> log'
-
-# Script file
-pnpm exec tsx examples/test-host.ts script.rill
-```
-
-Override model with `GEMINI_MODEL`.
 
 ## See Also
 

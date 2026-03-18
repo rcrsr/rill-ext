@@ -2,7 +2,7 @@
 
 *OpenAI API integration for rill scripts*
 
-This extension allows rill scripts to access OpenAI's GPT and embedding APIs. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:openai>`. Switching to Anthropic or Google means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access OpenAI's GPT and embedding APIs. The host declares it in `rill-config.json`, and scripts load it with `use<ext:openai>`. Switching to Anthropic or Google means changing the extension mount. Scripts stay identical.
 
 Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings — OpenAI offers `text-embedding-3-small` and `text-embedding-3-large` for this. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured output matching a schema dict. `message`, `messages`, and `tool_loop` return a `content`/`messages` shape. `generate` returns a `data`/`raw` shape.
 
@@ -10,21 +10,20 @@ The host sets API key, model, and temperature at creation time — scripts never
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createOpenAIExtension } from '@rcrsr/rill-ext-openai';
-
-const ext = createOpenAIExtension({
-  api_key: process.env.OPENAI_API_KEY!,
-  model: 'gpt-4o',
-});
-const { functions, dispose } = hoistExtension('openai', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { openai: functions } },
-  },
-});
+```json
+{
+  "extensions": {
+    "mounts": {
+      "openai": "@rcrsr/rill-ext-openai"
+    },
+    "config": {
+      "openai": {
+        "api_key": "${OPENAI_API_KEY}",
+        "model": "gpt-4o"
+      }
+    }
+  }
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
@@ -50,18 +49,24 @@ openai::message("Explain TCP handshakes")
 
 ## Configuration
 
-```typescript
-const ext = createOpenAIExtension({
-  api_key: process.env.OPENAI_API_KEY!,
-  model: 'gpt-4o',
-  temperature: 0.7,
-  max_tokens: 4096,
-  system: 'You are a helpful assistant.',
-  embed_model: 'text-embedding-3-small',
-  base_url: 'https://custom-endpoint.example.com',
-  max_retries: 3,
-  timeout: 30000,
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "openai": {
+        "api_key": "${OPENAI_API_KEY}",
+        "model": "gpt-4o",
+        "temperature": 0.7,
+        "max_tokens": 4096,
+        "system": "You are a helpful assistant.",
+        "embed_model": "text-embedding-3-small",
+        "base_url": "https://custom-endpoint.example.com",
+        "max_retries": 3,
+        "timeout": 30000
+      }
+    }
+  }
+}
 ```
 
 | Parameter | Type | Default | Description |
@@ -265,34 +270,6 @@ Completion events (`openai:message`, `openai:messages`, `openai:tool_loop`, `ope
 | `usage` | Token usage object (`input` and `output` counts) |
 | `request` | Messages array sent to the provider API |
 | `content` | Response text from the provider |
-
-## Test Host
-
-A runnable example at `examples/test-host.ts` demonstrates integration:
-
-```bash
-# Set API key
-export OPENAI_API_KEY="sk-..."
-
-# Built-in demo
-pnpm exec tsx examples/test-host.ts
-
-# Inline expression
-pnpm exec tsx examples/test-host.ts -e 'llm::message("Tell me a joke") -> $.content -> log'
-
-# Script file
-pnpm exec tsx examples/test-host.ts script.rill
-```
-
-Override model or endpoint with `OPENAI_MODEL` and `OPENAI_BASE_URL`. Works with any OpenAI-compatible server:
-
-```bash
-# LM Studio
-OPENAI_BASE_URL=http://localhost:1234/v1 OPENAI_API_KEY=lm-studio OPENAI_MODEL=local pnpm exec tsx examples/test-host.ts
-
-# Ollama
-OPENAI_BASE_URL=http://localhost:11434/v1 OPENAI_API_KEY=ollama OPENAI_MODEL=llama3.2 pnpm exec tsx examples/test-host.ts
-```
 
 ## See Also
 
