@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-param-shared",
   "private": true,
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Shared param builder utilities for rill extensions",
   "license": "MIT",
   "type": "module",
@@ -18,10 +18,10 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.17.0"
+    "@rcrsr/rill": "~0.18.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.17.0"
+    "@rcrsr/rill": "~0.18.0"
   },
   "repository": {
     "type": "git",
