@@ -8,26 +8,25 @@ Use SQLite backend when working with large datasets (>1000 entries), need better
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createSqliteKvExtension } from '@rcrsr/rill-ext-kv-sqlite';
-
-const ext = createSqliteKvExtension({
-  mounts: {
-    user: {
-      mode: 'read-write',
-      database: './data/app.db',
-      table: 'user_state',
+```json
+{
+  "extensions": {
+    "mounts": {
+      "kv": "@rcrsr/rill-ext-kv-sqlite"
     },
-  },
-});
-const { functions, dispose } = hoistExtension('kv', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { kv: functions } },
-  },
-});
+    "config": {
+      "kv": {
+        "mounts": {
+          "user": {
+            "mode": "read-write",
+            "database": "./data/app.db",
+            "table": "user_state"
+          }
+        }
+      }
+    }
+  }
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
@@ -54,20 +53,26 @@ kv::set("user", "name", "Alice")
 
 ## Configuration
 
-```typescript
-interface SqliteKvConfig {
-  mounts: Record<string, SqliteKvMountConfig>;
-  maxStoreSize?: number;  // bytes (default: 10485760 = 10MB)
-  writePolicy?: 'dispose' | 'immediate';  // default: 'dispose'
-}
-
-interface SqliteKvMountConfig {
-  mode: 'read' | 'write' | 'read-write';
-  database: string;  // SQLite file path
-  table: string;  // table name
-  schema?: Record<string, SchemaEntry>;
-  maxEntries?: number;  // default: 10000
-  maxValueSize?: number;  // bytes (default: 102400 = 100KB)
+```json
+{
+  "extensions": {
+    "config": {
+      "kv": {
+        "mounts": {
+          "user": {
+            "mode": "read-write",
+            "database": "./data/app.db",
+            "table": "user_state",
+            "schema": { "name": { "type": "string", "default": "" } },
+            "maxEntries": 10000,
+            "maxValueSize": 102400
+          }
+        },
+        "maxStoreSize": 10485760,
+        "writePolicy": "dispose"
+      }
+    }
+  }
 }
 ```
 
@@ -90,26 +95,32 @@ interface SqliteKvMountConfig {
 
 **Example with schema:**
 
-```typescript
-const ext = createSqliteKvExtension({
-  mounts: {
-    user: {
-      mode: 'read-write',
-      database: './data/app.db',
-      table: 'user_state',
-      schema: {
-        name: { type: 'string', default: '' },
-        count: { type: 'number', default: 0 }
+```json
+{
+  "extensions": {
+    "config": {
+      "kv": {
+        "mounts": {
+          "user": {
+            "mode": "read-write",
+            "database": "./data/app.db",
+            "table": "user_state",
+            "schema": {
+              "name": { "type": "string", "default": "" },
+              "count": { "type": "number", "default": 0 }
+            }
+          },
+          "cache": {
+            "mode": "read-write",
+            "database": "./data/cache.db",
+            "table": "cache_entries"
+          }
+        },
+        "writePolicy": "immediate"
       }
-    },
-    cache: {
-      mode: 'read-write',
-      database: './data/cache.db',
-      table: 'cache_entries'
     }
-  },
-  writePolicy: 'immediate'
-});
+  }
+}
 ```
 
 ## Functions
