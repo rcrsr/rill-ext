@@ -11,8 +11,10 @@ import {
   extractTemplateVariables,
   createReadResourceFunction,
   generateResourceTemplateFunctions,
+  generateStaticResourceFunctions,
   type McpResourceTemplate,
   type McpResourceResult,
+  type McpResource,
 } from '../../src/resources.js';
 
 // ============================================================
@@ -574,5 +576,106 @@ describe('generateResourceTemplateFunctions', () => {
 
     const func = functions.resource_item!;
     expect(func.annotations).toBeUndefined();
+  });
+});
+
+// ============================================================
+// STATIC RESOURCE FUNCTION TESTS
+// ============================================================
+
+describe('generateStaticResourceFunctions', () => {
+  let mockClient: Client;
+
+  beforeEach(() => {
+    mockClient = {
+      readResource: vi.fn(),
+    } as unknown as Client;
+  });
+
+  it('generates zero-param callable per resource', () => {
+    const resources: McpResource[] = [
+      { uri: 'config://app', name: 'app_config', description: 'App config' },
+      { uri: 'config://db', name: 'db_config', description: 'DB config' },
+    ];
+
+    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+
+    expect(Object.keys(functions)).toHaveLength(2);
+    expect(functions).toHaveProperty('resource_app_config');
+    expect(functions).toHaveProperty('resource_db_config');
+    expect(functions['resource_app_config']!.params).toEqual([]);
+    expect(functions['resource_db_config']!.params).toEqual([]);
+  });
+
+  it('pre-binds URI and calls readResource with correct URI', async () => {
+    const resources: McpResource[] = [
+      { uri: 'config://app', name: 'app_config', description: 'App config' },
+    ];
+
+    const mockResult: McpResourceResult = {
+      contents: [{ uri: 'config://app', text: 'value=1' }],
+    };
+
+    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
+
+    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const func = functions['resource_app_config']!;
+
+    await func.fn({}, { _lifecycle: { connectEmitted: false } } as any);
+
+    expect(mockClient.readResource).toHaveBeenCalledWith({ uri: 'config://app' });
+  });
+
+  it('uses resource description as annotation', () => {
+    const resources: McpResource[] = [
+      { uri: 'data://source', name: 'source', description: 'My data source' },
+    ];
+
+    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const func = functions['resource_source']!;
+
+    expect(func.annotations?.description).toBe('My data source');
+  });
+
+  it('falls back to default description when none provided', () => {
+    const resources: McpResource[] = [
+      { uri: 'data://raw', name: 'raw_data' },
+    ];
+
+    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const func = functions['resource_raw_data']!;
+
+    expect(func.annotations?.description).toMatch(/^Read resource:/);
+  });
+
+  it('appends mimeType to description', () => {
+    const resources: McpResource[] = [
+      {
+        uri: 'config://settings',
+        name: 'settings',
+        description: 'Config',
+        mimeType: 'application/json',
+      },
+    ];
+
+    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const func = functions['resource_settings']!;
+
+    expect(func.annotations?.description).toContain('application/json');
+  });
+
+  it('returns empty record for empty resources array', () => {
+    const functions = generateStaticResourceFunctions([], mockClient, 30000);
+    expect(functions).toEqual({});
+  });
+
+  it('applies name sanitization', () => {
+    const resources: McpResource[] = [
+      { uri: 'data://x', name: 'my-resource' },
+    ];
+
+    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+
+    expect(functions).toHaveProperty('resource_my_resource');
   });
 });

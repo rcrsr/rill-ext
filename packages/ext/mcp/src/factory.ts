@@ -11,7 +11,6 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { HeadersInit } from 'undici-types';
 import type { ExtensionFactoryResult, RillValue } from '@rcrsr/rill';
-import { toCallable } from '@rcrsr/rill';
 import type { McpExtensionConfig } from './types.js';
 import {
   createProcessExitError,
@@ -22,9 +21,10 @@ import { generateToolFunctions } from './tools.js';
 import {
   createReadResourceFunction,
   generateResourceTemplateFunctions,
+  generateStaticResourceFunctions,
 } from './resources.js';
 import { generatePromptFunctions } from './prompts.js';
-import { createIntrospectionFunctions } from './introspection.js';
+import { createIntrospectionDicts } from './introspection.js';
 
 /**
  * Create an MCP extension with the specified configuration.
@@ -145,6 +145,12 @@ export async function createMcpExtension(
     timeout,
     lifecycleState
   );
+  const staticResourceFunctions = generateStaticResourceFunctions(
+    capabilities.filteredResources as Parameters<typeof generateStaticResourceFunctions>[0],
+    client,
+    timeout,
+    lifecycleState
+  );
 
   // Generate prompt functions from filtered prompts
   const promptFunctions = generatePromptFunctions(
@@ -156,10 +162,10 @@ export async function createMcpExtension(
     lifecycleState
   );
 
-  // Generate introspection functions (all three use filtered function dicts)
-  const introspectionFunctions = createIntrospectionFunctions(
+  // Generate introspection dicts (all three use filtered function dicts)
+  const introspectionDicts = createIntrospectionDicts(
     toolFunctions,
-    { read_resource: readResourceFunction, ...resourceTemplateFunctions },
+    { read_resource: readResourceFunction, ...resourceTemplateFunctions, ...staticResourceFunctions },
     promptFunctions
   );
 
@@ -193,19 +199,12 @@ export async function createMcpExtension(
     }
   };
 
-  // Build value dict: convert each RillFunction to ApplicationCallable
-  const allFunctions = {
-    ...toolFunctions,
-    read_resource: readResourceFunction,
-    ...resourceTemplateFunctions,
-    ...promptFunctions,
-    ...introspectionFunctions,
+  // Build value dict from introspection dicts — capabilities are namespaced
+  const value: Record<string, RillValue> = {
+    tools: introspectionDicts.tools as unknown as RillValue,
+    resources: introspectionDicts.resources as unknown as RillValue,
+    prompts: introspectionDicts.prompts as unknown as RillValue,
   };
-
-  const value: Record<string, RillValue> = {};
-  for (const [name, rillFn] of Object.entries(allFunctions)) {
-    value[name] = toCallable(rillFn) as unknown as RillValue;
-  }
 
   return { value, dispose };
 }

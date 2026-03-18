@@ -1,17 +1,25 @@
 /**
- * Introspection function generation for MCP Server Mapper Extension.
+ * Introspection dict generation for MCP Server Mapper Extension.
  *
- * Generates tools, resources, and prompts as zero-arg RillFunctions that
- * return pre-built dicts of callable closures. The dicts contain callables
- * for the filtered (available) functions only.
+ * Builds tools, resources, and prompts as pre-built dicts of callable closures.
+ * The dicts contain callables for the filtered (available) functions only.
  */
 
 import type { RillFunction, RillValue } from '@rcrsr/rill';
-import { structureToTypeValue, toCallable } from '@rcrsr/rill';
+import { toCallable } from '@rcrsr/rill';
 
 // ============================================================
-// INTROSPECTION FUNCTION GENERATION
+// INTROSPECTION DICT GENERATION
 // ============================================================
+
+/**
+ * Return type for createIntrospectionDicts — one dict per capability category.
+ */
+export interface IntrospectionDicts {
+  readonly tools: Record<string, RillValue>;
+  readonly resources: Record<string, RillValue>;
+  readonly prompts: Record<string, RillValue>;
+}
 
 /**
  * Build a dict of typed callable closures from a record of RillFunctions.
@@ -37,48 +45,28 @@ function buildCallableDict(functions: Record<string, RillFunction>): Record<stri
 }
 
 /**
- * Creates introspection functions for MCP capabilities.
+ * Creates introspection dicts for MCP capabilities.
  *
- * Returns three zero-arg RillFunctions that return pre-built callable dicts:
- * - tools(): dict of tool name → callable closure (with description and params)
- * - resources(): dict of resource name → callable closure
- * - prompts(): dict of prompt name → callable closure
+ * Returns three pre-built callable dicts:
+ * - tools: dict of tool name → callable closure (with description and params)
+ * - resources: dict of resource name → callable closure
+ * - prompts: dict of prompt name → callable closure
  *
- * The dicts are built at factory time and returned by reference on each call.
+ * The dicts are built at factory time and assigned directly to the extension value.
  *
  * @param toolFunctions - Tool functions keyed by sanitized function name
  * @param resourceFunctions - Resource functions keyed by sanitized function name
  * @param promptFunctions - Prompt functions keyed by sanitized function name
- * @returns Record of function name to RillFunction
+ * @returns IntrospectionDicts with one callable dict per capability category
  */
-export function createIntrospectionFunctions(
+export function createIntrospectionDicts(
   toolFunctions: Record<string, RillFunction>,
   resourceFunctions: Record<string, RillFunction>,
   promptFunctions: Record<string, RillFunction>
-): Record<string, RillFunction> {
-  // Build callable dicts at creation time (static references)
-  const toolsDict = buildCallableDict(toolFunctions);
-  const resourcesDict = buildCallableDict(resourceFunctions);
-  const promptsDict = buildCallableDict(promptFunctions);
-
+): IntrospectionDicts {
   return {
-    tools: {
-      params: [],
-      fn: async (): Promise<RillValue> => toolsDict,
-      annotations: { description: 'Available MCP tools as callable closures' },
-      returnType: structureToTypeValue({ kind: 'dict' }),
-    },
-    resources: {
-      params: [],
-      fn: async (): Promise<RillValue> => resourcesDict,
-      annotations: { description: 'Available MCP resources as callable closures' },
-      returnType: structureToTypeValue({ kind: 'dict' }),
-    },
-    prompts: {
-      params: [],
-      fn: async (): Promise<RillValue> => promptsDict,
-      annotations: { description: 'Available MCP prompts as callable closures' },
-      returnType: structureToTypeValue({ kind: 'dict' }),
-    },
+    tools: buildCallableDict(toolFunctions),
+    resources: buildCallableDict(resourceFunctions),
+    prompts: buildCallableDict(promptFunctions),
   };
 }

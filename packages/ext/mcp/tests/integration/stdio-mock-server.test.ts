@@ -80,16 +80,16 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
       const v = fns(ext);
 
-      // Verify introspection functions exist as callables
+      // Verify introspection dicts exist
       expect(v.tools).toBeDefined();
-      expect(typeof v.tools.fn).toBe('function');
+      expect(typeof v.tools).toBe('object');
       expect(v.resources).toBeDefined();
-      expect(typeof v.resources.fn).toBe('function');
+      expect(typeof v.resources).toBe('object');
       expect(v.prompts).toBeDefined();
-      expect(typeof v.prompts.fn).toBe('function');
+      expect(typeof v.prompts).toBe('object');
 
-      // tools() returns a callable dict keyed by tool name
-      const toolsDict = (await v.tools.fn({})) as Record<string, unknown>;
+      // tools is already a callable dict keyed by tool name
+      const toolsDict = v.tools as Record<string, unknown>;
       expect(typeof toolsDict).toBe('object');
       expect(Object.keys(toolsDict).length).toBeGreaterThan(0);
 
@@ -223,8 +223,8 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
       const v = fns(ext);
 
-      // resources() returns a dict of callable closures keyed by function name
-      const resourcesDict = (await v.resources.fn({})) as Record<string, unknown>;
+      // resources is a dict of callable closures keyed by function name
+      const resourcesDict = v.resources as Record<string, unknown>;
 
       expect(typeof resourcesDict).toBe('object');
       expect(resourcesDict).not.toBe(null);
@@ -310,17 +310,17 @@ describe('Integration: stdio mock server', () => {
       activeExtensions.push(ext);
       const v = fns(ext);
 
-      // prompts() returns a dict of callable closures keyed by sanitized function name
-      const promptsDict = (await v.prompts.fn({})) as Record<string, unknown>;
+      // prompts is a dict of callable closures keyed by sanitized function name
+      const promptsDict = v.prompts as Record<string, unknown>;
 
       expect(typeof promptsDict).toBe('object');
       expect(promptsDict).not.toBe(null);
       expect(Array.isArray(promptsDict)).toBe(false);
       expect(Object.keys(promptsDict).length).toBeGreaterThan(0);
 
-      // Verify expected prompts exist as keys (sanitized: greeting → prompt_greeting)
-      expect(promptsDict['prompt_greeting']).toBeDefined();
-      expect(promptsDict['prompt_code_review']).toBeDefined();
+      // Verify expected prompts exist as keys (sanitized: greeting → greeting)
+      expect(promptsDict['greeting']).toBeDefined();
+      expect(promptsDict['code_review']).toBeDefined();
     }, 15000);
 
     it.skip('gets prompt without arguments', async () => {
@@ -336,7 +336,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Get greeting prompt
-      const result = await v.prompt_greeting.fn({}, mockContext);
+      const result = await v.greeting.fn({}, mockContext);
 
       // Verify result structure
       expect(typeof result).toBe('object');
@@ -366,7 +366,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Get code_review prompt with arguments
-      const result = await v.prompt_code_review.fn(
+      const result = await v.code_review.fn(
         {
           language: 'TypeScript',
           code: 'function hello() { return "world"; }',

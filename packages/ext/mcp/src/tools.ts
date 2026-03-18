@@ -7,7 +7,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { anyTypeValue, emitExtensionEvent } from '@rcrsr/rill';
+import { anyTypeValue, emitExtensionEvent, structureToTypeValue } from '@rcrsr/rill';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
 type RuntimeContextLike = {
@@ -22,7 +22,7 @@ import {
   createConnectionLostError,
   createAuthFailedError,
 } from './errors.js';
-import { generateParametersFromSchema, type JsonSchema } from './parsing.js';
+import { generateParametersFromSchema, jsonSchemaToTypeStructure, type JsonSchema, type OutputJsonSchema } from './parsing.js';
 import { sanitizeNames } from './naming.js';
 
 // ============================================================
@@ -36,6 +36,7 @@ export interface McpTool {
   readonly name: string;
   readonly description?: string | undefined;
   readonly inputSchema: JsonSchema;
+  readonly outputSchema?: OutputJsonSchema | undefined;
 }
 
 /**
@@ -293,7 +294,9 @@ function generateToolFunction(
     params,
     fn,
     ...(tool.description !== undefined && { annotations: { description: tool.description } }),
-    returnType: anyTypeValue,
+    returnType: tool.outputSchema
+      ? structureToTypeValue(jsonSchemaToTypeStructure(tool.outputSchema))
+      : anyTypeValue,
   };
 }
 

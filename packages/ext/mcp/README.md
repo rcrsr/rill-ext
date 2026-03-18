@@ -15,7 +15,7 @@ npm install @rcrsr/rill-ext-mcp
 ## Quick Start
 
 ```typescript
-import { parse, execute, createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
 import { createMcpExtension } from '@rcrsr/rill-ext-mcp';
 
 const ext = await createMcpExtension({
@@ -25,18 +25,19 @@ const ext = await createMcpExtension({
     args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
   },
 });
-const prefixed = prefixFunctions('fs', ext);
-const { dispose, ...functions } = prefixed;
-
+const { functions, dispose } = hoistExtension('fs', ext);
 const ctx = createRuntimeContext({
-  functions,
-  callbacks: { onLog: (v) => console.log(v) },
+  resolvers: { ext: extResolver },
+  configurations: {
+    resolvers: { ext: { fs: functions } },
+  },
 });
+```
 
-const script = `fs::tools() -> log`;
-const result = await execute(parse(script), ctx);
-
-dispose?.();
+```rill
+use<ext:fs> => $fs
+$fs.tools.list_directory([path: "/tmp"]) => $listing
+$listing.content -> log
 ```
 
 ## Documentation

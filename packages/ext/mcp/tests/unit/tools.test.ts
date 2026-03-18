@@ -6,13 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { anyTypeValue } from '@rcrsr/rill';
+import { anyTypeValue, structureToTypeValue } from '@rcrsr/rill';
 import { generateToolFunctions } from '../../src/tools.js';
 import type {
   McpTool,
   McpToolResult,
   McpToolContent,
 } from '../../src/tools.js';
+import type { OutputJsonSchema } from '../../src/parsing.js';
 
 // ============================================================
 // MOCK CLIENT
@@ -598,6 +599,98 @@ describe('generateToolFunctions', () => {
         expect(param.type).toEqual({ kind: 'string' });
         expect(param.defaultValue).toBeUndefined();
       }
+    });
+  });
+
+  // ============================================================
+  // RETURN TYPE BEHAVIOR
+  // ============================================================
+
+  describe('returnType behavior', () => {
+    it('returns anyTypeValue when tool has no outputSchema', () => {
+      const mockClient = createMockClient() as unknown as Client;
+      const functions = generateToolFunctions([TOOL_NO_PARAMS], mockClient);
+
+      expect(functions.get_status!.returnType).toEqual(anyTypeValue);
+    });
+
+    it('returns structureToTypeValue for object outputSchema with properties', () => {
+      const schema: OutputJsonSchema = {
+        type: 'object',
+        properties: {
+          status: { type: 'string' },
+          count: { type: 'number' },
+        },
+      };
+      const tool: McpTool = {
+        name: 'get-status',
+        inputSchema: { type: 'object' },
+        outputSchema: schema,
+      };
+
+      const mockClient = createMockClient() as unknown as Client;
+      const functions = generateToolFunctions([tool], mockClient);
+
+      expect(functions.get_status!.returnType).toEqual(
+        structureToTypeValue({
+          kind: 'dict',
+          fields: {
+            status: { type: { kind: 'string' } },
+            count: { type: { kind: 'number' } },
+          },
+        })
+      );
+    });
+
+    it('returns structureToTypeValue for string outputSchema', () => {
+      const schema: OutputJsonSchema = { type: 'string' };
+      const tool: McpTool = {
+        name: 'get-status',
+        inputSchema: { type: 'object' },
+        outputSchema: schema,
+      };
+
+      const mockClient = createMockClient() as unknown as Client;
+      const functions = generateToolFunctions([tool], mockClient);
+
+      expect(functions.get_status!.returnType).toEqual(
+        structureToTypeValue({ kind: 'string' })
+      );
+    });
+
+    it('returns structureToTypeValue for array outputSchema with string items', () => {
+      const schema: OutputJsonSchema = {
+        type: 'array',
+        items: { type: 'string' },
+      };
+      const tool: McpTool = {
+        name: 'get-status',
+        inputSchema: { type: 'object' },
+        outputSchema: schema,
+      };
+
+      const mockClient = createMockClient() as unknown as Client;
+      const functions = generateToolFunctions([tool], mockClient);
+
+      expect(functions.get_status!.returnType).toEqual(
+        structureToTypeValue({ kind: 'list', element: { kind: 'string' } })
+      );
+    });
+
+    it('returns structureToTypeValue for object outputSchema without properties', () => {
+      const schema: OutputJsonSchema = { type: 'object' };
+      const tool: McpTool = {
+        name: 'get-status',
+        inputSchema: { type: 'object' },
+        outputSchema: schema,
+      };
+
+      const mockClient = createMockClient() as unknown as Client;
+      const functions = generateToolFunctions([tool], mockClient);
+
+      expect(functions.get_status!.returnType).toEqual(
+        structureToTypeValue({ kind: 'dict' })
+      );
     });
   });
 

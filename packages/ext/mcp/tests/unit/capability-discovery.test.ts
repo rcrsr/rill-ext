@@ -106,12 +106,15 @@ describe('Capability Discovery', () => {
       expect(mockListResourceTemplates).toHaveBeenCalledTimes(1);
       expect(mockListPrompts).toHaveBeenCalledTimes(1);
 
-      // Verify discovered capabilities reflected in value dict
-      // 2 tools + read_resource + 1 resource template + 1 prompt + 3 introspection
-      expect(fns.tool1).toBeDefined();
-      expect(fns.tool2).toBeDefined();
-      expect(fns.read_resource).toBeDefined();
-      expect(fns.prompt_prompt1).toBeDefined();
+      // Verify discovered capabilities reflected in namespaced dicts
+      const toolsDict = fns.tools as Record<string, unknown>;
+      const resourcesDict = fns.resources as Record<string, unknown>;
+      const promptsDict = fns.prompts as Record<string, unknown>;
+
+      expect(toolsDict['tool1']).toBeDefined();
+      expect(toolsDict['tool2']).toBeDefined();
+      expect(resourcesDict['read_resource']).toBeDefined();
+      expect(promptsDict['prompt1']).toBeDefined();
       expect(fns.tools).toBeDefined();
       expect(fns.resources).toBeDefined();
       expect(fns.prompts).toBeDefined();
@@ -141,9 +144,9 @@ describe('Capability Discovery', () => {
       const fns = result.value as Record<string, any>;
 
       // With empty capabilities, only introspection + read_resource functions exist
-      const toolsDict = (await fns.tools.fn({})) as Record<string, unknown>;
-      const resourcesDict = (await fns.resources.fn({})) as Record<string, unknown>;
-      const promptsDict = (await fns.prompts.fn({})) as Record<string, unknown>;
+      const toolsDict = fns.tools as Record<string, unknown>;
+      const resourcesDict = fns.resources as Record<string, unknown>;
+      const promptsDict = fns.prompts as Record<string, unknown>;
 
       expect(Object.keys(toolsDict)).toHaveLength(0);
       // read_resource is always generated
@@ -184,16 +187,14 @@ describe('Capability Discovery', () => {
       const result = await createMcpExtension(config);
       const fns = result.value as Record<string, any>;
 
-      // Only filtered tools present as functions
-      expect(fns.tool1).toBeDefined();
-      expect(fns.tool2).toBeUndefined();
-      expect(fns.tool3).toBeDefined();
+      // Only filtered tools present in tools dict
+      const toolsDict = fns.tools as Record<string, unknown>;
+      expect(toolsDict['tool1']).toBeDefined();
+      expect(toolsDict['tool2']).toBeUndefined();
+      expect(toolsDict['tool3']).toBeDefined();
 
       // Introspection tools dict reflects filtered set
-      const toolsDict = (await fns.tools.fn({})) as Record<string, unknown>;
       expect(Object.keys(toolsDict)).toHaveLength(2);
-      expect(toolsDict['tool1']).toBeDefined();
-      expect(toolsDict['tool3']).toBeDefined();
     });
 
     it('filters resources by exact URI match', async () => {
@@ -221,8 +222,9 @@ describe('Capability Discovery', () => {
       const result = await createMcpExtension(config);
       const fns = result.value as Record<string, any>;
 
-      // read_resource is always present regardless of filter
-      expect(fns.read_resource).toBeDefined();
+      // read_resource is always present in resources dict regardless of filter
+      const resourcesDict = fns.resources as Record<string, unknown>;
+      expect(resourcesDict['read_resource']).toBeDefined();
 
       // Resource filter affects the resources introspection dict
       // (read_resource is always included in the introspection dict)
@@ -258,17 +260,15 @@ describe('Capability Discovery', () => {
       const result = await createMcpExtension(config);
       const fns = result.value as Record<string, any>;
 
-      // Only filtered prompts present as functions
-      expect(fns.prompt_prompt1).toBeUndefined();
-      expect(fns.prompt_prompt2).toBeDefined();
-      expect(fns.prompt_prompt3).toBeUndefined();
-      expect(fns.prompt_prompt4).toBeDefined();
+      // Only filtered prompts present in prompts dict
+      const promptsDict = fns.prompts as Record<string, unknown>;
+      expect(promptsDict['prompt1']).toBeUndefined();
+      expect(promptsDict['prompt2']).toBeDefined();
+      expect(promptsDict['prompt3']).toBeUndefined();
+      expect(promptsDict['prompt4']).toBeDefined();
 
       // Introspection prompts dict reflects filtered set
-      const promptsDict = (await fns.prompts.fn({})) as Record<string, unknown>;
       expect(Object.keys(promptsDict)).toHaveLength(2);
-      expect(promptsDict['prompt_prompt2']).toBeDefined();
-      expect(promptsDict['prompt_prompt4']).toBeDefined();
     });
 
     it('empty filter includes all capabilities', async () => {
@@ -300,10 +300,13 @@ describe('Capability Discovery', () => {
       const fns = result.value as Record<string, any>;
 
       // All capabilities included when filter is empty
-      expect(fns.tool1).toBeDefined();
-      expect(fns.tool2).toBeDefined();
-      expect(fns.read_resource).toBeDefined();
-      expect(fns.prompt_prompt1).toBeDefined();
+      const toolsDict = fns.tools as Record<string, unknown>;
+      const resourcesDict = fns.resources as Record<string, unknown>;
+      const promptsDict = fns.prompts as Record<string, unknown>;
+      expect(toolsDict['tool1']).toBeDefined();
+      expect(toolsDict['tool2']).toBeDefined();
+      expect(resourcesDict['read_resource']).toBeDefined();
+      expect(promptsDict['prompt1']).toBeDefined();
     });
 
     it('undefined filter includes all capabilities', async () => {
@@ -332,10 +335,13 @@ describe('Capability Discovery', () => {
       const result = await createMcpExtension(config);
       const fns = result.value as Record<string, any>;
 
-      expect(fns.tool1).toBeDefined();
-      expect(fns.tool2).toBeDefined();
-      expect(fns.read_resource).toBeDefined();
-      expect(fns.prompt_prompt1).toBeDefined();
+      const toolsDict2 = fns.tools as Record<string, unknown>;
+      const resourcesDict2 = fns.resources as Record<string, unknown>;
+      const promptsDict2 = fns.prompts as Record<string, unknown>;
+      expect(toolsDict2['tool1']).toBeDefined();
+      expect(toolsDict2['tool2']).toBeDefined();
+      expect(resourcesDict2['read_resource']).toBeDefined();
+      expect(promptsDict2['prompt1']).toBeDefined();
     });
 
     it('non-matching filter results in empty filtered list', async () => {
@@ -365,10 +371,10 @@ describe('Capability Discovery', () => {
       const fns = result.value as Record<string, any>;
 
       // tool1 not generated because filter excluded it
-      expect(fns.tool1).toBeUndefined();
+      const toolsDict = fns.tools as Record<string, unknown>;
+      expect(toolsDict['tool1']).toBeUndefined();
 
       // Introspection tools dict is empty
-      const toolsDict = (await fns.tools.fn({})) as Record<string, unknown>;
       expect(Object.keys(toolsDict)).toHaveLength(0);
     });
   });
@@ -403,14 +409,14 @@ describe('Capability Discovery', () => {
       const result = await createMcpExtension(config);
       const fns = result.value as Record<string, any>;
 
-      // Only 2 tool functions generated
-      expect(fns.tool1).toBeDefined();
-      expect(fns.tool2).toBeDefined();
-      expect(fns.tool3).toBeUndefined();
-      expect(fns.tool100).toBeUndefined();
+      // Only 2 tools dict entries generated
+      const toolsDict = fns.tools as Record<string, unknown>;
+      expect(toolsDict['tool1']).toBeDefined();
+      expect(toolsDict['tool2']).toBeDefined();
+      expect(toolsDict['tool3']).toBeUndefined();
+      expect(toolsDict['tool100']).toBeUndefined();
 
       // Introspection confirms only 2 tools
-      const toolsDict = (await fns.tools.fn({})) as Record<string, unknown>;
       expect(Object.keys(toolsDict)).toHaveLength(2);
     });
 
@@ -451,22 +457,21 @@ describe('Capability Discovery', () => {
       const result = await createMcpExtension(config);
       const fns = result.value as Record<string, any>;
 
-      // Only filtered tool present
-      expect(fns.tool1).toBeDefined();
-      expect(fns.tool2).toBeUndefined();
-      expect(fns.tool3).toBeUndefined();
+      // Only filtered tool present in tools dict
+      const toolsDict = fns.tools as Record<string, unknown>;
+      expect(toolsDict['tool1']).toBeDefined();
+      expect(toolsDict['tool2']).toBeUndefined();
+      expect(toolsDict['tool3']).toBeUndefined();
 
-      // Only filtered prompts present
-      expect(fns.prompt_p1).toBeDefined();
-      expect(fns.prompt_p2).toBeUndefined();
-      expect(fns.prompt_p3).toBeDefined();
-      expect(fns.prompt_p4).toBeUndefined();
+      // Only filtered prompts present in prompts dict
+      const promptsDict = fns.prompts as Record<string, unknown>;
+      expect(promptsDict['p1']).toBeDefined();
+      expect(promptsDict['p2']).toBeUndefined();
+      expect(promptsDict['p3']).toBeDefined();
+      expect(promptsDict['p4']).toBeUndefined();
 
       // Introspection dicts reflect filtered counts
-      const toolsDict = (await fns.tools.fn({})) as Record<string, unknown>;
       expect(Object.keys(toolsDict)).toHaveLength(1);
-
-      const promptsDict = (await fns.prompts.fn({})) as Record<string, unknown>;
       expect(Object.keys(promptsDict)).toHaveLength(2);
     });
   });

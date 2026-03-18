@@ -4,7 +4,7 @@
  * Converts MCP tool JSON Schema definitions to rill RillParam arrays.
  */
 
-import type { RillParam, RillValue } from '@rcrsr/rill';
+import type { RillFieldDef, RillParam, RillValue, TypeStructure } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 // ============================================================
@@ -36,6 +36,23 @@ export interface JsonSchema {
   readonly type?: 'object' | undefined;
   readonly properties?: Record<string, JsonSchemaProperty> | undefined;
   readonly required?: readonly string[] | undefined;
+}
+
+/**
+ * JSON Schema definition for any value (not restricted to top-level objects).
+ *
+ * Used for MCP outputSchema fields which may represent any JSON Schema type,
+ * including primitives, arrays, and objects with nested structure.
+ */
+export interface OutputJsonSchema {
+  readonly type?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | undefined;
+  readonly properties?: Record<string, JsonSchemaProperty> | undefined;
+  readonly items?: OutputJsonSchema | undefined;
+  readonly required?: readonly string[] | undefined;
+  readonly description?: string | undefined;
+  readonly enum?: readonly unknown[] | undefined;
+  readonly oneOf?: readonly unknown[] | undefined;
+  readonly anyOf?: readonly unknown[] | undefined;
 }
 
 // ============================================================
@@ -150,6 +167,61 @@ export function sanitizeParameterName(name: string): string {
   sanitized = sanitized.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
 
   return sanitized;
+}
+
+// ============================================================
+// OUTPUT SCHEMA CONVERSION
+// ============================================================
+
+/**
+ * Converts an OutputJsonSchema to a rill TypeStructure.
+ *
+ * Mapping rules:
+ * - `enum` / `oneOf` / `anyOf` present → `{ kind: 'any' }`
+ * - `type: 'string'` → `{ kind: 'string' }`
+ * - `type: 'number' | 'integer'` → `{ kind: 'number' }`
+ * - `type: 'boolean'` → `{ kind: 'bool' }`
+ * - `type: 'array'` with `items` → `{ kind: 'list', element: jsonSchemaToTypeStructure(items) }`
+ * - `type: 'array'` without `items` → `{ kind: 'list' }`
+ * - `type: 'object'` with `properties` → `{ kind: 'dict', fields: { [name]: { type: ... } } }`
+ * - `type: 'object'` without `properties` → `{ kind: 'dict' }`
+ * - missing/unknown → `{ kind: 'any' }`
+ *
+ * @param schema - JSON Schema definition for any value type
+ * @returns TypeStructure representing the schema in the rill type system
+ */
+export function jsonSchemaToTypeStructure(schema: OutputJsonSchema): TypeStructure {
+  // enum/oneOf/anyOf: fall back to any (value is not structurally typed)
+  if (schema.enum || schema.oneOf || schema.anyOf) {
+    return { kind: 'any' };
+  }
+
+  switch (schema.type) {
+    case 'string':
+      return { kind: 'string' };
+    case 'number':
+    case 'integer':
+      return { kind: 'number' };
+    case 'boolean':
+      return { kind: 'bool' };
+    case 'array':
+      if (schema.items !== undefined) {
+        return { kind: 'list', element: jsonSchemaToTypeStructure(schema.items) };
+      }
+      return { kind: 'list' };
+    case 'object': {
+      if (schema.properties !== undefined) {
+        const fields: Record<string, RillFieldDef> = {};
+        for (const [name, prop] of Object.entries(schema.properties)) {
+          fields[name] = { type: jsonSchemaToTypeStructure(prop) };
+        }
+        return { kind: 'dict', fields };
+      }
+      return { kind: 'dict' };
+    }
+    default:
+      return { kind: 'any' };
+  }
 }
 
 // ============================================================
