@@ -188,7 +188,7 @@ describe('createOpenAIExtension', () => {
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
-        returnType: { typeName: 'dict' },
+        returnType: { typeName: 'stream' },
       });
     });
 
@@ -208,7 +208,7 @@ describe('createOpenAIExtension', () => {
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
-        returnType: { typeName: 'dict' },
+        returnType: { typeName: 'stream' },
       });
     });
 
@@ -263,7 +263,7 @@ describe('createOpenAIExtension', () => {
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
-        returnType: { typeName: 'dict' },
+        returnType: { typeName: 'stream' },
       });
     });
   });

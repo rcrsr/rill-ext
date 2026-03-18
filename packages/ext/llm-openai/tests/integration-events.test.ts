@@ -17,9 +17,9 @@ function getCallable(ext: { value: unknown }, name: string): ApplicationCallable
 }
 
 /**
- * Create mock OpenAI API response.
+ * Build a full ChatCompletion object matching OpenAI response shape.
  */
-function createMockResponse(content: string, model = 'gpt-4-turbo') {
+function createMockFinalCompletion(content: string, model = 'gpt-4-turbo') {
   return {
     id: 'chatcmpl-test123',
     object: 'chat.completion' as const,
@@ -36,8 +36,53 @@ function createMockResponse(content: string, model = 'gpt-4-turbo') {
   };
 }
 
+/**
+ * Build a mock stream runner with async iteration and finalChatCompletion().
+ */
+function createMockStreamRunner(finalCompletion: ReturnType<typeof createMockFinalCompletion>) {
+  async function* asyncChunks() {
+    yield {
+      choices: [{ delta: { content: finalCompletion.choices[0]?.message?.content ?? '' }, finish_reason: null, index: 0 }],
+      id: finalCompletion.id,
+      object: 'chat.completion.chunk',
+      created: finalCompletion.created,
+      model: finalCompletion.model,
+    };
+  }
+
+  return {
+    [Symbol.asyncIterator]: asyncChunks,
+    finalChatCompletion: vi.fn().mockResolvedValue(finalCompletion),
+    abort: vi.fn(),
+  };
+}
+
+/**
+ * Build a mock stream runner that fails on finalChatCompletion().
+ */
+function createErrorStreamRunner(error: unknown) {
+  async function* asyncChunks() {
+    // Empty — error happens on finalChatCompletion
+  }
+
+  return {
+    [Symbol.asyncIterator]: asyncChunks,
+    finalChatCompletion: vi.fn().mockRejectedValue(error),
+    abort: vi.fn(),
+  };
+}
+
+/**
+ * Trigger the resolve callback on a RillStream to emit events.
+ */
+async function resolveStream(stream: unknown): Promise<unknown> {
+  const resolve = (stream as any).__rill_stream_resolve as () => Promise<unknown>;
+  return resolve();
+}
+
 // Mock the OpenAI SDK at module level
 const mockCreate = vi.fn();
+const mockStream = vi.fn();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {
@@ -59,6 +104,7 @@ vi.mock('openai', () => {
       chat = {
         completions: {
           create: mockCreate,
+          stream: mockStream,
         },
       };
       static APIError = MockAPIError;
@@ -74,11 +120,13 @@ vi.mock('openai', () => {
 describe('extension event emission', () => {
   beforeEach(() => {
     mockCreate.mockReset();
+    mockStream.mockReset();
   });
 
   describe('message() events', () => {
     it('emits openai:message event on success', async () => {
-      mockCreate.mockResolvedValue(createMockResponse('Response'));
+      const runner = createMockStreamRunner(createMockFinalCompletion('Response'));
+      mockStream.mockReturnValue(runner);
 
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
@@ -96,7 +144,9 @@ describe('extension event emission', () => {
         },
       });
 
-      await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      // fn() returns RillStream synchronously; trigger resolve to emit event
+      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      await resolveStream(stream);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -114,9 +164,9 @@ describe('extension event emission', () => {
 
     it('emits openai:error event on API failure', async () => {
       const { APIError } = await import('openai');
-      mockCreate.mockRejectedValue(
-        new APIError(401, {}, 'Invalid API key', {})
-      );
+      const apiError = new APIError(401, {}, 'Invalid API key', {});
+      const runner = createErrorStreamRunner(apiError);
+      mockStream.mockReturnValue(runner);
 
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
@@ -134,7 +184,9 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(getCallable(ext, 'message').fn({ text: 'Test' }, ctx)).rejects.toThrow();
+      // fn() returns RillStream; trigger resolve which will fail and emit error event
+      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      await expect(resolveStream(stream)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -149,7 +201,8 @@ describe('extension event emission', () => {
 
   describe('messages() events', () => {
     it('emits openai:messages event on success', async () => {
-      mockCreate.mockResolvedValue(createMockResponse('Response'));
+      const runner = createMockStreamRunner(createMockFinalCompletion('Response'));
+      mockStream.mockReturnValue(runner);
 
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
@@ -168,7 +221,8 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await getCallable(ext, 'messages').fn({ messages }, ctx);
+      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
+      await resolveStream(stream);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -186,7 +240,9 @@ describe('extension event emission', () => {
 
     it('emits openai:error event on API failure', async () => {
       const { APIError } = await import('openai');
-      mockCreate.mockRejectedValue(new APIError(429, {}, 'Rate limit', {}));
+      const apiError = new APIError(429, {}, 'Rate limit', {});
+      const runner = createErrorStreamRunner(apiError);
+      mockStream.mockReturnValue(runner);
 
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
@@ -205,7 +261,8 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await expect(getCallable(ext, 'messages').fn({ messages }, ctx)).rejects.toThrow();
+      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
+      await expect(resolveStream(stream)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);

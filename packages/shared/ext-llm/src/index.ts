@@ -18,6 +18,7 @@ export type {
   LLMProviderConfig,
   ProviderErrorDetector,
   ToolLoopCallbacks,
+  ToolLoopChunk,
   ToolLoopResult,
 } from './types.js';
 

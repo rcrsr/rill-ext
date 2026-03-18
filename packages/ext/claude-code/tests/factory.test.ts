@@ -8,19 +8,23 @@ import { structureToTypeValue } from '@rcrsr/rill';
 import { createClaudeCodeExtension } from '../src/factory.js';
 
 const EXPECTED_RETURN_TYPE = structureToTypeValue({
-  kind: 'dict',
-  fields: {
-    result: { type: { kind: 'string' } },
-    tokens: { type: { kind: 'dict', fields: {
-      prompt: { type: { kind: 'number' } },
-      cacheWrite5m: { type: { kind: 'number' } },
-      cacheWrite1h: { type: { kind: 'number' } },
-      cacheRead: { type: { kind: 'number' } },
-      output: { type: { kind: 'number' } },
-    } } },
-    cost: { type: { kind: 'number' } },
-    exitCode: { type: { kind: 'number' } },
-    duration: { type: { kind: 'number' } },
+  kind: 'stream',
+  chunk: { kind: 'string' },
+  ret: {
+    kind: 'dict',
+    fields: {
+      result: { type: { kind: 'string' } },
+      tokens: { type: { kind: 'dict', fields: {
+        prompt: { type: { kind: 'number' } },
+        cacheWrite5m: { type: { kind: 'number' } },
+        cacheWrite1h: { type: { kind: 'number' } },
+        cacheRead: { type: { kind: 'number' } },
+        output: { type: { kind: 'number' } },
+      } } },
+      cost: { type: { kind: 'number' } },
+      exitCode: { type: { kind: 'number' } },
+      duration: { type: { kind: 'number' } },
+    },
   },
 });
 
@@ -105,7 +109,7 @@ describe('createClaudeCodeExtension', () => {
       expect(v.command.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
 
-    it('validates prompt text before processing', async () => {
+    it('validates prompt text before processing', () => {
       const ext = createClaudeCodeExtension();
       const v = ext.value as any;
       const ctx = {
@@ -114,15 +118,14 @@ describe('createClaudeCodeExtension', () => {
         },
       } as never;
 
-      // Empty string validation tested in separate suite
-      // This verifies that functions are callable (not stubbed as "Not implemented")
-      await expect(v.prompt.fn({ text: '', options: {} }, ctx)).rejects.toThrow(
+      // Validation throws synchronously before stream creation (AC-10)
+      expect(() => v.prompt.fn({ text: '', options: {} }, ctx)).toThrow(
         'prompt text cannot be empty'
       );
-      await expect(v.skill.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.skill.fn({ name: '', args: {} }, ctx)).toThrow(
         'skill name cannot be empty'
       );
-      await expect(v.command.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.command.fn({ name: '', args: {} }, ctx)).toThrow(
         'command name cannot be empty'
       );
     });
@@ -163,17 +166,17 @@ describe('createClaudeCodeExtension', () => {
   });
 
   describe('binaryPath validation (EC-1)', () => {
-    it('throws Error for invalid binaryPath', () => {
+    it('throws RuntimeError RILL-R004 for invalid binaryPath', () => {
       expect(() =>
         createClaudeCodeExtension({ binaryPath: '/nonexistent/claude' })
-      ).toThrow('Binary not found: /nonexistent/claude');
+      ).toThrow('claude binary not found');
     });
 
     it('validates binaryPath eagerly at factory creation', () => {
       // Should throw immediately, not during function call
       expect(() =>
         createClaudeCodeExtension({ binaryPath: 'invalid-binary' })
-      ).toThrow('Binary not found: invalid-binary');
+      ).toThrow('claude binary not found');
     });
   });
 
@@ -310,41 +313,42 @@ describe('createClaudeCodeExtension', () => {
       },
     } as never;
 
-    it('throws RuntimeError for empty prompt text (EC-3)', async () => {
+    it('throws RuntimeError for empty prompt text (EC-3)', () => {
       const ext = createClaudeCodeExtension();
       const v = ext.value as any;
 
-      await expect(v.prompt.fn({ text: '', options: {} }, ctx)).rejects.toThrow(
+      // Validation throws synchronously before stream creation (AC-10)
+      expect(() => v.prompt.fn({ text: '', options: {} }, ctx)).toThrow(
         'prompt text cannot be empty'
       );
 
-      await expect(v.prompt.fn({ text: '   ', options: {} }, ctx)).rejects.toThrow(
+      expect(() => v.prompt.fn({ text: '   ', options: {} }, ctx)).toThrow(
         'prompt text cannot be empty'
       );
     });
 
-    it('throws RuntimeError for empty skill name (EC-10)', async () => {
+    it('throws RuntimeError for empty skill name (EC-10)', () => {
       const ext = createClaudeCodeExtension();
       const v = ext.value as any;
 
-      await expect(v.skill.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.skill.fn({ name: '', args: {} }, ctx)).toThrow(
         'skill name cannot be empty'
       );
 
-      await expect(v.skill.fn({ name: '   ', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.skill.fn({ name: '   ', args: {} }, ctx)).toThrow(
         'skill name cannot be empty'
       );
     });
 
-    it('throws RuntimeError for empty command name (EC-13)', async () => {
+    it('throws RuntimeError for empty command name (EC-13)', () => {
       const ext = createClaudeCodeExtension();
       const v = ext.value as any;
 
-      await expect(v.command.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.command.fn({ name: '', args: {} }, ctx)).toThrow(
         'command name cannot be empty'
       );
 
-      await expect(v.command.fn({ name: '   ', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.command.fn({ name: '   ', args: {} }, ctx)).toThrow(
         'command name cannot be empty'
       );
     });

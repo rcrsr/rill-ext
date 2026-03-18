@@ -164,7 +164,7 @@ describe('createGeminiExtension', () => {
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
-        returnType: { typeName: 'dict' },
+        returnType: { typeName: 'stream' },
       });
     });
 
@@ -184,7 +184,7 @@ describe('createGeminiExtension', () => {
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
-        returnType: { typeName: 'dict' },
+        returnType: { typeName: 'stream' },
       });
     });
 
@@ -239,7 +239,7 @@ describe('createGeminiExtension', () => {
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
-        returnType: { typeName: 'dict' },
+        returnType: { typeName: 'stream' },
       });
     });
   });

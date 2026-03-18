@@ -24,6 +24,22 @@ vi.mock('../src/process.js');
 vi.mock('../src/stream-parser.js');
 vi.mock('../src/result.js');
 
+// ============================================================
+// STREAM HELPERS
+// ============================================================
+
+/**
+ * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
+ * The resolve callback is where events are emitted.
+ */
+async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
+  return (stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
 /**
  * Helper to create event collector for onLogEvent callback.
  * Returns array that gets populated with emitted events.
@@ -32,12 +48,15 @@ function createEventCollector(): ExtensionEvent[] {
   return [];
 }
 
-describe('Claude Code Extension Integration Tests - Event Emission', () => {
-  // Reset mocks before each test
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+// ============================================================
+// SETUP
+// ============================================================
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('Claude Code Extension Integration Tests - Event Emission', () => {
   describe('AC-17: claude-code:prompt event emitted after prompt completes', () => {
     it('emits event with prompt (truncated) and duration fields', async () => {
       // Import mocked modules
@@ -88,8 +107,9 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      // Execute prompt
-      await (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx);
+      // Execute prompt and resolve stream to trigger event emission
+      const stream = (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx);
+      await resolveStream(stream);
 
       // Verify event was emitted
       expect(events).toHaveLength(1);
@@ -148,7 +168,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await (ext.value as any).prompt.fn({ text: longPrompt, options: {} }, ctx);
+      const stream = (ext.value as any).prompt.fn({ text: longPrompt, options: {} }, ctx);
+      await resolveStream(stream);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -203,7 +224,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const skillArgs = { verbose: true, retries: 3 };
-      await (ext.value as any).skill.fn({ name: 'test-skill', args: skillArgs }, ctx);
+      const stream = (ext.value as any).skill.fn({ name: 'test-skill', args: skillArgs }, ctx);
+      await resolveStream(stream);
 
       expect(events).toHaveLength(1);
 
@@ -261,7 +283,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx);
+      const stream = (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx);
+      await resolveStream(stream);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -315,7 +338,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const commandArgs = { config: { format: 'json' }, priority: 'high' };
-      await (ext.value as any).command.fn({ name: 'test-command', args: commandArgs }, ctx);
+      const stream = (ext.value as any).command.fn({ name: 'test-command', args: commandArgs }, ctx);
+      await resolveStream(stream);
 
       expect(events).toHaveLength(1);
 
@@ -361,7 +385,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect((ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx)).rejects.toThrow();
+      // fn() returns stream synchronously; resolve it to trigger event emission
+      const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      // Resolving a stream with an error chunk still resolves (not rejects)
+      await resolveStream(stream);
 
       // Find error event
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
@@ -403,7 +430,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect((ext.value as any).skill.fn({ name: 'failing-skill', args: {} }, ctx)).rejects.toThrow();
+      const stream = (ext.value as any).skill.fn({ name: 'failing-skill', args: {} }, ctx);
+      await resolveStream(stream);
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
       expect(errorEvents).toHaveLength(1);
@@ -441,9 +469,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect(
-        (ext.value as any).command.fn({ name: 'failing-command', args: {} }, ctx)
-      ).rejects.toThrow();
+      const stream = (ext.value as any).command.fn({ name: 'failing-command', args: {} }, ctx);
+      await resolveStream(stream);
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
       expect(errorEvents).toHaveLength(1);
@@ -482,7 +509,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect((ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx)).rejects.toBeDefined();
+      const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      await resolveStream(stream);
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
       expect(errorEvents).toHaveLength(1);
@@ -547,7 +575,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      await resolveStream(stream);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -604,10 +633,15 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      // Test all three functions
-      await (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
-      await (ext.value as any).skill.fn({ name: 'skill', args: {} }, ctx);
-      await (ext.value as any).command.fn({ name: 'command', args: {} }, ctx);
+      // Test all three functions — resolve each stream to emit events
+      const s1 = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      await resolveStream(s1);
+
+      const s2 = (ext.value as any).skill.fn({ name: 'skill', args: {} }, ctx);
+      await resolveStream(s2);
+
+      const s3 = (ext.value as any).command.fn({ name: 'command', args: {} }, ctx);
+      await resolveStream(s3);
 
       expect(events).toHaveLength(3);
       events.forEach((event) => {

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, RuntimeError } from '@rcrsr/rill';
 
 // ============================================================
 // MOCKS
@@ -484,7 +484,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
 // ============================================================
 
 describe('EC-1: Invalid binaryPath at factory creation', () => {
-  it('throws Error "Binary not found: {path}" when binary does not exist', async () => {
+  it('throws RuntimeError RILL-R004 "claude binary not found" when binary does not exist', async () => {
     const which = await import('which');
 
     // Mock which.sync to throw (binary not in PATH)
@@ -494,7 +494,7 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
 
     expect(() =>
       createClaudeCodeExtension({ binaryPath: '/nonexistent/claude' })
-    ).toThrow('Binary not found: /nonexistent/claude');
+    ).toThrow('claude binary not found');
   });
 
   it('throws for binary not in PATH', async () => {
@@ -506,7 +506,7 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
 
     expect(() =>
       createClaudeCodeExtension({ binaryPath: 'missing-binary' })
-    ).toThrow('Binary not found: missing-binary');
+    ).toThrow('claude binary not found');
   });
 
   it('validates binaryPath eagerly at factory creation time', async () => {
@@ -518,7 +518,7 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
 
     // Validation happens immediately during createClaudeCodeExtension call
     expect(() => createClaudeCodeExtension({ binaryPath: 'bad-path' })).toThrow(
-      'Binary not found: bad-path'
+      'claude binary not found'
     );
 
     // Verify which.sync was called during factory creation

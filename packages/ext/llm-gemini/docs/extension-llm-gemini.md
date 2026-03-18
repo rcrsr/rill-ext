@@ -4,7 +4,7 @@
 
 This extension allows rill scripts to access the Gemini API using the `@google/genai` SDK (preview). The host declares it in `rill-config.json`, and scripts load it with `use<ext:gemini>`. Switching to Anthropic or OpenAI means changing the extension mount. Scripts stay identical.
 
-Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured data as a typed dict. `message`, `messages`, and `tool_loop` return the same dict shape (`content`, `model`, `usage`, `stop_reason`, `id`, `messages`), so scripts work across providers without changes. `generate` returns a separate shape with `data` and `raw` fields instead of `content` and `messages`. Google's API returns 0 for token counts and empty string for request IDs — see [Provider Notes](#provider-notes) for details.
+Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured data as a typed dict. `message`, `messages`, and `tool_loop` return a `RillStream` value. Iterate chunks with `each` or resolve immediately with `()` to get the result dict. `generate` returns a dict directly (no streaming). `embed` and `embed_batch` return dicts directly. Google's API returns 0 for token counts and empty string for request IDs — see [Provider Notes](#provider-notes) for details.
 
 The host sets API key, model, and temperature at creation time — scripts never handle credentials. Each call emits a structured event (`gemini:message`, `gemini:tool_call`) for host-side logging and metrics.
 
@@ -26,18 +26,18 @@ The host sets API key, model, and temperature at creation time — scripts never
 }
 ```
 
-Rill script — load the extension as a handle and call functions via dot-path:
+Rill script — stream chunks:
 
 ```rill
 use<ext:gemini> => $llm
-$llm.message("Explain TCP handshakes") => $result
-$result.content -> log
+$llm.message("Explain TCP handshakes") => $s
+$s each $chunk { $chunk -> log }
 ```
 
-Direct dot-path — no intermediate variable:
+Resolve immediately to access the result dict:
 
 ```rill
-use<ext:gemini.message>("Explain TCP handshakes") => $result
+gemini::message("Explain TCP handshakes")() => $result
 $result.content -> log
 ```
 
@@ -83,24 +83,39 @@ gemini::message("Explain TCP handshakes")
 
 ## Functions
 
-**message(text, options?)** — Send a single prompt:
+**message(text, options?)** — Send a single prompt. Returns `RillStream`:
 
 ```rill
-gemini::message("Explain TCP handshakes") => $result
+# Stream text delta chunks
+gemini::message("Explain TCP handshakes") => $s
+$s each $chunk { $chunk -> log }
+
+# Or resolve to result dict
+gemini::message("Explain TCP handshakes")() => $result
 $result.content      # Response text
 $result.stop_reason  # Why generation stopped
 $result.usage.input  # Input tokens
 $result.usage.output # Output tokens
 ```
 
-**messages(messages, options?)** — Multi-turn conversation:
+**messages(messages, options?)** — Multi-turn conversation. Returns `RillStream`:
 
 ```rill
+# Stream text delta chunks
 [
   [role: "user", content: "What is rill?"],
   [role: "assistant", content: "A scripting language."],
   [role: "user", content: "Tell me more."],
-] -> gemini::messages => $result
+] -> gemini::messages => $s
+$s each $chunk { $chunk -> log }
+
+# Or resolve to result dict
+[
+  [role: "user", content: "What is rill?"],
+  [role: "assistant", content: "A scripting language."],
+  [role: "user", content: "Tell me more."],
+] -> gemini::messages => $s
+$s() => $result
 $result.content   # Latest response
 $result.messages  # Full conversation history
 ```
@@ -120,16 +135,29 @@ $vec.model           # Embedding model used
 $vectors.len  # Number of vectors
 ```
 
-**tool_loop(prompt, tools, options?)** — Agentic tool-use loop:
+**tool_loop(prompt, tools, options?)** — Agentic tool-use loop. Returns `RillStream`:
 
 ```rill
 ^("Get current weather for a city") |^("City name") city: string| {
   "Weather in {$city}: 72F sunny"
 } => $get_weather
 
+# Stream structured events
 gemini::tool_loop("What's the weather in Paris?", [get_weather: $get_weather], [
   max_turns: 5,
-]) => $result
+]) => $s
+$s each $event {
+  $event.type    # "text_delta", "tool_call", or "tool_result"
+  $event.text    # available when type == "text_delta"
+  $event.name    # available when type == "tool_call" or "tool_result"
+  $event.args    # available when type == "tool_call"
+  $event.result  # available when type == "tool_result"
+}
+
+# Or resolve to result dict
+gemini::tool_loop("What's the weather in Paris?", [get_weather: $get_weather], [
+  max_turns: 5,
+])() => $result
 $result.content  # Final response
 $result.turns    # Number of LLM round-trips
 ```
@@ -191,9 +219,41 @@ Params using `closure` or `tuple` type are not representable in JSON Schema and 
 | `messages` | list | tool_loop, generate | Prepend conversation history |
 | `schema` | dict or RillStructuralType | generate (required) | Dict descriptor (legacy) or `RillStructuralType` value (from `$closure.^input`) for structured output |
 
+## Streaming
+
+`message`, `messages`, and `tool_loop` return `RillStream`. Two usage patterns:
+
+**Iterate chunks** — process output incrementally:
+
+```rill
+gemini::message("hi") => $s
+$s each $chunk { $chunk -> log }
+```
+
+**Resolve immediately** — access the full result dict at once:
+
+```rill
+gemini::message("hi")() => $result
+$result.content -> log
+```
+
+### message / messages chunks
+
+Each chunk is a string (text delta).
+
+### tool_loop events
+
+Each event is a dict with a `type` field:
+
+| `type` | Other fields | Description |
+|--------|-------------|-------------|
+| `"text_delta"` | `text` | Incremental text from the model |
+| `"tool_call"` | `name`, `args` | Model invoked a tool |
+| `"tool_result"` | `name`, `result` | Tool returned a value |
+
 ## Result Dict
 
-All functions except `embed`, `embed_batch`, and `generate` return:
+`message`, `messages`, and `tool_loop` resolve to:
 
 | Field | Type | Description |
 |-------|------|-------------|

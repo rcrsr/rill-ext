@@ -25,7 +25,63 @@ function createEventCollector(): ExtensionEvent[] {
   return [];
 }
 
+/**
+ * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
+ * This triggers the resolve callback which emits extension events.
+ */
+async function resolveStream(stream: unknown): Promise<unknown> {
+  return (stream as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve();
+}
+
+/**
+ * Create a mock MessageStream for message/messages/tool_loop tests.
+ * Supports both asyncIterator (message/messages) and .on('text', ...) + finalMessage() (tool_loop streaming).
+ */
+function createMockMessageStream(response: {
+  id: string;
+  content: Array<{ type: string; text?: string }>;
+  model: string;
+  stop_reason: string;
+  usage: { input_tokens: number; output_tokens: number };
+}) {
+  const text = response.content.find((c) => c.type === 'text')?.text ?? '';
+  const asyncEvents = text.length > 0
+    ? [{ type: 'content_block_delta', delta: { type: 'text_delta', text } }]
+    : [];
+
+  const eventHandlers: Record<string, Array<(...args: unknown[]) => void>> = {};
+
+  return {
+    [Symbol.asyncIterator]: async function* () {
+      for (const event of asyncEvents) {
+        yield event;
+      }
+    },
+    on: (event: string, handler: (...args: unknown[]) => void) => {
+      if (!eventHandlers[event]) {
+        eventHandlers[event] = [];
+      }
+      eventHandlers[event].push(handler);
+      // Return the stream object for chaining
+      return eventHandlers;
+    },
+    finalMessage: vi.fn().mockImplementation(async () => {
+      // Emit text events when finalMessage is awaited (used by callAPIStreaming)
+      if (text && eventHandlers['text']) {
+        for (const handler of eventHandlers['text']) {
+          handler(text, text);
+        }
+      }
+      return response;
+    }),
+    abort: vi.fn(),
+  };
+}
+
 // Mock the Anthropic SDK at module level
+// All functions (message, messages, tool_loop) use messages.stream now.
+// messages.create is kept for tests that still need it (none currently for tool_loop).
+const mockStream = vi.fn();
 const mockCreate = vi.fn();
 
 vi.mock('@anthropic-ai/sdk', () => {
@@ -48,6 +104,7 @@ vi.mock('@anthropic-ai/sdk', () => {
   return {
     default: class MockAnthropic {
       messages = {
+        stream: mockStream,
         create: mockCreate,
       };
       static APIError = MockAPIError;
@@ -62,12 +119,12 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
   // Reset mocks before each test
   beforeEach(() => {
+    mockStream.mockReset();
     mockCreate.mockReset();
   });
 
   describe('IC-12: anthropic:message event with duration, model, usage', () => {
-    it('emits event after successful message() call', async () => {
-      // Mock Anthropic SDK response
+    it('emits event after successful message() resolve', async () => {
       const mockResponse = {
         id: 'msg_123',
         type: 'message' as const,
@@ -82,7 +139,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       };
 
-      mockCreate.mockResolvedValue(mockResponse);
+      mockStream.mockReturnValue(createMockMessageStream(mockResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -97,7 +154,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await getCallable(ext, 'message').fn({ text: 'Hello Claude', options: {} }, ctx);
+      // Events are emitted in the resolve callback, not during stream creation
+      const stream = getCallable(ext, 'message').fn({ text: 'Hello Claude', options: {} }, ctx);
+      await resolveStream(stream);
 
       // Verify event was emitted
       expect(events).toHaveLength(1);
@@ -116,7 +175,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
   });
 
   describe('IC-12: anthropic:messages event with duration, model, usage', () => {
-    it('emits event after successful messages() call', async () => {
+    it('emits event after successful messages() resolve', async () => {
       const mockResponse = {
         id: 'msg_456',
         type: 'message' as const,
@@ -131,7 +190,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       };
 
-      mockCreate.mockResolvedValue(mockResponse);
+      mockStream.mockReturnValue(createMockMessageStream(mockResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -152,7 +211,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         { role: 'user', content: 'How are you?' },
       ];
 
-      await getCallable(ext, 'messages').fn({ messages, options: {} }, ctx);
+      const stream = getCallable(ext, 'messages').fn({ messages, options: {} }, ctx);
+      await resolveStream(stream);
 
       expect(events).toHaveLength(1);
 
@@ -265,9 +325,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         usage: { input_tokens: 120, output_tokens: 20 },
       };
 
-      mockCreate
-        .mockResolvedValueOnce(toolUseResponse)
-        .mockResolvedValueOnce(finalResponse);
+      mockStream
+        .mockReturnValueOnce(createMockMessageStream(toolUseResponse))
+        .mockReturnValueOnce(createMockMessageStream(finalResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -290,10 +350,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         { name: 'unit', type: { kind: 'string' }, defaultValue: undefined, annotations: { description: 'Temperature unit' } },
       ];
 
-      await getCallable(ext, 'tool_loop').fn(
+      const stream = getCallable(ext, 'tool_loop').fn(
         { prompt: 'What is the weather in San Francisco?', tools: { get_weather: weatherFn }, options: {} },
         ctx
       );
+      await resolveStream(stream);
 
       // Find tool_call event
       const toolCallEvents = events.filter(
@@ -310,7 +371,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
       expect(typeof event.timestamp).toBe('string');
 
-      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(mockStream).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -345,9 +406,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         usage: { input_tokens: 60, output_tokens: 10 },
       };
 
-      mockCreate
-        .mockResolvedValueOnce(toolUseResponse)
-        .mockResolvedValueOnce(finalResponse);
+      mockStream
+        .mockReturnValueOnce(createMockMessageStream(toolUseResponse))
+        .mockReturnValueOnce(createMockMessageStream(finalResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -369,10 +430,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         { name: 'b', type: { kind: 'number' }, defaultValue: undefined, annotations: {} },
       ];
 
-      await getCallable(ext, 'tool_loop').fn(
+      const stream = getCallable(ext, 'tool_loop').fn(
         { prompt: 'Calculate 5 + 3', tools: { calculate: calculateFn }, options: {} },
         ctx
       );
+      await resolveStream(stream);
 
       // Find tool_result event
       const toolResultEvents = events.filter(
@@ -418,9 +480,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         usage: { input_tokens: 40, output_tokens: 15 },
       };
 
-      mockCreate
-        .mockResolvedValueOnce(toolUseResponse)
-        .mockResolvedValueOnce(finalResponse);
+      mockStream
+        .mockReturnValueOnce(createMockMessageStream(toolUseResponse))
+        .mockReturnValueOnce(createMockMessageStream(finalResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -440,10 +502,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
       (failingTool as Record<string, unknown>)['description'] = 'Always fails';
 
-      await getCallable(ext, 'tool_loop').fn(
+      const stream = getCallable(ext, 'tool_loop').fn(
         { prompt: 'Test failing tool', tools: { failing_tool: failingTool }, options: {} },
         ctx
       );
+      await resolveStream(stream);
 
       // Find tool_result event with error
       const toolResultEvents = events.filter(
@@ -472,7 +535,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         usage: { input_tokens: 25, output_tokens: 10 },
       };
 
-      mockCreate.mockResolvedValue(noToolResponse);
+      mockStream.mockReturnValue(createMockMessageStream(noToolResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -487,7 +550,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await getCallable(ext, 'tool_loop').fn({ prompt: 'Simple question', tools: {}, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Simple question', tools: {}, options: {} }, ctx);
+      await resolveStream(stream);
 
       // Find tool_loop event
       const toolLoopEvents = events.filter(
@@ -554,10 +618,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         usage: { input_tokens: 130, output_tokens: 20 },
       };
 
-      mockCreate
-        .mockResolvedValueOnce(toolUseResponse)
-        .mockResolvedValueOnce(turn2Response)
-        .mockResolvedValueOnce(finalResponse);
+      mockStream
+        .mockReturnValueOnce(createMockMessageStream(toolUseResponse))
+        .mockReturnValueOnce(createMockMessageStream(turn2Response))
+        .mockReturnValueOnce(createMockMessageStream(finalResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -577,10 +641,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const step2Fn = callable(vi.fn().mockReturnValue('step2 done'));
       (step2Fn as Record<string, unknown>)['description'] = 'Second step';
 
-      await getCallable(ext, 'tool_loop').fn(
+      const stream = getCallable(ext, 'tool_loop').fn(
         { prompt: 'Multi-step task', tools: { step1: step1Fn, step2: step2Fn }, options: {} },
         ctx
       );
+      await resolveStream(stream);
 
       // Find tool_loop event
       const toolLoopEvents = events.filter(
@@ -596,7 +661,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
   });
 
   describe('IC-12: anthropic:error event with error, duration', () => {
-    it('emits error event on message() API failure', async () => {
+    it('emits error event on message() API failure during resolve', async () => {
       // Use the mocked Anthropic.APIError class
       const apiError = new Anthropic.APIError(
         401,
@@ -608,7 +673,17 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         {}
       );
 
-      mockCreate.mockRejectedValue(apiError);
+      // Create a stream whose finalMessage rejects
+      const errorStream = {
+        [Symbol.asyncIterator]: async function* () {
+          throw apiError;
+          // eslint-disable-next-line no-unreachable
+          yield { type: 'never' };
+        },
+        finalMessage: vi.fn().mockRejectedValue(apiError),
+        abort: vi.fn(),
+      };
+      mockStream.mockReturnValue(errorStream);
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -623,7 +698,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect(getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx)).rejects.toThrow();
+      const stream = getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx);
+      await expect(resolveStream(stream)).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -636,7 +712,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       expect(typeof event.timestamp).toBe('string');
     });
 
-    it('emits error event on messages() validation failure', async () => {
+    it('throws synchronously on messages() validation failure (no stream event)', () => {
       const events = createEventCollector();
       const ext = createAnthropicExtension({
         api_key: TEST_API_KEY,
@@ -650,16 +726,14 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      // Empty messages list triggers validation error
-      await expect(getCallable(ext, 'messages').fn({ messages: [], options: {} }, ctx)).rejects.toThrow(
-        'messages list cannot be empty'
-      );
+      // Empty messages list triggers synchronous validation error before stream creation
+      expect(() =>
+        getCallable(ext, 'messages').fn({ messages: [], options: {} }, ctx)
+      ).toThrow('messages list cannot be empty');
 
+      // No error event emitted for pre-stream validation errors
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
-      expect(errorEvents).toHaveLength(1);
-
-      const event = errorEvents[0]!;
-      expect(event.error).toContain('messages list cannot be empty');
+      expect(errorEvents).toHaveLength(0);
     });
 
     it('emits error event on tool_loop failure', async () => {
@@ -676,10 +750,12 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      // Missing tools argument triggers validation error
-      await expect(
-        getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} }, ctx)
-      ).rejects.toThrow('tools parameter is required');
+      // Missing tools argument triggers validation error inside the shared loop promise
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} },
+        ctx
+      );
+      await expect(resolveStream(stream)).rejects.toThrow('tools parameter is required');
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -702,7 +778,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         usage: { input_tokens: 5, output_tokens: 3 },
       };
 
-      mockCreate.mockResolvedValue(mockResponse);
+      mockStream.mockReturnValue(createMockMessageStream(mockResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -717,7 +793,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx);
+      const stream = getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx);
+      await resolveStream(stream);
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
@@ -764,10 +841,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         usage: { input_tokens: 20, output_tokens: 10 },
       };
 
-      mockCreate
-        .mockResolvedValueOnce(mockMessageResponse)
-        .mockResolvedValueOnce(mockMessagesResponse)
-        .mockResolvedValueOnce(mockToolLoopResponse);
+      mockStream
+        .mockReturnValueOnce(createMockMessageStream(mockMessageResponse))
+        .mockReturnValueOnce(createMockMessageStream(mockMessagesResponse))
+        .mockReturnValueOnce(createMockMessageStream(mockToolLoopResponse));
 
       const events = createEventCollector();
       const ext = createAnthropicExtension({
@@ -782,12 +859,16 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      // Test all three main functions
-      await getCallable(ext, 'message').fn({ text: 'Test message', options: {} }, ctx);
-      await getCallable(ext, 'messages').fn({ messages: [{ role: 'user', content: 'Test' }], options: {} }, ctx);
-      await getCallable(ext, 'tool_loop').fn({ prompt: 'Test tool loop', tools: {}, options: {} }, ctx);
+      // Test all three main functions — all use stream now; resolve() needed for event emission
+      const stream1 = getCallable(ext, 'message').fn({ text: 'Test message', options: {} }, ctx);
+      await resolveStream(stream1);
+      const stream2 = getCallable(ext, 'messages').fn({ messages: [{ role: 'user', content: 'Test' }], options: {} }, ctx);
+      await resolveStream(stream2);
+      const stream3 = getCallable(ext, 'tool_loop').fn({ prompt: 'Test tool loop', tools: {}, options: {} }, ctx);
+      await resolveStream(stream3);
 
-      expect(mockCreate).toHaveBeenCalledTimes(3);
+      expect(mockStream).toHaveBeenCalledTimes(3);
+      expect(mockCreate).toHaveBeenCalledTimes(0);
 
       // Should have 3 success events
       expect(events).toHaveLength(3);
