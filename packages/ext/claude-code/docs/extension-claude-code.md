@@ -8,18 +8,19 @@ Each call returns a dict with the response text, token usage breakdown, cost in 
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createClaudeCodeExtension } from '@rcrsr/rill-ext-claude-code';
-
-const ext = createClaudeCodeExtension({ defaultTimeout: 60000 });
-const { functions, dispose } = hoistExtension('claude_code', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { claude_code: functions } },
-  },
-});
+```json
+{
+  "extensions": {
+    "mounts": {
+      "claude_code": "@rcrsr/rill-ext-claude-code"
+    },
+    "config": {
+      "claude_code": {
+        "defaultTimeout": 60000
+      }
+    }
+  }
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
@@ -53,15 +54,19 @@ The factory validates both requirements eagerly and throws on missing dependenci
 
 ## Configuration
 
-```typescript
-import { createClaudeCodeExtension } from '@rcrsr/rill-ext-claude-code';
-
-const ext = createClaudeCodeExtension({
-  binaryPath: '/usr/local/bin/claude',  // default: 'claude'
-  defaultTimeout: 60000,                // default: 1800000 (30 min)
-  dangerouslySkipPermissions: true,     // default: true
-  settingSources: '',                   // default: ''
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "claude_code": {
+        "binaryPath": "/usr/local/bin/claude",
+        "defaultTimeout": 60000,
+        "dangerouslySkipPermissions": true,
+        "settingSources": ""
+      }
+    }
+  }
+}
 ```
 
 | Parameter | Type | Default | Description |
@@ -163,23 +168,6 @@ The extension validates inputs and process state at runtime.
 | `claude-code:skill` | Skill completes |
 | `claude-code:command` | Command completes |
 | `claude-code:error` | Any operation fails |
-
-## Test Host
-
-A runnable example at `examples/test-host.ts` demonstrates integration:
-
-```bash
-# Built-in demo
-pnpm exec tsx examples/test-host.ts
-
-# Inline expression
-pnpm exec tsx examples/test-host.ts -e 'claude_code::prompt("Tell me a joke") -> log'
-
-# Script file
-pnpm exec tsx examples/test-host.ts script.rill
-```
-
-The test host wires the extension to the rill runtime with logging callbacks.
 
 ## Low-Level Exports
 
