@@ -2,7 +2,7 @@
 
 *ChromaDB vector database integration for rill scripts*
 
-This extension allows rill scripts to access ChromaDB's vector database API. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:chroma>`. Switching to Pinecone or Qdrant means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access ChromaDB's vector database API. The host declares it in `rill-config.json`, and scripts load it with `use<ext:chroma>`. Switching to Pinecone or Qdrant means changing the extension mount. Scripts stay identical.
 
 Eleven functions cover vector operations and collection management. `upsert` and `upsert_batch` insert vectors with metadata. `search` finds similar vectors. `get` retrieves by ID. `delete` and `delete_batch` remove vectors. `count` returns the total vector count. `create_collection`, `delete_collection`, `list_collections`, and `describe` manage collections. All operations use the configured collection unless overridden.
 
@@ -10,21 +10,20 @@ The host sets URL and collection name at creation time — scripts never handle 
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createChromaExtension } from '@rcrsr/rill-ext-chroma';
-
-const ext = createChromaExtension({
-  url: 'http://localhost:8000',
-  collection: 'my_vectors',
-});
-const { functions, dispose } = hoistExtension('chroma', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { chroma: functions } },
-  },
-});
+```json
+{
+  "extensions": {
+    "mounts": {
+      "chroma": "@rcrsr/rill-ext-chroma"
+    },
+    "config": {
+      "chroma": {
+        "url": "http://localhost:8000",
+        "collection": "my_vectors"
+      }
+    }
+  }
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
@@ -49,13 +48,19 @@ chroma::upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
 
 ## Configuration
 
-```typescript
-const ext = createChromaExtension({
-  url: 'http://localhost:8000',
-  collection: 'my_vectors',
-  embeddingFunction: 'openai',
-  timeout: 30000,
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "chroma": {
+        "url": "http://localhost:8000",
+        "collection": "my_vectors",
+        "embeddingFunction": "openai",
+        "timeout": 30000
+      }
+    }
+  }
+}
 ```
 
 | Parameter | Type | Default | Description |
@@ -183,10 +188,16 @@ ChromaDB supports embedded mode (in-process) or HTTP server mode.
 
 ChromaDB embedded mode runs in-process without external server:
 
-```typescript
-const ext = createChromaExtension({
-  collection: 'test_collection',
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "chroma": {
+        "collection": "test_collection"
+      }
+    }
+  }
+}
 ```
 
 No Docker or server setup required. Data persists to local storage.
@@ -207,21 +218,17 @@ The server will be available at `http://localhost:8000`.
 
 HTTP mode configuration:
 
-```typescript
-const ext = createChromaExtension({
-  url: 'http://localhost:8000',
-  collection: 'test_collection',
-});
-```
-
-## Lifecycle
-
-Call `dispose()` on the extension to clean up:
-
-```typescript
-const ext = createChromaExtension({ ... });
-// ... use extension ...
-await ext.dispose?.();
+```json
+{
+  "extensions": {
+    "config": {
+      "chroma": {
+        "url": "http://localhost:8000",
+        "collection": "test_collection"
+      }
+    }
+  }
+}
 ```
 
 ## See Also

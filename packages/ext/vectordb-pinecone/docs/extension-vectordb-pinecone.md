@@ -2,7 +2,7 @@
 
 *Pinecone vector database integration for rill scripts*
 
-This extension allows rill scripts to access Pinecone's vector database API. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:pinecone>`. Switching to Qdrant or Chroma means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access Pinecone's vector database API. The host declares it in `rill-config.json`, and scripts load it with `use<ext:pinecone>`. Switching to Qdrant or Chroma means changing the extension mount. Scripts stay identical.
 
 Eleven functions cover vector operations and collection management. `upsert` and `upsert_batch` insert vectors with metadata. `search` finds k-nearest neighbors. `get` fetches by ID. `delete` and `delete_batch` remove vectors. `count` returns the namespace vector count. `create_collection`, `delete_collection`, `list_collections`, and `describe` manage collections. All operations use the configured index and namespace.
 
@@ -10,22 +10,21 @@ The host sets API key, index name, and namespace at creation time — scripts ne
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createPineconeExtension } from '@rcrsr/rill-ext-pinecone';
-
-const ext = createPineconeExtension({
-  apiKey: process.env.PINECONE_API_KEY,
-  index: 'my-index',
-  namespace: 'default',
-});
-const { functions, dispose } = hoistExtension('pinecone', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { pinecone: functions } },
-  },
-});
+```json
+{
+  "extensions": {
+    "mounts": {
+      "pinecone": "@rcrsr/rill-ext-pinecone"
+    },
+    "config": {
+      "pinecone": {
+        "apiKey": "${PINECONE_API_KEY}",
+        "index": "my-index",
+        "namespace": "default"
+      }
+    }
+  }
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
@@ -50,13 +49,19 @@ pinecone::upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
 
 ## Configuration
 
-```typescript
-const ext = createPineconeExtension({
-  apiKey: process.env.PINECONE_API_KEY,
-  index: 'my-index',
-  namespace: 'production',
-  timeout: 30000,
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "pinecone": {
+        "apiKey": "${PINECONE_API_KEY}",
+        "index": "my-index",
+        "namespace": "production",
+        "timeout": 30000
+      }
+    }
+  }
+}
 ```
 
 | Parameter | Type | Default | Description |
@@ -198,12 +203,18 @@ Find your API key in the Pinecone Console under **API Keys** section.
 
 Default configuration:
 
-```typescript
-const ext = createPineconeExtension({
-  apiKey: process.env.PINECONE_API_KEY,
-  index: 'my-index',
-  namespace: '', // Empty string for default namespace
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "pinecone": {
+        "apiKey": "${PINECONE_API_KEY}",
+        "index": "my-index",
+        "namespace": ""
+      }
+    }
+  }
+}
 ```
 
 ### Free Tier Limits
@@ -215,16 +226,6 @@ Pinecone Starter (free) tier includes:
 - 10K vectors per namespace
 
 See [Pinecone Pricing](https://www.pinecone.io/pricing/) for current limits.
-
-## Lifecycle
-
-Call `dispose()` on the extension to clean up:
-
-```typescript
-const ext = createPineconeExtension({ ... });
-// ... use extension ...
-await ext.dispose?.();
-```
 
 ## See Also
 

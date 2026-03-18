@@ -11,13 +11,13 @@ import {
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryResult,
-  type VectorExtensionContract,
   type RillFunction,
   type RillValue,
   type RuntimeContext,
   type RillVector,
 } from '@rcrsr/rill';
 import {
+  type VectorExtensionContract,
   mapVectorError,
   createDisposalState,
   checkDisposed,
