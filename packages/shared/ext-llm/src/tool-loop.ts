@@ -290,7 +290,8 @@ export async function executeToolLoop(
   emitEvent: (event: string, data: Record<string, unknown>) => void,
   maxTurns = 10,
   context?: RuntimeContextLike,
-  yieldChunk?: (chunk: RillValue) => void
+  yieldChunk?: (chunk: RillValue) => void,
+  signal?: AbortSignal
 ): Promise<ToolLoopResult> {
   // Validate tools parameter
   if (tools === undefined) {
@@ -383,6 +384,11 @@ export async function executeToolLoop(
 
   // Multi-turn loop
   while (turnCount < maxTurns) {
+    // Check cancellation before each turn
+    if (signal?.aborted) {
+      throw new RuntimeError('RILL-R004', 'tool_loop cancelled');
+    }
+
     turnCount++;
     // EC-17: Call provider API with error handling
     // When yieldChunk is provided and callAPIStreaming is defined, use streaming path.
@@ -395,10 +401,11 @@ export async function executeToolLoop(
         response = await callbacks.callAPIStreaming(
           currentMessages,
           providerTools,
-          onTextDelta
+          onTextDelta,
+          signal
         );
       } else {
-        response = await callbacks.callAPI(currentMessages, providerTools);
+        response = await callbacks.callAPI(currentMessages, providerTools, signal);
       }
     } catch (error: unknown) {
       // Wrap provider API errors in RuntimeError

@@ -167,8 +167,8 @@ export function validateEmbedBatch(texts: RillValue[]): string[] {
       );
     }
 
-    // EC-10: Batch contains empty string → RuntimeError: "embed text cannot be empty at index {i}"
-    if (item === '') {
+    // EC-10: Batch contains empty or whitespace-only string → RuntimeError: "embed text cannot be empty at index {i}"
+    if (item.trim() === '') {
       throw new RuntimeError(
         'RILL-R001',
         `embed text cannot be empty at index ${i}`

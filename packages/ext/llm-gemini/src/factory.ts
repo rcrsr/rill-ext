@@ -910,13 +910,15 @@ export function createGeminiExtension(
 
           callAPI: async (
             msgs: unknown[],
-            tools: unknown
+            tools: unknown,
+            signal?: AbortSignal
           ): Promise<unknown> => {
             return await client.models.generateContent({
               model: factoryModel,
               contents: msgs as Content[],
               config: {
                 ...apiConfig,
+                ...(signal !== undefined && { abortSignal: signal }),
                 tools: [
                   { functionDeclarations: tools as FunctionDeclaration[] },
                 ],
@@ -928,13 +930,15 @@ export function createGeminiExtension(
           callAPIStreaming: async (
             msgs: unknown[],
             tools: unknown,
-            onTextDelta: (text: string) => void
+            onTextDelta: (text: string) => void,
+            signal?: AbortSignal
           ): Promise<unknown> => {
             const stream = await client.models.generateContentStream({
               model: factoryModel,
               contents: msgs as Content[],
               config: {
                 ...apiConfig,
+                ...(signal !== undefined && { abortSignal: signal }),
                 tools: [
                   { functionDeclarations: tools as FunctionDeclaration[] },
                 ],
@@ -1039,6 +1043,8 @@ export function createGeminiExtension(
           },
         };
 
+        const toolLoopAbortController = new AbortController();
+
         // Run executeToolLoop as a background Promise; chunks are collected via yieldChunk
         const loopPromise = executeToolLoop(
           contents,
@@ -1073,7 +1079,8 @@ export function createGeminiExtension(
               resolveNext = undefined;
               r();
             }
-          }
+          },
+          toolLoopAbortController.signal
         ).then((result) => {
           loopResultHolder = result;
           streamDone = true;
@@ -1210,6 +1217,7 @@ export function createGeminiExtension(
         return createRillStream({
           chunks: streamGenerator(),
           resolve,
+          dispose: () => { toolLoopAbortController.abort(); },
           chunkType: { kind: 'dict' },
           retType: retTypeStructure,
         }) as RillValue;

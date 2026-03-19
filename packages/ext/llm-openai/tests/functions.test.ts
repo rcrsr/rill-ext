@@ -1271,9 +1271,7 @@ describe('embed_batch() function', () => {
       ).rejects.toThrow('embed text cannot be empty at index 1');
     });
 
-    // Note: Whitespace-only strings are now allowed by validation
-    // and will be handled by the OpenAI API
-    it.skip('throws RuntimeError for whitespace-only string at index', async () => {
+    it('throws RuntimeError for whitespace-only string at index', async () => {
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
         model: 'gpt-4-turbo',

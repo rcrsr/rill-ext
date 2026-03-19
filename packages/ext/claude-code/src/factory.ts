@@ -165,7 +165,8 @@ function createPtyStream(
   });
 
   // Monitor exit promise — attach immediately to prevent unhandled rejections.
-  // EC-10: Non-zero exit or timeout — yield error chunk, resolve with partial data.
+  // EC-9: Timeout — re-throw RuntimeError so the generator propagates it to the consumer.
+  // EC-10: Non-zero exit — yield error chunk, resolve with partial data.
   const exitPromise = spawn.exitCode.then(
     () => {
       parser.flush((msg) => messages.push(msg));
@@ -173,6 +174,11 @@ function createPtyStream(
       wake();
     },
     (error: unknown) => {
+      if (error instanceof RuntimeError && error.context?.['timeoutMs'] !== undefined) {
+        done = true;
+        wake();
+        throw error;
+      }
       parser.flush((msg) => messages.push(msg));
       done = true;
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -180,6 +186,9 @@ function createPtyStream(
       wake();
     }
   );
+  // Suppress unhandled-rejection for the timeout path: exitPromise may reject before
+  // the generator or resolve callback awaits it. The rejection is handled at await sites.
+  exitPromise.catch(() => undefined);
 
   // Async generator bridges push-based onData to pull-based iteration.
   async function* chunks(): AsyncGenerator<RillValue> {

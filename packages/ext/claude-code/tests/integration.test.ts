@@ -776,7 +776,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
 
   // EC-9: Process timeout throws RuntimeError RILL-R004
   describe('EC-9: Process timeout throws RuntimeError RILL-R004', () => {
-    it('stream resolves with error chunk when process times out', async () => {
+    it('stream throws RuntimeError when process times out', async () => {
       const { spawnClaudeCli } = await import('../src/process.js');
       const { createStreamParser } = await import('../src/stream-parser.js');
       const { extractResult } = await import('../src/result.js');
@@ -817,15 +817,8 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
 
       const stream = (ext.value as any).prompt.fn({ text: 'Hello Claude', options: { timeout: 5000 } }, ctx);
 
-      // Consume chunks; the error chunk should appear
-      const chunks = await collectChunks(stream);
-
-      // EC-9: At least one error chunk containing the timeout message
-      expect(chunks.some((c) => c.includes('timeout') || c.includes('[error]'))).toBe(true);
-
-      // Stream resolves rather than throwing (partial data behavior)
-      const result = await resolveStream(stream) as Record<string, unknown>;
-      expect(result).toBeDefined();
+      // EC-9: timeout re-throws RuntimeError through the generator; collectChunks propagates it
+      await expect(collectChunks(stream)).rejects.toThrow('Claude CLI timeout after 5000ms');
     });
   });
 

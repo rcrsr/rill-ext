@@ -97,7 +97,7 @@ export interface ToolLoopCallbacks {
   /**
    * Call the provider API with messages and tools
    */
-  callAPI: (messages: unknown[], tools: unknown) => Promise<unknown>;
+  callAPI: (messages: unknown[], tools: unknown, signal?: AbortSignal) => Promise<unknown>;
 
   /**
    * Call the provider API with streaming text deltas.
@@ -107,7 +107,8 @@ export interface ToolLoopCallbacks {
   callAPIStreaming?: (
     messages: unknown[],
     tools: unknown,
-    onTextDelta: (text: string) => void
+    onTextDelta: (text: string) => void,
+    signal?: AbortSignal
   ) => Promise<unknown>;
 
   /**

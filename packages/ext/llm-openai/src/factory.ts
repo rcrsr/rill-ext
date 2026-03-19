@@ -776,7 +776,8 @@ export function createOpenAIExtension(
           // Call OpenAI API (non-streaming fallback)
           callAPI: async (
             msgs: unknown[],
-            tools: unknown
+            tools: unknown,
+            signal?: AbortSignal
           ): Promise<unknown> => {
             const apiParams: OpenAI.ChatCompletionCreateParamsNonStreaming = {
               model: factoryModel,
@@ -790,7 +791,7 @@ export function createOpenAIExtension(
               apiParams.temperature = factoryTemperature;
             }
 
-            const response = await client.chat.completions.create(apiParams);
+            const response = await client.chat.completions.create(apiParams, { signal });
 
             // Normalize response to include usage in expected format
             return {
@@ -806,7 +807,8 @@ export function createOpenAIExtension(
           callAPIStreaming: async (
             msgs: unknown[],
             tools: unknown,
-            onTextDelta: (text: string) => void
+            onTextDelta: (text: string) => void,
+            signal?: AbortSignal
           ): Promise<unknown> => {
             const streamRunner = client.chat.completions.stream({
               model: factoryModel,
@@ -815,7 +817,7 @@ export function createOpenAIExtension(
               tools: tools as OpenAI.ChatCompletionTool[],
               tool_choice: 'auto' as const,
               ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
-            });
+            }, { signal });
 
             // Emit text deltas as they arrive
             streamRunner.on('content', (delta: string) => {
@@ -968,6 +970,8 @@ export function createOpenAIExtension(
           chunkBuffer.push(chunk);
         };
 
+        const toolLoopAbortController = new AbortController();
+
         // Start the tool loop as a promise shared by both the generator and resolve
         const loopPromise = executeToolLoop(
           messages,
@@ -989,7 +993,8 @@ export function createOpenAIExtension(
           },
           maxTurns,
           ctx,
-          yieldChunk
+          yieldChunk,
+          toolLoopAbortController.signal
         );
 
         // Async generator — awaits the tool loop then yields buffered chunks
@@ -1092,6 +1097,7 @@ export function createOpenAIExtension(
         return createRillStream({
           chunks: chunks(),
           resolve,
+          dispose: () => { toolLoopAbortController.abort(); },
           chunkType: { kind: 'dict' },
           retType,
         });

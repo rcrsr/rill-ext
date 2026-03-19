@@ -291,7 +291,7 @@ describe('EC-6: Generic spawn failure', () => {
 // ============================================================
 
 describe('EC-8, AC-8: Timeout exceeded', () => {
-  it('yields error chunk containing timeout message in stream', async () => {
+  it('throws RuntimeError containing timeout message through stream', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -329,14 +329,9 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    // fn() returns a RillStream synchronously; exitCode rejection surfaces as error chunk
+    // EC-9: timeout re-throws RuntimeError through the generator to the consumer
     const stream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
-    const chunks = await collectChunks(stream);
-
-    // EC-10: error chunk is yielded containing the error message
-    const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
-    expect(errorChunks.length).toBeGreaterThan(0);
-    expect(errorChunks[0]).toContain('Claude CLI timeout after 5000ms');
+    await expect(collectChunks(stream)).rejects.toThrow('Claude CLI timeout after 5000ms');
   });
 });
 
@@ -556,7 +551,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     );
   });
 
-  it('yields error chunk for timeout (same as prompt)', async () => {
+  it('throws RuntimeError for timeout (same as prompt)', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -594,11 +589,9 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx);
-    const chunks = await collectChunks(stream);
 
-    const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
-    expect(errorChunks.length).toBeGreaterThan(0);
-    expect(errorChunks[0]).toContain('Claude CLI timeout after');
+    // EC-9: timeout re-throws RuntimeError through the generator
+    await expect(collectChunks(stream)).rejects.toThrow('Claude CLI timeout after 10000ms');
   });
 });
 
@@ -715,7 +708,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     );
   });
 
-  it('yields error chunk for timeout (same as prompt)', async () => {
+  it('throws RuntimeError for timeout (same as prompt)', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -753,11 +746,9 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx);
-    const chunks = await collectChunks(stream);
 
-    const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
-    expect(errorChunks.length).toBeGreaterThan(0);
-    expect(errorChunks[0]).toContain('Claude CLI timeout after');
+    // EC-9: timeout re-throws RuntimeError through the generator
+    await expect(collectChunks(stream)).rejects.toThrow('Claude CLI timeout after 15000ms');
   });
 
   it('throws RuntimeError for permission denied (same as prompt)', async () => {

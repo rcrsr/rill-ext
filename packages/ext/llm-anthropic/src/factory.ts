@@ -799,7 +799,8 @@ export function createAnthropicExtension(
           // Call Anthropic API (non-streaming path)
           callAPI: async (
             msgs: unknown[],
-            tools: unknown
+            tools: unknown,
+            signal?: AbortSignal
           ): Promise<unknown> => {
             const apiParams: Anthropic.MessageCreateParamsNonStreaming = {
               model: factoryModel,
@@ -815,14 +816,15 @@ export function createAnthropicExtension(
               apiParams.system = system;
             }
 
-            return await client.messages.create(apiParams);
+            return await client.messages.create(apiParams, { signal });
           },
 
           // Call Anthropic API with streaming text deltas (streaming path)
           callAPIStreaming: async (
             msgs: unknown[],
             tools: unknown,
-            onTextDelta: (text: string) => void
+            onTextDelta: (text: string) => void,
+            signal?: AbortSignal
           ): Promise<unknown> => {
             const apiParams: Anthropic.MessageStreamParams = {
               model: factoryModel,
@@ -838,7 +840,7 @@ export function createAnthropicExtension(
               apiParams.system = system;
             }
 
-            const sdkStream = client.messages.stream(apiParams);
+            const sdkStream = client.messages.stream(apiParams, { signal });
             sdkStream.on('text', (textDelta: string) => {
               onTextDelta(textDelta);
             });
@@ -952,6 +954,8 @@ export function createAnthropicExtension(
           }
         };
 
+        const toolLoopAbortController = new AbortController();
+
         const sharedLoopPromise = executeToolLoop(
           messages,
           toolsDict as RillValue,
@@ -960,7 +964,8 @@ export function createAnthropicExtension(
           emitEventFn,
           maxTurns,
           ctx,
-          yieldChunkFn
+          yieldChunkFn,
+          toolLoopAbortController.signal
         );
 
         // Signal the drain loop when the tool loop finishes
@@ -1063,7 +1068,7 @@ export function createAnthropicExtension(
         return createRillStream({
           chunks: chunks(),
           resolve,
-          dispose: () => { /* stream is self-contained, no external resource to abort */ },
+          dispose: () => { toolLoopAbortController.abort(); },
           chunkType: { kind: 'dict' },
           retType: retTypeStructure,
         }) as RillValue;

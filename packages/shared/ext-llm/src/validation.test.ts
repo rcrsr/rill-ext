@@ -271,6 +271,16 @@ describe('validateEmbedBatch', () => {
       'embed text cannot be empty at index 0'
     );
   });
+
+  it('throws for whitespace-only string in array', () => {
+    // EC-10: Whitespace-only string is treated as empty
+    expect(() => validateEmbedBatch(['valid', '   ', 'text'])).toThrow(
+      RuntimeError
+    );
+    expect(() => validateEmbedBatch(['valid', '   ', 'text'])).toThrow(
+      'embed text cannot be empty at index 1'
+    );
+  });
 });
 
 // ============================================================
