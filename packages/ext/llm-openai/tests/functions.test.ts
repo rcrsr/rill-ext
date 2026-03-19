@@ -267,6 +267,7 @@ describe('message() function', () => {
         model: 'gpt-4-turbo',
         max_completion_tokens: 4096,
         temperature: 0.7,
+        stream_options: { include_usage: true },
         messages: [{ role: 'user', content: 'What is 2+2?' }],
       });
     });
@@ -291,6 +292,7 @@ describe('message() function', () => {
         model: 'gpt-4-turbo',
         max_completion_tokens: 4096,
         temperature: 0.7,
+        stream_options: { include_usage: true },
         messages: [
           { role: 'system', content: 'You are helpful.' },
           { role: 'user', content: 'What is 2+2?' },

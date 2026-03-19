@@ -190,6 +190,7 @@ export function createOpenAIExtension(
           model: factoryModel,
           max_completion_tokens: maxTokens,
           messages: apiMessages,
+          stream_options: { include_usage: true },
           ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
         });
 
@@ -399,6 +400,7 @@ export function createOpenAIExtension(
           model: factoryModel,
           max_completion_tokens: maxTokens,
           messages: apiMessages,
+          stream_options: { include_usage: true },
           ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
         });
 
@@ -816,6 +818,7 @@ export function createOpenAIExtension(
               messages: msgs as OpenAI.ChatCompletionMessageParam[],
               tools: tools as OpenAI.ChatCompletionTool[],
               tool_choice: 'auto' as const,
+              stream_options: { include_usage: true },
               ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
             }, { signal });
 
