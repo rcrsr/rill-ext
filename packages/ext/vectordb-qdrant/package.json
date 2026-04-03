@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-qdrant",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "rill extension for Qdrant vector database integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@rcrsr/rill": "~0.18.0",
+    "@rcrsr/rill-ext-param-shared": "workspace:^",
     "@rcrsr/rill-ext-vector-shared": "workspace:^",
     "@types/node": "^25.3.0",
     "dts-bundle-generator": "^9.5.1",
@@ -50,7 +51,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@qdrant/js-client-rest": "^1.17.0",
-    "@rcrsr/rill-ext-param-shared": "workspace:^"
+    "@qdrant/js-client-rest": "^1.17.0"
   }
 }
