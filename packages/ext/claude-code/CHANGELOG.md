@@ -8,7 +8,7 @@
   Callers must either iterate chunks or resolve via `()` to access the result dict.
 
   Migration: `claude_code::prompt("task")` => use `claude_code::prompt("task")()` to preserve dict access,
-  or `claude_code::prompt("task") each $line { ... }` to stream stdout line chunks.
+  or `claude_code::prompt("task") -> each { log }` to stream stdout line chunks.
 
 ### Added
 

@@ -8,7 +8,7 @@
   Callers must either iterate chunks or resolve via `()` to access the result dict.
 
   Migration: `llm::message("hi")` => use `llm::message("hi")()` to preserve dict access,
-  or `llm::message("hi") each $chunk { ... }` to stream chunks.
+  or `llm::message("hi") -> each { log }` to stream chunks.
 
 ### Added
 

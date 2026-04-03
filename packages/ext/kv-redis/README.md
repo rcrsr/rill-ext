@@ -2,46 +2,54 @@
 
 [rill](https://rill.run) extension for Redis key-value storage. Provides persistent key-value operations with TTL support, SCAN-based key listing, and TLS connectivity.
 
-> **Experimental.** Breaking changes will occur before stabilization.
-
 ## Install
 
 ```bash
 npm install @rcrsr/rill-ext-kv-redis
 ```
 
-**Peer dependencies:** `@rcrsr/rill`
-
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
-import { createRedisKvExtension } from '@rcrsr/rill-ext-kv-redis';
+**rill-config.json**
 
-const ext = createRedisKvExtension({
-  url: 'redis://localhost:6379',
-  mounts: {
-    user: {
-      mode: 'read-write',
-      prefix: 'app:user:',
+```json
+{
+  "main": "app.rill",
+  "extensions": {
+    "mounts": {
+      "kv": "@rcrsr/rill-ext-kv-redis"
     },
-  },
-});
-const functions = prefixFunctions('kv', ext);
-const ctx = createRuntimeContext({ functions });
+    "config": {
+      "kv": {
+        "url": "redis://localhost:6379",
+        "mounts": {
+          "user": {
+            "mode": "read-write",
+            "prefix": "app:user:"
+          }
+        }
+      }
+    }
+  }
+}
+```
 
-// Script: kv::set("user", "name", "Alice")
+**app.rill**
+
+```rill
+use<ext:kv> => $kv
+
+$kv.set("user", "name", "Alice")
+$kv.get("user", "name") -> log
+```
+
+```bash
+rill-run
 ```
 
 ## Documentation
 
 See [full documentation](docs/extension-kv-redis.md) for configuration, functions, mount options, and error handling.
-
-## Related
-
-- [rill](https://github.com/rcrsr/rill) — Core language runtime
-- [Extensions Guide](https://github.com/rcrsr/rill/blob/main/docs/integration-extensions.md) — Extension contract and patterns
-- [Host API Reference](https://github.com/rcrsr/rill/blob/main/docs/ref-host-api.md) — Runtime context and host functions
 
 ## License
 

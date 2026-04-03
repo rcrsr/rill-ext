@@ -4,7 +4,7 @@
 
 This extension spawns the Claude Code CLI as a subprocess and exposes it to rill scripts. Scripts send prompts, invoke skills like `/commit`, and run named commands. The extension handles process lifecycle, timeout enforcement, and NDJSON stream parsing.
 
-Each call returns a `RillStream`. Iterate stdout line chunks with `each`, or resolve immediately with `()` to get the result dict containing response text, token usage breakdown, cost in USD, exit code, and duration in ms. Typical uses: automated code review, commit generation, and PR workflows.
+Each call returns a `RillStream`. Iterate stdout line chunks with `-> each`, or resolve immediately with `()` to get the result dict containing response text, token usage breakdown, cost in USD, exit code, and duration in ms. Typical uses: automated code review, commit generation, and PR workflows.
 
 ## Quick Start
 
@@ -28,7 +28,7 @@ Rill script — stream stdout line chunks:
 ```rill
 use<ext:claude_code> => $cc
 $cc.prompt("Explain TCP handshakes") => $s
-$s each $line { $line -> log }
+$s -> each { log }
 ```
 
 Resolve immediately to access the result dict:
@@ -95,7 +95,7 @@ Controls which Claude Code settings load before execution.
 ```rill
 # Stream stdout line chunks
 claude_code::prompt("Explain TCP handshakes") => $s
-$s each $line { $line -> log }
+$s -> each { log }
 
 # Or resolve to result dict
 claude_code::prompt("Explain TCP handshakes")() => $result
@@ -111,7 +111,7 @@ $result.duration     # Execution time in ms
 ```rill
 # Stream stdout line chunks
 claude_code::skill("commit", [message: "fix: resolve timeout bug"]) => $s
-$s each $line { $line -> log }
+$s -> each { log }
 
 # Or resolve to result dict
 claude_code::skill("commit", [message: "fix: resolve timeout bug"])() => $result
@@ -123,7 +123,7 @@ $result.result
 ```rill
 # Stream stdout line chunks
 claude_code::command("review-pr", [pr: "123"]) => $s
-$s each $line { $line -> log }
+$s -> each { log }
 
 # Or resolve to result dict
 claude_code::command("review-pr", [pr: "123"])() => $result
@@ -152,7 +152,7 @@ All 3 functions return `RillStream`. Two usage patterns:
 
 ```rill
 claude_code::prompt("Write a function") => $s
-$s each $line { $line -> log }
+$s -> each { log }
 ```
 
 **Resolve immediately** — access the full result dict at once:
