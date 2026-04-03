@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-gemini",
-  "version": "1.0.0",
+  "version": "0.18.0",
   "description": "rill extension for Google Gemini API integration",
   "license": "MIT",
   "author": "Andre Bremer",

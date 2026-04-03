@@ -37,7 +37,7 @@ function buildCallableDict(functions: Record<string, RillFunction>): Record<stri
     // Ensure description annotation is set for introspection
     const withDescription: RillFunction = {
       ...rillFn,
-      annotations: { description: rillFn.annotations?.['description'] ?? '' },
+      annotations: { ...rillFn.annotations, description: rillFn.annotations?.['description'] ?? '' },
     };
     dict[name] = toCallable(withDescription) as unknown as RillValue;
   }

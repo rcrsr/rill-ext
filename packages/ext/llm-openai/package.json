@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-openai",
-  "version": "1.0.0",
+  "version": "0.18.0",
   "description": "rill extension for OpenAI API integration",
   "license": "MIT",
   "author": "Andre Bremer",

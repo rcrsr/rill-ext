@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.18.0] - 2026-04-02
 
 ### Added
 
@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Anthropic `tool_loop()` includes the assistant message in response `messages` array
 - 0-parameter tools no longer fail with "Function expects 0 arguments, got 1"
 - `max_tokens: 0` treated as unset, falls through to factory default
+- OpenAI: `stream_options.include_usage` set on all streaming calls for token counting
+- MCP: `buildCallableDict` preserves existing annotations instead of overwriting
+- MCP: static resource error messages use sanitized callable name, not raw MCP name
 
 ## [0.16.0] - 2026-03-15
 

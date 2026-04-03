@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-anthropic",
-  "version": "1.0.0",
+  "version": "0.18.0",
   "description": "rill extension for Anthropic Claude API integration",
   "license": "MIT",
   "author": "Andre Bremer",

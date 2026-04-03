@@ -276,13 +276,15 @@ export function createReadResourceFunction(
  * @param client - Connected MCP client
  * @param timeoutMs - Timeout in milliseconds
  * @param lifecycleState - Shared state for lifecycle event tracking
+ * @param callableName - Sanitized callable name exposed to users (for error messages)
  * @returns RillFunction with zero params
  */
 function createStaticResourceFunction(
   resource: McpResource,
   client: Client,
   timeoutMs: number,
-  lifecycleState: { connectEmitted: boolean }
+  lifecycleState: { connectEmitted: boolean },
+  callableName: string
 ): RillFunction {
   // Build description: use resource.description if provided, otherwise derive from name.
   // Append MIME type when present.
@@ -320,7 +322,7 @@ function createStaticResourceFunction(
     // Set up timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => {
-        reject(createTimeoutError(resource.name, timeoutMs));
+        reject(createTimeoutError(callableName, timeoutMs));
       }, timeoutMs);
       timer.unref();
     });
@@ -377,10 +379,10 @@ function createStaticResourceFunction(
           throw createProtocolError(error.message);
         }
 
-        throw createToolError(resource.name, error.message);
+        throw createToolError(callableName, error.message);
       }
 
-      throw createToolError(resource.name, String(error));
+      throw createToolError(callableName, String(error));
     }
   };
 
@@ -433,7 +435,8 @@ export function generateStaticResourceFunctions(
       resource,
       client,
       timeoutMs,
-      lifecycleState
+      lifecycleState,
+      sanitizedName
     );
   }
 
