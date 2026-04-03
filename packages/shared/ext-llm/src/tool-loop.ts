@@ -11,7 +11,7 @@ import {
   RuntimeError,
   type ApplicationCallable,
   type RillCallable,
-  type RillType,
+  type TypeStructure,
   type RillValue,
   type RuntimeContext,
   type ScriptCallable,
@@ -289,7 +289,9 @@ export async function executeToolLoop(
   callbacks: ToolLoopCallbacks,
   emitEvent: (event: string, data: Record<string, unknown>) => void,
   maxTurns = 10,
-  context?: RuntimeContextLike
+  context?: RuntimeContextLike,
+  yieldChunk?: (chunk: RillValue) => void,
+  signal?: AbortSignal
 ): Promise<ToolLoopResult> {
   // Validate tools parameter
   if (tools === undefined) {
@@ -348,9 +350,9 @@ export async function executeToolLoop(
       // Build a synthetic closure type to delegate to buildJsonSchemaFromStructuralType.
       // param.type undefined → treated as 'any' (unconstrained, produces {} property).
       // param.annotations['description'] used for all callable kinds (AC-10, AC-11, AC-30).
-      const closureType: RillType = {
-        type: 'closure',
-        params: params.map((p) => ({ name: p.name, type: p.type ?? { type: 'any' } as RillType })),
+      const closureType: TypeStructure = {
+        kind: 'closure',
+        params: params.map((p) => ({ name: p.name, type: p.type ?? { kind: 'any' } as TypeStructure })),
       };
       const builtSchema = buildJsonSchemaFromStructuralType(closureType, [...params]);
 
@@ -382,11 +384,29 @@ export async function executeToolLoop(
 
   // Multi-turn loop
   while (turnCount < maxTurns) {
+    // Check cancellation before each turn
+    if (signal?.aborted) {
+      throw new RuntimeError('RILL-R004', 'tool_loop cancelled');
+    }
+
     turnCount++;
     // EC-17: Call provider API with error handling
+    // When yieldChunk is provided and callAPIStreaming is defined, use streaming path.
     let response: unknown;
     try {
-      response = await callbacks.callAPI(currentMessages, providerTools);
+      if (yieldChunk !== undefined && callbacks.callAPIStreaming !== undefined) {
+        const onTextDelta = (text: string): void => {
+          yieldChunk({ type: 'text_delta', text } as RillValue);
+        };
+        response = await callbacks.callAPIStreaming(
+          currentMessages,
+          providerTools,
+          onTextDelta,
+          signal
+        );
+      } else {
+        response = await callbacks.callAPI(currentMessages, providerTools, signal);
+      }
     } catch (error: unknown) {
       // Wrap provider API errors in RuntimeError
       // Note: Full mapProviderError not used because ProviderErrorDetector
@@ -463,6 +483,14 @@ export async function executeToolLoop(
 
       emitEvent('tool_call', { tool_name: name, args: input });
 
+      if (yieldChunk !== undefined) {
+        yieldChunk({
+          type: 'tool_call',
+          name,
+          args: input as Record<string, RillValue>,
+        } as RillValue);
+      }
+
       const toolStartTime = Date.now();
       try {
         const result = await executeToolCall(
@@ -477,6 +505,10 @@ export async function executeToolLoop(
 
         // Reset consecutive errors on success
         consecutiveErrors = 0;
+
+        if (yieldChunk !== undefined) {
+          yieldChunk({ type: 'tool_result', name, result } as RillValue);
+        }
 
         emitEvent('tool_result', { tool_name: name, duration });
       } catch (error: unknown) {

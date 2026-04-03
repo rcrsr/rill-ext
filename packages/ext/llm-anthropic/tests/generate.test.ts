@@ -7,10 +7,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
   RuntimeError,
+  type ApplicationCallable,
 } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 import type { ExtensionEvent } from '@rcrsr/rill';
+
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 
 // ============================================================
 // TEST HELPERS
@@ -108,7 +113,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.generate.fn(
+      const result = (await getCallable(ext, 'generate').fn(
         { prompt: 'Generate a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
@@ -129,7 +134,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.generate.fn(
+      const result = (await getCallable(ext, 'generate').fn(
         {
           prompt: 'Generate an address',
           options: {
@@ -160,7 +165,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.generate.fn(
+      const result = (await getCallable(ext, 'generate').fn(
         {
           prompt: 'Generate tags',
           options: { schema: { tags: { type: 'list', items: 'string' } } },
@@ -182,7 +187,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      await ext.generate.fn(
+      await getCallable(ext, 'generate').fn(
         {
           prompt: 'Get status',
           options: {
@@ -216,7 +221,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.generate.fn(
+      const result = (await getCallable(ext, 'generate').fn(
         { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
@@ -236,7 +241,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.generate.fn(
+      const result = (await getCallable(ext, 'generate').fn(
         { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
@@ -256,7 +261,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.generate.fn(
+      const result = (await getCallable(ext, 'generate').fn(
         { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
@@ -276,7 +281,7 @@ describe('generate() function', () => {
       });
       const ctx = createRuntimeContext();
 
-      await ext.generate.fn(
+      await getCallable(ext, 'generate').fn(
         {
           prompt: 'Generate',
           options: {
@@ -301,7 +306,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      await ext.generate.fn(
+      await getCallable(ext, 'generate').fn(
         { prompt: 'Generate', options: { schema: { name: 'string' }, max_tokens: 512 } },
         ctx
       );
@@ -325,7 +330,7 @@ describe('generate() function', () => {
         { role: 'assistant', content: 'I prefer JSON.' },
       ];
 
-      await ext.generate.fn(
+      await getCallable(ext, 'generate').fn(
         {
           prompt: 'Generate a name',
           options: { schema: { name: 'string' }, messages: prependedMessages },
@@ -360,7 +365,7 @@ describe('generate() function', () => {
       });
       const ctx = createRuntimeContext();
 
-      await ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx);
+      await getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({ system: 'Factory system prompt.' })
@@ -379,7 +384,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate something', options: {} }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: "generate requires 'schema' option",
@@ -392,7 +397,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate something', options: {} }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx)
       ).rejects.toThrow();
 
       expect(mockCreate).not.toHaveBeenCalled();
@@ -404,7 +409,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate', options: { schema: { ts: 'timestamp' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { ts: 'timestamp' } } }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('timestamp'),
@@ -418,7 +423,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate', options: { schema: { count: 'integer' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { count: 'integer' } } }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('integer'),
@@ -433,7 +438,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(
+        getCallable(ext, 'generate').fn(
           {
             prompt: 'Generate',
             options: {
@@ -460,7 +465,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
       });
@@ -474,7 +479,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('failed to parse response JSON'),
@@ -490,7 +495,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await ext.generate.fn(
+        await getCallable(ext, 'generate').fn(
           { prompt: 'Generate', options: { schema: { name: 'string' } } },
           ctx
         );
@@ -511,7 +516,7 @@ describe('generate() function', () => {
 
       let result: unknown = undefined;
       try {
-        result = await ext.generate.fn(
+        result = await getCallable(ext, 'generate').fn(
           { prompt: 'Generate', options: { schema: { name: 'string' } } },
           ctx
         );
@@ -533,7 +538,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -547,7 +552,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('schema'),
@@ -570,7 +575,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createCtxWithEvents(events);
 
-      await ext.generate.fn(
+      await getCallable(ext, 'generate').fn(
         { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       );
@@ -597,7 +602,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -617,7 +622,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        ext.generate.fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
       ).rejects.toThrow();
 
       const generateEvents = events.filter(
@@ -635,13 +640,13 @@ describe('generate() function', () => {
     it('has correct params definition', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
-      expect(ext.generate.params).toEqual([
-        { name: 'prompt', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'options', type: { type: 'dict', fields: {
-          schema: { type: { type: 'dict' } },
-          system: { type: { type: 'string' }, defaultValue: '' },
-          max_tokens: { type: { type: 'number' }, defaultValue: 0 },
-          messages: { type: { type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }, defaultValue: [] },
+      expect(getCallable(ext, 'generate').params).toEqual([
+        { name: 'prompt', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'options', type: { kind: 'dict', fields: {
+          schema: { type: { kind: 'dict' } },
+          system: { type: { kind: 'string' }, defaultValue: '' },
+          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
+          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
         } }, defaultValue: {}, annotations: {} },
       ]);
     });
@@ -649,18 +654,18 @@ describe('generate() function', () => {
     it('has correct return type', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
-      expect(ext.generate.returnType).toEqual({
+      expect(getCallable(ext, 'generate').returnType).toEqual({
         __rill_type: true,
         typeName: 'dict',
         structure: {
-          type: 'dict',
+          kind: 'dict',
           fields: {
-            data: { type: { type: 'any' } },
-            raw: { type: { type: 'string' } },
-            model: { type: { type: 'string' } },
-            usage: { type: { type: 'dict', fields: { input: { type: { type: 'number' } }, output: { type: { type: 'number' } } } } },
-            stop_reason: { type: { type: 'string' } },
-            id: { type: { type: 'string' } },
+            data: { type: { kind: 'any' } },
+            raw: { type: { kind: 'string' } },
+            model: { type: { kind: 'string' } },
+            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+            stop_reason: { type: { kind: 'string' } },
+            id: { type: { kind: 'string' } },
           },
         },
       });
@@ -669,8 +674,8 @@ describe('generate() function', () => {
     it('has description string', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
-      expect(typeof ext.generate.annotations?.['description']).toBe('string');
-      expect((ext.generate.annotations?.['description'] as string).length).toBeGreaterThan(0);
+      expect(typeof getCallable(ext, 'generate').annotations?.['description']).toBe('string');
+      expect((getCallable(ext, 'generate').annotations?.['description'] as string).length).toBeGreaterThan(0);
     });
   });
 });

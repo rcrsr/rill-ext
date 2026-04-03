@@ -8,7 +8,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { emitExtensionEvent, rillTypeToTypeValue } from '@rcrsr/rill';
+import { emitExtensionEvent, structureToTypeValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
@@ -36,6 +36,16 @@ import { parseResourceContent } from './parsing.js';
  */
 export interface McpResourceTemplate {
   readonly uriTemplate: string;
+  readonly name: string;
+  readonly description?: string | undefined;
+  readonly mimeType?: string | undefined;
+}
+
+/**
+ * MCP static resource from server.
+ */
+export interface McpResource {
+  readonly uri: string;
   readonly name: string;
   readonly description?: string | undefined;
   readonly mimeType?: string | undefined;
@@ -248,8 +258,189 @@ export function createReadResourceFunction(
     params: [p.str('uri', 'Resource URI to read')],
     fn,
     annotations: { description: 'Read an MCP resource by URI' },
-    returnType: rillTypeToTypeValue({ type: 'dict' }),
+    returnType: structureToTypeValue({ kind: 'dict' }),
   };
+}
+
+// ============================================================
+// STATIC RESOURCE FUNCTIONS
+// ============================================================
+
+/**
+ * Creates a zero-param function for a static MCP resource.
+ *
+ * Pre-binds the resource URI so callers need no arguments.
+ * Emits lifecycle events and reads the resource with timeout.
+ *
+ * @param resource - MCP static resource
+ * @param client - Connected MCP client
+ * @param timeoutMs - Timeout in milliseconds
+ * @param lifecycleState - Shared state for lifecycle event tracking
+ * @param callableName - Sanitized callable name exposed to users (for error messages)
+ * @returns RillFunction with zero params
+ */
+function createStaticResourceFunction(
+  resource: McpResource,
+  client: Client,
+  timeoutMs: number,
+  lifecycleState: { connectEmitted: boolean },
+  callableName: string
+): RillFunction {
+  // Build description: use resource.description if provided, otherwise derive from name.
+  // Append MIME type when present.
+  const baseDescription =
+    resource.description !== undefined
+      ? resource.description
+      : `Read resource: ${resource.name}`;
+  const description =
+    resource.mimeType !== undefined
+      ? `${baseDescription} (MIME: ${resource.mimeType})`
+      : baseDescription;
+
+  const uri = resource.uri;
+
+  const fn = async (
+    _args: Record<string, RillValue>,
+    ctx: RuntimeContextLike
+  ): Promise<RillValue> => {
+    // Emit mcp:connect on first resource call [IR-1]
+    if (!lifecycleState.connectEmitted) {
+      emitExtensionEvent(ctx, {
+        event: 'mcp:connect',
+        subsystem: 'extension:mcp',
+      });
+      lifecycleState.connectEmitted = true;
+    }
+
+    // Emit mcp:resource_read event [IR-1]
+    emitExtensionEvent(ctx, {
+      event: 'mcp:resource_read',
+      subsystem: 'extension:mcp',
+      uri,
+    });
+
+    // Set up timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => {
+        reject(createTimeoutError(callableName, timeoutMs));
+      }, timeoutMs);
+      timer.unref();
+    });
+
+    try {
+      // Call MCP readResource with pre-bound URI
+      const result = (await Promise.race([
+        client.readResource({ uri }),
+        timeoutPromise,
+      ])) as McpResourceResult;
+
+      // Parse and return content
+      return parseResourceContent(result);
+    } catch (error) {
+      // Emit mcp:error event [IR-1]
+      emitExtensionEvent(ctx, {
+        event: 'mcp:error',
+        subsystem: 'extension:mcp',
+        error: error instanceof Error ? error.message : String(error),
+        uri,
+      });
+
+      // Handle error categories (same as read_resource)
+      if (error instanceof Error) {
+        if (error.name === 'RuntimeError') {
+          throw error;
+        }
+
+        const message = error.message.toLowerCase();
+
+        if (
+          message.includes('connection closed') ||
+          message.includes('connection lost') ||
+          message.includes('disconnected')
+        ) {
+          throw createConnectionLostError();
+        }
+
+        if (
+          message.includes('unauthorized') ||
+          message.includes('authentication failed') ||
+          message.includes('token') ||
+          message.includes('auth')
+        ) {
+          throw createAuthFailedError();
+        }
+
+        if (
+          message.includes('protocol') ||
+          message.includes('invalid response') ||
+          message.includes('parse') ||
+          message.includes('malformed')
+        ) {
+          throw createProtocolError(error.message);
+        }
+
+        throw createToolError(callableName, error.message);
+      }
+
+      throw createToolError(callableName, String(error));
+    }
+  };
+
+  return {
+    params: [],
+    fn,
+    annotations: { description },
+    returnType: structureToTypeValue({ kind: 'dict' }),
+  };
+}
+
+/**
+ * Generates rill host functions for MCP static resources.
+ *
+ * Applies name sanitization with collision detection and creates
+ * a zero-param RillFunction for each static resource.
+ *
+ * Resource names are prefixed with "resource_" to distinguish from other functions.
+ *
+ * @param resources - Array of MCP static resources
+ * @param client - Connected MCP client
+ * @param timeoutMs - Timeout in milliseconds
+ * @param lifecycleState - Shared state for lifecycle event tracking
+ * @returns Record of sanitized function name to RillFunction
+ */
+export function generateStaticResourceFunctions(
+  resources: McpResource[],
+  client: Client,
+  timeoutMs: number,
+  lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
+): Record<string, RillFunction> {
+  // Prefix resource names with "resource_" before sanitization
+  const prefixedNames = resources.map((resource) => `resource_${resource.name}`);
+
+  // Sanitize names with collision detection
+  const nameMap = sanitizeNames(prefixedNames);
+  const functions: Record<string, RillFunction> = {};
+
+  for (let i = 0; i < resources.length; i++) {
+    const resource = resources[i]!;
+    const prefixedName = prefixedNames[i]!;
+    const sanitizedName = nameMap.get(prefixedName);
+
+    if (!sanitizedName) {
+      // Should never happen: sanitizeNames processes all names
+      continue;
+    }
+
+    functions[sanitizedName] = createStaticResourceFunction(
+      resource,
+      client,
+      timeoutMs,
+      lifecycleState,
+      sanitizedName
+    );
+  }
+
+  return functions;
 }
 
 // ============================================================
@@ -394,7 +585,7 @@ function createResourceTemplateFunction(
     ...(template.description !== undefined && {
       annotations: { description: template.description },
     }),
-    returnType: rillTypeToTypeValue({ type: 'dict' }),
+    returnType: structureToTypeValue({ kind: 'dict' }),
   };
 }
 

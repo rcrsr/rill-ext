@@ -5,7 +5,7 @@
  * RillParam descriptors used in extension host function parameter lists.
  */
 
-import { RuntimeError, type RillFieldDef, type RillParam, type RillType, type RillValue } from '@rcrsr/rill';
+import { RuntimeError, type RillFieldDef, type RillParam, type TypeStructure, type RillValue } from '@rcrsr/rill';
 
 // ============================================================
 // NAME VALIDATION
@@ -62,7 +62,7 @@ export const p = {
     validateParamName(name);
     return {
       name,
-      type: { type: 'string' },
+      type: { kind: 'string' },
       defaultValue: undefined,
       annotations: buildAnnotations(desc),
     };
@@ -80,7 +80,7 @@ export const p = {
     validateParamName(name);
     return {
       name,
-      type: { type: 'number' },
+      type: { kind: 'number' },
       defaultValue: def,
       annotations: buildAnnotations(desc),
     };
@@ -98,7 +98,7 @@ export const p = {
     validateParamName(name);
     return {
       name,
-      type: { type: 'bool' },
+      type: { kind: 'bool' },
       defaultValue: def,
       annotations: buildAnnotations(desc),
     };
@@ -115,9 +115,9 @@ export const p = {
    */
   dict(name: string, desc?: string, def?: RillValue, fields?: Record<string, RillFieldDef>): RillParam {
     validateParamName(name);
-    const type: RillType = fields !== undefined
-      ? { type: 'dict', fields }
-      : { type: 'dict' };
+    const type: TypeStructure = fields !== undefined
+      ? { kind: 'dict', fields }
+      : { kind: 'dict' };
     return {
       name,
       type,
@@ -134,11 +134,11 @@ export const p = {
    * @param desc - Optional description
    * @returns RillParam with type 'list' (with element if itemType provided)
    */
-  list(name: string, itemType?: RillType, desc?: string): RillParam {
+  list(name: string, itemType?: TypeStructure, desc?: string): RillParam {
     validateParamName(name);
-    const type: RillType = itemType !== undefined
-      ? { type: 'list', element: itemType }
-      : { type: 'list' };
+    const type: TypeStructure = itemType !== undefined
+      ? { kind: 'list', element: itemType }
+      : { kind: 'list' };
     return {
       name,
       type,
@@ -158,7 +158,7 @@ export const p = {
     validateParamName(name);
     return {
       name,
-      type: { type: 'closure' },
+      type: { kind: 'closure' },
       defaultValue: undefined,
       annotations: buildAnnotations(desc),
     };

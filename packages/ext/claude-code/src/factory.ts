@@ -6,9 +6,12 @@
 import which from 'which';
 import {
   RuntimeError,
+  createRillStream,
   emitExtensionEvent,
-  rillTypeToTypeValue,
-  type ExtensionResult,
+  structureToTypeValue,
+  toCallable,
+  type ExtensionFactoryResult,
+  type RillFunction,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -90,6 +93,185 @@ function truncateText(text: string, maxLength = 100): string {
 }
 
 // ============================================================
+// STREAM HELPER
+// ============================================================
+
+/**
+ * Options for createPtyStream event emission.
+ */
+interface PtyStreamEventOptions {
+  /** Event name (e.g. 'claude-code:prompt') */
+  readonly event: string;
+  /** Additional fields to include in the emitted event */
+  readonly eventData: Record<string, unknown>;
+}
+
+/**
+ * Bridge a PTY SpawnResult into a RillStream.
+ *
+ * The async generator converts push-based onData callbacks to a pull-based
+ * async iteration. Each raw PTY line is yielded as a string chunk.
+ * On non-zero exit (EC-10), an error chunk is yielded and the stream resolves
+ * with partial data rather than throwing.
+ *
+ * @param spawn - Spawned PTY process handle
+ * @param tracker - Active process tracker for cleanup registration
+ * @param ctx - Runtime context for event emission
+ * @param eventOpts - Event name and extra fields for emission on resolve
+ * @returns RillStream value
+ */
+function createPtyStream(
+  spawn: import('./process.js').SpawnResult,
+  tracker: ProcessTracker,
+  ctx: RuntimeContext,
+  eventOpts: PtyStreamEventOptions
+): RillValue {
+  // Accumulate parsed messages for the resolve callback
+  const messages: ClaudeMessage[] = [];
+  const parser = createStreamParser();
+
+  // Shared state for push-to-pull bridge — declared at createPtyStream scope so
+  // exitCode.then() attaches immediately (not lazily inside the generator).
+  // This prevents unhandled rejections when exitCode rejects before the first next().
+  const lineBuffer: string[] = [];
+  let done = false;
+  let errorMessage: string | undefined;
+  let resolveWaiter: (() => void) | undefined;
+
+  function wake(): void {
+    if (resolveWaiter) {
+      const fn = resolveWaiter;
+      resolveWaiter = undefined;
+      fn();
+    }
+  }
+
+  // onData pushes raw PTY chunks; lines are buffered for pull iteration.
+  spawn.ptyProcess.onData((chunk) => {
+    const rawText =
+      typeof chunk === 'string' ? chunk : (chunk as Buffer).toString('utf8');
+
+    // Split into lines and buffer non-empty ones for yielding
+    for (const line of rawText.split('\n')) {
+      if (line.length > 0) {
+        lineBuffer.push(line);
+      }
+    }
+
+    // Parse chunk to accumulate structured messages
+    parser.processChunk(chunk, (msg) => messages.push(msg));
+
+    wake();
+  });
+
+  // Monitor exit promise — attach immediately to prevent unhandled rejections.
+  // EC-9: Timeout — re-throw RuntimeError so the generator propagates it to the consumer.
+  // EC-10: Non-zero exit — yield error chunk, resolve with partial data.
+  const exitPromise = spawn.exitCode.then(
+    () => {
+      parser.flush((msg) => messages.push(msg));
+      done = true;
+      wake();
+    },
+    (error: unknown) => {
+      if (error instanceof RuntimeError && error.context?.['timeoutMs'] !== undefined) {
+        done = true;
+        wake();
+        throw error;
+      }
+      parser.flush((msg) => messages.push(msg));
+      done = true;
+      errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      lineBuffer.push(`[error] ${errorMessage}`);
+      wake();
+    }
+  );
+  // Suppress unhandled-rejection for the timeout path: exitPromise may reject before
+  // the generator or resolve callback awaits it. The rejection is handled at await sites.
+  exitPromise.catch(() => undefined);
+
+  // Async generator bridges push-based onData to pull-based iteration.
+  async function* chunks(): AsyncGenerator<RillValue> {
+    // Pull loop: yield buffered lines, wait when buffer is empty
+    while (!done || lineBuffer.length > 0) {
+      if (lineBuffer.length === 0) {
+        await new Promise<void>((resolve) => {
+          resolveWaiter = resolve;
+        });
+      }
+      while (lineBuffer.length > 0) {
+        yield lineBuffer.shift() as string;
+      }
+    }
+
+    await exitPromise;
+  }
+
+  const retTypeStructure = {
+    kind: 'dict' as const,
+    fields: {
+      result: { type: { kind: 'string' as const } },
+      tokens: { type: { kind: 'dict' as const, fields: {
+        prompt: { type: { kind: 'number' as const } },
+        cacheWrite5m: { type: { kind: 'number' as const } },
+        cacheWrite1h: { type: { kind: 'number' as const } },
+        cacheRead: { type: { kind: 'number' as const } },
+        output: { type: { kind: 'number' as const } },
+      } } },
+      cost: { type: { kind: 'number' as const } },
+      exitCode: { type: { kind: 'number' as const } },
+      duration: { type: { kind: 'number' as const } },
+    },
+  };
+
+  // Resolve callback: called after chunk exhaustion, returns same dict as pre-streaming.
+  // On error path, emits claude-code:error event instead of the success event.
+  // Awaits exitPromise to ensure errorMessage and messages are populated even when
+  // the caller resolves via __rill_stream_resolve() without iterating chunks.
+  const resolve = async (): Promise<RillValue> => {
+    await exitPromise;
+    const startTime = Date.now();
+    const result = extractResult(messages);
+    const duration = Date.now() - startTime;
+
+    if (errorMessage !== undefined) {
+      emitExtensionEvent(ctx, {
+        event: 'claude-code:error',
+        subsystem: 'extension:claude-code',
+        error: errorMessage,
+        duration,
+      });
+    } else {
+      emitExtensionEvent(ctx, {
+        event: eventOpts.event,
+        subsystem: 'extension:claude-code',
+        ...eventOpts.eventData,
+        duration,
+      });
+    }
+
+    tracker.disposers.delete(spawn.dispose);
+    spawn.dispose();
+
+    return {
+      ...result,
+      tokens: { ...result.tokens } as { [key: string]: RillValue },
+    } as RillValue;
+  };
+
+  return createRillStream({
+    chunks: chunks(),
+    resolve,
+    dispose: () => {
+      tracker.disposers.delete(spawn.dispose);
+      spawn.dispose();
+    },
+    chunkType: { kind: 'string' },
+    retType: retTypeStructure,
+  }) as RillValue;
+}
+
+// ============================================================
 // VALIDATION
 // ============================================================
 
@@ -137,7 +319,7 @@ function validateTimeout(timeout: number): void {
  */
 export function createClaudeCodeExtension(
   config: ClaudeCodeConfig = {}
-): ExtensionResult {
+): ExtensionFactoryResult {
   // Extract config with defaults
   const binaryPath = config.binaryPath ?? DEFAULT_BINARY_PATH;
   const defaultTimeout = config.defaultTimeout ?? DEFAULT_TIMEOUT;
@@ -151,7 +333,7 @@ export function createClaudeCodeExtension(
   try {
     which.sync(binaryPath);
   } catch {
-    throw new Error(`Binary not found: ${binaryPath}`);
+    throw new RuntimeError('RILL-R004', 'claude binary not found', undefined, { binaryPath });
   }
 
   // Track active processes for cleanup
@@ -175,106 +357,65 @@ export function createClaudeCodeExtension(
   };
 
   // Return extension result with implementations
-  const result: ExtensionResult = {
+  const fnDict: { prompt: RillFunction; skill: RillFunction; command: RillFunction } = {
     // IR-2: claude-code::prompt
     prompt: {
       params: [
         p.str('text'),
         p.dict('options', undefined, {}, {
-          timeout: { type: { type: 'number' }, defaultValue: 0 },
+          timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
-      fn: async (args, ctx): Promise<RillValue> => {
-        const startTime = Date.now();
+      fn: (args, ctx): RillValue => {
+        // Extract arguments
+        const text = args['text'] as string;
+        const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-        try {
-          // Extract arguments
-          const text = args['text'] as string;
-          const options = (args['options'] ?? {}) as Record<string, unknown>;
-
-          // EC-3: Validate text is non-empty
-          if (text.trim().length === 0) {
-            throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
-          }
-
-          // Extract timeout option
-          const timeout =
-            typeof options['timeout'] === 'number'
-              ? options['timeout']
-              : defaultTimeout;
-
-          // Spawn process and collect messages
-          const spawn = spawnClaudeCli(text, {
-            binaryPath,
-            timeoutMs: timeout,
-            dangerouslySkipPermissions,
-            settingSources,
-          });
-
-          // Register cleanup
-          tracker.disposers.add(spawn.dispose);
-
-          // Parse stream output
-          const parser = createStreamParser();
-          const messages: ClaudeMessage[] = [];
-
-          spawn.ptyProcess.onData((chunk) => {
-            parser.processChunk(chunk, (msg) => messages.push(msg));
-          });
-
-          // Wait for process completion
-          try {
-            await spawn.exitCode;
-            parser.flush((msg) => messages.push(msg));
-          } finally {
-            tracker.disposers.delete(spawn.dispose);
-            spawn.dispose();
-          }
-
-          // Extract result
-          const result = extractResult(messages);
-
-          // AC-17: Emit claude-code:prompt event
-          const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'claude-code:prompt',
-            subsystem: 'extension:claude-code',
-            prompt: truncateText(text),
-            duration,
-          });
-
-          // Convert to plain object literal for RillValue compatibility
-          return {
-            ...result,
-            tokens: { ...result.tokens } as { [key: string]: RillValue },
-          } as RillValue;
-        } catch (error: unknown) {
-          // AC-20: Emit claude-code:error event
-          const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'claude-code:error',
-            subsystem: 'extension:claude-code',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            duration,
-          });
-          throw error;
+        // EC-7: Validate text is non-empty (before stream creation)
+        if (text.trim().length === 0) {
+          throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
         }
+
+        // Extract timeout option
+        const timeout =
+          typeof options['timeout'] === 'number'
+            ? options['timeout']
+            : defaultTimeout;
+
+        // EC-8/EC-11: Spawn process (throws RuntimeError RILL-R004 on failure)
+        const spawn = spawnClaudeCli(text, {
+          binaryPath,
+          timeoutMs: timeout,
+          dangerouslySkipPermissions,
+          settingSources,
+        });
+
+        tracker.disposers.add(spawn.dispose);
+
+        return createPtyStream(spawn, tracker, ctx as RuntimeContext, {
+          event: 'claude-code:prompt',
+          eventData: { prompt: truncateText(text) },
+        });
       },
       annotations: { description: 'Execute Claude Code prompt and return result text and token usage' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
-        fields: {
-          result: { type: { type: 'string' } },
-          tokens: { type: { type: 'dict', fields: {
-            prompt: { type: { type: 'number' } },
-            cacheWrite5m: { type: { type: 'number' } },
-            cacheWrite1h: { type: { type: 'number' } },
-            cacheRead: { type: { type: 'number' } },
-            output: { type: { type: 'number' } },
-          } } },
-          cost: { type: { type: 'number' } },
-          exitCode: { type: { type: 'number' } },
-          duration: { type: { type: 'number' } },
+      returnType: structureToTypeValue({
+        kind: 'stream',
+        chunk: { kind: 'string' },
+        ret: {
+          kind: 'dict',
+          fields: {
+            result: { type: { kind: 'string' } },
+            tokens: { type: { kind: 'dict', fields: {
+              prompt: { type: { kind: 'number' } },
+              cacheWrite5m: { type: { kind: 'number' } },
+              cacheWrite1h: { type: { kind: 'number' } },
+              cacheRead: { type: { kind: 'number' } },
+              output: { type: { kind: 'number' } },
+            } } },
+            cost: { type: { kind: 'number' } },
+            exitCode: { type: { kind: 'number' } },
+            duration: { type: { kind: 'number' } },
+          },
         },
       }),
     },
@@ -284,105 +425,64 @@ export function createClaudeCodeExtension(
       params: [
         p.str('name'),
         p.dict('args', undefined, {}, {
-          timeout: { type: { type: 'number' }, defaultValue: 0 },
+          timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
-      fn: async (fnArgs, ctx): Promise<RillValue> => {
-        const startTime = Date.now();
+      fn: (fnArgs, ctx): RillValue => {
+        // Extract arguments
+        const name = fnArgs['name'] as string;
+        const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
-        try {
-          // Extract arguments
-          const name = fnArgs['name'] as string;
-          const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
-
-          // EC-10: Validate name is non-empty
-          if (name.trim().length === 0) {
-            throw new RuntimeError('RILL-R004', 'skill name cannot be empty');
-          }
-
-          // Format input as /{name} {serialized args}
-          const flags = serializeArgsToFlags(args);
-          const flagsText = flags.length > 0 ? ' ' + flags.join(' ') : '';
-          const prompt = `/${name}${flagsText}`;
-
-          // Extract timeout option
-          const timeout =
-            typeof args['timeout'] === 'number'
-              ? args['timeout']
-              : defaultTimeout;
-
-          // Spawn process
-          const spawn = spawnClaudeCli(prompt, {
-            binaryPath,
-            timeoutMs: timeout,
-            dangerouslySkipPermissions,
-            settingSources,
-          });
-
-          tracker.disposers.add(spawn.dispose);
-
-          // Parse stream output
-          const parser = createStreamParser();
-          const messages: ClaudeMessage[] = [];
-
-          spawn.ptyProcess.onData((chunk) => {
-            parser.processChunk(chunk, (msg) => messages.push(msg));
-          });
-
-          // Wait for process completion
-          try {
-            await spawn.exitCode;
-            parser.flush((msg) => messages.push(msg));
-          } finally {
-            tracker.disposers.delete(spawn.dispose);
-            spawn.dispose();
-          }
-
-          // Extract result
-          const result = extractResult(messages);
-
-          // AC-18: Emit claude-code:skill event
-          const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'claude-code:skill',
-            subsystem: 'extension:claude-code',
-            name,
-            args,
-            duration,
-          });
-
-          // Convert to plain object literal for RillValue compatibility
-          return {
-            ...result,
-            tokens: { ...result.tokens } as { [key: string]: RillValue },
-          } as RillValue;
-        } catch (error: unknown) {
-          // AC-20: Emit claude-code:error event
-          const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'claude-code:error',
-            subsystem: 'extension:claude-code',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            duration,
-          });
-          throw error;
+        // EC-7: Validate name is non-empty (before stream creation)
+        if (name.trim().length === 0) {
+          throw new RuntimeError('RILL-R004', 'skill name cannot be empty');
         }
+
+        // Format input as /{name} {serialized args}
+        const flags = serializeArgsToFlags(args);
+        const flagsText = flags.length > 0 ? ' ' + flags.join(' ') : '';
+        const prompt = `/${name}${flagsText}`;
+
+        // Extract timeout option
+        const timeout =
+          typeof args['timeout'] === 'number'
+            ? args['timeout']
+            : defaultTimeout;
+
+        // EC-8/EC-11: Spawn process (throws RuntimeError RILL-R004 on failure)
+        const spawn = spawnClaudeCli(prompt, {
+          binaryPath,
+          timeoutMs: timeout,
+          dangerouslySkipPermissions,
+          settingSources,
+        });
+
+        tracker.disposers.add(spawn.dispose);
+
+        return createPtyStream(spawn, tracker, ctx as RuntimeContext, {
+          event: 'claude-code:skill',
+          eventData: { name, args },
+        });
       },
       annotations: { description: 'Execute Claude Code skill with instruction and return structured result' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
-        fields: {
-          result: { type: { type: 'string' } },
-          tokens: { type: { type: 'dict', fields: {
-            prompt: { type: { type: 'number' } },
-            cacheWrite5m: { type: { type: 'number' } },
-            cacheWrite1h: { type: { type: 'number' } },
-            cacheRead: { type: { type: 'number' } },
-            output: { type: { type: 'number' } },
-          } } },
-          cost: { type: { type: 'number' } },
-          exitCode: { type: { type: 'number' } },
-          duration: { type: { type: 'number' } },
+      returnType: structureToTypeValue({
+        kind: 'stream',
+        chunk: { kind: 'string' },
+        ret: {
+          kind: 'dict',
+          fields: {
+            result: { type: { kind: 'string' } },
+            tokens: { type: { kind: 'dict', fields: {
+              prompt: { type: { kind: 'number' } },
+              cacheWrite5m: { type: { kind: 'number' } },
+              cacheWrite1h: { type: { kind: 'number' } },
+              cacheRead: { type: { kind: 'number' } },
+              output: { type: { kind: 'number' } },
+            } } },
+            cost: { type: { kind: 'number' } },
+            exitCode: { type: { kind: 'number' } },
+            duration: { type: { kind: 'number' } },
+          },
         },
       }),
     },
@@ -392,112 +492,74 @@ export function createClaudeCodeExtension(
       params: [
         p.str('name'),
         p.dict('args', undefined, {}, {
-          timeout: { type: { type: 'number' }, defaultValue: 0 },
+          timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
-      fn: async (fnArgs, ctx): Promise<RillValue> => {
-        const startTime = Date.now();
+      fn: (fnArgs, ctx): RillValue => {
+        // Extract arguments
+        const name = fnArgs['name'] as string;
+        const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
-        try {
-          // Extract arguments
-          const name = fnArgs['name'] as string;
-          const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
-
-          // EC-13: Validate name is non-empty
-          if (name.trim().length === 0) {
-            throw new RuntimeError('RILL-R004', 'command name cannot be empty');
-          }
-
-          // Format input similar to skill
-          const flags = serializeArgsToFlags(args);
-          const flagsText = flags.length > 0 ? ' ' + flags.join(' ') : '';
-          const prompt = `/${name}${flagsText}`;
-
-          // Extract timeout option
-          const timeout =
-            typeof args['timeout'] === 'number'
-              ? args['timeout']
-              : defaultTimeout;
-
-          // Spawn process
-          const spawn = spawnClaudeCli(prompt, {
-            binaryPath,
-            timeoutMs: timeout,
-            dangerouslySkipPermissions,
-            settingSources,
-          });
-
-          tracker.disposers.add(spawn.dispose);
-
-          // Parse stream output
-          const parser = createStreamParser();
-          const messages: ClaudeMessage[] = [];
-
-          spawn.ptyProcess.onData((chunk) => {
-            parser.processChunk(chunk, (msg) => messages.push(msg));
-          });
-
-          // Wait for process completion
-          try {
-            await spawn.exitCode;
-            parser.flush((msg) => messages.push(msg));
-          } finally {
-            tracker.disposers.delete(spawn.dispose);
-            spawn.dispose();
-          }
-
-          // Extract result
-          const result = extractResult(messages);
-
-          // AC-19: Emit claude-code:command event
-          const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'claude-code:command',
-            subsystem: 'extension:claude-code',
-            name,
-            args,
-            duration,
-          });
-
-          // Convert to plain object literal for RillValue compatibility
-          return {
-            ...result,
-            tokens: { ...result.tokens } as { [key: string]: RillValue },
-          } as RillValue;
-        } catch (error: unknown) {
-          // AC-20: Emit claude-code:error event
-          const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'claude-code:error',
-            subsystem: 'extension:claude-code',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            duration,
-          });
-          throw error;
+        // EC-7: Validate name is non-empty (before stream creation)
+        if (name.trim().length === 0) {
+          throw new RuntimeError('RILL-R004', 'command name cannot be empty');
         }
+
+        // Format input similar to skill
+        const flags = serializeArgsToFlags(args);
+        const flagsText = flags.length > 0 ? ' ' + flags.join(' ') : '';
+        const prompt = `/${name}${flagsText}`;
+
+        // Extract timeout option
+        const timeout =
+          typeof args['timeout'] === 'number'
+            ? args['timeout']
+            : defaultTimeout;
+
+        // EC-8/EC-11: Spawn process (throws RuntimeError RILL-R004 on failure)
+        const spawn = spawnClaudeCli(prompt, {
+          binaryPath,
+          timeoutMs: timeout,
+          dangerouslySkipPermissions,
+          settingSources,
+        });
+
+        tracker.disposers.add(spawn.dispose);
+
+        return createPtyStream(spawn, tracker, ctx as RuntimeContext, {
+          event: 'claude-code:command',
+          eventData: { name, args },
+        });
       },
       annotations: { description: 'Execute Claude Code command with task description and return execution summary' },
-      returnType: rillTypeToTypeValue({
-        type: 'dict',
-        fields: {
-          result: { type: { type: 'string' } },
-          tokens: { type: { type: 'dict', fields: {
-            prompt: { type: { type: 'number' } },
-            cacheWrite5m: { type: { type: 'number' } },
-            cacheWrite1h: { type: { type: 'number' } },
-            cacheRead: { type: { type: 'number' } },
-            output: { type: { type: 'number' } },
-          } } },
-          cost: { type: { type: 'number' } },
-          exitCode: { type: { type: 'number' } },
-          duration: { type: { type: 'number' } },
+      returnType: structureToTypeValue({
+        kind: 'stream',
+        chunk: { kind: 'string' },
+        ret: {
+          kind: 'dict',
+          fields: {
+            result: { type: { kind: 'string' } },
+            tokens: { type: { kind: 'dict', fields: {
+              prompt: { type: { kind: 'number' } },
+              cacheWrite5m: { type: { kind: 'number' } },
+              cacheWrite1h: { type: { kind: 'number' } },
+              cacheRead: { type: { kind: 'number' } },
+              output: { type: { kind: 'number' } },
+            } } },
+            cost: { type: { kind: 'number' } },
+            exitCode: { type: { kind: 'number' } },
+            duration: { type: { kind: 'number' } },
+          },
         },
       }),
     },
   };
 
-  // IR-5: Dispose function for process cleanup
-  result.dispose = dispose;
+  const callableDict = {
+    prompt: toCallable(fnDict.prompt),
+    skill: toCallable(fnDict.skill),
+    command: toCallable(fnDict.command),
+  };
 
-  return result;
+  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
 }

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, RuntimeError } from '@rcrsr/rill';
 
 // ============================================================
 // MOCKS
@@ -55,9 +55,9 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension();
 
       expect(which.default.sync).toHaveBeenCalledWith('claude');
-      expect(ext.prompt).toBeDefined();
-      expect(ext.skill).toBeDefined();
-      expect(ext.command).toBeDefined();
+      expect((ext.value as any).prompt).toBeDefined();
+      expect((ext.value as any).skill).toBeDefined();
+      expect((ext.value as any).command).toBeDefined();
       expect(ext.dispose).toBeDefined();
     });
 
@@ -99,7 +99,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension();
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
+      await (ext.value as any).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify default timeout 1800000 was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -114,15 +114,15 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
 
       const ext = createClaudeCodeExtension();
 
-      expect(ext.prompt).toBeDefined();
-      expect(ext.prompt.fn).toBeInstanceOf(Function);
-      expect(ext.prompt.params).toBeDefined();
-      expect(ext.skill).toBeDefined();
-      expect(ext.skill.fn).toBeInstanceOf(Function);
-      expect(ext.skill.params).toBeDefined();
-      expect(ext.command).toBeDefined();
-      expect(ext.command.fn).toBeInstanceOf(Function);
-      expect(ext.command.params).toBeDefined();
+      expect((ext.value as any).prompt).toBeDefined();
+      expect((ext.value as any).prompt.fn).toBeInstanceOf(Function);
+      expect((ext.value as any).prompt.params).toBeDefined();
+      expect((ext.value as any).skill).toBeDefined();
+      expect((ext.value as any).skill.fn).toBeInstanceOf(Function);
+      expect((ext.value as any).skill.params).toBeDefined();
+      expect((ext.value as any).command).toBeDefined();
+      expect((ext.value as any).command.fn).toBeInstanceOf(Function);
+      expect((ext.value as any).command.params).toBeDefined();
       expect(ext.dispose).toBeInstanceOf(Function);
     });
   });
@@ -137,7 +137,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       });
 
       expect(which.default.sync).toHaveBeenCalledWith('/usr/local/bin/claude');
-      expect(ext.prompt).toBeDefined();
+      expect((ext.value as any).prompt).toBeDefined();
     });
 
     it('validates binary exists in PATH at factory creation', async () => {
@@ -178,7 +178,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension({ binaryPath: 'custom-claude' });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn({ text: 'Test', options: {} }, ctx);
+      await (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
 
       // Verify custom binary path was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -227,7 +227,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension({ defaultTimeout: 60000 });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
+      await (ext.value as any).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify custom default timeout 60000 was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -274,7 +274,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension({ defaultTimeout: 3600000 });
       const ctx = createRuntimeContext();
 
-      await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
+      await (ext.value as any).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify maximum timeout was accepted
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -328,7 +328,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
     const ctx = createRuntimeContext();
 
-    await ext.prompt.fn({ text: 'Test prompt', options: { timeout: 90000 } }, ctx);
+    await (ext.value as any).prompt.fn({ text: 'Test prompt', options: { timeout: 90000 } }, ctx);
 
     // Verify timeout option overrides default
     expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -375,7 +375,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
     const ctx = createRuntimeContext();
 
-    await ext.skill.fn({ name: 'test-skill', args: { timeout: 120000 } }, ctx);
+    await (ext.value as any).skill.fn({ name: 'test-skill', args: { timeout: 120000 } }, ctx);
 
     // Verify timeout option overrides default for skill
     expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -422,7 +422,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
     const ctx = createRuntimeContext();
 
-    await ext.command.fn({ name: 'test-command', args: { timeout: 150000 } }, ctx);
+    await (ext.value as any).command.fn({ name: 'test-command', args: { timeout: 150000 } }, ctx);
 
     // Verify timeout option overrides default for command
     expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -469,7 +469,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     const ext = createClaudeCodeExtension({ defaultTimeout: 45000 });
     const ctx = createRuntimeContext();
 
-    await ext.prompt.fn({ text: 'Test prompt', options: {} }, ctx);
+    await (ext.value as any).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
     // Verify default timeout was used when option not provided
     expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -484,7 +484,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
 // ============================================================
 
 describe('EC-1: Invalid binaryPath at factory creation', () => {
-  it('throws Error "Binary not found: {path}" when binary does not exist', async () => {
+  it('throws RuntimeError RILL-R004 "claude binary not found" when binary does not exist', async () => {
     const which = await import('which');
 
     // Mock which.sync to throw (binary not in PATH)
@@ -494,7 +494,7 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
 
     expect(() =>
       createClaudeCodeExtension({ binaryPath: '/nonexistent/claude' })
-    ).toThrow('Binary not found: /nonexistent/claude');
+    ).toThrow('claude binary not found');
   });
 
   it('throws for binary not in PATH', async () => {
@@ -506,7 +506,7 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
 
     expect(() =>
       createClaudeCodeExtension({ binaryPath: 'missing-binary' })
-    ).toThrow('Binary not found: missing-binary');
+    ).toThrow('claude binary not found');
   });
 
   it('validates binaryPath eagerly at factory creation time', async () => {
@@ -518,7 +518,7 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
 
     // Validation happens immediately during createClaudeCodeExtension call
     expect(() => createClaudeCodeExtension({ binaryPath: 'bad-path' })).toThrow(
-      'Binary not found: bad-path'
+      'claude binary not found'
     );
 
     // Verify which.sync was called during factory creation

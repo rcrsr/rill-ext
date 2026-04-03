@@ -4,7 +4,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, createVector } from '@rcrsr/rill';
+import { createRuntimeContext, createVector, type ApplicationCallable } from '@rcrsr/rill';
+
+/**
+ * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
+ */
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 import { createPineconeExtension } from '../src/factory.js';
 import type { PineconeConfig } from '../src/types.js';
 
@@ -218,7 +225,7 @@ describe('Vector CRUD operations', () => {
       );
 
       // Upsert vector
-      const upsertResult = (await ext.upsert.fn(
+      const upsertResult = (await getCallable(ext, 'upsert').fn(
         { id: 'doc-1', vector: testVector, metadata: metadata },
         ctx
       )) as Record<string, unknown>;
@@ -239,7 +246,7 @@ describe('Vector CRUD operations', () => {
       expect(callArgs.records[0]?.values).toHaveLength(4);
 
       // Get vector back
-      const getResult = (await ext.get.fn({ id: 'doc-1' }, ctx)) as Record<
+      const getResult = (await getCallable(ext, 'get').fn({ id: 'doc-1' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -266,14 +273,14 @@ describe('Vector CRUD operations', () => {
         ])
       );
 
-      const upsertResult = (await ext.upsert.fn(
+      const upsertResult = (await getCallable(ext, 'upsert').fn(
         { id: 'doc-empty', vector: testVector, metadata: {} },
         ctx
       )) as Record<string, unknown>;
 
       expect(upsertResult['success']).toBe(true);
 
-      const getResult = (await ext.get.fn({ id: 'doc-empty' }, ctx)) as Record<
+      const getResult = (await getCallable(ext, 'get').fn({ id: 'doc-empty' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -302,14 +309,14 @@ describe('Vector CRUD operations', () => {
         ])
       );
 
-      const upsertResult = (await ext.upsert.fn(
+      const upsertResult = (await getCallable(ext, 'upsert').fn(
         { id: 'doc-large', vector: testVector, metadata: largeMetadata },
         ctx
       )) as Record<string, unknown>;
 
       expect(upsertResult['success']).toBe(true);
 
-      const getResult = (await ext.get.fn({ id: 'doc-large' }, ctx)) as Record<
+      const getResult = (await getCallable(ext, 'get').fn({ id: 'doc-large' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -339,7 +346,7 @@ describe('Vector CRUD operations', () => {
 
       mockUpsert.mockResolvedValue(undefined);
 
-      const result = (await ext.upsert_batch.fn({ items: items }, ctx)) as Record<
+      const result = (await getCallable(ext, 'upsert_batch').fn({ items: items }, ctx)) as Record<
         string,
         unknown
       >;
@@ -350,7 +357,7 @@ describe('Vector CRUD operations', () => {
     });
 
     it('returns { succeeded: 0 } for empty batch (AC-22)', async () => {
-      const result = (await ext.upsert_batch.fn({ items: [] }, ctx)) as Record<
+      const result = (await getCallable(ext, 'upsert_batch').fn({ items: [] }, ctx)) as Record<
         string,
         unknown
       >;
@@ -371,7 +378,7 @@ describe('Vector CRUD operations', () => {
 
       mockUpsert.mockRejectedValue(new Error('Network error'));
 
-      const result = (await ext.upsert_batch.fn({ items: items }, ctx)) as Record<
+      const result = (await getCallable(ext, 'upsert_batch').fn({ items: items }, ctx)) as Record<
         string,
         unknown
       >;
@@ -406,7 +413,7 @@ describe('Vector CRUD operations', () => {
         new Error('dimension mismatch (expected 4, got 2)')
       );
 
-      const result = (await ext.upsert_batch.fn({ items: items }, ctx)) as Record<
+      const result = (await getCallable(ext, 'upsert_batch').fn({ items: items }, ctx)) as Record<
         string,
         unknown
       >;
@@ -436,7 +443,7 @@ describe('Vector CRUD operations', () => {
         new Error('dimension mismatch (expected 4, got 2)')
       );
 
-      const firstResult = (await ext.upsert_batch.fn(
+      const firstResult = (await getCallable(ext, 'upsert_batch').fn(
         { items: badItems },
         ctx
       )) as Record<string, unknown>;
@@ -461,7 +468,7 @@ describe('Vector CRUD operations', () => {
       mockUpsert.mockResolvedValueOnce(undefined);
       mockUpsert.mockResolvedValueOnce(undefined);
 
-      const secondResult = (await ext.upsert_batch.fn(
+      const secondResult = (await getCallable(ext, 'upsert_batch').fn(
         { items: fixedItems },
         ctx
       )) as Record<string, unknown>;
@@ -486,7 +493,7 @@ describe('Vector CRUD operations', () => {
         ])
       );
 
-      const results = (await ext.search.fn({ vector: queryVector, options: {} }, ctx)) as Array<
+      const results = (await getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)) as Array<
         Record<string, unknown>
       >;
 
@@ -504,7 +511,7 @@ describe('Vector CRUD operations', () => {
 
       mockQuery.mockResolvedValue(createMockQueryResponse([]));
 
-      const results = (await ext.search.fn({ vector: queryVector, options: {} }, ctx)) as Array<
+      const results = (await getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)) as Array<
         Record<string, unknown>
       >;
 
@@ -520,7 +527,7 @@ describe('Vector CRUD operations', () => {
 
       mockQuery.mockResolvedValue(createMockQueryResponse([]));
 
-      const results = (await ext.search.fn(
+      const results = (await getCallable(ext, 'search').fn(
         { vector: queryVector, options },
         ctx
       )) as Array<Record<string, unknown>>;
@@ -549,7 +556,7 @@ describe('Vector CRUD operations', () => {
         ])
       );
 
-      const results = (await ext.search.fn(
+      const results = (await getCallable(ext, 'search').fn(
         { vector: queryVector, options },
         ctx
       )) as Array<Record<string, unknown>>;
@@ -563,7 +570,7 @@ describe('Vector CRUD operations', () => {
     it('deletes single vector', async () => {
       mockDeleteOne.mockResolvedValue(undefined);
 
-      const result = (await ext.delete.fn({ id: 'doc-1' }, ctx)) as Record<
+      const result = (await getCallable(ext, 'delete').fn({ id: 'doc-1' }, ctx)) as Record<
         string,
         unknown
       >;
@@ -577,7 +584,7 @@ describe('Vector CRUD operations', () => {
       mockDeleteOne.mockResolvedValue(undefined);
 
       const ids = ['doc-1', 'doc-2', 'doc-3'];
-      const result = (await ext.delete_batch.fn({ ids: ids }, ctx)) as Record<
+      const result = (await getCallable(ext, 'delete_batch').fn({ ids: ids }, ctx)) as Record<
         string,
         unknown
       >;
@@ -593,7 +600,7 @@ describe('Vector CRUD operations', () => {
         createMockIndexStatsResponse('', 42, 384)
       );
 
-      const count = (await ext.count.fn({}, ctx)) as number;
+      const count = (await getCallable(ext, 'count').fn({}, ctx)) as number;
 
       expect(count).toBe(42);
     });
@@ -622,7 +629,7 @@ describe('Collection lifecycle operations', () => {
     it('creates collection with dimensions (AC-7)', async () => {
       mockCreateIndex.mockResolvedValue(undefined);
 
-      const result = (await ext.create_collection.fn(
+      const result = (await getCallable(ext, 'create_collection').fn(
         { name: 'my_vectors', options: { dimensions: 384, distance: 'cosine' } },
         ctx
       )) as Record<string, unknown>;
@@ -650,7 +657,7 @@ describe('Collection lifecycle operations', () => {
         createMockDescribeIndexResponse('test_index', 384, 'cosine')
       );
 
-      const result = (await ext.describe.fn({}, ctx)) as Record<
+      const result = (await getCallable(ext, 'describe').fn({}, ctx)) as Record<
         string,
         unknown
       >;
@@ -675,7 +682,7 @@ describe('Collection lifecycle operations', () => {
       };
       const emptyExt = createPineconeExtension(config);
 
-      const result = (await emptyExt.describe.fn({}, ctx)) as Record<
+      const result = (await getCallable(emptyExt, 'describe').fn({}, ctx)) as Record<
         string,
         unknown
       >;
@@ -692,7 +699,7 @@ describe('Collection lifecycle operations', () => {
         ],
       });
 
-      const result = (await ext.list_collections.fn({}, ctx)) as Array<string>;
+      const result = (await getCallable(ext, 'list_collections').fn({}, ctx)) as Array<string>;
 
       expect(result).toEqual(['index-1', 'index-2', 'index-3']);
     });
@@ -702,7 +709,7 @@ describe('Collection lifecycle operations', () => {
         indexes: [],
       });
 
-      const result = (await ext.list_collections.fn({}, ctx)) as Array<string>;
+      const result = (await getCallable(ext, 'list_collections').fn({}, ctx)) as Array<string>;
 
       expect(result).toEqual([]);
     });
@@ -710,7 +717,7 @@ describe('Collection lifecycle operations', () => {
     it('deletes collection', async () => {
       mockDeleteIndex.mockResolvedValue(undefined);
 
-      const result = (await ext.delete_collection.fn(
+      const result = (await getCallable(ext, 'delete_collection').fn(
         { name: 'old_index' },
         ctx
       )) as Record<string, unknown>;
@@ -731,7 +738,7 @@ describe('Collection lifecycle operations', () => {
 
       mockUpsert.mockResolvedValue(undefined);
 
-      const result = (await ext.upsert.fn(
+      const result = (await getCallable(ext, 'upsert').fn(
         { id: 'doc-max', vector: testVector, metadata: {} },
         ctx
       )) as Record<string, unknown>;
@@ -769,7 +776,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
+    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'pinecone: authentication failed (401)'
     );
   });
@@ -782,7 +789,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
+    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'pinecone: collection not found'
     );
   });
@@ -795,7 +802,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
+    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'pinecone: rate limit exceeded'
     );
   });
@@ -810,7 +817,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
+    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'pinecone: request timeout'
     );
   });
@@ -823,7 +830,7 @@ describe('Error handling contracts', () => {
     const wrongVector = createVector(new Float32Array(128).fill(0.1), 'test');
 
     await expect(
-      ext.upsert.fn({ id: 'doc-1', vector: wrongVector, metadata: {} }, ctx)
+      getCallable(ext, 'upsert').fn({ id: 'doc-1', vector: wrongVector, metadata: {} }, ctx)
     ).rejects.toThrow('pinecone: dimension mismatch (expected 384, got 128)');
   });
 
@@ -833,14 +840,14 @@ describe('Error handling contracts', () => {
     );
 
     await expect(
-      ext.create_collection.fn({ name: 'test_index', options: { dimensions: 384 } }, ctx)
+      getCallable(ext, 'create_collection').fn({ name: 'test_index', options: { dimensions: 384 } }, ctx)
     ).rejects.toThrow('pinecone: collection already exists');
   });
 
   it('get non-existent ID produces "id not found" (EC-7, AC-15)', async () => {
     mockFetch.mockResolvedValue({ records: {} });
 
-    await expect(ext.get.fn({ id: 'nonexistent' }, ctx)).rejects.toThrow(
+    await expect(getCallable(ext, 'get').fn({ id: 'nonexistent' }, ctx)).rejects.toThrow(
       'pinecone: id not found'
     );
   });
@@ -853,7 +860,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
+    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'pinecone: operation cancelled'
     );
   });
@@ -866,7 +873,7 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
+    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'pinecone: Something unexpected happened'
     );
   });
@@ -904,7 +911,7 @@ describe('Event emission', () => {
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
       'test'
     );
-    await ext.search.fn({ vector: queryVector, options: { k: 5 } }, ctx);
+    await getCallable(ext, 'search').fn({ vector: queryVector, options: { k: 5 } }, ctx);
 
     const searchEvent = events.find((e) => e['event'] === 'pinecone:search');
     expect(searchEvent).toBeDefined();
@@ -977,7 +984,7 @@ describe('Request cancellation', () => {
     });
 
     // Start batch operation
-    const batchPromise = ext.upsert_batch.fn({ items: items }, ctx);
+    const batchPromise = getCallable(ext, 'upsert_batch').fn({ items: items }, ctx);
 
     // After disposal, subsequent operations should fail
     await expect(batchPromise).resolves.toBeDefined();
@@ -987,7 +994,7 @@ describe('Request cancellation', () => {
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
       'test'
     );
-    await expect(ext.search.fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
+    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
       'pinecone: operation cancelled'
     );
   });
@@ -1019,7 +1026,7 @@ describe('Concurrent operations', () => {
         new Float32Array([i / 10, 0.2, 0.3, 0.4]),
         'test'
       );
-      return ext.search.fn({ vector: queryVector, options: {} }, ctx);
+      return getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx);
     });
 
     const results = await Promise.all(searches);

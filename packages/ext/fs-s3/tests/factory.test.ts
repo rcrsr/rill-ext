@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { rillTypeToTypeValue } from '@rcrsr/rill';
+import { structureToTypeValue } from '@rcrsr/rill';
 import { createS3FsExtension } from '../src/index.js';
 import type { S3FsConfig } from '../src/types.js';
 
@@ -139,7 +139,7 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect(ext.read).toBeDefined();
+      expect((ext.value as any).read).toBeDefined();
       ext.dispose?.();
     });
 
@@ -163,7 +163,7 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect(ext.read).toBeDefined();
+      expect((ext.value as any).read).toBeDefined();
       ext.dispose?.();
     });
 
@@ -186,7 +186,7 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect(ext.read).toBeDefined();
+      expect((ext.value as any).read).toBeDefined();
       ext.dispose?.();
     });
 
@@ -204,7 +204,7 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect(ext.read).toBeDefined();
+      expect((ext.value as any).read).toBeDefined();
       ext.dispose?.();
     });
 
@@ -236,7 +236,7 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect(ext.read).toBeDefined();
+      expect((ext.value as any).read).toBeDefined();
       ext.dispose?.();
     });
 
@@ -259,7 +259,7 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect(ext.read).toBeDefined();
+      expect((ext.value as any).read).toBeDefined();
       ext.dispose?.();
     });
 
@@ -282,7 +282,7 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect(ext.read).toBeDefined();
+      expect((ext.value as any).read).toBeDefined();
       ext.dispose?.();
     });
   });
@@ -305,20 +305,21 @@ describe('createS3FsExtension', () => {
       };
 
       const ext = createS3FsExtension(config);
+      const v = ext.value as any;
 
       // Verify all 12 functions exist
-      expect(ext.read).toBeDefined();
-      expect(ext.write).toBeDefined();
-      expect(ext.append).toBeDefined();
-      expect(ext.list).toBeDefined();
-      expect(ext.find).toBeDefined();
-      expect(ext.exists).toBeDefined();
-      expect(ext.remove).toBeDefined();
-      expect(ext.stat).toBeDefined();
-      expect(ext.mkdir).toBeDefined();
-      expect(ext.copy).toBeDefined();
-      expect(ext.move).toBeDefined();
-      expect(ext.mounts).toBeDefined();
+      expect(v.read).toBeDefined();
+      expect(v.write).toBeDefined();
+      expect(v.append).toBeDefined();
+      expect(v.list).toBeDefined();
+      expect(v.find).toBeDefined();
+      expect(v.exists).toBeDefined();
+      expect(v.remove).toBeDefined();
+      expect(v.stat).toBeDefined();
+      expect(v.mkdir).toBeDefined();
+      expect(v.copy).toBeDefined();
+      expect(v.move).toBeDefined();
+      expect(v.mounts).toBeDefined();
 
       ext.dispose?.();
     });
@@ -340,38 +341,39 @@ describe('createS3FsExtension', () => {
       };
 
       const ext = createS3FsExtension(config);
+      const v = ext.value as any;
 
       // Verify structure for read function (all follow same pattern)
-      expect(ext.read.params).toBeDefined();
-      expect(Array.isArray(ext.read.params)).toBe(true);
-      expect(ext.read.params.length).toBeGreaterThan(0);
-      expect(ext.read.fn).toBeTypeOf('function');
-      expect(ext.read.annotations?.['description']).toBeTypeOf('string');
-      expect(ext.read.returnType).toEqual(rillTypeToTypeValue({ type: 'string' }));
+      expect(v.read.params).toBeDefined();
+      expect(Array.isArray(v.read.params)).toBe(true);
+      expect(v.read.params.length).toBeGreaterThan(0);
+      expect(v.read.fn).toBeTypeOf('function');
+      expect(v.read.annotations?.['description']).toBeTypeOf('string');
+      expect(v.read.returnType).toEqual(structureToTypeValue({ kind: 'string' }));
 
       // Verify structure for write function
-      expect(ext.write.params).toBeDefined();
-      expect(Array.isArray(ext.write.params)).toBe(true);
-      expect(ext.write.fn).toBeTypeOf('function');
-      expect(ext.write.annotations?.['description']).toBeTypeOf('string');
-      expect(ext.write.returnType).toEqual(rillTypeToTypeValue({ type: 'string' }));
+      expect(v.write.params).toBeDefined();
+      expect(Array.isArray(v.write.params)).toBe(true);
+      expect(v.write.fn).toBeTypeOf('function');
+      expect(v.write.annotations?.['description']).toBeTypeOf('string');
+      expect(v.write.returnType).toEqual(structureToTypeValue({ kind: 'string' }));
 
       // Verify structure for mounts function (no params)
-      expect(ext.mounts.params).toBeDefined();
-      expect(Array.isArray(ext.mounts.params)).toBe(true);
-      expect(ext.mounts.params.length).toBe(0);
-      expect(ext.mounts.fn).toBeTypeOf('function');
-      expect(ext.mounts.annotations?.['description']).toBeTypeOf('string');
-      expect(ext.mounts.returnType).toEqual(rillTypeToTypeValue({
-        type: 'list',
+      expect(v.mounts.params).toBeDefined();
+      expect(Array.isArray(v.mounts.params)).toBe(true);
+      expect(v.mounts.params.length).toBe(0);
+      expect(v.mounts.fn).toBeTypeOf('function');
+      expect(v.mounts.annotations?.['description']).toBeTypeOf('string');
+      expect(v.mounts.returnType).toEqual(structureToTypeValue({
+        kind: 'list',
         element: {
-          type: 'dict',
+          kind: 'dict',
           fields: {
-            name: { type: { type: 'string' } },
-            mode: { type: { type: 'string' } },
-            glob: { type: { type: 'string' } },
-            bucket: { type: { type: 'string' } },
-            prefix: { type: { type: 'string' } },
+            name: { type: { kind: 'string' } },
+            mode: { type: { kind: 'string' } },
+            glob: { type: { kind: 'string' } },
+            bucket: { type: { kind: 'string' } },
+            prefix: { type: { kind: 'string' } },
           },
         },
       }));

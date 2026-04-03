@@ -5,7 +5,7 @@
  */
 
 import { Redis } from 'ioredis';
-import { anyTypeValue, rillTypeToTypeValue, type ExtensionResult, type KvExtensionContract, type RillValue } from '@rcrsr/rill';
+import { anyTypeValue, structureToTypeValue, toCallable, type ExtensionFactoryResult, type KvExtensionContract, type RillFunction, type RillValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { RedisKvMountConfig } from './types.js';
 
@@ -54,7 +54,7 @@ export interface RedisKvExtensionConfig {
  */
 export function createRedisKvExtension(
   config: RedisKvExtensionConfig
-): ExtensionResult {
+): ExtensionFactoryResult {
   // Validate required configuration (AC-10)
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new Error(
@@ -599,7 +599,11 @@ export function createRedisKvExtension(
   // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
   // ============================================================
 
-  const result: ExtensionResult = ({
+  const fnDict: {
+    get: RillFunction; get_or: RillFunction; set: RillFunction; merge: RillFunction;
+    delete: RillFunction; keys: RillFunction; has: RillFunction; clear: RillFunction;
+    getAll: RillFunction; schema: RillFunction; mounts: RillFunction;
+  } = {
     get: {
       params: [
         p.str('mount', 'Mount name'),
@@ -627,7 +631,7 @@ export function createRedisKvExtension(
       ],
       fn: set,
       annotations: { description: 'Set value with validation' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     merge: {
       params: [
@@ -637,7 +641,7 @@ export function createRedisKvExtension(
       ],
       fn: merge,
       annotations: { description: 'Merge partial dict into existing dict value' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     delete: {
       params: [
@@ -646,13 +650,13 @@ export function createRedisKvExtension(
       ],
       fn: deleteKey,
       annotations: { description: 'Delete key' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     keys: {
       params: [p.str('mount', 'Mount name')],
       fn: keys,
       annotations: { description: 'Get all keys in mount' },
-      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
+      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
     },
     has: {
       params: [
@@ -661,32 +665,32 @@ export function createRedisKvExtension(
       ],
       fn: has,
       annotations: { description: 'Check key existence' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     clear: {
       params: [p.str('mount', 'Mount name')],
       fn: clear,
       annotations: { description: 'Clear all keys in mount' },
-      returnType: rillTypeToTypeValue({ type: 'bool' }),
+      returnType: structureToTypeValue({ kind: 'bool' }),
     },
     getAll: {
       params: [p.str('mount', 'Mount name')],
       fn: getAll,
       annotations: { description: 'Get all entries as dict' },
-      returnType: rillTypeToTypeValue({ type: 'dict' }),
+      returnType: structureToTypeValue({ kind: 'dict' }),
     },
     schema: {
       params: [p.str('mount', 'Mount name')],
       fn: schema,
       annotations: { description: 'Get schema information' },
-      returnType: rillTypeToTypeValue({
-        type: 'list',
+      returnType: structureToTypeValue({
+        kind: 'list',
         element: {
-          type: 'dict',
+          kind: 'dict',
           fields: {
-            key: { type: { type: 'string' } },
-            type: { type: { type: 'string' } },
-            description: { type: { type: 'string' } },
+            key: { type: { kind: 'string' } },
+            type: { type: { kind: 'string' } },
+            description: { type: { kind: 'string' } },
           },
         },
       }),
@@ -695,29 +699,42 @@ export function createRedisKvExtension(
       params: [],
       fn: mountsList,
       annotations: { description: 'Get list of mount metadata' },
-      returnType: rillTypeToTypeValue({
-        type: 'list',
+      returnType: structureToTypeValue({
+        kind: 'list',
         element: {
-          type: 'dict',
+          kind: 'dict',
           fields: {
-            name: { type: { type: 'string' } },
-            mode: { type: { type: 'string' } },
-            schema: { type: { type: 'string' } },
-            maxEntries: { type: { type: 'number' } },
-            maxValueSize: { type: { type: 'number' } },
-            prefix: { type: { type: 'string' } },
-            ttl: { type: { type: 'number' } },
+            name: { type: { kind: 'string' } },
+            mode: { type: { kind: 'string' } },
+            schema: { type: { kind: 'string' } },
+            maxEntries: { type: { kind: 'number' } },
+            maxValueSize: { type: { kind: 'number' } },
+            prefix: { type: { kind: 'string' } },
+            ttl: { type: { kind: 'number' } },
           },
         },
       }),
     },
-  }) satisfies KvExtensionContract;
+  };
 
-  // Attach dispose lifecycle method
-  result.dispose = async (): Promise<void> => {
+  const dispose = async (): Promise<void> => {
     // Disconnect Redis client
     await client.quit();
   };
 
-  return result;
+  const callableDict = {
+    get: toCallable(fnDict.get),
+    get_or: toCallable(fnDict.get_or),
+    set: toCallable(fnDict.set),
+    merge: toCallable(fnDict.merge),
+    delete: toCallable(fnDict.delete),
+    keys: toCallable(fnDict.keys),
+    has: toCallable(fnDict.has),
+    clear: toCallable(fnDict.clear),
+    getAll: toCallable(fnDict.getAll),
+    schema: toCallable(fnDict.schema),
+    mounts: toCallable(fnDict.mounts),
+  } satisfies KvExtensionContract;
+
+  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
 }

@@ -2,14 +2,14 @@
  * Prompt function generation for MCP Server Mapper Extension.
  *
  * Converts MCP prompts to rill RillFunction objects:
- * - Each prompt becomes ns::prompt_{prompt_name}(params...) -> list
+ * - Each prompt becomes ns::prompts.{prompt_name}(params...) -> list
  * - Returns list of dicts with role and content fields
  * - Multi-part content concatenated to single string per message
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { emitExtensionEvent, rillTypeToTypeValue } from '@rcrsr/rill';
+import { emitExtensionEvent, structureToTypeValue } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 // RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
@@ -193,7 +193,7 @@ function createPromptFunction(
       // Validate argument is string (or undefined for optional args)
       if (value !== undefined && typeof value !== 'string') {
         throw createToolError(
-          `prompt_${prompt.name}`,
+          `${prompt.name}`,
           `expected string for parameter ${promptArg.name}, got ${typeof value}`
         );
       }
@@ -203,7 +203,7 @@ function createPromptFunction(
         argsDict[promptArg.name] = value;
       } else if (promptArg.required === true) {
         throw createToolError(
-          `prompt_${prompt.name}`,
+          `${prompt.name}`,
           `required parameter ${promptArg.name} is missing`
         );
       }
@@ -220,7 +220,7 @@ function createPromptFunction(
     // Set up timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => {
-        reject(createTimeoutError(`prompt_${prompt.name}`, timeoutMs));
+        reject(createTimeoutError(`${prompt.name}`, timeoutMs));
       }, timeoutMs);
       timer.unref();
     });
@@ -280,10 +280,10 @@ function createPromptFunction(
           throw createProtocolError(error.message);
         }
 
-        throw createToolError(`prompt_${prompt.name}`, error.message);
+        throw createToolError(`${prompt.name}`, error.message);
       }
 
-      throw createToolError(`prompt_${prompt.name}`, String(error));
+      throw createToolError(`${prompt.name}`, String(error));
     }
   };
 
@@ -293,7 +293,7 @@ function createPromptFunction(
     ...(prompt.description !== undefined && {
       annotations: { description: prompt.description },
     }),
-    returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }),
+    returnType: structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }),
   };
 }
 
@@ -303,7 +303,7 @@ function createPromptFunction(
  * Applies name sanitization with collision detection and creates
  * RillFunction for each prompt.
  *
- * Prompt names are prefixed with "prompt_" to distinguish from other functions.
+ * Prompt names are sanitized without prefix — namespacing is handled by the value dict.
  *
  * @param prompts - Array of MCP prompts
  * @param client - Connected MCP client
@@ -317,17 +317,15 @@ export function generatePromptFunctions(
   timeoutMs: number,
   lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
 ): Record<string, RillFunction> {
-  // Prefix prompt names with "prompt_" before sanitization
-  const prefixedNames = prompts.map((prompt) => `prompt_${prompt.name}`);
-
   // Sanitize names with collision detection
-  const nameMap = sanitizeNames(prefixedNames);
+  const rawNames = prompts.map((prompt) => prompt.name);
+  const nameMap = sanitizeNames(rawNames);
   const functions: Record<string, RillFunction> = {};
 
   for (let i = 0; i < prompts.length; i++) {
     const prompt = prompts[i]!;
-    const prefixedName = prefixedNames[i]!;
-    const sanitizedName = nameMap.get(prefixedName);
+    const rawName = rawNames[i]!;
+    const sanitizedName = nameMap.get(rawName);
 
     if (!sanitizedName) {
       // Should never happen: sanitizeNames processes all names

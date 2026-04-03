@@ -18,6 +18,11 @@ import type { McpExtensionConfig } from '../src/types.js';
 describe('Integration: Dispose and Connection Lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(Client.prototype, 'getServerCapabilities').mockReturnValue({
+      tools: {},
+      resources: {},
+      prompts: {},
+    });
   });
 
   afterEach(() => {
@@ -77,9 +82,11 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config);
+      const fns = extension.value as Record<string, any>;
+      const tools = fns.tools as Record<string, any>;
 
       // Start a long-running tool call
-      const toolCallPromise = extension.long_operation!.fn({}, {
+      const toolCallPromise = tools.long_operation!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
@@ -145,12 +152,14 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config);
+      const fns = extension.value as Record<string, any>;
+      const tools = fns.tools as Record<string, any>;
 
       // Start multiple tool calls
-      const call1 = extension.tool_one!.fn({}, {
+      const call1 = tools.tool_one!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
-      const call2 = extension.tool_two!.fn({}, {
+      const call2 = tools.tool_two!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
@@ -298,9 +307,11 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config);
+      const fns = extension.value as Record<string, any>;
+      const tools = fns.tools as Record<string, any>;
 
       // Tool call before dispose works
-      const resultBefore = await extension.test_tool!.fn({ param1: 'value' }, {
+      const resultBefore = await tools.test_tool!.fn({ param1: 'value' }, {
         _lifecycle: { connectEmitted: false },
       } as any);
       expect(resultBefore).toBe('success');
@@ -314,7 +325,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
       // Tool call after dispose should throw connection lost error
       await expect(
-        extension.test_tool!.fn({ param1: 'value' }, {
+        tools.test_tool!.fn({ param1: 'value' }, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('mcp: connection lost');
@@ -357,9 +368,11 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config);
+      const fns = extension.value as Record<string, any>;
+      const resources = fns.resources as Record<string, any>;
 
       // Resource read before dispose works
-      const resultBefore = await extension.read_resource!.fn(
+      const resultBefore = await resources.read_resource!.fn(
         { uri: 'test://resource' },
         {
           _lifecycle: { connectEmitted: false },
@@ -376,7 +389,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
       // Resource read after dispose should throw
       await expect(
-        extension.read_resource!.fn({ uri: 'test://resource' }, {
+        resources.read_resource!.fn({ uri: 'test://resource' }, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('mcp: connection lost');
@@ -424,9 +437,11 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config);
+      const fns = extension.value as Record<string, any>;
+      const prompts = fns.prompts as Record<string, any>;
 
-      // Prompt call before dispose works (note: prompts are prefixed with "prompt_")
-      const resultBefore = await extension.prompt_test!.fn({}, {
+      // Prompt call before dispose works
+      const resultBefore = await prompts.test!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
       // Prompt returns list of dicts with role and content
@@ -441,7 +456,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
       // Prompt call after dispose should throw
       await expect(
-        extension.prompt_test!.fn({}, {
+        prompts.test!.fn({}, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('mcp: connection lost');
@@ -488,10 +503,12 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
       // Connect
       const extension = await createMcpExtension(config);
+      const fns = extension.value as Record<string, any>;
+      const tools = fns.tools as Record<string, any>;
       expect(mockConnect).toHaveBeenCalledTimes(1);
 
       // Use
-      const result = await extension.my_tool!.fn({}, {
+      const result = await tools.my_tool!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
       expect(result).toBe('result');

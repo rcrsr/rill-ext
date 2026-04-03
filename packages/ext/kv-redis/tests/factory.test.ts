@@ -77,12 +77,13 @@ describe('createRedisKvExtension', () => {
         'mounts', // IR-11
       ];
 
+      const value = result.value as Record<string, { fn: unknown; params: unknown[]; annotations?: Record<string, unknown>; returnType: unknown }>;
       for (const fnName of expectedFunctions) {
-        expect(result[fnName]).toBeDefined();
-        expect(typeof result[fnName]?.fn).toBe('function');
-        expect(Array.isArray(result[fnName]?.params)).toBe(true);
-        expect(typeof result[fnName]?.annotations?.['description']).toBe('string');
-        expect(typeof result[fnName]?.returnType).toBe('object');
+        expect(value[fnName]).toBeDefined();
+        expect(typeof value[fnName]?.fn).toBe('function');
+        expect(Array.isArray(value[fnName]?.params)).toBe(true);
+        expect(typeof value[fnName]?.annotations?.['description']).toBe('string');
+        expect(typeof value[fnName]?.returnType).toBe('object');
       }
     });
 

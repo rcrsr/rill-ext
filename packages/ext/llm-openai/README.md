@@ -1,8 +1,6 @@
 # @rcrsr/rill-ext-openai
 
-[rill](https://rill.run) extension for [OpenAI](https://platform.openai.com/docs) API integration. Provides `message`, `messages`, `embed`, `embed_batch`, `tool_loop`, and `generate` host functions. Compatible with any OpenAI-compatible server (LM Studio, Ollama, vLLM).
-
-> **Experimental.** Breaking changes will occur before stabilization.
+[rill](https://rill.run) extension for [OpenAI](https://platform.openai.com/docs) API integration. Provides `message`, `messages`, `embed`, `embed_batch`, `tool_loop`, and `generate` host functions. Compatible with OpenAI-compatible servers (LM Studio, Ollama, vLLM).
 
 ## Install
 
@@ -10,41 +8,53 @@
 npm install @rcrsr/rill-ext-openai
 ```
 
-**Peer dependencies:** `@rcrsr/rill`
-
 ## Quick Start
 
-```typescript
-import { parse, execute, createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
-import { createOpenAIExtension } from '@rcrsr/rill-ext-openai';
+**rill-config.json**
 
-const ext = createOpenAIExtension({
-  api_key: process.env.OPENAI_API_KEY!,
-  model: 'gpt-4o',
-});
-const prefixed = prefixFunctions('openai', ext);
-const { dispose, ...functions } = prefixed;
+```json
+{
+  "main": "hello.rill",
+  "extensions": {
+    "mounts": {
+      "llm": "@rcrsr/rill-ext-openai"
+    },
+    "config": {
+      "llm": {
+        "api_key": "${OPENAI_API_KEY}",
+        "model": "gpt-4o"
+      }
+    }
+  }
+}
+```
 
-const ctx = createRuntimeContext({
-  functions,
-  callbacks: { onLog: (v) => console.log(v) },
-});
+**hello.rill**
 
-const script = `openai::message("Explain TCP handshakes")`;
-const result = await execute(parse(script), ctx);
+```rill
+use<ext:llm> => $llm
 
-dispose?.();
+$llm.message("Explain TCP handshakes") -> each { log }
+```
+
+```bash
+rill-run
+```
+
+For local models, set `base_url` to point at the compatible server:
+
+```json
+{
+  "llm": {
+    "base_url": "http://localhost:1234/v1",
+    "model": "llama3"
+  }
+}
 ```
 
 ## Documentation
 
 See [full documentation](docs/extension-llm-openai.md) for configuration, functions, error handling, events, and examples.
-
-## Related
-
-- [rill](https://github.com/rcrsr/rill) — Core language runtime
-- [Extensions Guide](https://github.com/rcrsr/rill/blob/main/docs/integration-extensions.md) — Extension contract and patterns
-- [Host API Reference](https://github.com/rcrsr/rill/blob/main/docs/ref-host-api.md) — Runtime context and host functions
 
 ## License
 

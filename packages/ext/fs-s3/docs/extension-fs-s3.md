@@ -8,74 +8,80 @@ Use S3 fs backend for cloud deployments, serverless environments, multi-region d
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createS3FsExtension } from '@rcrsr/rill-ext-fs-s3';
-
-const ext = createS3FsExtension({
-  mounts: {
-    data: {
-      mode: 'read-write',
-      region: 'us-east-1',
-      bucket: 'my-app-data',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+```json
+{
+  "extensions": {
+    "mounts": {
+      "fs": "@rcrsr/rill-ext-fs-s3"
+    },
+    "config": {
+      "fs": {
+        "mounts": {
+          "data": {
+            "mode": "read-write",
+            "region": "us-east-1",
+            "bucket": "my-app-data",
+            "credentials": {
+              "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+              "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+            }
+          }
+        }
       }
     }
   }
-});
-const { functions, dispose } = hoistExtension('fs', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { fs: functions } },
-  },
-});
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
 
 ```rill
 use<ext:fs> => $storage
-$storage.read("data", "report.txt") => $content
+$storage.read("/data/report.txt") => $content
 $content -> log
 ```
 
 Direct dot-path — no intermediate variable:
 
 ```rill
-use<ext:fs.read>("data", "report.txt") => $content
+use<ext:fs.read>("/data/report.txt") => $content
 ```
 
 Secondary pattern (still works, not primary):
 
 ```rill
-fs::read("data", "report.txt")
+fs::read("/data/report.txt")
 ```
+
+All path arguments use a combined `/mount/path` string. The first segment after `/` identifies the mount name. The extension uses longest-match routing when mount names overlap.
 
 ## Configuration
 
-```typescript
-interface S3FsConfig {
-  mounts: Record<string, S3FsMountConfig>;
-  maxFileSize?: number;  // bytes (default: 10485760 = 10MB)
-  encoding?: 'utf-8' | 'utf8' | 'ascii';
-}
-
-interface S3FsMountConfig {
-  mode: 'read-only' | 'read-write';
-  region: string;
-  bucket: string;
-  prefix?: string;  // object key prefix
-  credentials: {
-    accessKeyId: string;
-    secretAccessKey: string;
-  };
-  endpoint?: string;  // for S3-compatible services (MinIO, R2)
-  forcePathStyle?: boolean;  // use path-style addressing (required for MinIO)
-  glob?: string;  // file filter pattern
-  maxFileSize?: number;
+```json
+{
+  "extensions": {
+    "config": {
+      "fs": {
+        "mounts": {
+          "data": {
+            "mode": "read-write",
+            "region": "us-east-1",
+            "bucket": "my-app-data",
+            "prefix": "uploads/",
+            "credentials": {
+              "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+              "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+            },
+            "endpoint": "https://custom.endpoint.com",
+            "forcePathStyle": false,
+            "glob": "*.csv"
+          }
+        },
+        "maxFileSize": 10485760,
+        "encoding": "utf-8"
+      }
+    }
+  }
 }
 ```
 
@@ -100,41 +106,53 @@ interface S3FsMountConfig {
 
 **Cloudflare R2:**
 
-```typescript
-const ext = createS3FsExtension({
-  mounts: {
-    storage: {
-      mode: 'read-write',
-      region: 'auto',
-      bucket: 'my-r2-bucket',
-      credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
-      },
-      endpoint: `https://<account-id>.r2.cloudflarestorage.com`
+```json
+{
+  "extensions": {
+    "config": {
+      "fs": {
+        "mounts": {
+          "storage": {
+            "mode": "read-write",
+            "region": "auto",
+            "bucket": "my-r2-bucket",
+            "credentials": {
+              "accessKeyId": "${R2_ACCESS_KEY_ID}",
+              "secretAccessKey": "${R2_SECRET_ACCESS_KEY}"
+            },
+            "endpoint": "https://<account-id>.r2.cloudflarestorage.com"
+          }
+        }
+      }
     }
   }
-});
+}
 ```
 
 **MinIO:**
 
-```typescript
-const ext = createS3FsExtension({
-  mounts: {
-    local: {
-      mode: 'read-write',
-      region: 'us-east-1',
-      bucket: 'test-bucket',
-      credentials: {
-        accessKeyId: 'minioadmin',
-        secretAccessKey: 'minioadmin'
-      },
-      endpoint: 'http://localhost:9000',
-      forcePathStyle: true  // MinIO requires path-style addressing
+```json
+{
+  "extensions": {
+    "config": {
+      "fs": {
+        "mounts": {
+          "local": {
+            "mode": "read-write",
+            "region": "us-east-1",
+            "bucket": "test-bucket",
+            "credentials": {
+              "accessKeyId": "minioadmin",
+              "secretAccessKey": "minioadmin"
+            },
+            "endpoint": "http://localhost:9000",
+            "forcePathStyle": true
+          }
+        }
+      }
     }
   }
-});
+}
 ```
 
 ## Key Differences from Core fs
@@ -150,18 +168,20 @@ Provides the same 12 functions as the core fs extension:
 
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
-| `read` | mount, path | string | Read file contents |
-| `write` | mount, path, content | string | Write file (bytes written) |
-| `append` | mount, path, content | string | Append to file (bytes written) |
-| `list` | mount, path? | list | Directory contents |
-| `find` | mount, pattern? | list | Recursive file search with glob |
-| `exists` | mount, path | bool | Check file existence |
-| `remove` | mount, path | bool | Delete file |
-| `stat` | mount, path | dict | File metadata |
-| `mkdir` | mount, path | bool | Create directory |
-| `copy` | mount, src, dest | bool | Copy file within mount |
-| `move` | mount, src, dest | bool | Move file within mount |
-| `mounts` | — | list | List configured mounts |
+| `read` | path | string | Read file contents |
+| `write` | path, content | string | Write file (bytes written) |
+| `append` | path, content | string | Append to file (bytes written) |
+| `list` | path | list | Directory contents |
+| `find` | path, pattern? | list | Recursive file search with glob |
+| `exists` | path | bool | Check file existence |
+| `remove` | path | bool | Delete file |
+| `stat` | path | dict | File metadata (`name`, `type`, `modified`) |
+| `mkdir` | path | bool | Create directory |
+| `copy` | src, dest | bool | Copy file (same mount) |
+| `move` | src, dest | bool | Move file (same mount) |
+| `mounts` | — | list | List configured mount details |
+
+All `path`, `src`, and `dest` arguments use `/mount/path` format. `stat` returns `name`, `type`, and `modified` (ISO 8601 string). `copy` and `move` validate that src and dest share the same mount.
 
 **Namespace convention:** `fs` or `s3`
 

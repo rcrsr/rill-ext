@@ -6,6 +6,11 @@
  */
 
 // ============================================================
+// CONTRACTS
+// ============================================================
+export type { LlmExtensionContract } from './contracts.js';
+
+// ============================================================
 // TYPES
 // ============================================================
 export type {
@@ -13,6 +18,7 @@ export type {
   LLMProviderConfig,
   ProviderErrorDetector,
   ToolLoopCallbacks,
+  ToolLoopChunk,
   ToolLoopResult,
 } from './types.js';
 

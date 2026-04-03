@@ -5,18 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.18.0] - 2026-04-02
 
 ### Added
 
-- `buildResponseMessages()` shared helper in ext-llm for consistent response messages across providers
+- `buildResponseMessages()` shared helper in ext-llm for consistent response messages
 - `tools` promoted to positional argument in `tool_loop()` across all 3 LLM extensions
+- MCP: static resource shortcut callables via `generateStaticResourceFunctions()`
+- MCP: `jsonSchemaToTypeStructure()` converts outputSchema to rill TypeStructure
+- MCP: name sanitizer handles whitespace in MCP identifiers
+
+### Changed
+
+- LLM and Claude Code host functions return RillStream values, supporting iteration
+  over output chunks as they arrive while still resolving full results via ()
+
+### Changed (Breaking)
+
+- All 14 packages bumped to v0.18.0 (`peerDependency: ~0.18.0`)
+- All extension docs rewritten from TypeScript `hoistExtension` API to `rill-config.json`
+- `LlmExtensionContract` moved from `@rcrsr/rill` to ext-llm-shared
+- `VectorExtensionContract` moved from `@rcrsr/rill` to ext-vector-shared
+- MCP: capabilities restructured as namespace dicts (`tools`, `resources`, `prompts`)
+- MCP: `createIntrospectionDicts` replaces `createIntrospectionFunctions`
+- MCP: prompt names no longer prefixed with `prompt_`
+- fs-s3: path API changed from `(mount, path)` to combined `/mount/path` string
+- fs-s3: `parseMountPath()` replaces `getMount()` + `mapPath()` with longest-match routing
+- fs-s3: `stat` returns `name`, `type`, `modified` (ISO string) instead of epoch number
+- fs-s3: `mounts` returns list of mount detail dicts instead of name list
+- fs-s3: `copy`/`move` validate same-mount constraint on src and dest
+
+### Removed
+
+- Test host sections from LLM and Claude Code docs (examples/ no longer shipped)
+- Lifecycle sections from vector DB docs (runtime manages dispose)
 
 ### Fixed
 
-- Anthropic `tool_loop()` now includes the assistant message in response `messages` array
+- Anthropic `tool_loop()` includes the assistant message in response `messages` array
 - 0-parameter tools no longer fail with "Function expects 0 arguments, got 1"
 - `max_tokens: 0` treated as unset, falls through to factory default
+- OpenAI: `stream_options.include_usage` set on all streaming calls for token counting
+- MCP: `buildCallableDict` preserves existing annotations instead of overwriting
+- MCP: static resource error messages use sanitized callable name, not raw MCP name
 
 ## [0.16.0] - 2026-03-15
 

@@ -197,7 +197,7 @@ describe('mcp:connect event', () => {
     );
 
     const ctx = createMockContext();
-    await functions['prompt_test_prompt']!.fn({}, ctx);
+    await functions['test_prompt']!.fn({}, ctx);
 
     // Verify mcp:connect emitted
     expect(emitExtensionEvent).toHaveBeenCalledWith(ctx, {
@@ -267,7 +267,7 @@ describe('mcp:connect event', () => {
 
     // Third call to prompt does not emit connect
     vi.clearAllMocks();
-    await promptFunctions['prompt_test_prompt']!.fn({}, ctx);
+    await promptFunctions['test_prompt']!.fn({}, ctx);
 
     // Verify mcp:connect NOT emitted on third operation
     const connectCallsAfterPrompt = vi
@@ -530,7 +530,7 @@ describe('mcp:prompt_get event', () => {
     const functions = generatePromptFunctions(prompts, mockClient, 30000);
     const ctx = createMockContext();
 
-    await functions['prompt_test_prompt']!.fn({ arg1: 'value1', arg2: 'value2' }, ctx);
+    await functions['test_prompt']!.fn({ arg1: 'value1', arg2: 'value2' }, ctx);
 
     // Verify mcp:prompt_get emitted with correct structure
     expect(emitExtensionEvent).toHaveBeenCalledWith(
@@ -563,7 +563,7 @@ describe('mcp:prompt_get event', () => {
     const functions = generatePromptFunctions(prompts, mockClient, 30000);
     const ctx = createMockContext();
 
-    await functions['prompt_no_arg_prompt']!.fn({}, ctx);
+    await functions['no_arg_prompt']!.fn({}, ctx);
 
     // Verify mcp:prompt_get emitted with empty params
     expect(emitExtensionEvent).toHaveBeenCalledWith(
@@ -594,9 +594,9 @@ describe('mcp:prompt_get event', () => {
     const functions = generatePromptFunctions(prompts, mockClient, 30000);
     const ctx = createMockContext();
 
-    await functions['prompt_prompt1']!.fn({}, ctx);
-    await functions['prompt_prompt2']!.fn({}, ctx);
-    await functions['prompt_prompt1']!.fn({}, ctx);
+    await functions['prompt1']!.fn({}, ctx);
+    await functions['prompt2']!.fn({}, ctx);
+    await functions['prompt1']!.fn({}, ctx);
 
     // Verify three prompt_get events
     const promptGetEvents = vi
@@ -763,7 +763,7 @@ describe('mcp:error event', () => {
     const ctx = createMockContext();
 
     await expect(
-      functions['prompt_test_prompt']!.fn({}, ctx)
+      functions['test_prompt']!.fn({}, ctx)
     ).rejects.toThrow();
 
     // Verify mcp:error emitted

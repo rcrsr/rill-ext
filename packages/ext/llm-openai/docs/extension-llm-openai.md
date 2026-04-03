@@ -2,43 +2,42 @@
 
 *OpenAI API integration for rill scripts*
 
-This extension allows rill scripts to access OpenAI's GPT and embedding APIs. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:openai>`. Switching to Anthropic or Google means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access OpenAI's GPT and embedding APIs. The host declares it in `rill-config.json`, and scripts load it with `use<ext:openai>`. Switching to Anthropic or Google means changing the extension mount. Scripts stay identical.
 
-Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings — OpenAI offers `text-embedding-3-small` and `text-embedding-3-large` for this. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured output matching a schema dict. `message`, `messages`, and `tool_loop` return a `content`/`messages` shape. `generate` returns a `data`/`raw` shape.
+Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings — OpenAI offers `text-embedding-3-small` and `text-embedding-3-large` for this. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured output matching a schema dict. `message`, `messages`, and `tool_loop` return a `RillStream` value. Iterate chunks with `-> each` or resolve immediately with `()` to get the result dict. `generate` returns a dict directly (no streaming). `embed` and `embed_batch` return dicts directly.
 
 The host sets API key, model, and temperature at creation time — scripts never handle credentials. Each call emits a structured event (`openai:message`, `openai:tool_call`) for host-side logging and metrics.
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createOpenAIExtension } from '@rcrsr/rill-ext-openai';
-
-const ext = createOpenAIExtension({
-  api_key: process.env.OPENAI_API_KEY!,
-  model: 'gpt-4o',
-});
-const { functions, dispose } = hoistExtension('openai', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { openai: functions } },
-  },
-});
+```json
+{
+  "extensions": {
+    "mounts": {
+      "openai": "@rcrsr/rill-ext-openai"
+    },
+    "config": {
+      "openai": {
+        "api_key": "${OPENAI_API_KEY}",
+        "model": "gpt-4o"
+      }
+    }
+  }
+}
 ```
 
-Rill script — load the extension as a handle and call functions via dot-path:
+Rill script — stream chunks:
 
 ```rill
 use<ext:openai> => $llm
-$llm.message("Explain TCP handshakes") => $result
-$result.content -> log
+$llm.message("Explain TCP handshakes") => $s
+$s -> each { log }
 ```
 
-Direct dot-path — no intermediate variable:
+Resolve immediately to access the result dict:
 
 ```rill
-use<ext:openai.message>("Explain TCP handshakes") => $result
+openai::message("Explain TCP handshakes")() => $result
 $result.content -> log
 ```
 
@@ -50,18 +49,24 @@ openai::message("Explain TCP handshakes")
 
 ## Configuration
 
-```typescript
-const ext = createOpenAIExtension({
-  api_key: process.env.OPENAI_API_KEY!,
-  model: 'gpt-4o',
-  temperature: 0.7,
-  max_tokens: 4096,
-  system: 'You are a helpful assistant.',
-  embed_model: 'text-embedding-3-small',
-  base_url: 'https://custom-endpoint.example.com',
-  max_retries: 3,
-  timeout: 30000,
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "openai": {
+        "api_key": "${OPENAI_API_KEY}",
+        "model": "gpt-4o",
+        "temperature": 0.7,
+        "max_tokens": 4096,
+        "system": "You are a helpful assistant.",
+        "embed_model": "text-embedding-3-small",
+        "base_url": "https://custom-endpoint.example.com",
+        "max_retries": 3,
+        "timeout": 30000
+      }
+    }
+  }
+}
 ```
 
 | Parameter | Type | Default | Description |
@@ -78,24 +83,39 @@ const ext = createOpenAIExtension({
 
 ## Functions
 
-**message(text, options?)** — Send a single prompt:
+**message(text, options?)** — Send a single prompt. Returns `RillStream`:
 
 ```rill
-openai::message("Explain TCP handshakes") => $result
+# Stream text delta chunks
+openai::message("Explain TCP handshakes") => $s
+$s -> each { log }
+
+# Or resolve to result dict
+openai::message("Explain TCP handshakes")() => $result
 $result.content      # Response text
 $result.stop_reason  # Why generation stopped
 $result.usage.input  # Input tokens
 $result.usage.output # Output tokens
 ```
 
-**messages(messages, options?)** — Multi-turn conversation:
+**messages(messages, options?)** — Multi-turn conversation. Returns `RillStream`:
 
 ```rill
+# Stream text delta chunks
 [
   [role: "user", content: "What is rill?"],
   [role: "assistant", content: "A scripting language."],
   [role: "user", content: "Tell me more."],
-] -> openai::messages => $result
+] -> openai::messages => $s
+$s -> each { log }
+
+# Or resolve to result dict
+[
+  [role: "user", content: "What is rill?"],
+  [role: "assistant", content: "A scripting language."],
+  [role: "user", content: "Tell me more."],
+] -> openai::messages => $s
+$s() => $result
 $result.content   # Latest response
 $result.messages  # Full conversation history
 ```
@@ -115,18 +135,29 @@ $vec.model           # Embedding model used
 $vectors.len  # Number of vectors
 ```
 
-**tool_loop(prompt, tools, options?)** — Agentic tool-use loop:
+**tool_loop(prompt, tools, options?)** — Agentic tool-use loop. Returns `RillStream`:
 
 ```rill
 ^("Get current weather for a city") |^("City name") city: string| {
   "Weather in {$city}: 72F sunny"
 } => $get_weather
 
+# Stream structured events
 openai::tool_loop("What's the weather in Paris?", [
   get_weather: $get_weather,
-], [
-  max_turns: 5,
-]) => $result
+], [max_turns: 5]) => $s
+$s -> each {
+  $.type    # "text_delta", "tool_call", or "tool_result"
+  $.text    # available when type == "text_delta"
+  $.name    # available when type == "tool_call" or "tool_result"
+  $.args    # available when type == "tool_call"
+  $.result  # available when type == "tool_result"
+}
+
+# Or resolve to result dict
+openai::tool_loop("What's the weather in Paris?", [
+  get_weather: $get_weather,
+], [max_turns: 5])() => $result
 $result.content  # Final response
 $result.turns    # Number of LLM round-trips
 ```
@@ -180,9 +211,41 @@ Params using `closure` or `tuple` type are not representable in JSON Schema and 
 | `messages` | list | tool_loop, generate | Prepend conversation history |
 | `schema` | dict or RillStructuralType | generate (required) | Dict descriptor (legacy) or `RillStructuralType` value (from `$closure.^input`) for structured output |
 
+## Streaming
+
+`message`, `messages`, and `tool_loop` return `RillStream`. Two usage patterns:
+
+**Iterate chunks** — process output incrementally:
+
+```rill
+openai::message("hi") => $s
+$s -> each { log }
+```
+
+**Resolve immediately** — access the full result dict at once:
+
+```rill
+openai::message("hi")() => $result
+$result.content -> log
+```
+
+### message / messages chunks
+
+Each chunk is a string (text delta).
+
+### tool_loop events
+
+Each event is a dict with a `type` field:
+
+| `type` | Other fields | Description |
+|--------|-------------|-------------|
+| `"text_delta"` | `text` | Incremental text from the model |
+| `"tool_call"` | `name`, `args` | Model invoked a tool |
+| `"tool_result"` | `name`, `result` | Tool returned a value |
+
 ## Result Dict
 
-All functions except `embed`, `embed_batch`, and `generate` return:
+`message`, `messages`, and `tool_loop` resolve to:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -265,34 +328,6 @@ Completion events (`openai:message`, `openai:messages`, `openai:tool_loop`, `ope
 | `usage` | Token usage object (`input` and `output` counts) |
 | `request` | Messages array sent to the provider API |
 | `content` | Response text from the provider |
-
-## Test Host
-
-A runnable example at `examples/test-host.ts` demonstrates integration:
-
-```bash
-# Set API key
-export OPENAI_API_KEY="sk-..."
-
-# Built-in demo
-pnpm exec tsx examples/test-host.ts
-
-# Inline expression
-pnpm exec tsx examples/test-host.ts -e 'llm::message("Tell me a joke") -> $.content -> log'
-
-# Script file
-pnpm exec tsx examples/test-host.ts script.rill
-```
-
-Override model or endpoint with `OPENAI_MODEL` and `OPENAI_BASE_URL`. Works with any OpenAI-compatible server:
-
-```bash
-# LM Studio
-OPENAI_BASE_URL=http://localhost:1234/v1 OPENAI_API_KEY=lm-studio OPENAI_MODEL=local pnpm exec tsx examples/test-host.ts
-
-# Ollama
-OPENAI_BASE_URL=http://localhost:11434/v1 OPENAI_API_KEY=ollama OPENAI_MODEL=llama3.2 pnpm exec tsx examples/test-host.ts
-```
 
 ## See Also
 

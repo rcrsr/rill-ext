@@ -7,23 +7,27 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { createRuntimeContext, prefixFunctions, rillTypeToTypeValue } from '@rcrsr/rill';
+import { createRuntimeContext, structureToTypeValue } from '@rcrsr/rill';
 import type { ClaudeCodeResult } from '../src/types.js';
 
-const EXPECTED_RETURN_TYPE = rillTypeToTypeValue({
-  type: 'dict',
-  fields: {
-    result: { type: { type: 'string' } },
-    tokens: { type: { type: 'dict', fields: {
-      prompt: { type: { type: 'number' } },
-      cacheWrite5m: { type: { type: 'number' } },
-      cacheWrite1h: { type: { type: 'number' } },
-      cacheRead: { type: { type: 'number' } },
-      output: { type: { type: 'number' } },
-    } } },
-    cost: { type: { type: 'number' } },
-    exitCode: { type: { type: 'number' } },
-    duration: { type: { type: 'number' } },
+const EXPECTED_RETURN_TYPE = structureToTypeValue({
+  kind: 'stream',
+  chunk: { kind: 'string' },
+  ret: {
+    kind: 'dict',
+    fields: {
+      result: { type: { kind: 'string' } },
+      tokens: { type: { kind: 'dict', fields: {
+        prompt: { type: { kind: 'number' } },
+        cacheWrite5m: { type: { kind: 'number' } },
+        cacheWrite1h: { type: { kind: 'number' } },
+        cacheRead: { type: { kind: 'number' } },
+        output: { type: { kind: 'number' } },
+      } } },
+      cost: { type: { kind: 'number' } },
+      exitCode: { type: { kind: 'number' } },
+      duration: { type: { kind: 'number' } },
+    },
   },
 });
 
@@ -61,61 +65,67 @@ beforeEach(() => {
 });
 
 // ============================================================
-// IR-1: Factory result works with prefixFunctions
+// STREAM HELPERS
 // ============================================================
 
-describe('IR-1: Factory result works with prefixFunctions', () => {
-  it('produces namespaced functions claude-code::prompt, claude-code::skill, claude-code::command', async () => {
+/**
+ * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
+ */
+async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
+  return (stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+}
+
+// ============================================================
+// IR-1: Factory result has correct value shape
+// ============================================================
+
+describe('IR-1: Factory result has correct value shape', () => {
+  it('ext.value contains prompt, skill, command functions', async () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     const ext = createClaudeCodeExtension();
-    const prefixed = prefixFunctions('claude-code', ext);
+    const v = ext.value as any;
 
-    // Verify namespaced function names exist
-    expect(prefixed['claude-code::prompt']).toBeDefined();
-    expect(prefixed['claude-code::skill']).toBeDefined();
-    expect(prefixed['claude-code::command']).toBeDefined();
-
-    // Verify original function names are removed
-    expect(prefixed['prompt']).toBeUndefined();
-    expect(prefixed['skill']).toBeUndefined();
-    expect(prefixed['command']).toBeUndefined();
+    // Verify all three function names exist in value dict
+    expect(v['prompt']).toBeDefined();
+    expect(v['skill']).toBeDefined();
+    expect(v['command']).toBeDefined();
   });
 
-  it('preserves dispose method after prefixFunctions', async () => {
+  it('dispose is on factory result, not inside value dict', async () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     const ext = createClaudeCodeExtension();
-    const prefixed = prefixFunctions('claude-code', ext);
+    const v = ext.value as any;
 
-    // Verify dispose is preserved and not namespaced
-    expect(prefixed.dispose).toBeDefined();
-    expect(typeof prefixed.dispose).toBe('function');
-    expect(prefixed['claude-code::dispose']).toBeUndefined();
+    // Verify dispose is on ext, not on ext.value
+    expect(ext.dispose).toBeDefined();
+    expect(typeof ext.dispose).toBe('function');
+    expect(v['dispose']).toBeUndefined();
   });
 
-  it('preserves function definitions through prefixFunctions', async () => {
+  it('preserves function definitions on ext.value', async () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     const ext = createClaudeCodeExtension();
-    const prefixed = prefixFunctions('claude-code', ext);
+    const v = ext.value as any;
 
     // Verify function definitions are intact
-    const promptDef = prefixed['claude-code::prompt'];
+    const promptDef = v['prompt'];
     expect(promptDef.params).toHaveLength(2);
     expect(promptDef.params[0].name).toBe('text');
-    expect(promptDef.params[0].type).toEqual({ type: 'string' });
+    expect(promptDef.params[0].type).toEqual({ kind: 'string' });
     expect(promptDef.params[1].name).toBe('options');
-    expect(promptDef.params[1].type).toEqual({ type: 'dict', fields: { timeout: { type: { type: 'number' }, defaultValue: 0 } } });
+    expect(promptDef.params[1].type).toEqual({ kind: 'dict', fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } } });
     expect(promptDef.fn).toBeInstanceOf(Function);
     expect(promptDef.annotations?.['description']).toBeTruthy();
     expect(promptDef.returnType).toEqual(EXPECTED_RETURN_TYPE);
   });
 
-  it('allows prefixed functions to be called via runtime context', async () => {
+  it('allows functions in ext.value to be called via runtime context', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -156,18 +166,21 @@ describe('IR-1: Factory result works with prefixFunctions', () => {
     });
 
     const ext = createClaudeCodeExtension();
-    const prefixed = prefixFunctions('claude-code', ext);
+    const v = ext.value as any;
     const ctx = createRuntimeContext();
 
-    // Call prefixed function
-    const result = await prefixed['claude-code::prompt'].fn(
+    // Call function via ext.value — fn() returns RillStream synchronously
+    const stream = v['prompt'].fn(
       { text: 'Test prompt', options: {} },
       ctx
     );
 
+    // Resolve stream to get final result
+    const result = await resolveStream(stream) as ClaudeCodeResult;
+
     // Verify execution succeeded
     expect(result).toBeDefined();
-    expect((result as ClaudeCodeResult).exitCode).toBe(0);
+    expect(result.exitCode).toBe(0);
   });
 });
 
@@ -225,8 +238,8 @@ describe('IR-5: dispose terminates active child processes', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    // Start prompt but don't await completion
-    const promise = ext.prompt.fn({ text: 'Test', options: {} }, ctx);
+    // Start prompt but don't await completion — fn() returns RillStream synchronously
+    const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
 
     // Wait briefly for process to start
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -240,8 +253,8 @@ describe('IR-5: dispose terminates active child processes', () => {
     // Verify dispose was called
     expect(disposeFn).toHaveBeenCalledTimes(1);
 
-    // Cleanup: ensure promise doesn't hang test
-    promise.catch(() => {});
+    // Cleanup: ensure stream doesn't hang test
+    resolveStream(stream).catch(() => {});
   });
 
   it('terminates multiple concurrent active processes', async () => {
@@ -295,9 +308,9 @@ describe('IR-5: dispose terminates active child processes', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    // Start 5 concurrent prompts
-    const promises = Array.from({ length: 5 }, (_, i) =>
-      ext.prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
+    // Start 5 concurrent prompts — fn() returns RillStream synchronously
+    const streams = Array.from({ length: 5 }, (_, i) =>
+      (ext.value as any).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
     );
 
     // Wait briefly for processes to start
@@ -319,8 +332,8 @@ describe('IR-5: dispose terminates active child processes', () => {
       expect(fn).toHaveBeenCalledTimes(1);
     });
 
-    // Cleanup: ensure promises don't hang test
-    promises.forEach((p) => p.catch(() => {}));
+    // Cleanup: ensure streams don't hang test
+    streams.forEach((s) => resolveStream(s).catch(() => {}));
   });
 });
 
@@ -387,8 +400,8 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    // Start process
-    const promise = ext.prompt.fn({ text: 'Test', options: {} }, ctx);
+    // Start process — fn() returns RillStream synchronously
+    const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
 
     // Wait briefly
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -402,7 +415,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     expect(disposeFn).toHaveBeenCalledTimes(1);
 
     // Cleanup
-    promise.catch(() => {});
+    resolveStream(stream).catch(() => {});
   });
 
   it('clears active process tracker after first dispose', async () => {
@@ -454,11 +467,11 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    // Start 3 processes
-    const promises = [
-      ext.prompt.fn({ text: 'Test 1', options: {} }, ctx),
-      ext.prompt.fn({ text: 'Test 2', options: {} }, ctx),
-      ext.prompt.fn({ text: 'Test 3', options: {} }, ctx),
+    // Start 3 processes — fn() returns RillStream synchronously
+    const streams = [
+      (ext.value as any).prompt.fn({ text: 'Test 1', options: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Test 2', options: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Test 3', options: {} }, ctx),
     ];
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -483,7 +496,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     });
 
     // Cleanup
-    promises.forEach((p) => p.catch(() => {}));
+    streams.forEach((s) => resolveStream(s).catch(() => {}));
   });
 });
 
@@ -541,8 +554,8 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    // Start process
-    const promise = ext.prompt.fn({ text: 'Test', options: {} }, ctx);
+    // Start process — fn() returns RillStream synchronously
+    const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Call dispose - should not throw despite error
@@ -555,7 +568,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
 
     // Cleanup
     warnSpy.mockRestore();
-    promise.catch(() => {});
+    resolveStream(stream).catch(() => {});
   });
 
   it('logs warning for unknown error types', async () => {
@@ -607,7 +620,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    const promise = ext.prompt.fn({ text: 'Test', options: {} }, ctx);
+    const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Call dispose
@@ -619,7 +632,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     );
 
     warnSpy.mockRestore();
-    promise.catch(() => {});
+    resolveStream(stream).catch(() => {});
   });
 
   it('continues disposing remaining processes after one fails', async () => {
@@ -679,11 +692,11 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     const ext = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    // Start 3 processes
-    const promises = [
-      ext.prompt.fn({ text: 'Test 1', options: {} }, ctx),
-      ext.prompt.fn({ text: 'Test 2', options: {} }, ctx),
-      ext.prompt.fn({ text: 'Test 3', options: {} }, ctx),
+    // Start 3 processes — fn() returns RillStream synchronously
+    const streams = [
+      (ext.value as any).prompt.fn({ text: 'Test 1', options: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Test 2', options: {} }, ctx),
+      (ext.value as any).prompt.fn({ text: 'Test 3', options: {} }, ctx),
     ];
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -703,7 +716,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     );
 
     warnSpy.mockRestore();
-    promises.forEach((p) => p.catch(() => {}));
+    streams.forEach((s) => resolveStream(s).catch(() => {}));
   });
 });
 
@@ -724,9 +737,9 @@ describe('IR-1: Factory creation is idempotent', () => {
     const ext3 = createClaudeCodeExtension(config);
 
     // Verify all created successfully
-    expect(ext1.prompt).toBeDefined();
-    expect(ext2.prompt).toBeDefined();
-    expect(ext3.prompt).toBeDefined();
+    expect((ext1.value as any).prompt).toBeDefined();
+    expect((ext2.value as any).prompt).toBeDefined();
+    expect((ext3.value as any).prompt).toBeDefined();
 
     // Verify each has own dispose function
     expect(ext1.dispose).toBeDefined();
@@ -786,10 +799,10 @@ describe('IR-1: Factory creation is idempotent', () => {
     const ext3 = createClaudeCodeExtension();
     const ctx = createRuntimeContext();
 
-    // Start process on each instance
-    const promise1 = ext1.prompt.fn({ text: 'Test 1', options: {} }, ctx);
-    const promise2 = ext2.prompt.fn({ text: 'Test 2', options: {} }, ctx);
-    const promise3 = ext3.prompt.fn({ text: 'Test 3', options: {} }, ctx);
+    // Start process on each instance — fn() returns RillStream synchronously
+    const stream1 = (ext1.value as any).prompt.fn({ text: 'Test 1', options: {} }, ctx);
+    const stream2 = (ext2.value as any).prompt.fn({ text: 'Test 2', options: {} }, ctx);
+    const stream3 = (ext3.value as any).prompt.fn({ text: 'Test 3', options: {} }, ctx);
 
     await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -820,7 +833,7 @@ describe('IR-1: Factory creation is idempotent', () => {
     expect(disposeCalls2[2]).toBe(0); // ext3 (still not disposed)
 
     // Cleanup
-    [promise1, promise2, promise3].forEach((p) => p.catch(() => {}));
+    [stream1, stream2, stream3].forEach((s) => resolveStream(s).catch(() => {}));
   });
 
   it('creates instances with different configs independently', async () => {
@@ -832,9 +845,9 @@ describe('IR-1: Factory creation is idempotent', () => {
     const ext3 = createClaudeCodeExtension({ defaultTimeout: 30000 });
 
     // Verify all created with different configs
-    expect(ext1.prompt).toBeDefined();
-    expect(ext2.prompt).toBeDefined();
-    expect(ext3.prompt).toBeDefined();
+    expect((ext1.value as any).prompt).toBeDefined();
+    expect((ext2.value as any).prompt).toBeDefined();
+    expect((ext3.value as any).prompt).toBeDefined();
 
     // Verify independence
     expect(ext1.dispose).not.toBe(ext2.dispose);

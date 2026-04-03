@@ -17,7 +17,7 @@ export function vectorParam(name: string): RillParam {
   validateParamName(name);
   return {
     name,
-    type: { type: 'vector' },
+    type: { kind: 'vector' },
     defaultValue: undefined,
     annotations: {},
   };

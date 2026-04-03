@@ -19,6 +19,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
   RuntimeError,
+  type ApplicationCallable,
 } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
@@ -26,6 +27,10 @@ import type { OpenAIExtensionConfig } from '../src/types.js';
 // ============================================================
 // TEST HELPERS
 // ============================================================
+
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
 
 const mockCreate = vi.fn();
 
@@ -101,7 +106,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.generate.fn(
+      const result = (await getCallable(ext, 'generate').fn(
         { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
         ctx
       )) as Record<string, unknown>;
@@ -120,7 +125,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      const result = (await ext.generate.fn(
+      const result = (await getCallable(ext, 'generate').fn(
         { prompt: 'rate something', options: { schema: { score: 'number' } } },
         ctx
       )) as Record<string, unknown>;
@@ -137,7 +142,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn(
+        getCallable(ext, 'generate').fn(
           { prompt: 'prompt', options: { schema: { field: 'unsupported_type' } } },
           ctx
         )
@@ -155,7 +160,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -172,7 +177,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -189,13 +194,13 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow('generate: failed to parse response JSON:');
 
       // Verify message contains the native JSON parse error detail
       let thrown: unknown;
       try {
-        await ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -216,7 +221,7 @@ describe('generate() function', () => {
 
       // Must reject, never resolve to a value
       await expect(
-        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow();
     });
 
@@ -226,7 +231,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        ext.generate.fn({ prompt: 'prompt', options: {} }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('schema'),
@@ -252,7 +257,7 @@ describe('generate() function', () => {
       });
 
       await expect(
-        ext.generate.fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
       ).rejects.toThrow();
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');

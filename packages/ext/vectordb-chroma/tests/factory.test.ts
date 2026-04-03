@@ -33,28 +33,30 @@ describe('createChromaExtension', () => {
   describe('function exports', () => {
     it('exports all 11 vector database functions', () => {
       const ext = createChromaExtension({ collection: 'test_collection' });
+      const value = ext.value as Record<string, unknown>;
 
       // IR-1 through IR-11
-      expect(ext.upsert).toBeDefined();
-      expect(ext.upsert_batch).toBeDefined();
-      expect(ext.search).toBeDefined();
-      expect(ext.get).toBeDefined();
-      expect(ext.delete).toBeDefined();
-      expect(ext.delete_batch).toBeDefined();
-      expect(ext.count).toBeDefined();
-      expect(ext.create_collection).toBeDefined();
-      expect(ext.delete_collection).toBeDefined();
-      expect(ext.list_collections).toBeDefined();
-      expect(ext.describe).toBeDefined();
+      expect(value['upsert']).toBeDefined();
+      expect(value['upsert_batch']).toBeDefined();
+      expect(value['search']).toBeDefined();
+      expect(value['get']).toBeDefined();
+      expect(value['delete']).toBeDefined();
+      expect(value['delete_batch']).toBeDefined();
+      expect(value['count']).toBeDefined();
+      expect(value['create_collection']).toBeDefined();
+      expect(value['delete_collection']).toBeDefined();
+      expect(value['list_collections']).toBeDefined();
+      expect(value['describe']).toBeDefined();
     });
 
     it('all functions have correct structure', () => {
       const ext = createChromaExtension({ collection: 'test_collection' });
+      const value = ext.value as Record<string, Record<string, unknown>>;
 
-      expect(ext.upsert.params).toBeDefined();
-      expect(ext.upsert.fn).toBeTypeOf('function');
-      expect(ext.upsert.annotations?.['description']).toBeTypeOf('string');
-      expect(ext.upsert.returnType).toBeDefined();
+      expect(value['upsert']!['params']).toBeDefined();
+      expect(value['upsert']!['fn']).toBeTypeOf('function');
+      expect((value['upsert']!['annotations'] as Record<string, unknown>)?.['description']).toBeTypeOf('string');
+      expect(value['upsert']!['returnType']).toBeDefined();
     });
   });
 
@@ -63,9 +65,9 @@ describe('createChromaExtension', () => {
       const ext = createChromaExtension({ collection: 'test_collection' });
 
       // Multiple calls should not throw
-      await ext.dispose();
-      await ext.dispose();
-      await ext.dispose();
+      await ext.dispose!();
+      await ext.dispose!();
+      await ext.dispose!();
     });
 
     // Note: Testing post-dispose error behavior (EC-8) requires a full

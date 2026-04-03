@@ -151,23 +151,23 @@ describe('Integration Tests', () => {
       const ext = createS3FsExtension(config);
 
       // Perform series of write operations
-      await ext.write?.fn({ mount: 'storage', path: 'report.txt', content: 'Initial content' });
-      await ext.write?.fn({ mount: 'storage', path: 'data.json', content: '{"count":42}' });
-      await ext.append?.fn({ mount: 'storage', path: 'report.txt', content: '\nAppended line' });
+      await ext.write?.fn({ path: '/storage/report.txt', content: 'Initial content' });
+      await ext.write?.fn({ path: '/storage/data.json', content: '{"count":42}' });
+      await ext.append?.fn({ path: '/storage/report.txt', content: '\nAppended line' });
 
       // Verify read operations
-      const report = await ext.read?.fn({ mount: 'storage', path: 'report.txt' });
+      const report = await ext.read?.fn({ path: '/storage/report.txt' });
       expect(report).toBe('Initial content\nAppended line');
 
-      const data = await ext.read?.fn({ mount: 'storage', path: 'data.json' });
+      const data = await ext.read?.fn({ path: '/storage/data.json' });
       expect(data).toBe('{"count":42}');
 
       // Verify exists operation
-      expect(await ext.exists?.fn({ mount: 'storage', path: 'report.txt' })).toBe(true);
-      expect(await ext.exists?.fn({ mount: 'storage', path: 'missing.txt' })).toBe(false);
+      expect(await ext.exists?.fn({ path: '/storage/report.txt' })).toBe(true);
+      expect(await ext.exists?.fn({ path: '/storage/missing.txt' })).toBe(false);
 
       // Verify list operation
-      const files = await ext.list?.fn({ mount: 'storage', path: '' });
+      const files = await ext.list?.fn({ path: '/storage' });
       expect(files).toHaveLength(2);
       expect(files).toContainEqual({
         name: 'report.txt',
@@ -176,15 +176,17 @@ describe('Integration Tests', () => {
       });
 
       // Verify stat operation
-      const stat = await ext.stat?.fn({ mount: 'storage', path: 'report.txt' });
+      const stat = await ext.stat?.fn({ path: '/storage/report.txt' });
       expect(stat).toEqual({
+        name: expect.any(String),
+        type: 'file',
         size: expect.any(Number),
-        modified: expect.any(Number),
+        modified: expect.any(String),
       });
 
       // Verify remove operation
-      expect(await ext.remove?.fn({ mount: 'storage', path: 'data.json' })).toBe(true);
-      expect(await ext.exists?.fn({ mount: 'storage', path: 'data.json' })).toBe(false);
+      expect(await ext.remove?.fn({ path: '/storage/data.json' })).toBe(true);
+      expect(await ext.exists?.fn({ path: '/storage/data.json' })).toBe(false);
     });
   });
 
@@ -202,11 +204,11 @@ describe('Integration Tests', () => {
 
       // Client A writes file
       const clientA = createS3FsExtension(config);
-      await clientA.write?.fn({ mount: 'output', path: 'report.txt', content: 'Server A content' });
+      await clientA.write?.fn({ path: '/output/report.txt', content: 'Server A content' });
 
       // Client B reads file (simulates different server)
       const clientB = createS3FsExtension(config);
-      const content = await clientB.read?.fn({ mount: 'output', path: 'report.txt' });
+      const content = await clientB.read?.fn({ path: '/output/report.txt' });
 
       expect(content).toBe('Server A content');
     });
@@ -226,8 +228,7 @@ describe('Integration Tests', () => {
       const writePromises = Array.from({ length: 3 }, async (_, index) => {
         const client = createS3FsExtension(config);
         await client.write?.fn({
-          mount: 'shared',
-          path: `file-${index}.txt`,
+          path: `/shared/file-${index}.txt`,
           content: `Content from client ${index}`,
         });
       });
@@ -236,11 +237,11 @@ describe('Integration Tests', () => {
 
       // Verify all writes succeeded
       const reader = createS3FsExtension(config);
-      const files = await reader.list?.fn({ mount: 'shared', path: '' });
+      const files = await reader.list?.fn({ path: '/shared' });
 
       expect(files).toHaveLength(3);
       for (let i = 0; i < 3; i++) {
-        const content = await reader.read?.fn({ mount: 'shared', path: `file-${i}.txt` });
+        const content = await reader.read?.fn({ path: `/shared/file-${i}.txt` });
         expect(content).toBe(`Content from client ${i}`);
       }
     });
@@ -262,60 +263,64 @@ describe('Integration Tests', () => {
       const ext = createS3FsExtension(config);
 
       // Test write
-      await ext.write?.fn({ mount: 'test', path: 'sample.txt', content: 'Hello MinIO' });
+      await ext.write?.fn({ path: '/test/sample.txt', content: 'Hello MinIO' });
 
       // Test read
-      const content = await ext.read?.fn({ mount: 'test', path: 'sample.txt' });
+      const content = await ext.read?.fn({ path: '/test/sample.txt' });
       expect(content).toBe('Hello MinIO');
 
       // Test append
-      await ext.append?.fn({ mount: 'test', path: 'sample.txt', content: ' from rill' });
-      const appended = await ext.read?.fn({ mount: 'test', path: 'sample.txt' });
+      await ext.append?.fn({ path: '/test/sample.txt', content: ' from rill' });
+      const appended = await ext.read?.fn({ path: '/test/sample.txt' });
       expect(appended).toBe('Hello MinIO from rill');
 
       // Test exists
-      expect(await ext.exists?.fn({ mount: 'test', path: 'sample.txt' })).toBe(true);
-      expect(await ext.exists?.fn({ mount: 'test', path: 'missing.txt' })).toBe(false);
+      expect(await ext.exists?.fn({ path: '/test/sample.txt' })).toBe(true);
+      expect(await ext.exists?.fn({ path: '/test/missing.txt' })).toBe(false);
 
       // Test stat
-      const stat = await ext.stat?.fn({ mount: 'test', path: 'sample.txt' });
+      const stat = await ext.stat?.fn({ path: '/test/sample.txt' });
       expect(stat).toEqual({
+        name: expect.any(String),
+        type: 'file',
         size: expect.any(Number),
-        modified: expect.any(Number),
+        modified: expect.any(String),
       });
 
       // Test copy
       expect(
-        await ext.copy?.fn({ mount: 'test', src: 'sample.txt', dest: 'sample-copy.txt' })
+        await ext.copy?.fn({ src: '/test/sample.txt', dest: '/test/sample-copy.txt' })
       ).toBe(true);
-      const copied = await ext.read?.fn({ mount: 'test', path: 'sample-copy.txt' });
+      const copied = await ext.read?.fn({ path: '/test/sample-copy.txt' });
       expect(copied).toBe('Hello MinIO from rill');
 
       // Test move
       expect(
-        await ext.move?.fn({ mount: 'test', src: 'sample-copy.txt', dest: 'sample-moved.txt' })
+        await ext.move?.fn({ src: '/test/sample-copy.txt', dest: '/test/sample-moved.txt' })
       ).toBe(true);
-      expect(await ext.exists?.fn({ mount: 'test', path: 'sample-copy.txt' })).toBe(false);
-      expect(await ext.exists?.fn({ mount: 'test', path: 'sample-moved.txt' })).toBe(true);
+      expect(await ext.exists?.fn({ path: '/test/sample-copy.txt' })).toBe(false);
+      expect(await ext.exists?.fn({ path: '/test/sample-moved.txt' })).toBe(true);
 
       // Test list
-      const files = await ext.list?.fn({ mount: 'test', path: '' });
+      const files = await ext.list?.fn({ path: '/test' });
       expect(files.length).toBeGreaterThanOrEqual(2);
 
       // Test find (recursive)
-      const found = await ext.find?.fn({ mount: 'test', pattern: '' });
+      const found = await ext.find?.fn({ path: '/test', pattern: '*' });
       expect(found.length).toBeGreaterThanOrEqual(2);
 
       // Test remove
-      expect(await ext.remove?.fn({ mount: 'test', path: 'sample.txt' })).toBe(true);
-      expect(await ext.exists?.fn({ mount: 'test', path: 'sample.txt' })).toBe(false);
+      expect(await ext.remove?.fn({ path: '/test/sample.txt' })).toBe(true);
+      expect(await ext.exists?.fn({ path: '/test/sample.txt' })).toBe(false);
 
       // Test mkdir (no-op that returns true)
-      expect(await ext.mkdir?.fn({ mount: 'test', path: 'subdir' })).toBe(true);
+      expect(await ext.mkdir?.fn({ path: '/test/subdir' })).toBe(true);
 
       // Test mounts
-      const mounts = ext.mounts?.fn({});
-      expect(mounts).toEqual(['test']);
+      const mounts = await ext.mounts?.fn({});
+      expect(mounts).toEqual([
+        { name: 'test', mode: 'read-write', glob: '', bucket: TEST_BUCKET, prefix: 'ac5-full-suite/' },
+      ]);
     });
   });
 
@@ -339,39 +344,39 @@ describe('Integration Tests', () => {
       const ext = createS3FsExtension(config);
 
       // Test all functions throw for unknown mount
-      await expect(ext.read?.fn({ mount: 'unknown', path: 'file.txt' })).rejects.toThrow(
-        'not configured'
+      await expect(ext.read?.fn({ path: '/unknown/file.txt' })).rejects.toThrow(
+        'unknown mount'
       );
       await expect(
-        ext.write?.fn({ mount: 'unknown', path: 'file.txt', content: 'content' })
-      ).rejects.toThrow('not configured');
+        ext.write?.fn({ path: '/unknown/file.txt', content: 'content' })
+      ).rejects.toThrow('unknown mount');
       await expect(
-        ext.append?.fn({ mount: 'unknown', path: 'file.txt', content: 'content' })
-      ).rejects.toThrow('not configured');
-      await expect(ext.list?.fn({ mount: 'unknown', path: '' })).rejects.toThrow(
-        'not configured'
+        ext.append?.fn({ path: '/unknown/file.txt', content: 'content' })
+      ).rejects.toThrow('unknown mount');
+      await expect(ext.list?.fn({ path: '/unknown' })).rejects.toThrow(
+        'unknown mount'
       );
-      await expect(ext.find?.fn({ mount: 'unknown', pattern: '' })).rejects.toThrow(
-        'not configured'
+      await expect(ext.find?.fn({ path: '/unknown', pattern: '' })).rejects.toThrow(
+        'unknown mount'
       );
-      await expect(ext.exists?.fn({ mount: 'unknown', path: 'file.txt' })).rejects.toThrow(
-        'not configured'
+      await expect(ext.exists?.fn({ path: '/unknown/file.txt' })).rejects.toThrow(
+        'unknown mount'
       );
-      await expect(ext.remove?.fn({ mount: 'unknown', path: 'file.txt' })).rejects.toThrow(
-        'not configured'
+      await expect(ext.remove?.fn({ path: '/unknown/file.txt' })).rejects.toThrow(
+        'unknown mount'
       );
-      await expect(ext.stat?.fn({ mount: 'unknown', path: 'file.txt' })).rejects.toThrow(
-        'not configured'
+      await expect(ext.stat?.fn({ path: '/unknown/file.txt' })).rejects.toThrow(
+        'unknown mount'
       );
-      await expect(ext.mkdir?.fn({ mount: 'unknown', path: 'dir' })).rejects.toThrow(
-        'not configured'
+      await expect(ext.mkdir?.fn({ path: '/unknown/dir' })).rejects.toThrow(
+        'unknown mount'
       );
       await expect(
-        ext.copy?.fn({ mount: 'unknown', src: 'src.txt', dest: 'dest.txt' })
-      ).rejects.toThrow('not configured');
+        ext.copy?.fn({ src: '/unknown/src.txt', dest: '/unknown/dest.txt' })
+      ).rejects.toThrow('unknown mount');
       await expect(
-        ext.move?.fn({ mount: 'unknown', src: 'src.txt', dest: 'dest.txt' })
-      ).rejects.toThrow('not configured');
+        ext.move?.fn({ src: '/unknown/src.txt', dest: '/unknown/dest.txt' })
+      ).rejects.toThrow('unknown mount');
     });
   });
 
@@ -391,19 +396,19 @@ describe('Integration Tests', () => {
 
       // Test all write operations throw
       await expect(
-        ext.write?.fn({ mount: 'readonly-mount', path: 'file.txt', content: 'content' })
+        ext.write?.fn({ path: '/readonly-mount/file.txt', content: 'content' })
       ).rejects.toThrow('read-only');
       await expect(
-        ext.append?.fn({ mount: 'readonly-mount', path: 'file.txt', content: 'content' })
+        ext.append?.fn({ path: '/readonly-mount/file.txt', content: 'content' })
       ).rejects.toThrow('read-only');
       await expect(
-        ext.remove?.fn({ mount: 'readonly-mount', path: 'file.txt' })
+        ext.remove?.fn({ path: '/readonly-mount/file.txt' })
       ).rejects.toThrow('read-only');
       await expect(
-        ext.copy?.fn({ mount: 'readonly-mount', src: 'src.txt', dest: 'dest.txt' })
+        ext.copy?.fn({ src: '/readonly-mount/src.txt', dest: '/readonly-mount/dest.txt' })
       ).rejects.toThrow('read-only');
       await expect(
-        ext.move?.fn({ mount: 'readonly-mount', src: 'src.txt', dest: 'dest.txt' })
+        ext.move?.fn({ src: '/readonly-mount/src.txt', dest: '/readonly-mount/dest.txt' })
       ).rejects.toThrow('read-only');
     });
 
@@ -420,7 +425,7 @@ describe('Integration Tests', () => {
       });
 
       const writer = createS3FsExtension(writeConfig);
-      await writer.write?.fn({ mount: 'setup', path: 'data.txt', content: 'Read-only test' });
+      await writer.write?.fn({ path: '/setup/data.txt', content: 'Read-only test' });
 
       // Open as read-only
       const readConfig = createMinIOConfig({
@@ -434,20 +439,22 @@ describe('Integration Tests', () => {
       const reader = createS3FsExtension(readConfig);
 
       // Read operations should succeed
-      const content = await reader.read?.fn({ mount: 'readonly-mount', path: 'data.txt' });
+      const content = await reader.read?.fn({ path: '/readonly-mount/data.txt' });
       expect(content).toBe('Read-only test');
 
-      expect(await reader.exists?.fn({ mount: 'readonly-mount', path: 'data.txt' })).toBe(
+      expect(await reader.exists?.fn({ path: '/readonly-mount/data.txt' })).toBe(
         true
       );
 
-      const files = await reader.list?.fn({ mount: 'readonly-mount', path: '' });
+      const files = await reader.list?.fn({ path: '/readonly-mount' });
       expect(files).toHaveLength(1);
 
-      const stat = await reader.stat?.fn({ mount: 'readonly-mount', path: 'data.txt' });
+      const stat = await reader.stat?.fn({ path: '/readonly-mount/data.txt' });
       expect(stat).toEqual({
+        name: expect.any(String),
+        type: 'file',
         size: expect.any(Number),
-        modified: expect.any(Number),
+        modified: expect.any(String),
       });
     });
   });
@@ -467,7 +474,7 @@ describe('Integration Tests', () => {
 
       const writer = createS3FsExtension(writeConfig);
       const largeContent = 'x'.repeat(2000); // 2KB file
-      await writer.write?.fn({ mount: 'unlimited', path: 'large.txt', content: largeContent });
+      await writer.write?.fn({ path: '/unlimited/large.txt', content: largeContent });
 
       // Read with size limit
       const readConfig = createMinIOConfig({
@@ -482,7 +489,7 @@ describe('Integration Tests', () => {
       const reader = createS3FsExtension(readConfig);
 
       // Should throw size error
-      await expect(reader.read?.fn({ mount: 'limited', path: 'large.txt' })).rejects.toThrow(
+      await expect(reader.read?.fn({ path: '/limited/large.txt' })).rejects.toThrow(
         'exceeds limit'
       );
     });
@@ -504,7 +511,7 @@ describe('Integration Tests', () => {
       // Should throw size error
       const largeContent = 'x'.repeat(200);
       await expect(
-        ext.write?.fn({ mount: 'limited', path: 'large.txt', content: largeContent })
+        ext.write?.fn({ path: '/limited/large.txt', content: largeContent })
       ).rejects.toThrow('exceeds limit');
     });
   });
@@ -523,7 +530,7 @@ describe('Integration Tests', () => {
 
       const ext = createS3FsExtension(config);
 
-      await expect(ext.read?.fn({ mount: 'storage', path: 'missing.txt' })).rejects.toThrow(
+      await expect(ext.read?.fn({ path: '/storage/missing.txt' })).rejects.toThrow(
         'not found'
       );
     });
@@ -541,7 +548,7 @@ describe('Integration Tests', () => {
 
       const ext = createS3FsExtension(config);
 
-      expect(await ext.exists?.fn({ mount: 'storage', path: 'missing.txt' })).toBe(false);
+      expect(await ext.exists?.fn({ path: '/storage/missing.txt' })).toBe(false);
     });
   });
 
@@ -561,12 +568,12 @@ describe('Integration Tests', () => {
 
       // All write operations should throw
       await expect(
-        ext.write?.fn({ mount: 'readonly', path: 'test.txt', content: 'content' })
+        ext.write?.fn({ path: '/readonly/test.txt', content: 'content' })
       ).rejects.toThrow('read-only');
       await expect(
-        ext.append?.fn({ mount: 'readonly', path: 'test.txt', content: 'content' })
+        ext.append?.fn({ path: '/readonly/test.txt', content: 'content' })
       ).rejects.toThrow('read-only');
-      await expect(ext.remove?.fn({ mount: 'readonly', path: 'test.txt' })).rejects.toThrow(
+      await expect(ext.remove?.fn({ path: '/readonly/test.txt' })).rejects.toThrow(
         'read-only'
       );
     });
@@ -588,7 +595,7 @@ describe('Integration Tests', () => {
 
       // Write to deeply nested path without creating parent directories
       await expect(
-        ext.write?.fn({ mount: 'storage', path: 'a/b/c/d/file.txt', content: 'content' })
+        ext.write?.fn({ path: '/storage/a/b/c/d/file.txt', content: 'content' })
       ).resolves.not.toThrow();
 
       // Verify file was written
@@ -601,7 +608,7 @@ describe('Integration Tests', () => {
       });
 
       const reader = createS3FsExtension(readConfig);
-      const content = await reader.read?.fn({ mount: 'storage', path: 'a/b/c/d/file.txt' });
+      const content = await reader.read?.fn({ path: '/storage/a/b/c/d/file.txt' });
       expect(content).toBe('content');
     });
   });
@@ -621,11 +628,11 @@ describe('Integration Tests', () => {
       const ext = createS3FsExtension(config);
 
       // mkdir should return true
-      expect(await ext.mkdir?.fn({ mount: 'storage', path: 'subdir' })).toBe(true);
-      expect(await ext.mkdir?.fn({ mount: 'storage', path: 'a/b/c' })).toBe(true);
+      expect(await ext.mkdir?.fn({ path: '/storage/subdir' })).toBe(true);
+      expect(await ext.mkdir?.fn({ path: '/storage/a/b/c' })).toBe(true);
 
       // No directory markers should be created
-      const files = await ext.list?.fn({ mount: 'storage', path: '' });
+      const files = await ext.list?.fn({ path: '/storage' });
       expect(files).toHaveLength(0);
     });
   });
@@ -650,13 +657,12 @@ describe('Integration Tests', () => {
       const ext = createS3FsExtension(config);
 
       try {
-        await ext.read?.fn({ mount: 'unknown', path: 'file.txt' });
+        await ext.read?.fn({ path: '/unknown/file.txt' });
         expect.fail('Should have thrown error');
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
         const message = (error as Error).message;
-        expect(message).toContain('unknown');
-        expect(message).toContain('not configured');
+        expect(message).toContain('unknown mount');
       }
     });
   });

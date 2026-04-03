@@ -97,7 +97,19 @@ export interface ToolLoopCallbacks {
   /**
    * Call the provider API with messages and tools
    */
-  callAPI: (messages: unknown[], tools: unknown) => Promise<unknown>;
+  callAPI: (messages: unknown[], tools: unknown, signal?: AbortSignal) => Promise<unknown>;
+
+  /**
+   * Call the provider API with streaming text deltas.
+   * When defined and yieldChunk is provided, the orchestrator uses this instead of callAPI.
+   * Must return the same response object shape as callAPI for tool extraction and token tracking.
+   */
+  callAPIStreaming?: (
+    messages: unknown[],
+    tools: unknown,
+    onTextDelta: (text: string) => void,
+    signal?: AbortSignal
+  ) => Promise<unknown>;
 
   /**
    * Extract tool calls from provider response
@@ -150,3 +162,15 @@ export interface ToolLoopResult {
    */
   turns: number;
 }
+
+/**
+ * Discriminated union of chunk types emitted during a streaming tool loop.
+ *
+ * - text_delta: incremental text from the assistant
+ * - tool_call:  a tool the assistant has invoked
+ * - tool_result: the result returned from executing a tool
+ */
+export type ToolLoopChunk =
+  | { type: 'text_delta'; text: string }
+  | { type: 'tool_call'; name: string; args: Record<string, RillValue> }
+  | { type: 'tool_result'; name: string; result: RillValue };

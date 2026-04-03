@@ -8,26 +8,25 @@ Use Redis backend for distributed systems, caching layers, high-throughput workl
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createRedisKvExtension } from '@rcrsr/rill-ext-kv-redis';
-
-const ext = createRedisKvExtension({
-  url: 'redis://localhost:6379',
-  mounts: {
-    user: {
-      mode: 'read-write',
-      prefix: 'app:user:',
+```json
+{
+  "extensions": {
+    "mounts": {
+      "kv": "@rcrsr/rill-ext-kv-redis"
     },
-  },
-});
-const { functions, dispose } = hoistExtension('kv', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { kv: functions } },
-  },
-});
+    "config": {
+      "kv": {
+        "url": "redis://localhost:6379",
+        "mounts": {
+          "user": {
+            "mode": "read-write",
+            "prefix": "app:user:"
+          }
+        }
+      }
+    }
+  }
+}
 ```
 
 Rill script — load the extension as a handle and call functions via dot-path:
@@ -54,21 +53,27 @@ kv::set("user", "name", "Alice")
 
 ## Configuration
 
-```typescript
-interface RedisKvConfig {
-  url: string;  // Redis connection URL
-  mounts: Record<string, RedisKvMountConfig>;
-  maxStoreSize?: number;  // bytes (default: 10485760 = 10MB)
-  writePolicy?: 'dispose' | 'immediate';  // default: 'dispose'
-}
-
-interface RedisKvMountConfig {
-  mode: 'read' | 'write' | 'read-write';
-  prefix: string;  // key prefix for isolation
-  schema?: Record<string, SchemaEntry>;
-  maxEntries?: number;  // default: 10000
-  maxValueSize?: number;  // bytes (default: 102400 = 100KB)
-  ttl?: number;  // expiry in seconds (optional)
+```json
+{
+  "extensions": {
+    "config": {
+      "kv": {
+        "url": "redis://localhost:6379",
+        "mounts": {
+          "user": {
+            "mode": "read-write",
+            "prefix": "app:user:",
+            "schema": { "name": { "type": "string", "default": "" } },
+            "maxEntries": 10000,
+            "maxValueSize": 102400,
+            "ttl": 3600
+          }
+        },
+        "maxStoreSize": 10485760,
+        "writePolicy": "dispose"
+      }
+    }
+  }
 }
 ```
 
@@ -92,57 +97,75 @@ interface RedisKvMountConfig {
 
 **Example with schema and TTL:**
 
-```typescript
-const ext = createRedisKvExtension({
-  url: 'redis://localhost:6379',
-  mounts: {
-    user: {
-      mode: 'read-write',
-      prefix: 'app:user:',
-      schema: {
-        name: { type: 'string', default: '' },
-        count: { type: 'number', default: 0 }
+```json
+{
+  "extensions": {
+    "config": {
+      "kv": {
+        "url": "redis://localhost:6379",
+        "mounts": {
+          "user": {
+            "mode": "read-write",
+            "prefix": "app:user:",
+            "schema": {
+              "name": { "type": "string", "default": "" },
+              "count": { "type": "number", "default": 0 }
+            }
+          },
+          "cache": {
+            "mode": "read-write",
+            "prefix": "app:cache:",
+            "ttl": 3600
+          }
+        },
+        "writePolicy": "immediate"
       }
-    },
-    cache: {
-      mode: 'read-write',
-      prefix: 'app:cache:',
-      ttl: 3600  // 1 hour expiry
     }
-  },
-  writePolicy: 'immediate'
-});
+  }
+}
 ```
 
 **Redis with authentication:**
 
-```typescript
-const ext = createRedisKvExtension({
-  url: 'redis://user:password@host:6379/0',
-  mounts: {
-    session: {
-      mode: 'read-write',
-      prefix: 'session:',
-      ttl: 1800  // 30 minute session timeout
+```json
+{
+  "extensions": {
+    "config": {
+      "kv": {
+        "url": "redis://${REDIS_USER}:${REDIS_PASSWORD}@host:6379/0",
+        "mounts": {
+          "session": {
+            "mode": "read-write",
+            "prefix": "session:",
+            "ttl": 1800
+          }
+        }
+      }
     }
   }
-});
+}
 ```
 
 **Redis with TLS:**
 
-```typescript
-const ext = createRedisKvExtension({
-  url: 'rediss://secure-host:6380',
-  mounts: {
-    data: {
-      mode: 'read-write',
-      prefix: 'prod:data:',
-      maxEntries: 50000,
-      ttl: 86400  // 24 hours
+```json
+{
+  "extensions": {
+    "config": {
+      "kv": {
+        "url": "rediss://secure-host:6380",
+        "mounts": {
+          "data": {
+            "mode": "read-write",
+            "prefix": "prod:data:",
+            "maxEntries": 50000,
+            "ttl": 86400
+          }
+        }
+      }
     }
   }
-});
+}
 ```
 
 ## Key Features

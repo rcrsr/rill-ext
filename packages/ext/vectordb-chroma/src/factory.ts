@@ -8,14 +8,16 @@ import {
   RuntimeError,
   emitExtensionEvent,
   createVector,
-  rillTypeToTypeValue,
-  type ExtensionResult,
-  type VectorExtensionContract,
+  structureToTypeValue,
+  toCallable,
+  type ExtensionFactoryResult,
+  type RillFunction,
   type RillValue,
   type RuntimeContext,
   type RillVector,
 } from '@rcrsr/rill';
 import {
+  type VectorExtensionContract,
   mapVectorError,
   createDisposalState,
   checkDisposed,
@@ -55,7 +57,7 @@ import type { ChromaConfig } from './types.js';
  * await ext.dispose();
  * ```
  */
-export function createChromaExtension(config: ChromaConfig): ExtensionResult {
+export function createChromaExtension(config: ChromaConfig): ExtensionFactoryResult {
   // Validate required fields (AC-10)
   assertRequired(config.collection, 'collection');
 
@@ -77,8 +79,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
   // Track disposal state (EC-8)
   const disposalState: DisposalState = createDisposalState('chroma');
 
-  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
-  const result: ExtensionResult = ({
+  // Build function dict — satisfies verifies contract shape at compile time (IR-8)
+  const fnDict: { upsert: RillFunction; upsert_batch: RillFunction; search: RillFunction; get: RillFunction; delete: RillFunction; delete_batch: RillFunction; count: RillFunction; create_collection: RillFunction; delete_collection: RillFunction; list_collections: RillFunction; describe: RillFunction } = ({
     // IR-1: chroma::upsert
     upsert: {
       params: [
@@ -141,7 +143,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Insert or update single vector with metadata' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, success: { type: { type: 'bool' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, success: { type: { kind: 'bool' } } } }),
     },
 
     // IR-2: chroma::upsert_batch
@@ -251,7 +253,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Batch insert/update vectors' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { succeeded: { type: { type: 'number' } }, failed: { type: { type: 'string' } }, error: { type: { type: 'string' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { succeeded: { type: { kind: 'number' } }, failed: { type: { kind: 'string' } }, error: { type: { kind: 'string' } } } }),
     },
 
     // IR-3: chroma::search
@@ -259,8 +261,8 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
       params: [
         vectorParam('vector'),
         p.dict('options', undefined, {}, {
-          k: { type: { type: 'number' }, defaultValue: 10 },
-          filter: { type: { type: 'dict' }, defaultValue: {} },
+          k: { type: { kind: 'number' }, defaultValue: 10 },
+          filter: { type: { kind: 'dict' }, defaultValue: {} },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -333,7 +335,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Search k nearest neighbors' },
-      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { id: { type: { type: 'string' } }, score: { type: { type: 'number' } }, metadata: { type: { type: 'dict' } } } } }),
+      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { id: { type: { kind: 'string' } }, score: { type: { kind: 'number' } }, metadata: { type: { kind: 'dict' } } } } }),
     },
 
     // IR-4: chroma::get
@@ -410,7 +412,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Fetch vector by ID' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, vector: { type: { type: 'vector' } }, metadata: { type: { type: 'dict' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, vector: { type: { kind: 'vector' } }, metadata: { type: { kind: 'dict' } } } }),
     },
 
     // IR-5: chroma::delete
@@ -467,7 +469,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Delete vector by ID' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { id: { type: { type: 'string' } }, deleted: { type: { type: 'bool' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } } }),
     },
 
     // IR-6: chroma::delete_batch
@@ -548,7 +550,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Batch delete vectors' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { succeeded: { type: { type: 'number' } }, failed: { type: { type: 'string' } }, error: { type: { type: 'string' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { succeeded: { type: { kind: 'number' } }, failed: { type: { kind: 'string' } }, error: { type: { kind: 'string' } } } }),
     },
 
     // IR-7: chroma::count
@@ -594,7 +596,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Return total vector count in collection' },
-      returnType: rillTypeToTypeValue({ type: 'number' }),
+      returnType: structureToTypeValue({ kind: 'number' }),
     },
 
     // IR-8: chroma::create_collection
@@ -602,7 +604,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
       params: [
         p.str('name'),
         p.dict('options', undefined, {}, {
-          metadata: { type: { type: 'dict' }, defaultValue: {} },
+          metadata: { type: { kind: 'dict' }, defaultValue: {} },
         }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -659,7 +661,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Create new vector collection' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, created: { type: { type: 'bool' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, created: { type: { kind: 'bool' } } } }),
     },
 
     // IR-9: chroma::delete_collection
@@ -709,7 +711,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Delete vector collection' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, deleted: { type: { type: 'bool' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } } }),
     },
 
     // IR-10: chroma::list_collections
@@ -750,7 +752,7 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'List all collection names' },
-      returnType: rillTypeToTypeValue({ type: 'list', element: { type: 'string' } }),
+      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
     },
 
     // IR-11: chroma::describe
@@ -802,12 +804,11 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
         }
       },
       annotations: { description: 'Describe configured collection' },
-      returnType: rillTypeToTypeValue({ type: 'dict', fields: { name: { type: { type: 'string' } }, count: { type: { type: 'number' } } } }),
+      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, count: { type: { kind: 'number' } } } }),
     },
-  }) satisfies VectorExtensionContract;
+  });
 
-  // Attach dispose lifecycle method using shared utility
-  result.dispose = async (): Promise<void> => {
+  const disposeExtension = async (): Promise<void> => {
     await dispose(disposalState, async () => {
       // Cleanup SDK HTTP connections
       // Note: ChromaDB SDK doesn't expose a close() method, but we include
@@ -815,5 +816,19 @@ export function createChromaExtension(config: ChromaConfig): ExtensionResult {
     });
   };
 
-  return result;
+  const callableDict = {
+    upsert: toCallable(fnDict.upsert),
+    upsert_batch: toCallable(fnDict.upsert_batch),
+    search: toCallable(fnDict.search),
+    get: toCallable(fnDict.get),
+    delete: toCallable(fnDict.delete),
+    delete_batch: toCallable(fnDict.delete_batch),
+    count: toCallable(fnDict.count),
+    create_collection: toCallable(fnDict.create_collection),
+    delete_collection: toCallable(fnDict.delete_collection),
+    list_collections: toCallable(fnDict.list_collections),
+    describe: toCallable(fnDict.describe),
+  } satisfies VectorExtensionContract;
+
+  return { value: callableDict as unknown as RillValue, dispose: disposeExtension } satisfies ExtensionFactoryResult;
 }

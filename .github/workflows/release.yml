@@ -13,12 +13,12 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Enable Corepack and install pnpm
         run: corepack enable && corepack prepare --activate
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '25'
           cache: 'pnpm'

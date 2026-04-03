@@ -4,36 +4,38 @@
 
 This extension spawns the Claude Code CLI as a subprocess and exposes it to rill scripts. Scripts send prompts, invoke skills like `/commit`, and run named commands. The extension handles process lifecycle, timeout enforcement, and NDJSON stream parsing.
 
-Each call returns a dict with the response text, token usage breakdown, cost in USD, exit code, and duration in ms. Typical uses: automated code review, commit generation, and PR workflows.
+Each call returns a `RillStream`. Iterate stdout line chunks with `-> each`, or resolve immediately with `()` to get the result dict containing response text, token usage breakdown, cost in USD, exit code, and duration in ms. Typical uses: automated code review, commit generation, and PR workflows.
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createClaudeCodeExtension } from '@rcrsr/rill-ext-claude-code';
-
-const ext = createClaudeCodeExtension({ defaultTimeout: 60000 });
-const { functions, dispose } = hoistExtension('claude_code', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { claude_code: functions } },
-  },
-});
+```json
+{
+  "extensions": {
+    "mounts": {
+      "claude_code": "@rcrsr/rill-ext-claude-code"
+    },
+    "config": {
+      "claude_code": {
+        "defaultTimeout": 60000
+      }
+    }
+  }
+}
 ```
 
-Rill script — load the extension as a handle and call functions via dot-path:
+Rill script — stream stdout line chunks:
 
 ```rill
 use<ext:claude_code> => $cc
-$cc.prompt("Explain TCP handshakes") => $result
-$result.result -> log
+$cc.prompt("Explain TCP handshakes") => $s
+$s -> each { log }
 ```
 
-Direct dot-path — no intermediate variable:
+Resolve immediately to access the result dict:
 
 ```rill
-use<ext:claude_code.prompt>("Explain TCP handshakes") => $result
+claude_code::prompt("Explain TCP handshakes")() => $result
+$result.result -> log
 ```
 
 Secondary pattern (still works, not primary):
@@ -53,15 +55,19 @@ The factory validates both requirements eagerly and throws on missing dependenci
 
 ## Configuration
 
-```typescript
-import { createClaudeCodeExtension } from '@rcrsr/rill-ext-claude-code';
-
-const ext = createClaudeCodeExtension({
-  binaryPath: '/usr/local/bin/claude',  // default: 'claude'
-  defaultTimeout: 60000,                // default: 1800000 (30 min)
-  dangerouslySkipPermissions: true,     // default: true
-  settingSources: '',                   // default: ''
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "claude_code": {
+        "binaryPath": "/usr/local/bin/claude",
+        "defaultTimeout": 60000,
+        "dangerouslySkipPermissions": true,
+        "settingSources": ""
+      }
+    }
+  }
+}
 ```
 
 | Parameter | Type | Default | Description |
@@ -84,27 +90,43 @@ Controls which Claude Code settings load before execution.
 
 ## Functions
 
-**prompt(text, options?)** — Execute a Claude Code prompt:
+**prompt(text, options?)** — Execute a Claude Code prompt. Returns `RillStream`:
 
 ```rill
-claude_code::prompt("Explain TCP handshakes") => $result
+# Stream stdout line chunks
+claude_code::prompt("Explain TCP handshakes") => $s
+$s -> each { log }
+
+# Or resolve to result dict
+claude_code::prompt("Explain TCP handshakes")() => $result
 $result.result       # Response text
 $result.tokens       # Token usage breakdown
 $result.cost         # Cost in USD
+$result.exitCode     # CLI exit code
 $result.duration     # Execution time in ms
 ```
 
-**skill(name, args?)** — Execute a Claude Code skill:
+**skill(name, args?)** — Execute a Claude Code skill. Returns `RillStream`:
 
 ```rill
-claude_code::skill("commit", [message: "fix: resolve timeout bug"]) => $result
+# Stream stdout line chunks
+claude_code::skill("commit", [message: "fix: resolve timeout bug"]) => $s
+$s -> each { log }
+
+# Or resolve to result dict
+claude_code::skill("commit", [message: "fix: resolve timeout bug"])() => $result
 $result.result
 ```
 
-**command(name, args?)** — Execute a Claude Code command:
+**command(name, args?)** — Execute a Claude Code command. Returns `RillStream`:
 
 ```rill
-claude_code::command("review-pr", [pr: "123"]) => $result
+# Stream stdout line chunks
+claude_code::command("review-pr", [pr: "123"]) => $s
+$s -> each { log }
+
+# Or resolve to result dict
+claude_code::command("review-pr", [pr: "123"])() => $result
 $result.result
 ```
 
@@ -122,9 +144,29 @@ claude_code::prompt("Long task", [timeout: 300000]) => $result
 |--------|------|-------------|
 | `timeout` | number | Override defaultTimeout for this call |
 
+## Streaming
+
+All 3 functions return `RillStream`. Two usage patterns:
+
+**Iterate chunks** — process stdout output line-by-line:
+
+```rill
+claude_code::prompt("Write a function") => $s
+$s -> each { log }
+```
+
+**Resolve immediately** — access the full result dict at once:
+
+```rill
+claude_code::prompt("Write a function")() => $result
+$result.result -> log
+```
+
+Each chunk is a string (one stdout line).
+
 ## Result Dict
 
-All 3 functions return the same structure:
+All 3 functions resolve to the same structure:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -163,23 +205,6 @@ The extension validates inputs and process state at runtime.
 | `claude-code:skill` | Skill completes |
 | `claude-code:command` | Command completes |
 | `claude-code:error` | Any operation fails |
-
-## Test Host
-
-A runnable example at `examples/test-host.ts` demonstrates integration:
-
-```bash
-# Built-in demo
-pnpm exec tsx examples/test-host.ts
-
-# Inline expression
-pnpm exec tsx examples/test-host.ts -e 'claude_code::prompt("Tell me a joke") -> log'
-
-# Script file
-pnpm exec tsx examples/test-host.ts script.rill
-```
-
-The test host wires the extension to the rill runtime with logging callbacks.
 
 ## Low-Level Exports
 

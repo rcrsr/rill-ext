@@ -756,19 +756,19 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'city',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'count',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'optional_flag',
-            type: { type: 'bool' },
+            type: { kind: 'bool' },
             defaultValue: true,
             annotations: {},
           },
@@ -820,37 +820,37 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'str_param',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: { description: 'A string parameter' },
           },
           {
             name: 'num_param',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: undefined,
             annotations: { description: 'A number parameter' },
           },
           {
             name: 'bool_param',
-            type: { type: 'bool' },
+            type: { kind: 'bool' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'list_param',
-            type: { type: 'list' },
+            type: { kind: 'list' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'dict_param',
-            type: { type: 'dict' },
+            type: { kind: 'dict' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'optional_param',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: 'default value',
             annotations: {},
           },
@@ -955,7 +955,7 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'param',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -991,7 +991,7 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'required_param',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -1026,7 +1026,7 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'optional_num',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: 0,
             annotations: {},
           },
@@ -1069,13 +1069,13 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'param_a',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'param_b',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -1131,19 +1131,19 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'first',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'second',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'third',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -1201,13 +1201,13 @@ describe('executeToolLoop', () => {
         params: [
           {
             name: 'name',
-            type: { type: 'string' },
+            type: { kind: 'string' },
             defaultValue: undefined,
             annotations: {},
           },
           {
             name: 'age',
-            type: { type: 'number' },
+            type: { kind: 'number' },
             defaultValue: undefined,
             annotations: {},
           },
@@ -1802,7 +1802,7 @@ describe('executeToolLoop', () => {
       params: [
         {
           name: 'query',
-          type: { type: 'string' } as const,
+          type: { kind: 'string' } as const,
           defaultValue: undefined,
           annotations: { description: 'Search query' },
         },
@@ -1824,7 +1824,7 @@ describe('executeToolLoop', () => {
       params: [
         {
           name: 'q',
-          type: { type: 'string' } as const,
+          type: { kind: 'string' } as const,
           defaultValue: undefined,
           annotations: {},
         },
@@ -2168,6 +2168,299 @@ describe('executeToolLoop', () => {
 
         expect(scriptDescriptor?.description).toBe('Search the web');
         expect(appDescriptor?.description).toBe('My tool description');
+      });
+    });
+  });
+});
+
+// ============================================================
+// YIELD CHUNK / STREAMING
+// ============================================================
+
+describe('executeToolLoop yieldChunk', () => {
+  describe('when yieldChunk is undefined', () => {
+    it('calls callAPI (not callAPIStreaming) and returns identical result', async () => {
+      // IR-2: yieldChunk=undefined — behavior identical to non-streaming path
+      const mockCallAPIStreaming = vi.fn(async () => ({
+        content: 'streamed',
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }));
+      const callbacks = createMockCallbacks({ callAPIStreaming: mockCallAPIStreaming });
+      const emitEvent = vi.fn();
+
+      const result = await executeToolLoop(
+        [{ role: 'user', content: 'Hello' }],
+        {},
+        3,
+        callbacks,
+        emitEvent,
+        10,
+        undefined,
+        undefined // yieldChunk not provided
+      );
+
+      expect(callbacks.callAPI).toHaveBeenCalledTimes(1);
+      expect(mockCallAPIStreaming).not.toHaveBeenCalled();
+      expect(result.response).toBeDefined();
+    });
+  });
+
+  describe('when yieldChunk is provided and callAPIStreaming is defined', () => {
+    it('uses callAPIStreaming instead of callAPI', async () => {
+      // IR-2: yieldChunk + callAPIStreaming defined → streaming path used
+      const mockCallAPIStreaming = vi.fn(async (_msgs, _tools, _onTextDelta) => ({
+        content: 'streamed response',
+        usage: { input_tokens: 20, output_tokens: 10 },
+      }));
+      const callbacks = createMockCallbacks({ callAPIStreaming: mockCallAPIStreaming });
+      const emitEvent = vi.fn();
+      const chunks: unknown[] = [];
+      const yieldChunk = vi.fn((chunk: unknown) => { chunks.push(chunk); });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Hello' }],
+        {},
+        3,
+        callbacks,
+        emitEvent,
+        10,
+        undefined,
+        yieldChunk
+      );
+
+      expect(mockCallAPIStreaming).toHaveBeenCalledTimes(1);
+      expect(callbacks.callAPI).not.toHaveBeenCalled();
+    });
+
+    it('emits text_delta chunks via onTextDelta callback', async () => {
+      // IR-2: text deltas from callAPIStreaming wrapped as { type: "text_delta", text }
+      const mockCallAPIStreaming = vi.fn(
+        async (_msgs, _tools, onTextDelta: (text: string) => void) => {
+          onTextDelta('Hello');
+          onTextDelta(', world');
+          return {
+            content: 'Hello, world',
+            usage: { input_tokens: 5, output_tokens: 3 },
+          };
+        }
+      );
+      const callbacks = createMockCallbacks({ callAPIStreaming: mockCallAPIStreaming });
+      const emitEvent = vi.fn();
+      const chunks: unknown[] = [];
+      const yieldChunk = vi.fn((chunk: unknown) => { chunks.push(chunk); });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Hi' }],
+        {},
+        3,
+        callbacks,
+        emitEvent,
+        10,
+        undefined,
+        yieldChunk
+      );
+
+      const textDeltaChunks = chunks.filter(
+        (c) => (c as Record<string, unknown>)['type'] === 'text_delta'
+      );
+      expect(textDeltaChunks).toHaveLength(2);
+      expect(textDeltaChunks[0]).toEqual({ type: 'text_delta', text: 'Hello' });
+      expect(textDeltaChunks[1]).toEqual({ type: 'text_delta', text: ', world' });
+    });
+
+    it('emits tool_call chunk before tool execution', async () => {
+      // IR-2: tool_call chunk emitted before executing each tool
+      const toolImpl = vi.fn(() => 'tool result');
+      const tools = { my_tool: createMockTool(toolImpl) };
+
+      let callCount = 0;
+      const mockCallAPIStreaming = vi.fn(
+        async (_msgs, _tools, _onTextDelta) => ({
+          content: '',
+          usage: { input_tokens: 10, output_tokens: 5 },
+        })
+      );
+      const callbacks = createMockCallbacks({
+        callAPIStreaming: mockCallAPIStreaming,
+        extractToolCalls: vi.fn(() => {
+          callCount++;
+          if (callCount === 1) {
+            return [{ id: 'c1', name: 'my_tool', input: { x: 42 } }];
+          }
+          return null;
+        }),
+      });
+      const emitEvent = vi.fn();
+      const chunks: unknown[] = [];
+      const yieldChunk = vi.fn((chunk: unknown) => { chunks.push(chunk); });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Go' }],
+        tools,
+        3,
+        callbacks,
+        emitEvent,
+        10,
+        undefined,
+        yieldChunk
+      );
+
+      const toolCallChunks = chunks.filter(
+        (c) => (c as Record<string, unknown>)['type'] === 'tool_call'
+      );
+      expect(toolCallChunks).toHaveLength(1);
+      expect(toolCallChunks[0]).toEqual({
+        type: 'tool_call',
+        name: 'my_tool',
+        args: { x: 42 },
+      });
+    });
+
+    it('emits tool_result chunk after tool execution', async () => {
+      // IR-2: tool_result chunk emitted after tool execution completes
+      const toolImpl = vi.fn(() => 'computed result');
+      const tools = { compute: createMockTool(toolImpl) };
+
+      let callCount = 0;
+      const mockCallAPIStreaming = vi.fn(
+        async (_msgs, _tools, _onTextDelta) => ({
+          content: '',
+          usage: { input_tokens: 10, output_tokens: 5 },
+        })
+      );
+      const callbacks = createMockCallbacks({
+        callAPIStreaming: mockCallAPIStreaming,
+        extractToolCalls: vi.fn(() => {
+          callCount++;
+          if (callCount === 1) {
+            return [{ id: 'c2', name: 'compute', input: {} }];
+          }
+          return null;
+        }),
+      });
+      const emitEvent = vi.fn();
+      const chunks: unknown[] = [];
+      const yieldChunk = vi.fn((chunk: unknown) => { chunks.push(chunk); });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Compute' }],
+        tools,
+        3,
+        callbacks,
+        emitEvent,
+        10,
+        undefined,
+        yieldChunk
+      );
+
+      const toolResultChunks = chunks.filter(
+        (c) => (c as Record<string, unknown>)['type'] === 'tool_result'
+      );
+      expect(toolResultChunks).toHaveLength(1);
+      expect(toolResultChunks[0]).toEqual({
+        type: 'tool_result',
+        name: 'compute',
+        result: 'computed result',
+      });
+    });
+
+    it('emits tool_call before tool_result in correct order within a turn', async () => {
+      // IR-2: order of emission within a single turn — tool_call precedes tool_result
+      // The second turn also emits a text_delta (streaming fires onTextDelta each call),
+      // so the full sequence is: text_delta, tool_call, tool_result, text_delta.
+      const tools = { order_test: createMockTool(() => 'done') };
+
+      let callCount = 0;
+      const mockCallAPIStreaming = vi.fn(
+        async (_msgs, _tools, onTextDelta: (text: string) => void) => {
+          onTextDelta('thinking...');
+          return { content: '', usage: { input_tokens: 5, output_tokens: 2 } };
+        }
+      );
+      const callbacks = createMockCallbacks({
+        callAPIStreaming: mockCallAPIStreaming,
+        extractToolCalls: vi.fn(() => {
+          callCount++;
+          if (callCount === 1) {
+            return [{ id: 'c3', name: 'order_test', input: { v: 1 } }];
+          }
+          return null;
+        }),
+      });
+      const emitEvent = vi.fn();
+      const chunkTypes: string[] = [];
+      const yieldChunk = vi.fn((chunk: unknown) => {
+        chunkTypes.push((chunk as Record<string, unknown>)['type'] as string);
+      });
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Run' }],
+        tools,
+        3,
+        callbacks,
+        emitEvent,
+        10,
+        undefined,
+        yieldChunk
+      );
+
+      // First turn: text_delta → tool_call → tool_result
+      // Second turn: text_delta (no more tool calls, loop ends)
+      expect(chunkTypes[0]).toBe('text_delta');
+      expect(chunkTypes[1]).toBe('tool_call');
+      expect(chunkTypes[2]).toBe('tool_result');
+      // tool_call always precedes tool_result
+      const toolCallIdx = chunkTypes.indexOf('tool_call');
+      const toolResultIdx = chunkTypes.indexOf('tool_result');
+      expect(toolCallIdx).toBeLessThan(toolResultIdx);
+    });
+
+    it('falls back to callAPI when callAPIStreaming is not defined', async () => {
+      // IR-2: yieldChunk provided but callAPIStreaming absent → use callAPI
+      const callbacks = createMockCallbacks(); // no callAPIStreaming
+      const emitEvent = vi.fn();
+      const yieldChunk = vi.fn();
+
+      await executeToolLoop(
+        [{ role: 'user', content: 'Hello' }],
+        {},
+        3,
+        callbacks,
+        emitEvent,
+        10,
+        undefined,
+        yieldChunk
+      );
+
+      expect(callbacks.callAPI).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('EC-4: streaming API failure', () => {
+    it('wraps callAPIStreaming failure as RuntimeError RILL-R004', async () => {
+      // EC-4: provider streaming failure → RuntimeError RILL-R004
+      const streamingError = new Error('stream connection lost');
+      const mockCallAPIStreaming = vi.fn(async () => {
+        throw streamingError;
+      });
+      const callbacks = createMockCallbacks({ callAPIStreaming: mockCallAPIStreaming });
+      const emitEvent = vi.fn();
+      const yieldChunk = vi.fn();
+
+      await expect(
+        executeToolLoop(
+          [{ role: 'user', content: 'Hello' }],
+          {},
+          3,
+          callbacks,
+          emitEvent,
+          10,
+          undefined,
+          yieldChunk
+        )
+      ).rejects.toMatchObject({
+        errorId: 'RILL-R004',
+        message: expect.stringContaining('stream connection lost'),
       });
     });
   });

@@ -496,15 +496,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'name',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'name', type: { type: 'string' } }],
+          kind: 'closure',
+          params: [{ name: 'name', type: { kind: 'string' } }],
         },
         params
       );
@@ -518,15 +518,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'count',
-          type: { type: 'number' },
+          type: { kind: 'number' },
           defaultValue: undefined,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'count', type: { type: 'number' } }],
+          kind: 'closure',
+          params: [{ name: 'count', type: { kind: 'number' } }],
         },
         params
       );
@@ -538,15 +538,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'active',
-          type: { type: 'bool' },
+          type: { kind: 'bool' },
           defaultValue: undefined,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'active', type: { type: 'bool' } }],
+          kind: 'closure',
+          params: [{ name: 'active', type: { kind: 'bool' } }],
         },
         params
       );
@@ -557,15 +557,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'meta',
-          type: { type: 'dict' },
+          type: { kind: 'dict' },
           defaultValue: undefined,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'meta', type: { type: 'dict' } }],
+          kind: 'closure',
+          params: [{ name: 'meta', type: { kind: 'dict' } }],
         },
         params
       );
@@ -577,15 +577,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'limit',
-          type: { type: 'number' },
+          type: { kind: 'number' },
           defaultValue: 10,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'limit', type: { type: 'number' } }],
+          kind: 'closure',
+          params: [{ name: 'limit', type: { kind: 'number' } }],
         },
         params
       );
@@ -596,15 +596,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'offset',
-          type: { type: 'number' },
+          type: { kind: 'number' },
           defaultValue: 0,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'offset', type: { type: 'number' } }],
+          kind: 'closure',
+          params: [{ name: 'offset', type: { kind: 'number' } }],
         },
         params
       );
@@ -615,15 +615,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'query',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { description: 'Search query' },
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'query', type: { type: 'string' } }],
+          kind: 'closure',
+          params: [{ name: 'query', type: { kind: 'string' } }],
         },
         params
       );
@@ -634,15 +634,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'status',
-          type: { type: 'string' },
+          type: { kind: 'string' },
           defaultValue: undefined,
           annotations: { enum: ['active', 'inactive'] },
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'status', type: { type: 'string' } }],
+          kind: 'closure',
+          params: [{ name: 'status', type: { kind: 'string' } }],
         },
         params
       );
@@ -651,7 +651,7 @@ describe('buildJsonSchema', () => {
 
     it('empty closure produces empty properties and required arrays', () => {
       const result = buildJsonSchemaFromStructuralType({
-        type: 'closure',
+        kind: 'closure',
         params: [],
       });
       expect(result.properties).toEqual({});
@@ -663,15 +663,15 @@ describe('buildJsonSchema', () => {
       const params: RillParam[] = [
         {
           name: 'tags',
-          type: { type: 'list', element: { type: 'string' } },
+          type: { kind: 'list', element: { kind: 'string' } },
           defaultValue: undefined,
           annotations: {},
         },
       ];
       const result = buildJsonSchemaFromStructuralType(
         {
-          type: 'closure',
-          params: [{ name: 'tags', type: { type: 'list', element: { type: 'string' } } }],
+          kind: 'closure',
+          params: [{ name: 'tags', type: { kind: 'list', element: { kind: 'string' } } }],
         },
         params
       );
@@ -681,8 +681,8 @@ describe('buildJsonSchema', () => {
 
     it('list type without element produces array with no items', () => {
       const result = buildJsonSchemaFromStructuralType({
-        type: 'closure',
-        params: [{ name: 'items', type: { type: 'list' } }],
+        kind: 'closure',
+        params: [{ name: 'items', type: { kind: 'list' } }],
       });
       expect(result.properties['items']?.type).toBe('array');
       expect(result.properties['items']?.items).toBeUndefined();
@@ -690,8 +690,8 @@ describe('buildJsonSchema', () => {
 
     it('nested list element type recurses correctly', () => {
       const result = buildJsonSchemaFromStructuralType({
-        type: 'closure',
-        params: [{ name: 'matrix', type: { type: 'list', element: { type: 'list', element: { type: 'number' } } } }],
+        kind: 'closure',
+        params: [{ name: 'matrix', type: { kind: 'list', element: { kind: 'list', element: { kind: 'number' } } } }],
       });
       expect(result.properties['matrix']?.type).toBe('array');
       expect(result.properties['matrix']?.items?.type).toBe('array');
@@ -703,9 +703,9 @@ describe('buildJsonSchema', () => {
       let thrown: RuntimeError | undefined;
       try {
         buildJsonSchemaFromStructuralType({
-          type: 'closure',
+          kind: 'closure',
           params: [
-            { name: 'fn', type: { type: 'closure', params: [] } },
+            { name: 'fn', type: { kind: 'closure', params: [] } },
           ],
         });
       } catch (e) {
@@ -719,8 +719,8 @@ describe('buildJsonSchema', () => {
       let thrown: RuntimeError | undefined;
       try {
         buildJsonSchemaFromStructuralType({
-          type: 'closure',
-          params: [{ name: 't', type: { type: 'tuple', elements: [] } }],
+          kind: 'closure',
+          params: [{ name: 't', type: { kind: 'tuple', elements: [] } }],
         });
       } catch (e) {
         thrown = e as RuntimeError;

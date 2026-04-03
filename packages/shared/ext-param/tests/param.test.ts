@@ -99,7 +99,7 @@ describe('p.str', () => {
   it('returns RillParam with type string and no desc', () => {
     const result = p.str('text');
     expect(result.name).toBe('text');
-    expect(result.type).toEqual({ type: 'string' });
+    expect(result.type).toEqual({ kind: 'string' });
     expect(result.defaultValue).toBeUndefined();
     expect(result.annotations).toEqual({});
   });
@@ -130,7 +130,7 @@ describe('p.num', () => {
   it('returns RillParam with type number, no desc, no default', () => {
     const result = p.num('count');
     expect(result.name).toBe('count');
-    expect(result.type).toEqual({ type: 'number' });
+    expect(result.type).toEqual({ kind: 'number' });
     expect(result.defaultValue).toBeUndefined();
     expect(result.annotations).toEqual({});
   });
@@ -164,7 +164,7 @@ describe('p.bool', () => {
   it('returns RillParam with type bool, no desc, no default', () => {
     const result = p.bool('enabled');
     expect(result.name).toBe('enabled');
-    expect(result.type).toEqual({ type: 'bool' });
+    expect(result.type).toEqual({ kind: 'bool' });
     expect(result.defaultValue).toBeUndefined();
     expect(result.annotations).toEqual({});
   });
@@ -193,7 +193,7 @@ describe('p.dict', () => {
   it('returns RillParam with type dict, no desc, no default', () => {
     const result = p.dict('options');
     expect(result.name).toBe('options');
-    expect(result.type).toEqual({ type: 'dict' });
+    expect(result.type).toEqual({ kind: 'dict' });
     expect(result.defaultValue).toBeUndefined();
     expect(result.annotations).toEqual({});
   });
@@ -223,27 +223,27 @@ describe('p.list', () => {
   it('returns type list with no element when itemType absent (AC-31)', () => {
     const result = p.list('items');
     expect(result.name).toBe('items');
-    expect(result.type).toEqual({ type: 'list' });
+    expect(result.type).toEqual({ kind: 'list' });
     expect('element' in result.type).toBe(false);
     expect(result.defaultValue).toBeUndefined();
     expect(result.annotations).toEqual({});
   });
 
   it('returns type list with element when itemType provided (AC-32)', () => {
-    const result = p.list('items', { type: 'string' });
-    expect(result.type).toEqual({ type: 'list', element: { type: 'string' } });
+    const result = p.list('items', { kind: 'string' });
+    expect(result.type).toEqual({ kind: 'list', element: { kind: 'string' } });
   });
 
   it('includes element for number itemType', () => {
-    const result = p.list('scores', { type: 'number' });
-    expect(result.type).toEqual({ type: 'list', element: { type: 'number' } });
+    const result = p.list('scores', { kind: 'number' });
+    expect(result.type).toEqual({ kind: 'list', element: { kind: 'number' } });
   });
 
   it('includes element for nested list itemType', () => {
-    const result = p.list('matrix', { type: 'list', element: { type: 'number' } });
+    const result = p.list('matrix', { kind: 'list', element: { kind: 'number' } });
     expect(result.type).toEqual({
-      type: 'list',
-      element: { type: 'list', element: { type: 'number' } },
+      kind: 'list',
+      element: { kind: 'list', element: { kind: 'number' } },
     });
   });
 
@@ -253,9 +253,9 @@ describe('p.list', () => {
   });
 
   it('includes description with itemType', () => {
-    const result = p.list('tags', { type: 'string' }, 'List of tags');
+    const result = p.list('tags', { kind: 'string' }, 'List of tags');
     expect(result.annotations).toEqual({ description: 'List of tags' });
-    expect(result.type).toEqual({ type: 'list', element: { type: 'string' } });
+    expect(result.type).toEqual({ kind: 'list', element: { kind: 'string' } });
   });
 });
 
@@ -267,7 +267,7 @@ describe('p.callable', () => {
   it('returns RillParam with type closure, no desc', () => {
     const result = p.callable('handler');
     expect(result.name).toBe('handler');
-    expect(result.type).toEqual({ type: 'closure' });
+    expect(result.type).toEqual({ kind: 'closure' });
     expect(result.defaultValue).toBeUndefined();
     expect(result.annotations).toEqual({});
   });

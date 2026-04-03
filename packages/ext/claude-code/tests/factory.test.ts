@@ -4,23 +4,27 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { rillTypeToTypeValue } from '@rcrsr/rill';
+import { structureToTypeValue } from '@rcrsr/rill';
 import { createClaudeCodeExtension } from '../src/factory.js';
 
-const EXPECTED_RETURN_TYPE = rillTypeToTypeValue({
-  type: 'dict',
-  fields: {
-    result: { type: { type: 'string' } },
-    tokens: { type: { type: 'dict', fields: {
-      prompt: { type: { type: 'number' } },
-      cacheWrite5m: { type: { type: 'number' } },
-      cacheWrite1h: { type: { type: 'number' } },
-      cacheRead: { type: { type: 'number' } },
-      output: { type: { type: 'number' } },
-    } } },
-    cost: { type: { type: 'number' } },
-    exitCode: { type: { type: 'number' } },
-    duration: { type: { type: 'number' } },
+const EXPECTED_RETURN_TYPE = structureToTypeValue({
+  kind: 'stream',
+  chunk: { kind: 'string' },
+  ret: {
+    kind: 'dict',
+    fields: {
+      result: { type: { kind: 'string' } },
+      tokens: { type: { kind: 'dict', fields: {
+        prompt: { type: { kind: 'number' } },
+        cacheWrite5m: { type: { kind: 'number' } },
+        cacheWrite1h: { type: { kind: 'number' } },
+        cacheRead: { type: { kind: 'number' } },
+        output: { type: { kind: 'number' } },
+      } } },
+      cost: { type: { kind: 'number' } },
+      exitCode: { type: { kind: 'number' } },
+      duration: { type: { kind: 'number' } },
+    },
   },
 });
 
@@ -47,77 +51,81 @@ describe('createClaudeCodeExtension', () => {
   describe('factory return value', () => {
     it('returns ExtensionResult with prompt, skill, command functions', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
 
       // IR-1: Returns ExtensionResult with host functions
-      expect(ext).toHaveProperty('prompt');
-      expect(ext).toHaveProperty('skill');
-      expect(ext).toHaveProperty('command');
+      expect(v).toHaveProperty('prompt');
+      expect(v).toHaveProperty('skill');
+      expect(v).toHaveProperty('command');
       expect(ext).toHaveProperty('dispose');
 
       // Verify host function structure
-      expect(ext.prompt).toHaveProperty('params');
-      expect(ext.prompt).toHaveProperty('fn');
-      expect(ext.prompt).toHaveProperty('annotations');
-      expect(ext.prompt).toHaveProperty('returnType');
+      expect(v.prompt).toHaveProperty('params');
+      expect(v.prompt).toHaveProperty('fn');
+      expect(v.prompt).toHaveProperty('annotations');
+      expect(v.prompt).toHaveProperty('returnType');
 
-      expect(ext.skill).toHaveProperty('params');
-      expect(ext.skill).toHaveProperty('fn');
-      expect(ext.skill).toHaveProperty('annotations');
-      expect(ext.skill).toHaveProperty('returnType');
+      expect(v.skill).toHaveProperty('params');
+      expect(v.skill).toHaveProperty('fn');
+      expect(v.skill).toHaveProperty('annotations');
+      expect(v.skill).toHaveProperty('returnType');
 
-      expect(ext.command).toHaveProperty('params');
-      expect(ext.command).toHaveProperty('fn');
-      expect(ext.command).toHaveProperty('annotations');
-      expect(ext.command).toHaveProperty('returnType');
+      expect(v.command).toHaveProperty('params');
+      expect(v.command).toHaveProperty('fn');
+      expect(v.command).toHaveProperty('annotations');
+      expect(v.command).toHaveProperty('returnType');
     });
 
     it('creates prompt function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
 
-      expect(ext.prompt.params).toEqual([
-        { name: 'text', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'options', type: { type: 'dict', fields: { timeout: { type: { type: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
+      expect(v.prompt.params).toEqual([
+        { name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'options', type: { kind: 'dict', fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.prompt.returnType).toEqual(EXPECTED_RETURN_TYPE);
+      expect(v.prompt.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
 
     it('creates skill function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
 
-      expect(ext.skill.params).toEqual([
-        { name: 'name', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'args', type: { type: 'dict', fields: { timeout: { type: { type: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
+      expect(v.skill.params).toEqual([
+        { name: 'name', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'args', type: { kind: 'dict', fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.skill.returnType).toEqual(EXPECTED_RETURN_TYPE);
+      expect(v.skill.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
 
     it('creates command function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
 
-      expect(ext.command.params).toEqual([
-        { name: 'name', type: { type: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'args', type: { type: 'dict', fields: { timeout: { type: { type: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
+      expect(v.command.params).toEqual([
+        { name: 'name', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'args', type: { kind: 'dict', fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
       ]);
-      expect(ext.command.returnType).toEqual(EXPECTED_RETURN_TYPE);
+      expect(v.command.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
 
-    it('validates prompt text before processing', async () => {
+    it('validates prompt text before processing', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
       const ctx = {
         callbacks: {
           onLogEvent: vi.fn(),
         },
       } as never;
 
-      // Empty string validation tested in separate suite
-      // This verifies that functions are callable (not stubbed as "Not implemented")
-      await expect(ext.prompt.fn({ text: '', options: {} }, ctx)).rejects.toThrow(
+      // Validation throws synchronously before stream creation (AC-10)
+      expect(() => v.prompt.fn({ text: '', options: {} }, ctx)).toThrow(
         'prompt text cannot be empty'
       );
-      await expect(ext.skill.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.skill.fn({ name: '', args: {} }, ctx)).toThrow(
         'skill name cannot be empty'
       );
-      await expect(ext.command.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.command.fn({ name: '', args: {} }, ctx)).toThrow(
         'command name cannot be empty'
       );
     });
@@ -158,17 +166,17 @@ describe('createClaudeCodeExtension', () => {
   });
 
   describe('binaryPath validation (EC-1)', () => {
-    it('throws Error for invalid binaryPath', () => {
+    it('throws RuntimeError RILL-R004 for invalid binaryPath', () => {
       expect(() =>
         createClaudeCodeExtension({ binaryPath: '/nonexistent/claude' })
-      ).toThrow('Binary not found: /nonexistent/claude');
+      ).toThrow('claude binary not found');
     });
 
     it('validates binaryPath eagerly at factory creation', () => {
       // Should throw immediately, not during function call
       expect(() =>
         createClaudeCodeExtension({ binaryPath: 'invalid-binary' })
-      ).toThrow('Binary not found: invalid-binary');
+      ).toThrow('claude binary not found');
     });
   });
 
@@ -286,9 +294,9 @@ describe('createClaudeCodeExtension', () => {
     it('handles empty config object', () => {
       const ext = createClaudeCodeExtension({});
       expect(ext).toBeDefined();
-      expect(ext.prompt).toBeDefined();
-      expect(ext.skill).toBeDefined();
-      expect(ext.command).toBeDefined();
+      expect((ext.value as any).prompt).toBeDefined();
+      expect((ext.value as any).skill).toBeDefined();
+      expect((ext.value as any).command).toBeDefined();
       expect(ext.dispose).toBeDefined();
     });
 
@@ -305,38 +313,42 @@ describe('createClaudeCodeExtension', () => {
       },
     } as never;
 
-    it('throws RuntimeError for empty prompt text (EC-3)', async () => {
+    it('throws RuntimeError for empty prompt text (EC-3)', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
 
-      await expect(ext.prompt.fn({ text: '', options: {} }, ctx)).rejects.toThrow(
+      // Validation throws synchronously before stream creation (AC-10)
+      expect(() => v.prompt.fn({ text: '', options: {} }, ctx)).toThrow(
         'prompt text cannot be empty'
       );
 
-      await expect(ext.prompt.fn({ text: '   ', options: {} }, ctx)).rejects.toThrow(
+      expect(() => v.prompt.fn({ text: '   ', options: {} }, ctx)).toThrow(
         'prompt text cannot be empty'
       );
     });
 
-    it('throws RuntimeError for empty skill name (EC-10)', async () => {
+    it('throws RuntimeError for empty skill name (EC-10)', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
 
-      await expect(ext.skill.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.skill.fn({ name: '', args: {} }, ctx)).toThrow(
         'skill name cannot be empty'
       );
 
-      await expect(ext.skill.fn({ name: '   ', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.skill.fn({ name: '   ', args: {} }, ctx)).toThrow(
         'skill name cannot be empty'
       );
     });
 
-    it('throws RuntimeError for empty command name (EC-13)', async () => {
+    it('throws RuntimeError for empty command name (EC-13)', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
 
-      await expect(ext.command.fn({ name: '', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.command.fn({ name: '', args: {} }, ctx)).toThrow(
         'command name cannot be empty'
       );
 
-      await expect(ext.command.fn({ name: '   ', args: {} }, ctx)).rejects.toThrow(
+      expect(() => v.command.fn({ name: '   ', args: {} }, ctx)).toThrow(
         'command name cannot be empty'
       );
     });
@@ -345,11 +357,12 @@ describe('createClaudeCodeExtension', () => {
   describe('event emission (AC-17-20)', () => {
     it('functions have event emission structure in place', () => {
       const ext = createClaudeCodeExtension();
+      const v = ext.value as any;
 
       // Functions are defined and can be called (event emission tested in integration tests)
-      expect(ext.prompt.fn).toBeInstanceOf(Function);
-      expect(ext.skill.fn).toBeInstanceOf(Function);
-      expect(ext.command.fn).toBeInstanceOf(Function);
+      expect(v.prompt.fn).toBeInstanceOf(Function);
+      expect(v.skill.fn).toBeInstanceOf(Function);
+      expect(v.command.fn).toBeInstanceOf(Function);
     });
   });
 });

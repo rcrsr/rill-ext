@@ -2,43 +2,42 @@
 
 *Anthropic API integration for rill scripts*
 
-This extension allows rill scripts to access Anthropic's Claude API. The host registers it with `hoistExtension` and `extResolver`, and scripts load it with `use<ext:anthropic>`. Switching to OpenAI or Google means changing one line of host config. Scripts stay identical.
+This extension allows rill scripts to access Anthropic's Claude API. The host declares it in `rill-config.json`, and scripts load it with `use<ext:anthropic>`. Switching to OpenAI or Google means changing the extension mount. Scripts stay identical.
 
-Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured data as a typed dict. `message`, `messages`, and `tool_loop` return the same dict shape (`content`, `model`, `usage`, `stop_reason`, `id`, `messages`), so scripts work across providers without changes. `generate` returns a separate shape with `data` and `raw` fields instead of `content` and `messages`.
+Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured data as a typed dict. `message`, `messages`, and `tool_loop` return a `RillStream` value. Iterate chunks with `-> each` or resolve immediately with `()` to get the result dict. `generate` returns a dict directly (no streaming). `embed` and `embed_batch` return dicts directly.
 
 The host sets API key, model, and temperature at creation time — scripts never handle credentials. Each call emits a structured event (`anthropic:message`, `anthropic:tool_call`) for host-side logging and metrics.
 
 ## Quick Start
 
-```typescript
-import { createRuntimeContext, extResolver, hoistExtension } from '@rcrsr/rill';
-import { createAnthropicExtension } from '@rcrsr/rill-ext-anthropic';
-
-const ext = createAnthropicExtension({
-  api_key: process.env.ANTHROPIC_API_KEY!,
-  model: 'claude-sonnet-4-5-20250929',
-});
-const { functions, dispose } = hoistExtension('anthropic', ext);
-const ctx = createRuntimeContext({
-  resolvers: { ext: extResolver },
-  configurations: {
-    resolvers: { ext: { anthropic: functions } },
-  },
-});
+```json
+{
+  "extensions": {
+    "mounts": {
+      "anthropic": "@rcrsr/rill-ext-anthropic"
+    },
+    "config": {
+      "anthropic": {
+        "api_key": "${ANTHROPIC_API_KEY}",
+        "model": "claude-sonnet-4-5-20250929"
+      }
+    }
+  }
+}
 ```
 
-Rill script — load the extension as a handle and call functions via dot-path:
+Rill script — stream chunks:
 
 ```rill
 use<ext:anthropic> => $llm
-$llm.message("Explain TCP handshakes") => $result
-$result.content -> log
+$llm.message("Explain TCP handshakes") => $s
+$s -> each { log }
 ```
 
-Direct dot-path — no intermediate variable:
+Resolve immediately to access the result dict:
 
 ```rill
-use<ext:anthropic.message>("Explain TCP handshakes") => $result
+anthropic::message("Explain TCP handshakes")() => $result
 $result.content -> log
 ```
 
@@ -50,18 +49,24 @@ anthropic::message("Explain TCP handshakes")
 
 ## Configuration
 
-```typescript
-const ext = createAnthropicExtension({
-  api_key: process.env.ANTHROPIC_API_KEY!,
-  model: 'claude-sonnet-4-5-20250929',
-  temperature: 0.7,
-  max_tokens: 4096,
-  system: 'You are a helpful assistant.',
-  embed_model: 'voyage-3',
-  base_url: 'https://custom-endpoint.example.com',
-  max_retries: 3,
-  timeout: 30000,
-});
+```json
+{
+  "extensions": {
+    "config": {
+      "anthropic": {
+        "api_key": "${ANTHROPIC_API_KEY}",
+        "model": "claude-sonnet-4-5-20250929",
+        "temperature": 0.7,
+        "max_tokens": 4096,
+        "system": "You are a helpful assistant.",
+        "embed_model": "voyage-3",
+        "base_url": "https://custom-endpoint.example.com",
+        "max_retries": 3,
+        "timeout": 30000
+      }
+    }
+  }
+}
 ```
 
 | Parameter | Type | Default | Description |
@@ -78,24 +83,39 @@ const ext = createAnthropicExtension({
 
 ## Functions
 
-**message(text, options?)** — Send a single prompt:
+**message(text, options?)** — Send a single prompt. Returns `RillStream`:
 
 ```rill
-anthropic::message("Explain TCP handshakes") => $result
+# Stream text delta chunks
+anthropic::message("Explain TCP handshakes") => $s
+$s -> each { log }
+
+# Or resolve to result dict
+anthropic::message("Explain TCP handshakes")() => $result
 $result.content      # Response text
 $result.stop_reason  # Why generation stopped
 $result.usage.input  # Input tokens
 $result.usage.output # Output tokens
 ```
 
-**messages(messages, options?)** — Multi-turn conversation:
+**messages(messages, options?)** — Multi-turn conversation. Returns `RillStream`:
 
 ```rill
+# Stream text delta chunks
 [
   [role: "user", content: "What is rill?"],
   [role: "assistant", content: "A scripting language."],
   [role: "user", content: "Tell me more."],
-] -> anthropic::messages => $result
+] -> anthropic::messages => $s
+$s -> each { log }
+
+# Or resolve to result dict
+[
+  [role: "user", content: "What is rill?"],
+  [role: "assistant", content: "A scripting language."],
+  [role: "user", content: "Tell me more."],
+] -> anthropic::messages => $s
+$s() => $result
 $result.content   # Latest response
 $result.messages  # Full conversation history
 ```
@@ -115,18 +135,29 @@ $vec.model           # Embedding model used
 $vectors.len  # Number of vectors
 ```
 
-**tool_loop(prompt, tools, options?)** — Agentic tool-use loop:
+**tool_loop(prompt, tools, options?)** — Agentic tool-use loop. Returns `RillStream`:
 
 ```rill
 ^("Get current weather for a city") |^("City name") city: string| {
   "Weather in {$city}: 72F sunny"
 } => $get_weather
 
+# Stream structured events
 anthropic::tool_loop("What's the weather in Paris?", [
   get_weather: $get_weather,
-], [
-  max_turns: 5,
-]) => $result
+], [max_turns: 5]) => $s
+$s -> each {
+  $.type    # "text_delta", "tool_call", or "tool_result"
+  $.text    # available when type == "text_delta"
+  $.name    # available when type == "tool_call" or "tool_result"
+  $.args    # available when type == "tool_call"
+  $.result  # available when type == "tool_result"
+}
+
+# Or resolve to result dict
+anthropic::tool_loop("What's the weather in Paris?", [
+  get_weather: $get_weather,
+], [max_turns: 5])() => $result
 $result.content  # Final response
 $result.turns    # Number of LLM round-trips
 ```
@@ -188,9 +219,41 @@ Params using `closure` or `tuple` type are not representable in JSON Schema and 
 | `messages` | list | tool_loop, generate | Prepend conversation history |
 | `schema` | dict or RillStructuralType | generate (required) | Dict descriptor (legacy) or `RillStructuralType` value (from `$closure.^input`) for structured output |
 
+## Streaming
+
+`message`, `messages`, and `tool_loop` return `RillStream`. Two usage patterns:
+
+**Iterate chunks** — process output incrementally:
+
+```rill
+anthropic::message("hi") => $s
+$s -> each { log }
+```
+
+**Resolve immediately** — access the full result dict at once:
+
+```rill
+anthropic::message("hi")() => $result
+$result.content -> log
+```
+
+### message / messages chunks
+
+Each chunk is a string (text delta).
+
+### tool_loop events
+
+Each event is a dict with a `type` field:
+
+| `type` | Other fields | Description |
+|--------|-------------|-------------|
+| `"text_delta"` | `text` | Incremental text from the model |
+| `"tool_call"` | `name`, `args` | Model invoked a tool |
+| `"tool_result"` | `name`, `result` | Tool returned a value |
+
 ## Result Dict
 
-All functions except `embed`, `embed_batch`, and `generate` return:
+`message`, `messages`, and `tool_loop` resolve to:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -273,26 +336,6 @@ Completion events (`anthropic:message`, `anthropic:messages`, `anthropic:tool_lo
 | `usage` | Token usage object (`input` and `output` counts) |
 | `request` | Messages array sent to the provider API |
 | `content` | Response text from the provider |
-
-## Test Host
-
-A runnable example at `examples/test-host.ts` demonstrates integration:
-
-```bash
-# Set API key
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# Built-in demo
-pnpm exec tsx examples/test-host.ts
-
-# Inline expression
-pnpm exec tsx examples/test-host.ts -e 'llm::message("Tell me a joke") -> $.content -> log'
-
-# Script file
-pnpm exec tsx examples/test-host.ts script.rill
-```
-
-Override model or endpoint with `ANTHROPIC_MODEL` and `ANTHROPIC_BASE_URL`.
 
 ## See Also
 

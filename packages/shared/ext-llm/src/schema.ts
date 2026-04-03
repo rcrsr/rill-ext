@@ -6,10 +6,13 @@
  */
 
 import {
-  type RillType,
+  type TypeStructure,
   type RillParam,
   RuntimeError,
 } from '@rcrsr/rill';
+
+type ListTypeStructure = Extract<TypeStructure, { kind: 'list' }>;
+type ClosureTypeStructure = Extract<TypeStructure, { kind: 'closure' }>;
 
 /**
  * Represents an individual JSON Schema property descriptor.
@@ -73,32 +76,33 @@ export function mapRillType(rillType: string): string {
  * - dict type maps to object.
  * - primitive types (string, number, bool) map via mapRillType.
  */
-function buildPropertyFromStructuralType(rillType: RillType): JsonSchemaProperty {
-  if (rillType.type === 'closure' || rillType.type === 'tuple') {
+function buildPropertyFromStructuralType(rillType: TypeStructure): JsonSchemaProperty {
+  if (rillType.kind === 'closure' || rillType.kind === 'tuple') {
     throw new RuntimeError(
       'RILL-R004',
-      `unsupported type for JSON Schema: ${rillType.type}`
+      `unsupported type for JSON Schema: ${rillType.kind}`
     );
   }
 
-  if (rillType.type === 'any') {
+  if (rillType.kind === 'any') {
     return {};
   }
 
-  if (rillType.type === 'list') {
+  if (rillType.kind === 'list') {
+    const listType = rillType as ListTypeStructure;
     const property: JsonSchemaProperty = { type: 'array' };
-    if (rillType.element !== undefined) {
-      property.items = buildPropertyFromStructuralType(rillType.element);
+    if (listType.element !== undefined) {
+      property.items = buildPropertyFromStructuralType(listType.element);
     }
     return property;
   }
 
-  if (rillType.type === 'dict') {
+  if (rillType.kind === 'dict') {
     return { type: 'object' };
   }
 
   // string, number, bool, vector, shape — map through RILL_TYPE_MAP; unsupported types throw
-  return { type: mapRillType(rillType.type) };
+  return { type: mapRillType(rillType.kind) };
 }
 
 /**
@@ -117,14 +121,14 @@ function buildPropertyFromStructuralType(rillType: RillType): JsonSchemaProperty
  * @throws RuntimeError RILL-R004 for unsupported type name (EC-3)
  */
 export function buildJsonSchemaFromStructuralType(
-  type: RillType,
+  type: TypeStructure,
   params?: RillParam[]
 ): JsonSchemaObject {
   const properties: Record<string, JsonSchemaProperty> = {};
   const required: string[] = [];
 
-  if (type.type === 'closure') {
-    const closureParams = type.params ?? [];
+  if (type.kind === 'closure') {
+    const closureParams = (type as ClosureTypeStructure).params ?? [];
     for (let i = 0; i < closureParams.length; i++) {
       const fieldDef = closureParams[i]!;
       const paramName = fieldDef.name ?? `param${i}`;

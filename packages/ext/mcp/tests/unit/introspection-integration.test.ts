@@ -1,171 +1,149 @@
 /**
- * Integration tests for introspection functions in factory.
+ * Integration tests for introspection dicts in factory.
  *
- * Verifies that introspection functions are properly generated and included
- * in extension result alongside tool/resource/prompt functions.
+ * Verifies that introspection dicts are properly generated and included
+ * in the extension result alongside tool/resource/prompt functions.
  *
- * These tests verify the static data returned by introspection functions
- * using the _capabilities test interface exposed by factory.
+ * The three introspection dicts (tools, resources, prompts) are pre-built
+ * at factory time and assigned directly to the extension value.
  */
 
 import { describe, it, expect } from 'vitest';
-import { rillTypeToTypeValue } from '@rcrsr/rill';
-import { createIntrospectionFunctions } from '../../src/introspection.js';
-import type { RillValue } from '@rcrsr/rill';
+import { structureToTypeValue, isCallable } from '@rcrsr/rill';
+import type { RillFunction, RillValue } from '@rcrsr/rill';
+import { createIntrospectionDicts } from '../../src/introspection.js';
+
+// Helper to create a minimal RillFunction for testing
+function makeRillFn(description: string): RillFunction {
+  return {
+    fn: async () => 'result',
+    params: [],
+    annotations: { description },
+    returnType: structureToTypeValue({ kind: 'string' }),
+  };
+}
 
 describe('introspection integration', () => {
   describe('factory integration', () => {
-    it('generates list_tools, list_resources, list_prompts functions', () => {
+    it('generates tools, resources, prompts dicts', () => {
       // Arrange
-      const tools = [
-        { name: 'echo', description: 'Echo tool' },
-        { name: 'calc', description: 'Calculator' },
-      ];
-      const resources = [
-        {
-          uri: 'file://test',
-          name: 'test',
-          description: 'Test',
-          mimeType: 'text/plain',
-        },
-      ];
-      const prompts = [
-        { name: 'greet', description: 'Greeting', arguments: [{ name: 'n' }] },
-      ];
+      const toolFunctions: Record<string, RillFunction> = {
+        echo: makeRillFn('Echo tool'),
+        calc: makeRillFn('Calculator'),
+      };
+      const resourceFunctions: Record<string, RillFunction> = {
+        read_resource: makeRillFn('Read a resource'),
+        resource_template1: makeRillFn('File template'),
+      };
+      const promptFunctions: Record<string, RillFunction> = {
+        greet: makeRillFn('Greeting'),
+      };
 
       // Act
-      const functions = createIntrospectionFunctions(
-        tools,
-        resources,
-        [],
-        prompts
-      );
+      const dicts = createIntrospectionDicts(toolFunctions, resourceFunctions, promptFunctions);
 
-      // Assert - all three functions exist
-      expect(functions.list_tools).toBeDefined();
-      expect(functions.list_resources).toBeDefined();
-      expect(functions.list_prompts).toBeDefined();
-
-      // Assert - function metadata
-      expect(functions.list_tools.params).toEqual([]);
-      expect(functions.list_tools.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } } } } }));
-      expect(functions.list_resources.params).toEqual([]);
-      expect(functions.list_resources.returnType).toEqual(rillTypeToTypeValue({ type: 'list' }));
-      expect(functions.list_prompts.params).toEqual([]);
-      expect(functions.list_prompts.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { name: { type: { type: 'string' } }, description: { type: { type: 'string' } }, arguments: { type: { type: 'list', element: { type: 'string' } } } } } }));
+      // Assert - all three dicts are present
+      expect(dicts.tools).toBeDefined();
+      expect(dicts.resources).toBeDefined();
+      expect(dicts.prompts).toBeDefined();
     });
 
-    it('list_tools returns all tools regardless of filters', async () => {
-      // Arrange - simulate filter scenario where factory would filter tools
-      const allTools = [
-        { name: 'tool1', description: 'First' },
-        { name: 'tool2', description: 'Second' },
-        { name: 'tool3', description: 'Third' },
-      ];
-      // In real factory, toolFilter would limit which tool functions are generated
-      // But introspection uses allTools, not filteredTools
-      const functions = createIntrospectionFunctions(allTools, [], [], []);
+    it('tools dict contains callable for all tool functions', () => {
+      // Arrange
+      const toolFunctions: Record<string, RillFunction> = {
+        tool1: makeRillFn('First'),
+        tool2: makeRillFn('Second'),
+        tool3: makeRillFn('Third'),
+      };
+      const dicts = createIntrospectionDicts(toolFunctions, {}, {});
+      const result = dicts.tools as Record<string, RillValue>;
 
-      // Act
-      const result = (await functions.list_tools.fn({})) as RillValue[];
-
-      // Assert - all tools returned (not filtered)
-      expect(result).toHaveLength(3);
-      expect(result.map((t) => (t as { name: string }).name)).toEqual([
-        'tool1',
-        'tool2',
-        'tool3',
-      ]);
+      // Assert - all tools returned as callables
+      expect(Object.keys(result)).toHaveLength(3);
+      expect(isCallable(result['tool1']!)).toBe(true);
+      expect(isCallable(result['tool2']!)).toBe(true);
+      expect(isCallable(result['tool3']!)).toBe(true);
     });
 
-    it('list_resources returns all resources regardless of filters', async () => {
+    it('resources dict contains callable for all resource functions', () => {
       // Arrange
-      const allResources = [
-        { uri: 'file://a', name: 'a', description: '', mimeType: '' },
-        { uri: 'file://b', name: 'b', description: '', mimeType: '' },
-      ];
-      const functions = createIntrospectionFunctions([], allResources, [], []);
+      const resourceFunctions: Record<string, RillFunction> = {
+        read_resource: makeRillFn('Read resource'),
+        resource_template1: makeRillFn('Template 1'),
+        resource_template2: makeRillFn('Template 2'),
+      };
+      const dicts = createIntrospectionDicts({}, resourceFunctions, {});
+      const result = dicts.resources as Record<string, RillValue>;
 
-      // Act
-      const result = (await functions.list_resources.fn({})) as RillValue[];
-
-      // Assert - all resources returned
-      expect(result).toHaveLength(2);
+      // Assert - all resources returned as callables
+      expect(Object.keys(result)).toHaveLength(3);
+      expect(isCallable(result['read_resource']!)).toBe(true);
+      expect(isCallable(result['resource_template1']!)).toBe(true);
+      expect(isCallable(result['resource_template2']!)).toBe(true);
     });
 
-    it('list_prompts returns all prompts regardless of filters', async () => {
+    it('prompts dict contains callable for all prompt functions', () => {
       // Arrange
-      const allPrompts = [
-        { name: 'prompt1', description: '' },
-        { name: 'prompt2', description: '' },
-      ];
-      const functions = createIntrospectionFunctions([], [], [], allPrompts);
+      const promptFunctions: Record<string, RillFunction> = {
+        greet: makeRillFn('Greet'),
+        summarize: makeRillFn('Summarize'),
+      };
+      const dicts = createIntrospectionDicts({}, {}, promptFunctions);
+      const result = dicts.prompts as Record<string, RillValue>;
 
-      // Act
-      const result = (await functions.list_prompts.fn({})) as RillValue[];
-
-      // Assert - all prompts returned
-      expect(result).toHaveLength(2);
+      // Assert - all prompts returned as callables
+      expect(Object.keys(result)).toHaveLength(2);
+      expect(isCallable(result['greet']!)).toBe(true);
+      expect(isCallable(result['summarize']!)).toBe(true);
     });
   });
 
   describe('static data verification', () => {
-    it('returns same data on multiple calls (static)', async () => {
+    it('tools dict is the same reference on repeated access (static)', () => {
       // Arrange
-      const tools = [{ name: 'test', description: 'Test tool' }];
-      const functions = createIntrospectionFunctions(tools, [], [], []);
+      const toolFunctions: Record<string, RillFunction> = {
+        test: makeRillFn('Test tool'),
+      };
+      const dicts = createIntrospectionDicts(toolFunctions, {}, {});
 
-      // Act
-      const result1 = (await functions.list_tools.fn({})) as RillValue[];
-      const result2 = (await functions.list_tools.fn({})) as RillValue[];
-
-      // Assert - same reference (static data)
-      expect(result1).toBe(result2);
+      // Assert - same reference (static data, built once)
+      expect(dicts.tools).toBe(dicts.tools);
     });
 
-    it('data captured at factory time, not query time', async () => {
-      // Arrange - create functions with initial data
-      const tools = [{ name: 'tool1', description: 'First' }];
-      const functions = createIntrospectionFunctions(tools, [], [], []);
+    it('data captured at factory time, not mutation time', () => {
+      // Arrange - create dicts with initial data
+      const toolFunctions: Record<string, RillFunction> = {
+        tool1: makeRillFn('First'),
+      };
+      const dicts = createIntrospectionDicts(toolFunctions, {}, {});
 
-      // Modify source data after function creation
-      tools.push({ name: 'tool2', description: 'Second' });
+      // Modify source after dict creation (should not affect result)
+      (toolFunctions as Record<string, RillFunction>)['tool2'] = makeRillFn('Second');
 
-      // Act
-      const result = (await functions.list_tools.fn({})) as RillValue[];
-
-      // Assert - still returns original data (captured at creation)
-      expect(result).toHaveLength(1);
-      expect((result[0] as { name: string }).name).toBe('tool1');
+      // Assert - still contains only original data (captured at creation)
+      expect(Object.keys(dicts.tools)).toHaveLength(1);
+      expect((dicts.tools as Record<string, unknown>)['tool1']).toBeDefined();
+      expect((dicts.tools as Record<string, unknown>)['tool2']).toBeUndefined();
     });
   });
 
   describe('empty capability handling', () => {
-    it('returns empty lists for servers with no capabilities', async () => {
-      // Arrange
-      const functions = createIntrospectionFunctions([], [], [], []);
+    it('returns empty dicts for servers with no capabilities', () => {
+      // Arrange & Act
+      const dicts = createIntrospectionDicts({}, {}, {});
 
-      // Act
-      const tools = (await functions.list_tools.fn({})) as RillValue[];
-      const resources = (await functions.list_resources.fn({})) as RillValue[];
-      const prompts = (await functions.list_prompts.fn({})) as RillValue[];
-
-      // Assert - all empty
-      expect(tools).toEqual([]);
-      expect(resources).toEqual([]);
-      expect(prompts).toEqual([]);
+      // Assert - all empty dicts
+      expect(Object.keys(dicts.tools)).toHaveLength(0);
+      expect(Object.keys(dicts.resources)).toHaveLength(0);
+      expect(Object.keys(dicts.prompts)).toHaveLength(0);
     });
 
-    it('generates only introspection functions when no capabilities', () => {
+    it('returns exactly three dict keys', () => {
       // Arrange & Act
-      const functions = createIntrospectionFunctions([], [], [], []);
+      const dicts = createIntrospectionDicts({}, {}, {});
 
-      // Assert - exactly three functions
-      expect(Object.keys(functions)).toEqual([
-        'list_tools',
-        'list_resources',
-        'list_prompts',
-      ]);
+      // Assert - exactly three entries
+      expect(Object.keys(dicts)).toEqual(['tools', 'resources', 'prompts']);
     });
   });
 });

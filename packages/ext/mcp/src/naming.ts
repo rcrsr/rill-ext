@@ -19,8 +19,8 @@
  * @returns Sanitized rill identifier
  */
 function sanitizeName(name: string): string {
-  // Replace hyphens and dots with underscores
-  let sanitized = name.replace(/[-.]/g, '_');
+  // Replace hyphens, dots, and whitespace with underscores
+  let sanitized = name.replace(/[-.\s]/g, '_');
 
   // Convert camelCase and PascalCase to snake_case
   // Insert underscore before uppercase letters, then lowercase everything

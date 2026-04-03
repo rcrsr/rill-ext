@@ -66,8 +66,9 @@ describe('createQdrantExtension factory export', () => {
     });
 
     expect(ext).toBeDefined();
-    // ExtensionResult is a Record<string, HostFunctionDefinition> with optional dispose
-    expect(ext.upsert).toBeDefined();
+    // ExtensionFactoryResult has value dict with callables and optional dispose
+    const value = ext.value as Record<string, unknown>;
+    expect(value['upsert']).toBeDefined();
     expect(ext.dispose).toBeDefined();
   });
 });

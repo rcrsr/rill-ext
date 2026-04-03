@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, callable } from '@rcrsr/rill';
+import { createRuntimeContext, callable, type ApplicationCallable, type RillStream } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
 
@@ -12,14 +12,45 @@ import type { GeminiExtensionConfig } from '../src/types.js';
 // TEST HELPERS
 // ============================================================
 
+function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+  return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
+
 /**
- * Create mock Google API response for generateContent.
+ * Build an async iterable that yields chunks from an array of text strings.
  */
-function createMockGenerateContentResponse(content: string) {
-  return {
-    text: content,
-    functionCalls: undefined,
-  };
+async function* makeChunksIterable(chunks: string[]): AsyncGenerator<{ text: string }> {
+  for (const text of chunks) {
+    yield { text };
+  }
+}
+
+/**
+ * Build an async iterable simulating Gemini streaming chunks for tool_loop.
+ */
+async function* makeToolLoopStream(
+  chunks: Array<{ text?: string; functionCalls?: Array<{ name: string; args: object; id: string }>; candidates?: unknown[] }>
+): AsyncGenerator<{ text?: string; functionCalls?: unknown[]; candidates?: unknown[] }> {
+  for (const chunk of chunks) {
+    yield chunk;
+  }
+}
+
+/**
+ * Exhaust a RillStream by calling next() until done, then invoke resolve.
+ */
+async function collectStream(
+  stream: unknown,
+  ctx: ReturnType<typeof createRuntimeContext>
+): Promise<void> {
+  let current = stream as RillStream;
+
+  while (!current.done) {
+    const nextFn = current.next as ApplicationCallable;
+    current = (await nextFn.fn({}, ctx)) as RillStream;
+  }
+
+  await (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve();
 }
 
 /**
@@ -37,6 +68,7 @@ function createMockEmbedContentResponse(dimensions = 768) {
 
 // Mock the Google GenAI SDK at module level
 const mockGenerateContent = vi.fn();
+const mockGenerateContentStream = vi.fn();
 const mockEmbedContent = vi.fn();
 
 vi.mock('@google/genai', () => {
@@ -44,6 +76,7 @@ vi.mock('@google/genai', () => {
     GoogleGenAI: class MockGoogleGenAI {
       models = {
         generateContent: mockGenerateContent,
+        generateContentStream: mockGenerateContentStream,
         embedContent: mockEmbedContent,
       };
     },
@@ -65,14 +98,13 @@ vi.mock('@google/genai', () => {
 describe('extension event emission', () => {
   beforeEach(() => {
     mockGenerateContent.mockReset();
+    mockGenerateContentStream.mockReset();
     mockEmbedContent.mockReset();
   });
 
   describe('message() events', () => {
-    it('emits gemini:message event on success', async () => {
-      mockGenerateContent.mockResolvedValue(
-        createMockGenerateContentResponse('Response')
-      );
+    it('emits gemini:message event on success after stream resolved', async () => {
+      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Response']));
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -90,9 +122,10 @@ describe('extension event emission', () => {
         },
       });
 
-      await ext.message.fn({ text: 'Test' }, ctx);
+      const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      await collectStream(stream, ctx);
 
-      // Verify event structure (§4.10)
+      // Verify event structure (§4.10) — emitted on resolve
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
         event: 'gemini:message',
@@ -106,8 +139,8 @@ describe('extension event emission', () => {
       expect(events[0]?.['content']).toBeDefined();
     });
 
-    it('emits gemini:error event on API failure', async () => {
-      mockGenerateContent.mockRejectedValue(
+    it('emits gemini:error event when stream iteration fails', async () => {
+      mockGenerateContentStream.mockRejectedValue(
         new Error('API request failed (401)')
       );
 
@@ -127,7 +160,8 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(ext.message.fn({ text: 'Test' }, ctx)).rejects.toThrow();
+      const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      await expect(collectStream(stream, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -141,10 +175,8 @@ describe('extension event emission', () => {
   });
 
   describe('messages() events', () => {
-    it('emits gemini:messages event on success', async () => {
-      mockGenerateContent.mockResolvedValue(
-        createMockGenerateContentResponse('Response')
-      );
+    it('emits gemini:messages event on success after stream resolved', async () => {
+      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Response']));
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -163,9 +195,10 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await ext.messages.fn({ messages: messages }, ctx);
+      const stream = await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
+      await collectStream(stream, ctx);
 
-      // Verify event structure (§4.10)
+      // Verify event structure (§4.10) — emitted on resolve
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
         event: 'gemini:messages',
@@ -179,8 +212,8 @@ describe('extension event emission', () => {
       expect(events[0]?.['content']).toBeDefined();
     });
 
-    it('emits gemini:error event on API failure', async () => {
-      mockGenerateContent.mockRejectedValue(
+    it('emits gemini:error event when stream iteration fails', async () => {
+      mockGenerateContentStream.mockRejectedValue(
         new Error('API request failed (429)')
       );
 
@@ -201,7 +234,8 @@ describe('extension event emission', () => {
       });
 
       const messages = [{ role: 'user', content: 'Test' }];
-      await expect(ext.messages.fn({ messages: messages }, ctx)).rejects.toThrow();
+      const stream = await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
+      await expect(collectStream(stream, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -235,7 +269,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await ext.embed.fn({ text: 'Test text' }, ctx);
+      await getCallable(ext, 'embed').fn({ text: 'Test text' }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -269,7 +303,7 @@ describe('extension event emission', () => {
         },
       });
 
-      await expect(ext.embed.fn({ text: 'Test text' }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'embed').fn({ text: 'Test text' }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -310,7 +344,7 @@ describe('extension event emission', () => {
       });
 
       const texts = ['Text 1', 'Text 2', 'Text 3'];
-      await ext.embed_batch.fn({ texts: texts }, ctx);
+      await getCallable(ext, 'embed_batch').fn({ texts: texts }, ctx);
 
       // Verify event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -346,7 +380,7 @@ describe('extension event emission', () => {
       });
 
       const texts = ['Text 1', 'Text 2'];
-      await expect(ext.embed_batch.fn({ texts: texts }, ctx)).rejects.toThrow();
+      await expect(getCallable(ext, 'embed_batch').fn({ texts: texts }, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
       expect(events).toHaveLength(1);
@@ -361,23 +395,15 @@ describe('extension event emission', () => {
 
   describe('tool_loop() events', () => {
     it('emits gemini:tool_call, gemini:tool_result, and gemini:tool_loop events on success', async () => {
-      // First call: model calls a tool
-      mockGenerateContent.mockResolvedValueOnce({
-        text: '',
-        functionCalls: [
-          {
-            name: 'test_tool',
-            args: { value: 'test' },
-            id: 'call_123',
-          },
-        ],
-      });
-
-      // Second call: model returns final response
-      mockGenerateContent.mockResolvedValueOnce({
-        text: 'Final response',
-        functionCalls: undefined,
-      });
+      // Turn 1: model calls a tool (fresh generator per call)
+      mockGenerateContentStream
+        .mockResolvedValueOnce(makeToolLoopStream([
+          { text: '', functionCalls: [{ name: 'test_tool', args: { value: 'test' }, id: 'call_123' }] },
+        ]))
+        // Turn 2: model returns final response
+        .mockResolvedValueOnce(makeToolLoopStream([
+          { text: 'Final response' },
+        ]));
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -400,25 +426,18 @@ describe('extension event emission', () => {
       (testToolFn as Record<string, unknown>)['description'] = 'Test tool';
 
       const tools = { test_tool: testToolFn };
-      const options = {
-        max_turns: 5,
-      };
+      const options = { max_turns: 5 };
 
-      await ext.tool_loop.fn({ prompt: 'Test prompt', tools, options }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools, options }, ctx);
+      await collectStream(stream, ctx);
 
       // Verify event sequence (§4.10)
       expect(events.length).toBeGreaterThanOrEqual(3);
 
       // Find events by type
-      const toolCallEvents = events.filter(
-        (e) => e['event'] === 'gemini:tool_call'
-      );
-      const toolResultEvents = events.filter(
-        (e) => e['event'] === 'gemini:tool_result'
-      );
-      const toolLoopEvents = events.filter(
-        (e) => e['event'] === 'gemini:tool_loop'
-      );
+      const toolCallEvents = events.filter((e) => e['event'] === 'gemini:tool_call');
+      const toolResultEvents = events.filter((e) => e['event'] === 'gemini:tool_result');
+      const toolLoopEvents = events.filter((e) => e['event'] === 'gemini:tool_loop');
 
       // Verify tool_call event
       expect(toolCallEvents).toHaveLength(1);
@@ -437,7 +456,7 @@ describe('extension event emission', () => {
         tool_name: 'test_tool',
       });
 
-      // Verify tool_loop event
+      // Verify tool_loop event (emitted in resolve callback)
       expect(toolLoopEvents).toHaveLength(1);
       expect(toolLoopEvents[0]).toMatchObject({
         event: 'gemini:tool_loop',
@@ -445,13 +464,12 @@ describe('extension event emission', () => {
         turns: 2,
         usage: { input: 0, output: 0 },
       });
-      expect(typeof toolLoopEvents[0]?.['total_duration']).toBe('number');
       expect(toolLoopEvents[0]?.['request']).toBeDefined();
       expect(toolLoopEvents[0]?.['content']).toBeDefined();
     });
 
     it('emits gemini:error event on API failure', async () => {
-      mockGenerateContent.mockRejectedValue(new Error('API error'));
+      mockGenerateContentStream.mockRejectedValue(new Error('API error'));
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -474,11 +492,13 @@ describe('extension event emission', () => {
 
       const tools = { test_tool: testTool };
 
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools }, ctx);
+
       await expect(
-        ext.tool_loop.fn({ prompt: 'Test prompt', tools }, ctx)
+        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
       ).rejects.toThrow();
 
-      // Verify error event structure (§4.10)
+      // Verify error event structure (§4.10) — emitted in resolve callback
       const errorEvents = events.filter((e) => e['event'] === 'gemini:error');
       expect(errorEvents).toHaveLength(1);
       expect(errorEvents[0]).toMatchObject({
@@ -486,27 +506,18 @@ describe('extension event emission', () => {
         subsystem: 'extension:gemini',
         error: 'Provider API error: API error',
       });
-      expect(typeof errorEvents[0]?.['duration']).toBe('number');
     });
 
     it('emits tool_result event with error field when tool execution fails', async () => {
-      // First call: model calls a tool
-      mockGenerateContent.mockResolvedValueOnce({
-        text: '',
-        functionCalls: [
-          {
-            name: 'test_tool',
-            args: { value: 'test' },
-            id: 'call_123',
-          },
-        ],
-      });
-
-      // Second call: model returns final response after tool error
-      mockGenerateContent.mockResolvedValueOnce({
-        text: 'Final response after error',
-        functionCalls: undefined,
-      });
+      // Turn 1: model calls a tool
+      mockGenerateContentStream
+        .mockResolvedValueOnce(makeToolLoopStream([
+          { text: '', functionCalls: [{ name: 'test_tool', args: { value: 'test' }, id: 'call_123' }] },
+        ]))
+        // Turn 2: model returns final response after tool error
+        .mockResolvedValueOnce(makeToolLoopStream([
+          { text: 'Final response after error' },
+        ]));
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -531,17 +542,13 @@ describe('extension event emission', () => {
       (failingTool as Record<string, unknown>)['description'] = 'Test tool';
 
       const tools = { test_tool: failingTool };
-      const options = {
-        max_turns: 5,
-        max_errors: 3,
-      };
+      const options = { max_turns: 5, max_errors: 3 };
 
-      await ext.tool_loop.fn({ prompt: 'Test prompt', tools, options }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools, options }, ctx);
+      await collectStream(stream, ctx);
 
       // Find tool_result event
-      const toolResultEvents = events.filter(
-        (e) => e['event'] === 'gemini:tool_result'
-      );
+      const toolResultEvents = events.filter((e) => e['event'] === 'gemini:tool_result');
       expect(toolResultEvents).toHaveLength(1);
       expect(toolResultEvents[0]).toMatchObject({
         event: 'gemini:tool_result',

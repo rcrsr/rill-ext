@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { rillTypeToTypeValue } from '@rcrsr/rill';
+import { structureToTypeValue } from '@rcrsr/rill';
 import type { McpPrompt, McpPromptResult } from '../../src/prompts.js';
 import { generatePromptFunctions } from '../../src/prompts.js';
 
@@ -26,7 +26,7 @@ describe('Prompt Function Generation', () => {
   });
 
   describe('IR-5: Generated prompt function signature', () => {
-    it('generates prompt_{name} function with correct parameters', () => {
+    it('generates function with correct parameters', () => {
       const prompts: McpPrompt[] = [
         {
           name: 'code-review',
@@ -40,24 +40,24 @@ describe('Prompt Function Generation', () => {
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      expect(functions).toHaveProperty('prompt_code_review');
-      const fn = functions.prompt_code_review!;
+      expect(functions).toHaveProperty('code_review');
+      const fn = functions.code_review!;
 
       expect(fn.params).toHaveLength(2);
       expect(fn.params[0]).toMatchObject({
         name: 'code',
-        type: { type: 'string' },
+        type: { kind: 'string' },
       });
       expect(fn.params[0]?.defaultValue).toBeUndefined();
 
       expect(fn.params[1]).toMatchObject({
         name: 'language',
-        type: { type: 'string' },
+        type: { kind: 'string' },
       });
       expect(fn.params[1]?.defaultValue).toBeUndefined();
 
       expect(fn.annotations?.description).toBe('Review code for issues');
-      expect(fn.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }));
+      expect(fn.returnType).toEqual(structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }));
     });
 
     it('generates function with no parameters for prompt without arguments', () => {
@@ -70,11 +70,11 @@ describe('Prompt Function Generation', () => {
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      expect(functions).toHaveProperty('prompt_greeting');
-      const fn = functions.prompt_greeting!;
+      expect(functions).toHaveProperty('greeting');
+      const fn = functions.greeting!;
 
       expect(fn.params).toHaveLength(0);
-      expect(fn.returnType).toEqual(rillTypeToTypeValue({ type: 'list', element: { type: 'dict', fields: { role: { type: { type: 'string' } }, content: { type: { type: 'string' } } } } }));
+      expect(fn.returnType).toEqual(structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }));
     });
 
     it('sets defaultValue for optional arguments only', () => {
@@ -90,7 +90,7 @@ describe('Prompt Function Generation', () => {
       ];
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-      const fn = functions.prompt_test!;
+      const fn = functions.test!;
 
       expect(fn.params[0]?.defaultValue).toBeUndefined(); // required: true
       expect(fn.params[1]?.defaultValue).toBeUndefined(); // required: false — all params use p.str (defaultValue: undefined)
@@ -122,7 +122,7 @@ describe('Prompt Function Generation', () => {
       ];
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-      await functions.prompt_test_prompt!.fn({ arg1: 'value1', arg2: 'value2' }, {
+      await functions.test_prompt!.fn({ arg1: 'value1', arg2: 'value2' }, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
@@ -154,7 +154,7 @@ describe('Prompt Function Generation', () => {
       ];
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-      await functions.prompt_test!.fn({ required: 'req-value', optional: undefined }, {
+      await functions.test!.fn({ required: 'req-value', optional: undefined }, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
@@ -178,7 +178,7 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
       await expect(
-        functions.prompt_test!.fn({ required: undefined }, {
+        functions.test!.fn({ required: undefined }, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('required parameter required is missing');
@@ -195,7 +195,7 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
       await expect(
-        functions.prompt_test!.fn({ arg: 123 }, {
+        functions.test!.fn({ arg: 123 }, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('expected string for parameter arg, got number');
@@ -222,7 +222,7 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      const result = await functions.prompt_test!.fn({}, {
+      const result = await functions.test!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
@@ -248,7 +248,7 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      const result = await functions.prompt_test!.fn({}, {
+      const result = await functions.test!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
@@ -277,7 +277,7 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      const result = await functions.prompt_test!.fn({}, {
+      const result = await functions.test!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
       const msg = result[0] as { [key: string]: unknown };
@@ -300,7 +300,7 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      const result = await functions.prompt_test!.fn({}, {
+      const result = await functions.test!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
       const msg = result[0] as { [key: string]: unknown };
@@ -327,7 +327,7 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      const result = await functions.prompt_test!.fn({}, {
+      const result = await functions.test!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
       const msg = result[0] as { [key: string]: unknown };
@@ -351,7 +351,7 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      const result = await functions.prompt_test!.fn({}, {
+      const result = await functions.test!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
       const msg = result[0] as { [key: string]: unknown };
@@ -370,9 +370,9 @@ describe('Prompt Function Generation', () => {
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      expect(functions).toHaveProperty('prompt_code_review');
-      expect(functions).toHaveProperty('prompt_fetch_data');
-      expect(functions).toHaveProperty('prompt_camel_case_name');
+      expect(functions).toHaveProperty('code_review');
+      expect(functions).toHaveProperty('fetch_data');
+      expect(functions).toHaveProperty('camel_case_name');
     });
 
     it('handles name collisions with numeric suffixes', () => {
@@ -384,9 +384,9 @@ describe('Prompt Function Generation', () => {
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      expect(functions).toHaveProperty('prompt_test_name');
-      expect(functions).toHaveProperty('prompt_test_name_2');
-      expect(functions).toHaveProperty('prompt_test_name_3');
+      expect(functions).toHaveProperty('test_name');
+      expect(functions).toHaveProperty('test_name_2');
+      expect(functions).toHaveProperty('test_name_3');
     });
   });
 
@@ -405,7 +405,7 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, 50); // 50ms timeout
 
       await expect(
-        functions.prompt_test!.fn({}, {
+        functions.test!.fn({}, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow();
@@ -422,7 +422,7 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
       await expect(
-        functions.prompt_test!.fn({}, {
+        functions.test!.fn({}, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('connection lost');
@@ -439,7 +439,7 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
       await expect(
-        functions.prompt_test!.fn({}, {
+        functions.test!.fn({}, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('authentication failed');
@@ -456,7 +456,7 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
       await expect(
-        functions.prompt_test!.fn({}, {
+        functions.test!.fn({}, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('protocol');
@@ -473,7 +473,7 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
       await expect(
-        functions.prompt_test!.fn({}, {
+        functions.test!.fn({}, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow('Something went wrong');
@@ -491,7 +491,7 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
       await expect(
-        functions.prompt_test!.fn({}, {
+        functions.test!.fn({}, {
           _lifecycle: { connectEmitted: false },
         } as any)
       ).rejects.toThrow(runtimeError);
@@ -509,9 +509,9 @@ describe('Prompt Function Generation', () => {
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
       expect(Object.keys(functions)).toHaveLength(3);
-      expect(functions).toHaveProperty('prompt_prompt1');
-      expect(functions).toHaveProperty('prompt_prompt2');
-      expect(functions).toHaveProperty('prompt_prompt3');
+      expect(functions).toHaveProperty('prompt1');
+      expect(functions).toHaveProperty('prompt2');
+      expect(functions).toHaveProperty('prompt3');
     });
 
     it('each function operates independently', async () => {
@@ -529,10 +529,10 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'p1' }, { name: 'p2' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      const result1 = await functions.prompt_p1!.fn({}, {
+      const result1 = await functions.p1!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
-      const result2 = await functions.prompt_p2!.fn({}, {
+      const result2 = await functions.p2!.fn({}, {
         _lifecycle: { connectEmitted: false },
       } as any);
 
