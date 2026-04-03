@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-llm-shared",
   "private": true,
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Shared utilities for rill LLM extensions",
   "license": "MIT",
   "type": "module",

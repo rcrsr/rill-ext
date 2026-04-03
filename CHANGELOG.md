@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@rcrsr/rill-ext-param-shared` moved from `dependencies` to `devDependencies` in all 11
   extension packages; the private shared package was bundled by tsup at build time but
   listed as a runtime dependency, causing unresolvable installs from npm
+- All 14 packages bumped to v0.18.1
 
 ## [0.18.0] - 2026-04-02
 

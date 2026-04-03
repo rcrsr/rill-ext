@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-vector-shared",
   "private": true,
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Shared utilities for rill vector database extensions",
   "license": "MIT",
   "type": "module",
