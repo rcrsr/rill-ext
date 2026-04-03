@@ -1,0 +1,745 @@
+# rill-ext
+
+> Vendor extensions for the rill language runtime. Each extension is an independent npm package under `@rcrsr/`. Extensions in the same category share identical function signatures, so scripts swap providers without code changes. All packages require `@rcrsr/rill` as a peer dependency at matching minor version (e.g., extension `0.18.x` works with `rill@0.18.y`).
+
+rill-ext is a pnpm monorepo containing 11 published extension packages and 3 private shared libraries. Extensions follow a factory pattern: call `create*Extension(config)` to get host functions and a `dispose()` cleanup function. The host registers these functions into a rill runtime context, and scripts access them via `use<ext:name>`.
+
+Repository: https://github.com/rcrsr/rill-ext
+Core runtime: https://github.com/rcrsr/rill
+License: MIT
+
+## Architecture
+
+### Extension factory pattern
+
+Every extension exports a factory function returning `{ value, dispose }`:
+
+```typescript
+import { p } from '@rcrsr/rill-ext-param-shared';
+
+export function createAnthropicExtension(config: LLMProviderConfig): ExtensionFactoryResult {
+  // validate config, create SDK client
+  return {
+    value: {
+      message: toCallable({ fn, params: [p.str('text'), p.dict('options')] }),
+      // ... more functions
+    },
+    dispose: async () => { /* cleanup */ },
+  };
+}
+```
+
+### Host integration
+
+```typescript
+import { createRuntimeContext, prefixFunctions } from '@rcrsr/rill';
+import { createAnthropicExtension } from '@rcrsr/rill-ext-anthropic';
+
+const ext = createAnthropicExtension({
+  api_key: process.env.ANTHROPIC_API_KEY,
+  model: 'claude-sonnet-4-20250514',
+});
+const { dispose, ...functions } = prefixFunctions('llm', ext);
+const ctx = createRuntimeContext({ functions });
+// execute scripts, then:
+await dispose();
+```
+
+### rill-config.json declaration
+
+Extensions are declared in `rill-config.json` for script-level use:
+
+```json
+{
+  "extensions": {
+    "mounts": { "llm": "@rcrsr/rill-ext-anthropic" },
+    "config": {
+      "llm": {
+        "api_key": "${ANTHROPIC_API_KEY}",
+        "model": "claude-sonnet-4-5-20250929"
+      }
+    }
+  }
+}
+```
+
+Scripts load extensions with `use<ext:name>`:
+
+```rill
+use<ext:llm> => $ai
+$ai.message("Hello")() => $result
+$result.content -> log
+```
+
+### Error codes
+
+- `RILL-R004`: Extension-level errors (validation, API, runtime)
+- `RILL-R001`: Shared validation errors (converted to R004 by extensions)
+
+### Streaming convention
+
+Functions returning `RillStream` support two patterns:
+
+```rill
+# Iterate chunks incrementally
+ext::fn("input") => $s
+$s -> each { log }
+
+# Resolve to result dict
+ext::fn("input")() => $result
+$result.content -> log
+```
+
+## LLM Extensions
+
+Three LLM extensions share identical 6-function APIs. Swap providers by changing the mount. Scripts stay unchanged.
+
+### @rcrsr/rill-ext-anthropic
+
+npm: `@rcrsr/rill-ext-anthropic`
+SDK: `@anthropic-ai/sdk`
+Factory: `createAnthropicExtension(config)`
+
+### @rcrsr/rill-ext-openai
+
+npm: `@rcrsr/rill-ext-openai`
+SDK: `openai`
+Factory: `createOpenAIExtension(config)`
+
+### @rcrsr/rill-ext-gemini
+
+npm: `@rcrsr/rill-ext-gemini`
+SDK: `@google/genai`
+Factory: `createGeminiExtension(config)`
+Note: Google's API returns 0 for token counts and empty string for request IDs.
+
+### LLM configuration (all three)
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `api_key` | string | yes | API key |
+| `model` | string | yes | Model identifier |
+| `temperature` | number | no | Sampling temperature, 0.0-2.0 |
+| `max_tokens` | number | no | Maximum response tokens (default: 4096) |
+| `system` | string | no | Default system prompt |
+| `embed_model` | string | no | Model for embed operations |
+| `base_url` | string | no | Custom API endpoint |
+| `max_retries` | number | no | Retry attempts on failure |
+| `timeout` | number | no | Request timeout in ms |
+
+### LLM functions (all three)
+
+**message(text, options?) -> RillStream**
+
+Single prompt. Stream yields text delta strings. Resolves to result dict.
+
+```rill
+use<ext:llm> => $ai
+$ai.message("Explain TCP handshakes")() => $result
+$result.content      # response text
+$result.usage.input  # input tokens
+$result.usage.output # output tokens
+$result.stop_reason  # why generation stopped
+$result.model        # model identifier
+$result.id           # request identifier
+$result.messages     # conversation history
+```
+
+**messages(messages, options?) -> RillStream**
+
+Multi-turn conversation. Messages format: `[{ role, content }, ...]`. Same result dict as `message`.
+
+```rill
+[
+  [role: "user", content: "What is rill?"],
+  [role: "assistant", content: "A scripting language."],
+  [role: "user", content: "Tell me more."],
+] -> $ai.messages => $s
+$s() => $result
+$result.content   # latest response
+$result.messages  # full conversation history
+```
+
+**embed(text) -> dict**
+
+Text embedding. Requires `embed_model` in config.
+
+```rill
+$ai.embed("sample text") => $vec
+$vec.dimensions  # vector size
+$vec.model       # embedding model used
+$vec.vector      # number array
+```
+
+**embed_batch(texts) -> dict**
+
+Batch embeddings.
+
+```rill
+["first", "second"] -> $ai.embed_batch => $result
+$result.len        # number of vectors
+$result.succeeded  # successful count
+$result.vectors    # array of vectors
+```
+
+**tool_loop(prompt, tools, options?) -> RillStream**
+
+Agentic loop. The model calls rill closures as tools until it has an answer. Tools is a dict mapping `name -> callable`. Stream yields structured events.
+
+```rill
+^("Get weather") |^("City name") city: string| {
+  "Weather in {$city}: 72F sunny"
+} => $get_weather
+
+$ai.tool_loop("What's the weather in Paris?", [
+  get_weather: $get_weather,
+], [max_turns: 5]) => $s
+
+# Stream events
+$s -> each {
+  $.type    # "text_delta", "tool_call", or "tool_result"
+  $.text    # available when type == "text_delta"
+  $.name    # available when type == "tool_call" or "tool_result"
+  $.args    # available when type == "tool_call"
+  $.result  # available when type == "tool_result"
+}
+
+# Or resolve
+$s() => $result
+$result.content  # final response text
+$result.turns    # number of LLM round-trips
+$result.usage    # { input, output } token counts
+```
+
+Tool loop options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `system` | string | config default | Override system prompt |
+| `max_tokens` | number | config default | Override max tokens |
+| `max_turns` | number | unlimited | Limit LLM round-trips |
+| `max_errors` | number | 3 | Consecutive error limit |
+| `messages` | list | [] | Prepend conversation history |
+
+**generate(prompt, options) -> dict**
+
+Structured output extraction. Returns parsed data matching a schema.
+
+```rill
+# Schema from dict descriptor
+[name: "string", confidence: "number", tags: "list"] => $schema
+$ai.generate("Extract metadata from: rill is a pipe-based language", [
+  schema: $schema,
+]) => $result
+$result.data.name        # extracted field
+$result.data.confidence  # extracted field
+$result.raw              # original JSON string
+$result.usage            # { input, output }
+$result.stop_reason      # stop reason
+$result.model            # model identifier
+
+# Schema from closure structural type
+|^("Name") name: string, ^(description: "Score") confidence: number| { } => $extractor
+$ai.generate("Extract data", [schema: $extractor.^input]) => $result
+```
+
+Generate options:
+
+| Option | Type | Required | Description |
+|--------|------|----------|-------------|
+| `schema` | dict or RillStructuralType | yes | Output schema definition |
+| `system` | string | no | Override system prompt |
+| `max_tokens` | number | no | Override max tokens |
+| `messages` | list | no | Prepend conversation history |
+
+### LLM events
+
+Events use the provider prefix (`anthropic:`, `openai:`, `gemini:`):
+
+| Event | Emitted when |
+|-------|-------------|
+| `{provider}:message` | message() completes |
+| `{provider}:messages` | messages() completes |
+| `{provider}:embed` | embed() completes |
+| `{provider}:embed_batch` | embed_batch() completes |
+| `{provider}:tool_loop` | tool_loop() completes |
+| `{provider}:generate` | generate() completes |
+| `{provider}:tool_call` | tool invoked during loop |
+| `{provider}:tool_result` | tool returns during loop |
+| `{provider}:error` | any operation fails |
+
+Completion events include: `duration` (ms), `model`, `usage`, `request`, `content`.
+
+## Key-Value Extensions
+
+Two KV extensions share an identical 11-function API. Scripts swap backends without code changes.
+
+### @rcrsr/rill-ext-kv-sqlite
+
+npm: `@rcrsr/rill-ext-kv-sqlite`
+SDK: `better-sqlite3`
+Factory: `createSqliteKvExtension(config)`
+
+Config:
+
+```json
+{
+  "mounts": {
+    "user": {
+      "mode": "read-write",
+      "database": "./data/app.db",
+      "table": "user_state",
+      "schema": { "name": { "type": "string", "default": "" } },
+      "maxEntries": 10000,
+      "maxValueSize": 102400
+    }
+  },
+  "maxStoreSize": 10485760,
+  "writePolicy": "dispose"
+}
+```
+
+SQLite mount parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `mode` | string | yes | `'read'`, `'write'`, or `'read-write'` |
+| `database` | string | yes | SQLite file path |
+| `table` | string | yes | Table name |
+| `schema` | Record | no | Field schema with type and default |
+| `maxEntries` | number | no | Max entries per mount (default: 10000) |
+| `maxValueSize` | number | no | Max value size in bytes (default: 102400) |
+
+### @rcrsr/rill-ext-kv-redis
+
+npm: `@rcrsr/rill-ext-kv-redis`
+SDK: `ioredis`
+Factory: `createRedisKvExtension(config)`
+
+Config:
+
+```json
+{
+  "url": "redis://localhost:6379",
+  "mounts": {
+    "user": {
+      "mode": "read-write",
+      "prefix": "app:user:",
+      "schema": { "name": { "type": "string", "default": "" } },
+      "maxEntries": 10000,
+      "maxValueSize": 102400
+    }
+  }
+}
+```
+
+Redis mount parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `mode` | string | yes | `'read'`, `'write'`, or `'read-write'` |
+| `prefix` | string | yes | Redis key prefix |
+| `schema` | Record | no | Field schema with type and default |
+| `maxEntries` | number | no | Max entries per mount (default: 10000) |
+| `maxValueSize` | number | no | Max value size in bytes (default: 102400) |
+
+Additional top-level: `url` (string, required) - Redis connection URL.
+
+### KV functions (both backends)
+
+```rill
+use<ext:kv> => $store
+```
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `get` | mount, key | any | Get value or schema default |
+| `get_or` | mount, key, default | any | Get value or provided default |
+| `set` | mount, key, value | bool | Set value (validates against schema) |
+| `merge` | mount, key, partial | bool | Merge dict fields into existing value |
+| `delete` | mount, key | bool | Delete key |
+| `keys` | mount | list | All keys in mount |
+| `has` | mount, key | bool | Check key existence |
+| `clear` | mount | bool | Clear all keys (restores schema defaults) |
+| `getAll` | mount | dict | All entries as dict |
+| `schema` | mount | list | Schema information |
+| `mounts` | (none) | list | Available mount names |
+
+```rill
+$store.set("user", "name", "Alice")
+$store.get("user", "name") => $name
+$store.has("user", "name") => $exists
+$store.keys("user") => $all_keys
+$store.getAll("user") => $everything
+$store.delete("user", "name")
+$store.clear("user")
+$store.mounts() => $mount_names
+```
+
+## Filesystem Extension
+
+### @rcrsr/rill-ext-fs-s3
+
+npm: `@rcrsr/rill-ext-fs-s3`
+SDK: `@aws-sdk/client-s3`
+Factory: `createS3FsExtension(config)`
+Supports: AWS S3, Cloudflare R2, MinIO, and S3-compatible services.
+
+Config:
+
+```json
+{
+  "mounts": {
+    "data": {
+      "mode": "read-write",
+      "region": "us-east-1",
+      "bucket": "my-app-data",
+      "prefix": "uploads/",
+      "credentials": {
+        "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+        "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+      },
+      "endpoint": "https://custom.endpoint.com",
+      "forcePathStyle": false,
+      "glob": "*.csv"
+    }
+  },
+  "maxFileSize": 10485760,
+  "encoding": "utf-8"
+}
+```
+
+Mount parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `mode` | string | yes | `'read-only'` or `'read-write'` |
+| `region` | string | yes | AWS region or `'auto'` for R2 |
+| `bucket` | string | yes | S3 bucket name |
+| `prefix` | string | no | Object key prefix for namespace isolation |
+| `credentials` | object | yes | `{ accessKeyId, secretAccessKey }` |
+| `endpoint` | string | no | Custom endpoint for S3-compatible services |
+| `forcePathStyle` | boolean | no | Path-style addressing (required for MinIO) |
+| `glob` | string | no | File filter pattern |
+
+### FS functions
+
+All path arguments use `/mount/path` format. Longest mount name wins.
+
+```rill
+use<ext:fs> => $storage
+```
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `read` | path | string | File contents |
+| `write` | path, content | string | Bytes written |
+| `append` | path, content | string | Bytes appended |
+| `list` | path | list | Directory contents (non-recursive) |
+| `find` | path, pattern? | list | Recursive file search with glob |
+| `exists` | path | bool | File existence check |
+| `remove` | path | bool | Delete file |
+| `stat` | path | dict | `{ name, type, size, modified }` |
+| `mkdir` | path | bool | Create directory (no-op for S3) |
+| `copy` | src, dest | bool | Copy file (same mount only) |
+| `move` | src, dest | bool | Move file (same mount only) |
+| `mounts` | (none) | list | Mount metadata |
+
+```rill
+$storage.write("/data/out.txt", "hello")
+$storage.read("/data/out.txt") => $content
+$storage.exists("/data/out.txt") => $yes
+$storage.stat("/data/out.txt") => $info
+$storage.list("/data/") => $files
+$storage.find("/data/", "*.csv") => $csvs
+$storage.remove("/data/out.txt")
+```
+
+## Vector Database Extensions
+
+Three vector DB extensions share an identical 11-function API. Scripts swap backends without code changes.
+
+### @rcrsr/rill-ext-qdrant
+
+npm: `@rcrsr/rill-ext-qdrant`
+SDK: `@qdrant/js-client-rest`
+Factory: `createQdrantExtension(config)`
+
+Config:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `url` | string | yes | Qdrant API endpoint URL |
+| `collection` | string | yes | Default collection name |
+| `dimensions` | number | no | Vector dimension size |
+| `distance` | string | no | `"cosine"`, `"euclidean"`, or `"dot"` (default: cosine) |
+| `apiKey` | string | no | API key for Qdrant Cloud |
+| `timeout` | number | no | Request timeout in ms |
+
+### @rcrsr/rill-ext-pinecone
+
+npm: `@rcrsr/rill-ext-pinecone`
+SDK: `@pinecone-database/pinecone`
+Factory: `createPineconeExtension(config)`
+
+Config:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `apiKey` | string | yes | Pinecone API key |
+| `index` | string | yes | Index name |
+| `namespace` | string | no | Namespace (default: empty string) |
+| `timeout` | number | no | Request timeout in ms (default: 30000) |
+
+### @rcrsr/rill-ext-chroma
+
+npm: `@rcrsr/rill-ext-chroma`
+SDK: `chromadb`
+Factory: `createChromaExtension(config)`
+
+Config:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `url` | string | no | ChromaDB endpoint (omit for embedded mode) |
+| `collection` | string | yes | Default collection name |
+| `embeddingFunction` | string | no | Embedding function name (e.g., 'openai') |
+| `timeout` | number | no | Request timeout in ms |
+
+### Vector DB functions (all three)
+
+```rill
+use<ext:qdrant> => $db
+```
+
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `upsert` | id, vector, metadata? | dict | Insert or update vector |
+| `upsert_batch` | items | dict | Batch insert (items: `[{ id, vector, metadata }]`) |
+| `search` | vector, options? | dict | Similarity search |
+| `get` | id | dict or null | Retrieve by ID |
+| `delete` | id | dict | Remove vector |
+| `delete_batch` | ids | dict | Batch remove |
+| `count` | (none) | dict | Collection vector count |
+| `create_collection` | name, options? | dict | Create collection |
+| `delete_collection` | name | dict | Delete collection |
+| `list_collections` | (none) | dict | List all collections |
+| `describe` | (none) | dict | Collection info and stats |
+
+Search options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `limit` | number | 10 | Max results |
+| `score_threshold` | number | none | Min similarity score |
+| `filter` | dict | none | Metadata filter conditions |
+| `offset` | number | 0 | Pagination offset |
+
+```rill
+$db.upsert("doc-1", [0.1, 0.2, 0.3], [title: "Example"])
+$db.search([0.1, 0.2, 0.3], [limit: 5]) => $results
+$db.get("doc-1") => $point
+$db.delete("doc-1")
+$db.count() => $n
+$db.create_collection("new_coll", [dimensions: 384, distance: "cosine"])
+$db.list_collections() => $colls
+$db.describe() => $info
+```
+
+## MCP Extension
+
+### @rcrsr/rill-ext-mcp
+
+npm: `@rcrsr/rill-ext-mcp`
+SDK: `@modelcontextprotocol/sdk`
+Factory: `createMcpExtension(config)`
+
+Connects rill scripts to Model Context Protocol (MCP) servers. Supports stdio and HTTP transports. Auto-generates host functions from server metadata across three capability dicts: `tools`, `resources`, `prompts`.
+
+Config:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `transport` | object | yes | Transport configuration |
+| `timeout` | number | no | Request timeout in ms (default: 30000) |
+| `toolFilter` | string[] | no | Include only named tools |
+| `resourceFilter` | string[] | no | Include only named resource URIs |
+| `promptFilter` | string[] | no | Include only named prompts |
+
+Stdio transport:
+
+```json
+{
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+  "env": { "LOG_LEVEL": "info" }
+}
+```
+
+HTTP transport:
+
+```json
+{
+  "type": "http",
+  "url": "https://mcp.example.com/v1",
+  "headers": { "Authorization": "Bearer ${API_KEY}" }
+}
+```
+
+### MCP value structure
+
+```
+ext:mcp
+  .tools
+    .read_file(path, ...)      # MCP tool
+    .search_files(pattern, ...) # MCP tool
+  .resources
+    .read_resource(uri)         # reads any resource by URI
+    .resource_app_log()         # static resource shortcut
+  .prompts
+    .code_review(code, ...)     # MCP prompt template
+```
+
+### MCP usage
+
+```rill
+use<ext:fs> => $fs
+$fs.tools.read_file([path: "/tmp/test.txt"]) => $result
+$result.content -> log
+```
+
+### MCP + LLM composition
+
+Pass MCP tools directly to an LLM's `tool_loop`:
+
+```rill
+use<ext:fs> => $fs
+use<ext:ai> => $ai
+
+$ai.tool_loop("Find all TODOs in the project", $fs.tools, [
+  max_turns: 10,
+]) => $result
+$result.content -> log
+```
+
+Combine tools from multiple MCP servers:
+
+```rill
+use<ext:fs> => $fs
+use<ext:gh> => $gh
+$fs.tools -> .merge($gh.tools) => $all_tools
+$ai.tool_loop("Read README and create issues", $all_tools)
+```
+
+## Claude Code Extension
+
+### @rcrsr/rill-ext-claude-code
+
+npm: `@rcrsr/rill-ext-claude-code`
+SDK: `which`, peer dep `node-pty`
+Factory: `createClaudeCodeExtension(config)`
+
+Spawns the Claude Code CLI as a subprocess. Scripts send prompts, invoke skills, and run commands. All 3 functions return `RillStream`.
+
+Prerequisites: `node-pty` (native compilation) and `claude` binary in `$PATH`.
+
+Config:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `binaryPath` | string | `'claude'` | Path to Claude CLI binary |
+| `defaultTimeout` | number | 1800000 | Timeout in ms (max: 3600000) |
+| `dangerouslySkipPermissions` | boolean | true | Skip permission checks |
+| `settingSources` | string | `''` | Settings to load: `''`, `'user'`, `'project'`, `'user,project'` |
+
+### Claude Code functions
+
+**prompt(text, options?) -> RillStream**
+
+```rill
+use<ext:claude_code> => $cc
+$cc.prompt("Explain TCP handshakes")() => $result
+$result.result       # response text
+$result.tokens       # { prompt, cacheWrite5m, cacheWrite1h, cacheRead, output }
+$result.cost         # cost in USD
+$result.exitCode     # CLI exit code (0 = success)
+$result.duration     # execution time in ms
+```
+
+**skill(name, args?) -> RillStream**
+
+```rill
+$cc.skill("commit", [message: "fix: resolve timeout bug"])() => $result
+```
+
+**command(name, args?) -> RillStream**
+
+```rill
+$cc.command("review-pr", [pr: "123"])() => $result
+```
+
+Per-call option: `timeout` (number) overrides `defaultTimeout`.
+
+### Claude Code events
+
+| Event | Emitted when |
+|-------|-------------|
+| `claude-code:prompt` | prompt completes |
+| `claude-code:skill` | skill completes |
+| `claude-code:command` | command completes |
+| `claude-code:error` | any operation fails |
+
+## Shared Packages
+
+Internal packages bundled into consuming extensions at build time. Not published to npm.
+
+### @rcrsr/rill-ext-param-shared
+
+Parameter builder helpers for `RillParam` objects. All extensions depend on this.
+
+```typescript
+import { p } from '@rcrsr/rill-ext-param-shared';
+
+p.str('name', 'description')           // string param
+p.num('name', 'description', default)  // number param
+p.bool('name', 'description', default) // boolean param
+p.dict('name', 'description', default, fields) // dict param with optional structural fields
+p.list('name', itemType, 'description')  // list param
+p.callable('name', 'description')       // closure param
+```
+
+### @rcrsr/rill-ext-llm-shared
+
+Shared validation, error handling, tool loop orchestration, and JSON Schema building. All 3 LLM extensions depend on this.
+
+Exports: `validateApiKey`, `validateModel`, `validateTemperature`, `validateMessages`, `validateEmbedText`, `validateEmbedBatch`, `validateEmbedModel`, `mapProviderError`, `executeToolLoop`, `buildResponseMessages`, `buildJsonSchema`, `buildJsonSchemaFromStructuralType`, `mapRillType`.
+
+Key types: `LLMExtensionConfig`, `LLMProviderConfig`, `ProviderErrorDetector`, `ToolLoopCallbacks`, `ToolLoopResult`, `ToolLoopChunk`.
+
+### @rcrsr/rill-ext-vector-shared
+
+Common utilities for all 3 vector DB extensions.
+
+Exports: `mapVectorError`, `withEventEmission`, `executeBatch`, `createDisposalState`, `checkDisposed`, `dispose`, `assertRequired`, `createFunctionWrapper`, `normalizeDistance`, `vectorParam`.
+
+Key types: `VectorExtensionConfig`, `BatchResult`, `DisposalState`, `DistanceMetric`.
+
+## Package Index
+
+| Package | npm | Category |
+|---------|-----|----------|
+| `packages/ext/llm-anthropic` | `@rcrsr/rill-ext-anthropic` | LLM |
+| `packages/ext/llm-openai` | `@rcrsr/rill-ext-openai` | LLM |
+| `packages/ext/llm-gemini` | `@rcrsr/rill-ext-gemini` | LLM |
+| `packages/ext/kv-sqlite` | `@rcrsr/rill-ext-kv-sqlite` | Key-Value |
+| `packages/ext/kv-redis` | `@rcrsr/rill-ext-kv-redis` | Key-Value |
+| `packages/ext/fs-s3` | `@rcrsr/rill-ext-fs-s3` | Filesystem |
+| `packages/ext/vectordb-qdrant` | `@rcrsr/rill-ext-qdrant` | Vector DB |
+| `packages/ext/vectordb-pinecone` | `@rcrsr/rill-ext-pinecone` | Vector DB |
+| `packages/ext/vectordb-chroma` | `@rcrsr/rill-ext-chroma` | Vector DB |
+| `packages/ext/mcp` | `@rcrsr/rill-ext-mcp` | Integration |
+| `packages/ext/claude-code` | `@rcrsr/rill-ext-claude-code` | Integration |
+| `packages/shared/ext-param` | `@rcrsr/rill-ext-param-shared` | Shared (private) |
+| `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` | Shared (private) |
+| `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` | Shared (private) |
