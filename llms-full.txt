@@ -25,8 +25,10 @@ Declare extensions in `rill-config.json`. The `mounts` object maps a namespace t
         }
       },
       "fs": {
+        "region": "us-east-1",
+        "credentials": { "accessKeyId": "${AWS_KEY}", "secretAccessKey": "${AWS_SECRET}" },
         "mounts": {
-          "data": { "mode": "read-write", "region": "us-east-1", "bucket": "my-bucket", "credentials": { "accessKeyId": "${AWS_KEY}", "secretAccessKey": "${AWS_SECRET}" } }
+          "data": { "mode": "read-write", "bucket": "my-bucket", "prefix": "" }
         }
       }
     }
@@ -105,7 +107,7 @@ Three interchangeable packages: `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-op
 | `api_key` | string | yes | API key |
 | `model` | string | yes | Model identifier |
 | `temperature` | number | no | Sampling temperature, 0.0-2.0 |
-| `max_tokens` | number | no | Max response tokens (default: 4096) |
+| `max_tokens` | number | no | Max response tokens (default: 0, unlimited) |
 | `system` | string | no | Default system prompt |
 | `embed_model` | string | no | Model for embed/embed_batch |
 | `base_url` | string | no | Custom API endpoint |
@@ -153,24 +155,22 @@ $result.messages  # full conversation history including new response
 
 ### embed(text)
 
-Generate a vector embedding. Requires `embed_model` in config. Returns dict.
+Generate a vector embedding. Requires `embed_model` in config. Returns a `vector` value.
+
+Note: Anthropic does not support embeddings. Calling `embed` or `embed_batch` on the Anthropic extension throws `Anthropic: embeddings API not available`. Use OpenAI or Gemini for embeddings.
 
 ```rill
 $ai.embed("sample text") => $vec
-$vec.dimensions  # vector size
-$vec.model       # embedding model used
-$vec.vector      # number array
+# $vec is a vector value (float32 array with model metadata)
 ```
 
 ### embed_batch(texts)
 
-Batch embeddings. Returns dict.
+Batch embeddings. Returns a `list` of `vector` values.
 
 ```rill
-["first text", "second text"] -> $ai.embed_batch => $result
-$result.len        # number of vectors
-$result.succeeded  # successful count
-$result.vectors    # array of number arrays
+["first text", "second text"] -> $ai.embed_batch => $vectors
+# $vectors is a list of vector values
 ```
 
 ### tool_loop(prompt, tools, options?)
@@ -215,7 +215,7 @@ Tool loop options:
 |--------|------|---------|-------------|
 | `system` | string | config value | Override system prompt |
 | `max_tokens` | number | config value | Override max tokens |
-| `max_turns` | number | unlimited | Limit LLM round-trips |
+| `max_turns` | number | 10 | Limit LLM round-trips |
 | `max_errors` | number | 3 | Consecutive tool error limit before abort |
 | `messages` | list | [] | Prepend conversation history |
 
@@ -418,47 +418,58 @@ One package: `@rcrsr/rill-ext-fs-s3`. Works with AWS S3, Cloudflare R2, MinIO, a
 
 ### FS config
 
+Top-level fields apply to all mounts. Mount-level fields configure each storage target.
+
 ```json
 {
   "fs": {
+    "region": "us-east-1",
+    "credentials": {
+      "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+      "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+    },
     "mounts": {
       "data": {
         "mode": "read-write",
-        "region": "us-east-1",
         "bucket": "my-app-data",
         "prefix": "uploads/",
-        "credentials": {
-          "accessKeyId": "${AWS_ACCESS_KEY_ID}",
-          "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
-        }
+        "maxFileSize": 10485760
       }
-    },
-    "maxFileSize": 10485760,
-    "encoding": "utf-8"
+    }
   }
 }
 ```
 
-| Mount param | Type | Required | Description |
-|-------------|------|----------|-------------|
-| `mode` | string | yes | `'read-only'` or `'read-write'` |
+Top-level parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
 | `region` | string | yes | AWS region or `'auto'` for R2 |
-| `bucket` | string | yes | S3 bucket name |
-| `prefix` | string | no | Object key prefix for namespace isolation |
-| `credentials` | object | yes | `{ accessKeyId, secretAccessKey }` |
+| `credentials` | object | no | `{ accessKeyId, secretAccessKey }` |
 | `endpoint` | string | no | Custom endpoint (R2, MinIO) |
 | `forcePathStyle` | boolean | no | Path-style addressing (required for MinIO) |
+| `mounts` | Record | yes | Named mount configurations |
+
+Mount parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `mode` | string | yes | `'read'`, `'write'`, or `'read-write'` |
+| `bucket` | string | yes | S3 bucket name |
+| `prefix` | string | yes | Object key prefix for namespace isolation |
 | `glob` | string | no | File filter pattern |
+| `maxFileSize` | number | no | Max file size in bytes (default: 10485760) |
 
 Cloudflare R2 example:
 
 ```json
 {
-  "mode": "read-write",
   "region": "auto",
-  "bucket": "my-r2-bucket",
   "credentials": { "accessKeyId": "${R2_KEY}", "secretAccessKey": "${R2_SECRET}" },
-  "endpoint": "https://<account-id>.r2.cloudflarestorage.com"
+  "endpoint": "https://<account-id>.r2.cloudflarestorage.com",
+  "mounts": {
+    "storage": { "mode": "read-write", "bucket": "my-r2-bucket", "prefix": "" }
+  }
 }
 ```
 
@@ -466,12 +477,13 @@ MinIO example:
 
 ```json
 {
-  "mode": "read-write",
   "region": "us-east-1",
-  "bucket": "test-bucket",
   "credentials": { "accessKeyId": "minioadmin", "secretAccessKey": "minioadmin" },
   "endpoint": "http://localhost:9000",
-  "forcePathStyle": true
+  "forcePathStyle": true,
+  "mounts": {
+    "local": { "mode": "read-write", "bucket": "test-bucket", "prefix": "" }
+  }
 }
 ```
 
@@ -597,24 +609,23 @@ Three interchangeable packages: `@rcrsr/rill-ext-qdrant`, `@rcrsr/rill-ext-pinec
 |----------|-----------|---------|-------------|
 | `upsert` | id, vector, metadata? | dict | Insert or update a vector |
 | `upsert_batch` | items | dict | Batch insert (`[{ id, vector, metadata }]`) |
-| `search` | vector, options? | dict | Similarity search |
-| `get` | id | dict or null | Retrieve vector by ID |
+| `search` | vector, options? | list | Similarity search (list of `{ id, score, metadata }`) |
+| `get` | id | dict | Retrieve vector by ID (throws if not found) |
 | `delete` | id | dict | Remove vector |
 | `delete_batch` | ids | dict | Batch remove |
-| `count` | (none) | dict | Collection vector count |
+| `count` | (none) | number | Collection vector count |
 | `create_collection` | name, options? | dict | Create collection |
 | `delete_collection` | name | dict | Delete collection |
-| `list_collections` | (none) | dict | List all collections |
+| `list_collections` | (none) | list | List all collection names |
 | `describe` | (none) | dict | Collection info and stats |
 
 Search options:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `limit` | number | 10 | Max results |
-| `score_threshold` | number | none | Min similarity score |
-| `filter` | dict | none | Metadata filter conditions |
-| `offset` | number | 0 | Pagination offset |
+| `k` | number | 10 | Max results to return |
+| `filter` | dict | {} | Metadata filter conditions |
+| `score_threshold` | number | 0 | Min similarity score (Qdrant and Pinecone) |
 
 ```rill
 use<ext:vectors> => $db
@@ -630,20 +641,21 @@ $db.upsert("doc-2", [0.4, 0.5, 0.6], [title: "Second document", page: 2])
 ] -> $db.upsert_batch => $batch_result
 
 # Search for similar vectors
-$db.search([0.1, 0.2, 0.3], [limit: 5, score_threshold: 0.8]) => $results
+$db.search([0.1, 0.2, 0.3], [k: 5, score_threshold: 0.8]) => $results
+# $results is a list of { id, score, metadata } dicts
 
-# Retrieve and delete
+# Retrieve by ID (throws if not found)
 $db.get("doc-1") => $point
-$point.vector   # the vector
-$point.payload  # the metadata
+$point.vector    # the vector
+$point.metadata  # the metadata
 
 $db.delete("doc-1")
 $db.delete_batch(["doc-2", "doc-3"])
 
 # Collection management
-$db.count() => $n
+$db.count() => $n  # returns a number
 $db.create_collection("new_coll", [dimensions: 384, distance: "cosine"])
-$db.list_collections() => $colls
+$db.list_collections() => $names  # returns a list of strings
 $db.describe() => $info
 $db.delete_collection("old_coll")
 ```
@@ -824,11 +836,12 @@ Requires `claude` binary in `$PATH` and `node-pty` (peer dependency, native comp
 | `dangerouslySkipPermissions` | boolean | true | Skip permission checks |
 | `settingSources` | string | `''` | Settings to load (see below) |
 
-`settingSources` values:
+`settingSources` values (comma-separated, passed to `--setting-sources`):
 - `''` (default): No settings. Disables plugins, MCP servers, slash commands.
 - `'user'`: Load user settings (~/.claude/settings.json).
 - `'project'`: Load project settings (.claude/settings.json).
-- `'user,project'`: Load both.
+- `'local'`: Load local settings (.claude/settings.local.json).
+- `'user,project'`: Load user and project settings.
 
 ### Claude Code functions
 
