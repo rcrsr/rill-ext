@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-openai",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "rill extension for OpenAI API integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@rcrsr/rill": "~0.18.0",
     "@rcrsr/rill-ext-llm-shared": "workspace:^",
+    "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/node": "^25.3.0",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
@@ -50,7 +51,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@rcrsr/rill-ext-param-shared": "workspace:*",
     "openai": "^6.25.0"
   }
 }

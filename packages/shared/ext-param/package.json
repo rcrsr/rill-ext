@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-param-shared",
   "private": true,
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Shared param builder utilities for rill extensions",
   "license": "MIT",
   "type": "module",
