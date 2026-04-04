@@ -329,6 +329,38 @@ Completion events (`openai:message`, `openai:messages`, `openai:tool_loop`, `ope
 | `request` | Messages array sent to the provider API |
 | `content` | Response text from the provider |
 
+## OpenAI-Compatible Providers
+
+This extension works with any OpenAI-compatible API. Set `base_url` in config to point at the provider's endpoint. Set `api_key` to that provider's key. Set `model` to a model name the provider accepts.
+
+```json
+{
+  "extensions": {
+    "config": {
+      "openai": {
+        "api_key": "${GROQ_API_KEY}",
+        "model": "llama-3.3-70b-versatile",
+        "base_url": "https://api.groq.com/openai/v1"
+      }
+    }
+  }
+}
+```
+
+Compatible providers include Groq, Together AI, Fireworks AI, and others that implement the OpenAI chat completions API.
+
+### Known Limitations
+
+Not all providers support every OpenAI API feature. Test the specific feature set you need before deploying.
+
+| Limitation | Affected Providers | Detail |
+|------------|--------------------|--------|
+| Structured outputs + tool use in one request | Groq | Cannot combine `response_format: json_schema` with tools. Use one or the other per call. |
+| Strict mode (`strict: true`) | Groq | Groq does not support `strict: true`. The parameter is silently ignored. |
+| Model names differ | All non-OpenAI providers | Use provider-specific model IDs (e.g., `llama-3.3-70b-versatile` for Groq). |
+| Streaming + tool use | Some providers | Certain providers do not support concurrent streaming and tool calling. |
+| `response_format` options | Some providers | Providers may reject or ignore unsupported `response_format` values. |
+
 ## See Also
 
 - [rill](https://github.com/rcrsr/rill) — Core language runtime
