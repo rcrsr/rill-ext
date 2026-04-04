@@ -99,7 +99,7 @@ export function createExecExtension(
         {
           name: 'stdin',
           type: { kind: 'string' },
-          defaultValue: '',
+          defaultValue: undefined,
           annotations: { description: 'Standard input data' },
         },
       ],

@@ -45,15 +45,19 @@ function mapParamToArg(param: EndpointParam): EndpointArg {
  * Convert EndpointConfig to InternalEndpointConfig for request module.
  *
  * @param config - Public endpoint configuration
+ * @param globalResponseShape - Global default response shape from factory config
  * @returns Request-compatible endpoint configuration
  */
-function mapEndpointConfig(config: EndpointConfig): InternalEndpointConfig {
+function mapEndpointConfig(
+  config: EndpointConfig,
+  globalResponseShape: 'body' | 'full'
+): InternalEndpointConfig {
   return {
     method: config.method,
     path: config.path,
     args: config.params?.map(mapParamToArg),
     headers: config.headers,
-    responseShape: config.responseShape ?? 'body',
+    responseShape: config.responseShape ?? globalResponseShape,
   };
 }
 
@@ -148,7 +152,7 @@ export function createFetchExtension(
     endpoints: Object.fromEntries(
       Object.entries(config.endpoints).map(([name, endpointConfig]) => [
         name,
-        mapEndpointConfig(endpointConfig),
+        mapEndpointConfig(endpointConfig, defaultResponseShape),
       ])
     ),
   };

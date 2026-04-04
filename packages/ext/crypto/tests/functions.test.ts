@@ -229,4 +229,34 @@ describe('random()', () => {
     const result = await ext.value.random.fn({ bytes: 0 });
     expect(result).toBe('');
   });
+
+  it('throws RuntimeError for negative bytes', async () => {
+    const ext = createCryptoExtension();
+    await expect(ext.value.random.fn({ bytes: -1 })).rejects.toThrow(RuntimeError);
+    await expect(ext.value.random.fn({ bytes: -1 })).rejects.toThrow(
+      'bytes must be a non-negative integer',
+    );
+  });
+
+  it('throws RuntimeError for non-integer bytes', async () => {
+    const ext = createCryptoExtension();
+    await expect(ext.value.random.fn({ bytes: 1.5 })).rejects.toThrow(RuntimeError);
+    await expect(ext.value.random.fn({ bytes: 1.5 })).rejects.toThrow(
+      'bytes must be a non-negative integer',
+    );
+  });
+
+  it('throws RuntimeError when bytes exceeds 1MB limit', async () => {
+    const ext = createCryptoExtension();
+    await expect(ext.value.random.fn({ bytes: 1_048_577 })).rejects.toThrow(RuntimeError);
+    await expect(ext.value.random.fn({ bytes: 1_048_577 })).rejects.toThrow(
+      'bytes must not exceed 1048576 (1MB)',
+    );
+  });
+
+  it('accepts exactly 1MB bytes', async () => {
+    const ext = createCryptoExtension();
+    const result = await ext.value.random.fn({ bytes: 1_048_576 });
+    expect(result).toHaveLength(2_097_152);
+  });
 });

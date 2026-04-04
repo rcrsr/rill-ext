@@ -20,6 +20,7 @@ import type { FsLocalExtensionConfig, MountConfig } from './types.js';
 import {
   resolvePath,
   matchesGlob,
+  checkMode,
   initializeMount,
   parseMountPath,
 } from './sandbox.js';
@@ -103,7 +104,10 @@ export async function createLocalFsExtension(
     try {
       resolvedPath = await resolvePath(mountName, filePath, mounts, 'read');
     } catch (error) {
-      if (error instanceof RuntimeError) {
+      if (
+        error instanceof RuntimeError &&
+        error.message.includes('file not found')
+      ) {
         throw new RuntimeError(
           'RILL-R004',
           `file not found: ${filePath}`,
@@ -300,7 +304,10 @@ export async function createLocalFsExtension(
     try {
       resolvedPath = await resolvePath(mountName, filePath, mounts, 'write');
     } catch (error) {
-      if (error instanceof RuntimeError) {
+      if (
+        error instanceof RuntimeError &&
+        error.message.includes('file not found')
+      ) {
         return false;
       }
       throw error;
@@ -359,6 +366,10 @@ export async function createLocalFsExtension(
 
   /**
    * Create directory.
+   *
+   * Security: resolves the nearest existing ancestor through realpath to block
+   * symlink escapes. A symlink inside the mount that points outside will be
+   * caught by the post-realpath boundary check before any directory is created.
    */
   const mkdir = async (args: Record<string, RillValue>): Promise<boolean> => {
     const { mountName, relativePath: dirPath } = parseMountPath(
@@ -376,10 +387,21 @@ export async function createLocalFsExtension(
       );
     }
 
+    // Verify write mode before doing any filesystem work.
+    if (!checkMode(mount.mode, 'write')) {
+      throw new RuntimeError(
+        'RILL-R004',
+        `mount "${mountName}" does not permit write`,
+        undefined,
+        { mountName, mode: mount.mode }
+      );
+    }
+
     const mountBase = mount.resolvedPath;
     const joined = path.join(mountBase, dirPath);
     const normalized = path.resolve(joined);
 
+    // Pre-realpath boundary check (catches plain path traversal).
     if (
       !normalized.startsWith(mountBase + path.sep) &&
       normalized !== mountBase
@@ -392,6 +414,47 @@ export async function createLocalFsExtension(
       );
     }
 
+    // Walk up to the deepest existing ancestor and resolve it through
+    // fs.realpath() to catch symlink escapes. The target directory does not
+    // exist yet so we cannot realpath it directly.
+    let ancestorNormalized = normalized;
+    let resolvedAncestor: string | undefined;
+    while (ancestorNormalized !== mountBase) {
+      try {
+        resolvedAncestor = await fs.realpath(ancestorNormalized);
+        break;
+      } catch (error) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          (error as { code: string }).code === 'ENOENT'
+        ) {
+          ancestorNormalized = path.dirname(ancestorNormalized);
+        } else {
+          throw error;
+        }
+      }
+    }
+    // If the loop exhausted to mountBase without a break, resolve it.
+    if (resolvedAncestor === undefined) {
+      resolvedAncestor = await fs.realpath(mountBase);
+    }
+
+    // Post-realpath boundary check (catches symlinks pointing outside mount).
+    if (
+      !resolvedAncestor.startsWith(mountBase + path.sep) &&
+      resolvedAncestor !== mountBase
+    ) {
+      throw new RuntimeError(
+        'RILL-R004',
+        'path escapes mount boundary',
+        undefined,
+        { mountName, path: dirPath, resolvedAncestor, mountBase }
+      );
+    }
+
+    // Check if target already exists.
     try {
       const stats = await fs.stat(normalized);
       if (stats.isDirectory()) {

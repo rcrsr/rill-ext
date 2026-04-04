@@ -350,13 +350,18 @@ export async function executeRequest(
       }
 
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const timeoutController = new AbortController();
+        const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+        const signals = options.signal
+          ? [options.signal, timeoutController.signal]
+          : [timeoutController.signal];
+        const combinedSignal = AbortSignal.any(signals);
 
         try {
           const response = await fetch(url, {
             ...options,
-            signal: controller.signal,
+            signal: combinedSignal,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any);
 

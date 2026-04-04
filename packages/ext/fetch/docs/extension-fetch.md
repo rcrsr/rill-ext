@@ -22,11 +22,11 @@ The fetch extension provides HTTP endpoint functions for rill scripts. Each endp
 ```typescript
 {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  path: string;                         // Path with :param placeholders.
-  params?: EndpointParam[];             // Parameter definitions.
-  headers?: Record<string, string>;     // Endpoint-specific headers.
-  responseShape?: 'body' | 'full';      // Override global responseShape.
-  description?: string;                 // Used in endpoints() introspection.
+  path: string;                    // Path with :param placeholders.
+  params?: EndpointParam[];        // Parameter definitions.
+  headers?: Record<string, string>; // Endpoint-specific headers.
+  responseShape?: 'body' | 'full'; // Override global responseShape.
+  description?: string;            // Used in endpoints() introspection.
 }
 ```
 

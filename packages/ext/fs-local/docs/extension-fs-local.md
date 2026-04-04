@@ -135,9 +135,4 @@ The sandbox enforces the following:
 
 | Code | Description |
 |------|-------------|
-| `RILL-R004` | Extension-level validation errors (size limit, file not found) |
-| `RILL-R017` | Unknown mount or mount not initialized |
-| `RILL-R018` | Path escapes mount boundary |
-| `RILL-R019` | File type not permitted by mount glob |
-| `RILL-R020` | Mount mode does not permit operation |
-| `RILL-R021` | Permission denied or file not found in sandbox |
+| `RILL-R004` | All extension errors: unknown mount, path escapes boundary, glob violation, mode violation, permission denied, file not found, size limit exceeded |

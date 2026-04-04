@@ -83,8 +83,26 @@ export function createCryptoExtension(
     return crypto.randomUUID();
   };
 
+  const MAX_RANDOM_BYTES = 1_048_576;
+
   const random = async (args: Record<string, RillValue>): Promise<string> => {
     const bytes = args['bytes'] as number;
+    if (!Number.isInteger(bytes) || bytes < 0) {
+      throw new RuntimeError(
+        'RILL-R004',
+        'bytes must be a non-negative integer',
+        undefined,
+        { bytes },
+      );
+    }
+    if (bytes > MAX_RANDOM_BYTES) {
+      throw new RuntimeError(
+        'RILL-R004',
+        `bytes must not exceed ${MAX_RANDOM_BYTES} (1MB)`,
+        undefined,
+        { bytes, max: MAX_RANDOM_BYTES },
+      );
+    }
     return crypto.randomBytes(bytes).toString('hex');
   };
 

@@ -482,6 +482,67 @@ describe('createFetchExtension', () => {
       expect(result).toHaveProperty('headers');
       expect(result).toHaveProperty('body');
     });
+
+    it('applies global responseShape to endpoints without explicit shape', async () => {
+      mockResponses.push({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        body: '{"id":123}',
+      });
+
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        responseShape: 'full',
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+            // no responseShape set — should inherit global 'full'
+          },
+        },
+      };
+
+      const ext = createFetchExtension(config);
+
+      const result = await getCallable(ext, 'getUser').fn(
+        { id: '123' },
+        {} as never
+      );
+
+      expect(result).toHaveProperty('status', 200);
+      expect(result).toHaveProperty('headers');
+      expect(result).toHaveProperty('body');
+    });
+
+    it('endpoint responseShape overrides global responseShape', async () => {
+      mockResponses.push({
+        status: 200,
+        body: '{"id":123}',
+      });
+
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        responseShape: 'full',
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+            responseShape: 'body',
+          },
+        },
+      };
+
+      const ext = createFetchExtension(config);
+
+      const result = await getCallable(ext, 'getUser').fn(
+        { id: '123' },
+        {} as never
+      );
+
+      expect(result).toEqual({ id: 123 });
+    });
   });
 
   describe('dispose()', () => {
@@ -520,6 +581,33 @@ describe('createFetchExtension', () => {
       expect(() => ext.dispose()).not.toThrow();
       expect(() => ext.dispose()).not.toThrow();
       expect(() => ext.dispose()).not.toThrow();
+    });
+
+    it('dispose aborts in-flight requests', async () => {
+      mockResponses.push({ status: 200, body: '{"id":123}', delay: 500 });
+
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+          },
+        },
+      };
+
+      const ext = createFetchExtension(config);
+
+      const requestPromise = getCallable(ext, 'getUser').fn(
+        { id: '123' },
+        {} as never
+      );
+
+      // Abort all in-flight requests via dispose
+      ext.dispose();
+
+      await expect(requestPromise).rejects.toThrow(RuntimeError);
     });
   });
 

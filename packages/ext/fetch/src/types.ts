@@ -23,8 +23,6 @@ export interface EndpointConfig {
   readonly path: string;
   readonly params?: EndpointParam[] | undefined;
   readonly headers?: Record<string, string> | undefined;
-  readonly body?: 'json' | 'form' | 'text' | undefined;
-  readonly responseFormat?: 'json' | 'text' | undefined;
   readonly responseShape?: 'body' | 'full' | undefined;
   readonly description?: string | undefined;
 }
@@ -40,7 +38,6 @@ export interface FetchExtensionConfig {
   readonly retries?: number | undefined;
   readonly retryDelay?: number | undefined;
   readonly maxConcurrent?: number | undefined;
-  readonly responseFormat?: 'json' | 'text' | undefined;
   readonly responseShape?: 'body' | 'full' | undefined;
   readonly endpoints: Record<string, EndpointConfig>;
 }

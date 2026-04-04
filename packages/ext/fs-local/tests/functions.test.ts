@@ -86,6 +86,31 @@ describe('fs-local extension functions', () => {
       }
     });
 
+    it('rethrows mode violation RuntimeError from sandbox (not masked as file not found)', async () => {
+      const ext = await makeExt({
+        mounts: { workspace: { path: testMount, mode: 'read' } },
+      });
+
+      await fs.writeFile(path.join(testMount, 'test.txt'), 'data', 'utf-8');
+
+      // read() with a read-only mount reads fine - test mode check surfaces on write mount
+      // Use a write-only mount to trigger mode violation on read
+      const extWriteOnly = await makeExt({
+        mounts: { workspace: { path: testMount, mode: 'write' } },
+      });
+
+      try {
+        await extWriteOnly['read']!.fn({ path: '/workspace/test.txt' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(RuntimeError);
+        expect((error as RuntimeError).errorId).toBe('RILL-R004');
+        // Must NOT be masked as "file not found" - must surface the real mode error
+        expect((error as RuntimeError).message).not.toContain('file not found');
+        expect((error as RuntimeError).message).toContain('does not permit');
+      }
+    });
+
     it('throws RuntimeError when file exceeds size limit', async () => {
       const ext = await makeExt({
         mounts: { workspace: { path: testMount, mode: 'read-write' } },
@@ -378,6 +403,23 @@ describe('fs-local extension functions', () => {
       const result = await ext['remove']!.fn({ path: '/workspace/nonexistent.txt' });
       expect(result).toBe(false);
     });
+
+    it('rethrows mode violation RuntimeError (not swallowed as false)', async () => {
+      const ext = await makeExt({
+        mounts: { workspace: { path: testMount, mode: 'read' } },
+      });
+
+      await fs.writeFile(path.join(testMount, 'file.txt'), 'data', 'utf-8');
+
+      try {
+        await ext['remove']!.fn({ path: '/workspace/file.txt' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(RuntimeError);
+        expect((error as RuntimeError).errorId).toBe('RILL-R004');
+        expect((error as RuntimeError).message).toContain('does not permit');
+      }
+    });
   });
 
   // ============================================================
@@ -465,6 +507,36 @@ describe('fs-local extension functions', () => {
 
       const stats = await fs.stat(path.join(testMount, 'a', 'b', 'c'));
       expect(stats.isDirectory()).toBe(true);
+    });
+
+    it('throws RuntimeError when mount mode does not permit write', async () => {
+      const ext = await makeExt({
+        mounts: { workspace: { path: testMount, mode: 'read' } },
+      });
+
+      try {
+        await ext['mkdir']!.fn({ path: '/workspace/newdir' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(RuntimeError);
+        expect((error as RuntimeError).errorId).toBe('RILL-R004');
+        expect((error as RuntimeError).message).toContain('does not permit');
+      }
+    });
+
+    it('throws RuntimeError when path escapes mount boundary via traversal', async () => {
+      const ext = await makeExt({
+        mounts: { workspace: { path: testMount, mode: 'read-write' } },
+      });
+
+      try {
+        await ext['mkdir']!.fn({ path: '/workspace/../../escaped' });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(RuntimeError);
+        expect((error as RuntimeError).errorId).toBe('RILL-R004');
+        expect((error as RuntimeError).message).toContain('escapes mount boundary');
+      }
     });
   });
 
