@@ -1,6 +1,6 @@
 {
-  "name": "@rcrsr/rill-ext-exa",
-  "version": "0.18.1",
+  "name": "@rcrsr/rill-ext-search-exa",
+  "version": "0.18.2",
   "description": "rill extension for Exa search API integration",
   "license": "MIT",
   "author": "Andre Bremer",

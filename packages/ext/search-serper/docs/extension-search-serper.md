@@ -14,7 +14,7 @@ The host sets the API key and base URL at creation time — scripts never handle
 {
   "extensions": {
     "mounts": {
-      "serper": "@rcrsr/rill-ext-serper"
+      "serper": "@rcrsr/rill-ext-search-serper"
     },
     "config": {
       "serper": {

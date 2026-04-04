@@ -14,7 +14,7 @@ The host sets the API key and timeout at creation time. Scripts never handle cre
 {
   "extensions": {
     "mounts": {
-      "exa": "@rcrsr/rill-ext-exa"
+      "exa": "@rcrsr/rill-ext-search-exa"
     },
     "config": {
       "exa": {

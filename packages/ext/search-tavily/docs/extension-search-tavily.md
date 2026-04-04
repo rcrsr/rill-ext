@@ -12,7 +12,7 @@ Use this extension when your script needs search results optimized for AI pipeli
 {
   "extensions": {
     "mounts": {
-      "tavily": "@rcrsr/rill-ext-tavily"
+      "tavily": "@rcrsr/rill-ext-search-tavily"
     },
     "config": {
       "tavily": {
