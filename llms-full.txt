@@ -1,6 +1,6 @@
 # rill-ext
 
-> Vendor extensions for the rill language runtime. Extensions provide LLM, key-value storage, filesystem, vector database, MCP, and Claude Code capabilities to rill scripts. Extensions in the same category share identical function signatures, so scripts swap providers (e.g., Anthropic to OpenAI) by changing one line in `rill-config.json`.
+> Vendor extensions for the rill language runtime. Extensions provide LLM, key-value storage, filesystem, vector database, web search, MCP, and Claude Code capabilities to rill scripts. Extensions in the same category share identical function signatures, so scripts swap providers (e.g., Anthropic to OpenAI) by changing one line in `rill-config.json`.
 
 ## Loading Extensions
 
@@ -675,6 +675,150 @@ $ai.embed("scripting languages") => $query
 $db.search($query.vector, [limit: 5]) => $results
 ```
 
+## Search Extensions
+
+Five interchangeable packages for web search: `@rcrsr/rill-ext-brave`, `@rcrsr/rill-ext-exa`, `@rcrsr/rill-ext-searxng`, `@rcrsr/rill-ext-serper`, `@rcrsr/rill-ext-tavily`. All use native `fetch()` for HTTP requests. All return dicts (no streaming). All share the `search(query, options?)` function signature. Provider-specific functions provide additional capabilities.
+
+### Search config (API-key providers)
+
+Brave, Exa, Serper, and Tavily require an API key:
+
+```json
+{
+  "web": {
+    "apiKey": "${SEARCH_API_KEY}",
+    "baseUrl": "https://api.example.com",
+    "timeout": 30000
+  }
+}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `apiKey` | string | yes | Provider API key |
+| `baseUrl` | string | no | API base URL override |
+| `timeout` | number | no | Request timeout in ms (default: 30000) |
+
+### Search config (SearXNG)
+
+SearXNG requires a `baseUrl` instead of an API key. The factory probes `/config` at creation time to verify JSON format availability.
+
+```json
+{
+  "web": {
+    "baseUrl": "https://searxng.example.com",
+    "timeout": 30000
+  }
+}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `baseUrl` | string | yes | SearXNG instance URL |
+| `timeout` | number | no | Request timeout in ms (default: 30000) |
+
+### Search functions by provider
+
+| Function | Brave | Exa | SearXNG | Serper | Tavily |
+|----------|-------|-----|---------|--------|--------|
+| `search(query, options?)` | yes | yes | yes | yes | yes |
+| `news(query, options?)` | yes | — | — | yes | — |
+| `summarize(query, options?)` | yes | — | — | — | — |
+| `contents(urls, options?)` | — | yes | — | — | — |
+| `find_similar(url, options?)` | — | yes | — | — | — |
+| `answer(query, options?)` | — | yes | — | — | — |
+| `images(query, options?)` | — | — | — | yes | — |
+| `extract(urls, options?)` | — | — | — | — | yes |
+| `config()` | — | — | yes | — | — |
+
+### Search usage
+
+```rill
+use<ext:web> => $web
+
+# Basic web search (response shape varies by provider)
+$web.search("open source LLMs") => $result
+$result -> log
+
+# With per-call options
+$web.search("open source LLMs", [max_results: 5, include_answer: true]) => $result
+
+# Provider-specific functions
+$web.news("AI regulation") => $news_result
+$web.extract(["https://example.com"]) => $extract_result
+$web.answer("What is rill?") => $answer_result
+```
+
+### Brave-specific options
+
+`search` and `news` options: `count`, `offset`, `country`, `search_lang`, `freshness`, `safesearch`, `extra_snippets`, `goggles`.
+
+`summarize` options: `count`, `country`, `search_lang`, `safesearch`. The Brave Summarizer API is deprecated in favor of the Answers API.
+
+### Exa-specific options
+
+`search` options: `type` (neural/keyword), `num_results`, `include_text`, `include_highlights`, `include_summary`, `category`, `include_domains`, `exclude_domains`, `start_published_date`, `end_published_date`, `max_age_hours`.
+
+`contents` options: `include_text` (defaults true), `include_highlights`, `include_summary`.
+
+`find_similar` options: `num_results`, `exclude_source_domain`, `include_domains`, `exclude_domains`, `include_text`, `include_highlights`.
+
+`answer` options: `include_text`, `num_results`.
+
+### SearXNG-specific options
+
+`search` options: `categories`, `engines`, `language`, `pageno`, `safesearch`, `time_range` (`"day"`, `"month"`, or `"year"` only).
+
+### Serper-specific options
+
+`search` options: `num`, `page`, `gl`, `hl`, `tbs`, `autocorrect`, `safe`, `location`.
+
+`news` options: `num`, `tbs`, `gl`, `hl`.
+
+`images` options: `num`, `gl`, `hl`.
+
+### Tavily-specific options
+
+`search` options: `search_depth`, `max_results`, `topic`, `time_range`, `include_answer`, `include_raw_content`, `include_images`, `include_domains`, `exclude_domains`, `country`.
+
+`extract` options: `extract_depth`, `format`, `chunks_per_source`, `query`.
+
+### Search error messages
+
+Validation (before request):
+- `{provider}: query is required`
+- `{provider}: operation cancelled` (called after dispose)
+
+API errors:
+- `{provider}: rate limit exceeded`
+- `{provider}: authentication failed`
+- `{provider}: request timeout`
+
+SearXNG-specific:
+- `searxng: instance unreachable at {url}`
+- `searxng: JSON format is not enabled on {url}`
+- `searxng: time_range must be one of: day, month, year`
+- `searxng: connection failed`
+- `searxng: server error ({status})`
+
+Brave-specific:
+- `brave: summarizer key not found`
+- `brave: summarizer request failed`
+- `brave: access denied ({code})`
+
+### Search events
+
+Events use the provider name as prefix (`brave:`, `exa:`, `searxng:`, `serper:`, `tavily:`):
+
+| Event | Emitted when |
+|-------|-------------|
+| `{provider}:{operation}` | Operation completes (e.g., `brave:search`, `exa:answer`) |
+| `{provider}:error` | Any operation fails |
+
+Success events include: `duration` (ms), `query` (string), `result_count` (number).
+
+Error events include: `duration` (ms), `error` (string).
+
 ## MCP Extension
 
 Package: `@rcrsr/rill-ext-mcp`. Connects rill scripts to Model Context Protocol (MCP) servers. Supports stdio and HTTP transports. Auto-generates callable functions from server metadata.
@@ -920,5 +1064,10 @@ Per-call option: `timeout` (number) overrides `defaultTimeout` for that call.
 | `@rcrsr/rill-ext-qdrant` | Vector DB | `"vectors": "@rcrsr/rill-ext-qdrant"` |
 | `@rcrsr/rill-ext-pinecone` | Vector DB | `"vectors": "@rcrsr/rill-ext-pinecone"` |
 | `@rcrsr/rill-ext-chroma` | Vector DB | `"vectors": "@rcrsr/rill-ext-chroma"` |
+| `@rcrsr/rill-ext-brave` | Search | `"web": "@rcrsr/rill-ext-brave"` |
+| `@rcrsr/rill-ext-exa` | Search | `"web": "@rcrsr/rill-ext-exa"` |
+| `@rcrsr/rill-ext-searxng` | Search | `"web": "@rcrsr/rill-ext-searxng"` |
+| `@rcrsr/rill-ext-serper` | Search | `"web": "@rcrsr/rill-ext-serper"` |
+| `@rcrsr/rill-ext-tavily` | Search | `"web": "@rcrsr/rill-ext-tavily"` |
 | `@rcrsr/rill-ext-mcp` | Integration | `"fs": "@rcrsr/rill-ext-mcp"` |
 | `@rcrsr/rill-ext-claude-code` | Integration | `"claude_code": "@rcrsr/rill-ext-claude-code"` |

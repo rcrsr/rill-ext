@@ -1,0 +1,53 @@
+{
+  "name": "@rcrsr/rill-ext-exa",
+  "version": "0.18.1",
+  "description": "rill extension for Exa search API integration",
+  "license": "MIT",
+  "author": "Andre Bremer",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "rill",
+    "exa",
+    "search",
+    "web-search",
+    "extension",
+    "ai",
+    "scripting"
+  ],
+  "scripts": {
+    "build": "tsup && dts-bundle-generator --config dts-bundle-generator.config.cjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config ../../../eslint.config.js src/",
+    "check": "pnpm run build && pnpm run test && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@rcrsr/rill": "~0.18.0"
+  },
+  "devDependencies": {
+    "@rcrsr/rill": "~0.18.0",
+    "@rcrsr/rill-ext-param-shared": "workspace:^",
+    "@rcrsr/rill-ext-search-shared": "workspace:^",
+    "@types/node": "^25.3.0",
+    "dts-bundle-generator": "^9.5.1",
+    "tsup": "^8.5.1",
+    "undici-types": "^7.22.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git",
+    "directory": "packages/ext/search-exa"
+  },
+  "homepage": "https://github.com/rcrsr/rill-ext/tree/main/packages/ext/search-exa#readme",
+  "bugs": {
+    "url": "https://github.com/rcrsr/rill-ext/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

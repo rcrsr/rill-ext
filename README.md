@@ -36,6 +36,16 @@ Vendor extensions for [rill](https://github.com/rcrsr/rill). Each extension is a
 | [`rill-ext-pinecone`](packages/ext/vectordb-pinecone/docs/extension-vectordb-pinecone.md) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-pinecone)](https://www.npmjs.com/package/@rcrsr/rill-ext-pinecone) | Pinecone vector database |
 | [`rill-ext-chroma`](packages/ext/vectordb-chroma/docs/extension-vectordb-chroma.md) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-chroma)](https://www.npmjs.com/package/@rcrsr/rill-ext-chroma) | ChromaDB vector database |
 
+### Search
+
+| Package | npm | Description |
+|---------|-----|-------------|
+| [`rill-ext-brave`](packages/ext/search-brave/docs/extension-search-brave.md) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-brave)](https://www.npmjs.com/package/@rcrsr/rill-ext-brave) | Brave Search API |
+| [`rill-ext-exa`](packages/ext/search-exa/docs/extension-search-exa.md) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-exa)](https://www.npmjs.com/package/@rcrsr/rill-ext-exa) | Exa AI search API |
+| [`rill-ext-searxng`](packages/ext/search-searxng/docs/extension-search-searxng.md) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-searxng)](https://www.npmjs.com/package/@rcrsr/rill-ext-searxng) | SearXNG self-hosted meta-search |
+| [`rill-ext-serper`](packages/ext/search-serper/docs/extension-search-serper.md) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-serper)](https://www.npmjs.com/package/@rcrsr/rill-ext-serper) | Serper Google Search API |
+| [`rill-ext-tavily`](packages/ext/search-tavily/docs/extension-search-tavily.md) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-tavily)](https://www.npmjs.com/package/@rcrsr/rill-ext-tavily) | Tavily AI search API |
+
 ### Other Integrations
 
 | Package | npm | Description |
