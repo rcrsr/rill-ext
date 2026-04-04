@@ -7,7 +7,7 @@ Vendor extensions for [rill](https://github.com/rcrsr/rill). Each extension is a
 
 ## Extensions
 
-All packages are published under `@rcrsr/` on npm. Extensions in the same category share function signatures and are interchangeable.
+All packages are published under `@rcrsr/` on npm. Provider categories (**LLM**, **Key-Value**, **Filesystem**, **Vector DB**) share function signatures within their category and are interchangeable. **Standalone** and **Integrations** expose distinct host functions.
 
 | Category | Package | npm | Docs | Description |
 |----------|---------|-----|------|-------------|
