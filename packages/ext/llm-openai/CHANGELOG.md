@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.2] - 2026-04-04
+
+### Fixed
+
+- `tool_loop()` strips SDK-injected properties (`parsed`, `refusal`) from assistant messages
+  before sending them in the next API request
+
+### Added
+
+- Docs: OpenAI-compatible provider section covering Groq, Together AI, Fireworks AI
+
 ## [0.18.0] - 2026-04-02
 
 ### Breaking Changes
