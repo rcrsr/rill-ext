@@ -1,0 +1,132 @@
+# rill Vendor Extensions Index
+
+> Discovery index for rill vendor extensions in this repository. Each entry lists the npm package, a summary, and a relative path to full documentation. Extensions load via `rill-config.json` mounts.
+
+## How extensions load
+
+```json
+{
+  "extensions": {
+    "mounts": { "<namespace>": "<npm-package>" },
+    "config": { "<namespace>": { ... } }
+  }
+}
+```
+
+```rill
+use<ext:namespace> => $ext
+$ext.function_name(args)
+```
+
+Extensions in the same category share identical function signatures. Scripts swap providers by changing the mount package.
+
+## LLM (3 interchangeable packages, 6 shared functions)
+
+Single-prompt, multi-turn conversation, embeddings, tool loops, structured output.
+
+| Package | Provider | Docs |
+|---------|----------|------|
+| `@rcrsr/rill-ext-anthropic` | Claude and Anthropic-style APIs | [extension-llm-anthropic.md](packages/ext/llm-anthropic/docs/extension-llm-anthropic.md) |
+| `@rcrsr/rill-ext-openai` | GPT and OpenAI-style APIs | [extension-llm-openai.md](packages/ext/llm-openai/docs/extension-llm-openai.md) |
+| `@rcrsr/rill-ext-gemini` | Google Gemini | [extension-llm-gemini.md](packages/ext/llm-gemini/docs/extension-llm-gemini.md) |
+
+Functions: `message`, `messages`, `embed`, `embed_batch`, `tool_loop`, `generate`
+
+Note: Anthropic does not support embeddings. Use OpenAI or Gemini for `embed`/`embed_batch`.
+
+## Key-Value Store (3 interchangeable packages, 11 shared functions)
+
+Persistent key-value storage with optional schema validation and named mounts.
+
+| Package | Backend | Docs |
+|---------|---------|------|
+| `@rcrsr/rill-ext-kv-file` | JSON files (zero dependencies) | [extension-kv-file.md](packages/ext/kv-file/docs/extension-kv-file.md) |
+| `@rcrsr/rill-ext-kv-sqlite` | SQLite (single-server persistence) | [extension-kv-sqlite.md](packages/ext/kv-sqlite/docs/extension-kv-sqlite.md) |
+| `@rcrsr/rill-ext-kv-redis` | Redis (distributed, TTL support) | [extension-kv-redis.md](packages/ext/kv-redis/docs/extension-kv-redis.md) |
+
+Functions: `get`, `get_or`, `set`, `merge`, `delete`, `keys`, `has`, `clear`, `getAll`, `schema`, `mounts`
+
+## Filesystem (2 interchangeable packages, 12 shared functions)
+
+File operations with mount-based sandboxing.
+
+| Package | Backend | Docs |
+|---------|---------|------|
+| `@rcrsr/rill-ext-fs-local` | Local filesystem (node:fs) | [extension-fs-local.md](packages/ext/fs-local/docs/extension-fs-local.md) |
+| `@rcrsr/rill-ext-fs-s3` | S3-compatible services (AWS S3, R2, MinIO) | [extension-fs-s3.md](packages/ext/fs-s3/docs/extension-fs-s3.md) |
+
+Functions: `read`, `write`, `append`, `list`, `find`, `exists`, `remove`, `stat`, `mkdir`, `copy`, `move`, `mounts`
+
+## Vector Database (3 interchangeable packages, 11 shared functions)
+
+Vector storage and similarity search for embeddings.
+
+| Package | Backend | Docs |
+|---------|---------|------|
+| `@rcrsr/rill-ext-qdrant` | Qdrant | [extension-vectordb-qdrant.md](packages/ext/vectordb-qdrant/docs/extension-vectordb-qdrant.md) |
+| `@rcrsr/rill-ext-pinecone` | Pinecone | [extension-vectordb-pinecone.md](packages/ext/vectordb-pinecone/docs/extension-vectordb-pinecone.md) |
+| `@rcrsr/rill-ext-chroma` | ChromaDB | [extension-vectordb-chroma.md](packages/ext/vectordb-chroma/docs/extension-vectordb-chroma.md) |
+
+Functions: `upsert`, `upsert_batch`, `search`, `get`, `delete`, `delete_batch`, `count`, `create_collection`, `delete_collection`, `list_collections`, `describe`
+
+## Web Search (5 packages)
+
+Web search with provider-specific capabilities. All packages share `search`. Additional functions vary by provider.
+
+| Package | Provider | Functions | Docs |
+|---------|----------|-----------|------|
+| `@rcrsr/rill-ext-brave` | Brave Search API | `search`, `news`, `summarize` | [extension-search-brave.md](packages/ext/search-brave/docs/extension-search-brave.md) |
+| `@rcrsr/rill-ext-exa` | Exa AI search | `search`, `contents`, `find_similar`, `answer` | [extension-search-exa.md](packages/ext/search-exa/docs/extension-search-exa.md) |
+| `@rcrsr/rill-ext-searxng` | SearXNG (self-hosted) | `search`, `config` | [extension-search-searxng.md](packages/ext/search-searxng/docs/extension-search-searxng.md) |
+| `@rcrsr/rill-ext-serper` | Serper (Google Search) | `search`, `news`, `images` | [extension-search-serper.md](packages/ext/search-serper/docs/extension-search-serper.md) |
+| `@rcrsr/rill-ext-tavily` | Tavily AI search | `search`, `extract` | [extension-search-tavily.md](packages/ext/search-tavily/docs/extension-search-tavily.md) |
+
+## MCP — Model Context Protocol (1 package)
+
+Connects rill scripts to MCP servers via stdio or HTTP transport. Auto-generates callable functions from server metadata. MCP tools pass directly to LLM `tool_loop`.
+
+| Package | Transport | Docs |
+|---------|-----------|------|
+| `@rcrsr/rill-ext-mcp` | stdio, HTTP | [extension-mcp.md](packages/ext/mcp/docs/extension-mcp.md) |
+
+Returns three capability dicts: `.tools`, `.resources`, `.prompts`
+
+## Claude Code (1 package, 3 functions)
+
+Spawns the Claude Code CLI as a subprocess. Requires `claude` binary in `$PATH`.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-claude-code` | [extension-claude-code.md](packages/ext/claude-code/docs/extension-claude-code.md) |
+
+Functions: `prompt`, `skill`, `command`
+
+## Crypto (1 package, 4 functions)
+
+Hashing, HMAC, UUID generation, and random bytes via node:crypto.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-crypto` | [extension-crypto.md](packages/ext/crypto/docs/extension-crypto.md) |
+
+Functions: `hash`, `hmac`, `uuid`, `random`
+
+## Exec (1 package, dynamic functions)
+
+Sandboxed command execution with allowlist/blocklist. Generates one callable per allowed command.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-exec` | [extension-exec.md](packages/ext/exec/docs/extension-exec.md) |
+
+Functions: per-command callables (e.g. `git()`, `curl()`), `commands`
+
+## Fetch (1 package, dynamic functions)
+
+HTTP client with pre-defined endpoints, automatic retries, and concurrency limits.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-fetch` | [extension-fetch.md](packages/ext/fetch/docs/extension-fetch.md) |
+
+Functions: per-endpoint callables (auto-generated from config), `endpoints`

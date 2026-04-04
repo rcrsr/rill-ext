@@ -1,0 +1,51 @@
+{
+  "name": "@rcrsr/rill-ext-fetch",
+  "version": "0.18.1",
+  "description": "rill extension for HTTP fetch with configurable endpoints",
+  "license": "MIT",
+  "author": "Andre Bremer",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "rill",
+    "fetch",
+    "http",
+    "rest",
+    "api",
+    "extension",
+    "scripting"
+  ],
+  "scripts": {
+    "build": "tsup && dts-bundle-generator --config dts-bundle-generator.config.cjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config ../../../eslint.config.js src/",
+    "check": "pnpm run build && pnpm run test && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@rcrsr/rill": "~0.18.0"
+  },
+  "devDependencies": {
+    "@rcrsr/rill": "~0.18.0",
+    "@types/node": "^25.3.0",
+    "dts-bundle-generator": "^9.5.1",
+    "tsup": "^8.5.1",
+    "undici-types": "^7.22.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git",
+    "directory": "packages/ext/fetch"
+  },
+  "homepage": "https://github.com/rcrsr/rill-ext/tree/main/packages/ext/fetch#readme",
+  "bugs": {
+    "url": "https://github.com/rcrsr/rill-ext/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
