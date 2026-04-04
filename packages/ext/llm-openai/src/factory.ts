@@ -938,13 +938,18 @@ export function createOpenAIExtension(
               return null;
             }
 
-            const msg = (choice as { message: Record<string, unknown> }).message;
+            const msg = (choice as { message: unknown }).message;
+            if (!msg || typeof msg !== 'object') {
+              return null;
+            }
+
+            const m = msg as Record<string, unknown>;
             const clean: Record<string, unknown> = {
-              role: msg['role'],
-              content: msg['content'],
+              role: m['role'],
+              content: m['content'],
             };
-            if (msg['tool_calls']) {
-              clean['tool_calls'] = msg['tool_calls'];
+            if (m['tool_calls']) {
+              clean['tool_calls'] = m['tool_calls'];
             }
             return clean;
           },
