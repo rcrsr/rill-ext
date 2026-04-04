@@ -19,9 +19,15 @@ rill-ext is a pnpm workspace containing vendor extensions for the rill language 
 | `packages/ext/vectordb-chroma` | `@rcrsr/rill-ext-chroma` | chromadb |
 | `packages/ext/vectordb-pinecone` | `@rcrsr/rill-ext-pinecone` | @pinecone-database/pinecone |
 | `packages/ext/vectordb-qdrant` | `@rcrsr/rill-ext-qdrant` | @qdrant/js-client-rest |
+| `packages/ext/search-brave` | `@rcrsr/rill-ext-brave` | fetch (native) |
+| `packages/ext/search-exa` | `@rcrsr/rill-ext-exa` | fetch (native) |
+| `packages/ext/search-searxng` | `@rcrsr/rill-ext-searxng` | fetch (native) |
+| `packages/ext/search-serper` | `@rcrsr/rill-ext-serper` | fetch (native) |
+| `packages/ext/search-tavily` | `@rcrsr/rill-ext-tavily` | fetch (native) |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
 | `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` (private) | -- |
 | `packages/shared/ext-param` | `@rcrsr/rill-ext-param-shared` (private) | -- |
+| `packages/shared/ext-search` | `@rcrsr/rill-ext-search-shared` (private) | -- |
 
 ## Commands
 
@@ -97,6 +103,7 @@ Shared packages (`packages/shared/`) are **bundled into** the consuming extensio
 - **ext-llm-shared**: Validation (`validateApiKey`, `validateModel`, `validateTemperature`), error mapping (`mapProviderError`), JSON Schema building (`buildJsonSchema`), and tool loop orchestration (`executeToolLoop`). All 3 LLM extensions depend on this.
 - **ext-vector-shared**: Error mapping, event emission, batch execution, disposal state, distance normalization, and function wrappers. All 3 vector DB extensions depend on this.
 - **ext-param-shared**: Parameter construction helpers (`p.*`) for building `RillParam` objects. All extensions that declare typed host function parameters depend on this.
+- **ext-search-shared**: Validation (`assertRequired`, `validateBaseUrl`), error mapping (`mapSearchError`, `mapProviderSearchError`), event emission, function wrapper (`createSearchFunctionWrapper`), disposal and in-flight request tracking. All 5 search extensions depend on this.
 
 ### LLM Extension Call Flow
 
@@ -107,6 +114,13 @@ Shared packages (`packages/shared/`) are **bundled into** the consuming extensio
    - Delegates to shared `executeToolLoop()` which handles the loop, tool dispatch via `invokeCallable()`, error tracking, and token aggregation
    - `buildJsonSchema()` converts rill callable parameter metadata to JSON Schema for the provider API
 4. `embed()` / `embed_batch()` — text embedding via provider embedding API
+
+### Search Extension Call Flow
+
+1. Factory creates disposal state, in-flight tracking, and wrapped host functions via `createSearchFunctionWrapper`
+2. Host functions build HTTP requests via native `fetch()` with `AbortSignal.timeout()`
+3. Responses map to rill-compatible dicts; errors map through `mapSearchError`/`mapProviderSearchError`
+4. `dispose()` calls `abortAll()` on in-flight requests, then sets disposal flag
 
 ### Tool Loop Tools Format
 
