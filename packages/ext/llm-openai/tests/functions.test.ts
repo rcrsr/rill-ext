@@ -1748,6 +1748,85 @@ describe('tool_loop() function', () => {
       expect(result['usage']).toEqual({ input: 30, output: 15 });
       expect(mockToolFn).toHaveBeenCalledWith({ location: 'NYC' }, ctx);
     });
+
+    it('strips SDK-injected properties from assistant messages before next request', async () => {
+      // First call: response includes SDK-injected `parsed` and `refusal` fields
+      const runner1 = createMockToolLoopRunner(
+        [],
+        {
+          id: 'chatcmpl-test1',
+          object: 'chat.completion' as const,
+          created: 1234567890,
+          model: 'gpt-4-turbo',
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: 'assistant' as const,
+                content: null,
+                parsed: { extracted: true },
+                refusal: null,
+                tool_calls: [
+                  {
+                    id: 'call_1',
+                    type: 'function' as const,
+                    function: {
+                      name: 'get_weather',
+                      arguments: '{"location":"NYC"}',
+                    },
+                  },
+                ],
+              },
+              finish_reason: 'tool_calls' as const,
+            },
+          ],
+          usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        }
+      );
+
+      // Second call: final response
+      const runner2 = createMockToolLoopRunner(
+        [],
+        createMockFinalCompletion('The weather is sunny')
+      );
+
+      mockStream
+        .mockReturnValueOnce(runner1)
+        .mockReturnValueOnce(runner2);
+
+      const config: OpenAIExtensionConfig = {
+        api_key: 'test-key',
+        model: 'gpt-4-turbo',
+      };
+
+      const ext = createOpenAIExtension(config);
+      const ctx = createRuntimeContext();
+
+      const tools = {
+        get_weather: makeTool(vi.fn().mockResolvedValue('Sunny, 72°F'), {
+          description: 'Get weather',
+          params: [{ name: 'location', type: 'string', description: 'City name' }],
+        }),
+      };
+
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'What is the weather?', tools, options: {} },
+        ctx
+      );
+      await resolveStream(stream);
+
+      // Inspect the messages sent in the second API call
+      const secondCallArgs = mockStream.mock.calls[1]![0];
+      const assistantMsg = secondCallArgs.messages.find(
+        (m: Record<string, unknown>) => m['role'] === 'assistant'
+      );
+
+      expect(assistantMsg).toBeDefined();
+      expect(assistantMsg).not.toHaveProperty('parsed');
+      expect(assistantMsg).not.toHaveProperty('refusal');
+      expect(assistantMsg).toHaveProperty('role', 'assistant');
+      expect(assistantMsg).toHaveProperty('tool_calls');
+    });
   });
 
   describe('error cases', () => {

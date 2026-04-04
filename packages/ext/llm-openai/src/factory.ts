@@ -938,7 +938,20 @@ export function createOpenAIExtension(
               return null;
             }
 
-            return (choice as { message: unknown }).message;
+            const msg = (choice as { message: unknown }).message;
+            if (!msg || typeof msg !== 'object') {
+              return null;
+            }
+
+            const m = msg as Record<string, unknown>;
+            const clean: Record<string, unknown> = {
+              role: m['role'],
+              content: m['content'],
+            };
+            if (m['tool_calls']) {
+              clean['tool_calls'] = m['tool_calls'];
+            }
+            return clean;
           },
 
           // Format tool results into OpenAI message format
