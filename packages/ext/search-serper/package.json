@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-serper",
-  "version": "0.18.1",
+  "version": "0.18.2",
   "description": "rill extension for Serper search API integration",
   "license": "MIT",
   "author": "Andre Bremer",

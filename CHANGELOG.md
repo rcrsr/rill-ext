@@ -5,11 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.18.2] - 2026-04-04
 
 ### Added
 
-- Five web search extensions: Exa, Serper, Brave, Tavily, SearXNG with shared validation, disposal, and error mapping
+- Five web search extensions with shared validation, disposal, and error mapping via ext-search-shared:
+  `rill-ext-brave`, `rill-ext-exa`, `rill-ext-searxng`, `rill-ext-serper`, `rill-ext-tavily`
+- Five standalone extensions using Node.js built-ins (zero external dependencies):
+  `rill-ext-crypto`, `rill-ext-exec`, `rill-ext-fetch`, `rill-ext-fs-local`, `rill-ext-kv-file`
+- `llms.txt` discovery index for all 21 extensions in this repository
+- OpenAI docs: compatible provider section covering Groq, Together AI, Fireworks AI
+
+### Fixed
+
+- `rill-ext-openai` tool loop now strips SDK-injected properties (`parsed`, `refusal`) from
+  assistant messages before sending them in the next API request
+- `rill-ext-fetch` signal handling: `executeRequest()` combines timeout and external signals
+  via `AbortSignal.any()` so dispose cancellation reaches in-flight requests
+- `rill-ext-fetch` removed dead config options (`responseFormat`, `body` encoding) that were
+  declared in types but never implemented
+- `rill-ext-fetch` global `responseShape` config now propagates through `mapEndpointConfig()`
+- `rill-ext-fs-local` `mkdir()` uses ancestor realpath resolution to prevent symlink escapes
+- `rill-ext-fs-local` `read()` and `remove()` rethrow sandbox violations instead of masking
+  them as "file not found" or returning false
+- `rill-ext-fs-local` docs updated to reflect actual `RILL-R004` error code (removed phantom
+  RILL-R017..R021)
+- `rill-ext-exec` `stdin` parameter `defaultValue` changed from `''` to `undefined` to avoid
+  false "stdin not allowed" validation
+- `rill-ext-crypto` `random()` validates bytes parameter (rejects negative, non-integer, >1MB)
 
 ## [0.18.1] - 2026-04-03
 
