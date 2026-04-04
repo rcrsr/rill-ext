@@ -24,6 +24,11 @@ rill-ext is a pnpm workspace containing vendor extensions for the rill language 
 | `packages/ext/search-searxng` | `@rcrsr/rill-ext-searxng` | fetch (native) |
 | `packages/ext/search-serper` | `@rcrsr/rill-ext-serper` | fetch (native) |
 | `packages/ext/search-tavily` | `@rcrsr/rill-ext-tavily` | fetch (native) |
+| `packages/ext/crypto` | `@rcrsr/rill-ext-crypto` | node:crypto (built-in) |
+| `packages/ext/exec` | `@rcrsr/rill-ext-exec` | node:child_process (built-in) |
+| `packages/ext/fetch` | `@rcrsr/rill-ext-fetch` | fetch (native) |
+| `packages/ext/fs-local` | `@rcrsr/rill-ext-fs-local` | node:fs (built-in) |
+| `packages/ext/kv-file` | `@rcrsr/rill-ext-kv-file` | node:fs (built-in) |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
 | `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` (private) | -- |
 | `packages/shared/ext-param` | `@rcrsr/rill-ext-param-shared` (private) | -- |
