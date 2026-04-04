@@ -12,7 +12,7 @@ Use SearXNG when your deployment requires on-premise search, privacy, or zero ex
 {
   "extensions": {
     "mounts": {
-      "searxng": "@rcrsr/rill-ext-searxng"
+      "searxng": "@rcrsr/rill-ext-search-searxng"
     },
     "config": {
       "searxng": {

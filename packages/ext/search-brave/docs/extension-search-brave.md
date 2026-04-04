@@ -12,7 +12,7 @@ Use this extension when your script needs real-time web results, news headlines,
 {
   "extensions": {
     "mounts": {
-      "brave": "@rcrsr/rill-ext-brave"
+      "brave": "@rcrsr/rill-ext-search-brave"
     },
     "config": {
       "brave": {

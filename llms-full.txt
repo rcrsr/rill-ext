@@ -677,7 +677,7 @@ $db.search($query.vector, [limit: 5]) => $results
 
 ## Search Extensions
 
-Five interchangeable packages for web search: `@rcrsr/rill-ext-brave`, `@rcrsr/rill-ext-exa`, `@rcrsr/rill-ext-searxng`, `@rcrsr/rill-ext-serper`, `@rcrsr/rill-ext-tavily`. All use native `fetch()` for HTTP requests. All return dicts (no streaming). All share the `search(query, options?)` function signature. Provider-specific functions provide additional capabilities.
+Five interchangeable packages for web search: `@rcrsr/rill-ext-search-brave`, `@rcrsr/rill-ext-search-exa`, `@rcrsr/rill-ext-search-searxng`, `@rcrsr/rill-ext-search-serper`, `@rcrsr/rill-ext-search-tavily`. All use native `fetch()` for HTTP requests. All return dicts (no streaming). All share the `search(query, options?)` function signature. Provider-specific functions provide additional capabilities.
 
 ### Search config (API-key providers)
 
@@ -1064,10 +1064,10 @@ Per-call option: `timeout` (number) overrides `defaultTimeout` for that call.
 | `@rcrsr/rill-ext-qdrant` | Vector DB | `"vectors": "@rcrsr/rill-ext-qdrant"` |
 | `@rcrsr/rill-ext-pinecone` | Vector DB | `"vectors": "@rcrsr/rill-ext-pinecone"` |
 | `@rcrsr/rill-ext-chroma` | Vector DB | `"vectors": "@rcrsr/rill-ext-chroma"` |
-| `@rcrsr/rill-ext-brave` | Search | `"web": "@rcrsr/rill-ext-brave"` |
-| `@rcrsr/rill-ext-exa` | Search | `"web": "@rcrsr/rill-ext-exa"` |
-| `@rcrsr/rill-ext-searxng` | Search | `"web": "@rcrsr/rill-ext-searxng"` |
-| `@rcrsr/rill-ext-serper` | Search | `"web": "@rcrsr/rill-ext-serper"` |
-| `@rcrsr/rill-ext-tavily` | Search | `"web": "@rcrsr/rill-ext-tavily"` |
+| `@rcrsr/rill-ext-search-brave` | Search | `"web": "@rcrsr/rill-ext-search-brave"` |
+| `@rcrsr/rill-ext-search-exa` | Search | `"web": "@rcrsr/rill-ext-search-exa"` |
+| `@rcrsr/rill-ext-search-searxng` | Search | `"web": "@rcrsr/rill-ext-search-searxng"` |
+| `@rcrsr/rill-ext-search-serper` | Search | `"web": "@rcrsr/rill-ext-search-serper"` |
+| `@rcrsr/rill-ext-search-tavily` | Search | `"web": "@rcrsr/rill-ext-search-tavily"` |
 | `@rcrsr/rill-ext-mcp` | Integration | `"fs": "@rcrsr/rill-ext-mcp"` |
 | `@rcrsr/rill-ext-claude-code` | Integration | `"claude_code": "@rcrsr/rill-ext-claude-code"` |

@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Five web search extensions with shared validation, disposal, and error mapping via ext-search-shared:
-  `rill-ext-brave`, `rill-ext-exa`, `rill-ext-searxng`, `rill-ext-serper`, `rill-ext-tavily`
+  `rill-ext-search-brave`, `rill-ext-search-exa`, `rill-ext-search-searxng`, `rill-ext-search-serper`, `rill-ext-search-tavily`
 - Five standalone extensions using Node.js built-ins (zero external dependencies):
   `rill-ext-crypto`, `rill-ext-exec`, `rill-ext-fetch`, `rill-ext-fs-local`, `rill-ext-kv-file`
 - `llms.txt` discovery index for all 21 extensions in this repository

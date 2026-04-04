@@ -1,5 +1,5 @@
 {
-  "name": "@rcrsr/rill-ext-exa",
+  "name": "@rcrsr/rill-ext-search-exa",
   "version": "0.18.2",
   "description": "rill extension for Exa search API integration",
   "license": "MIT",

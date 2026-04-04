@@ -1,5 +1,5 @@
 {
-  "name": "@rcrsr/rill-ext-brave",
+  "name": "@rcrsr/rill-ext-search-brave",
   "version": "0.18.2",
   "description": "rill extension for Brave search API integration",
   "license": "MIT",

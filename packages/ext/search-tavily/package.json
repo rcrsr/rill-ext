@@ -1,5 +1,5 @@
 {
-  "name": "@rcrsr/rill-ext-tavily",
+  "name": "@rcrsr/rill-ext-search-tavily",
   "version": "0.18.2",
   "description": "rill extension for Tavily search API integration",
   "license": "MIT",

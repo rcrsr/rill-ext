@@ -19,11 +19,11 @@ rill-ext is a pnpm workspace containing vendor extensions for the rill language 
 | `packages/ext/vectordb-chroma` | `@rcrsr/rill-ext-chroma` | chromadb |
 | `packages/ext/vectordb-pinecone` | `@rcrsr/rill-ext-pinecone` | @pinecone-database/pinecone |
 | `packages/ext/vectordb-qdrant` | `@rcrsr/rill-ext-qdrant` | @qdrant/js-client-rest |
-| `packages/ext/search-brave` | `@rcrsr/rill-ext-brave` | fetch (native) |
-| `packages/ext/search-exa` | `@rcrsr/rill-ext-exa` | fetch (native) |
-| `packages/ext/search-searxng` | `@rcrsr/rill-ext-searxng` | fetch (native) |
-| `packages/ext/search-serper` | `@rcrsr/rill-ext-serper` | fetch (native) |
-| `packages/ext/search-tavily` | `@rcrsr/rill-ext-tavily` | fetch (native) |
+| `packages/ext/search-brave` | `@rcrsr/rill-ext-search-brave` | fetch (native) |
+| `packages/ext/search-exa` | `@rcrsr/rill-ext-search-exa` | fetch (native) |
+| `packages/ext/search-searxng` | `@rcrsr/rill-ext-search-searxng` | fetch (native) |
+| `packages/ext/search-serper` | `@rcrsr/rill-ext-search-serper` | fetch (native) |
+| `packages/ext/search-tavily` | `@rcrsr/rill-ext-search-tavily` | fetch (native) |
 | `packages/ext/crypto` | `@rcrsr/rill-ext-crypto` | node:crypto (built-in) |
 | `packages/ext/exec` | `@rcrsr/rill-ext-exec` | node:child_process (built-in) |
 | `packages/ext/fetch` | `@rcrsr/rill-ext-fetch` | fetch (native) |

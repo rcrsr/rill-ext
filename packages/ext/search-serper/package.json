@@ -1,5 +1,5 @@
 {
-  "name": "@rcrsr/rill-ext-serper",
+  "name": "@rcrsr/rill-ext-search-serper",
   "version": "0.18.2",
   "description": "rill extension for Serper search API integration",
   "license": "MIT",

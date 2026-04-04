@@ -75,11 +75,11 @@ Web search with provider-specific capabilities. All packages share `search`. Add
 
 | Package | Provider | Functions | Docs |
 |---------|----------|-----------|------|
-| `@rcrsr/rill-ext-brave` | Brave Search API | `search`, `news`, `summarize` | [extension-search-brave.md](packages/ext/search-brave/docs/extension-search-brave.md) |
-| `@rcrsr/rill-ext-exa` | Exa AI search | `search`, `contents`, `find_similar`, `answer` | [extension-search-exa.md](packages/ext/search-exa/docs/extension-search-exa.md) |
-| `@rcrsr/rill-ext-searxng` | SearXNG (self-hosted) | `search`, `config` | [extension-search-searxng.md](packages/ext/search-searxng/docs/extension-search-searxng.md) |
-| `@rcrsr/rill-ext-serper` | Serper (Google Search) | `search`, `news`, `images` | [extension-search-serper.md](packages/ext/search-serper/docs/extension-search-serper.md) |
-| `@rcrsr/rill-ext-tavily` | Tavily AI search | `search`, `extract` | [extension-search-tavily.md](packages/ext/search-tavily/docs/extension-search-tavily.md) |
+| `@rcrsr/rill-ext-search-brave` | Brave Search API | `search`, `news`, `summarize` | [extension-search-brave.md](packages/ext/search-brave/docs/extension-search-brave.md) |
+| `@rcrsr/rill-ext-search-exa` | Exa AI search | `search`, `contents`, `find_similar`, `answer` | [extension-search-exa.md](packages/ext/search-exa/docs/extension-search-exa.md) |
+| `@rcrsr/rill-ext-search-searxng` | SearXNG (self-hosted) | `search`, `config` | [extension-search-searxng.md](packages/ext/search-searxng/docs/extension-search-searxng.md) |
+| `@rcrsr/rill-ext-search-serper` | Serper (Google Search) | `search`, `news`, `images` | [extension-search-serper.md](packages/ext/search-serper/docs/extension-search-serper.md) |
+| `@rcrsr/rill-ext-search-tavily` | Tavily AI search | `search`, `extract` | [extension-search-tavily.md](packages/ext/search-tavily/docs/extension-search-tavily.md) |
 
 ## MCP — Model Context Protocol (1 package)
 
