@@ -736,9 +736,9 @@ SearXNG requires a `baseUrl` instead of an API key. The factory probes `/config`
 ```rill
 use<ext:web> => $web
 
-# Basic web search
+# Basic web search (response shape varies by provider)
 $web.search("open source LLMs") => $result
-$result.results -> log
+$result -> log
 
 # With per-call options
 $web.search("open source LLMs", [max_results: 5, include_answer: true]) => $result

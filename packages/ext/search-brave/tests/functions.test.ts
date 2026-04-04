@@ -117,10 +117,15 @@ describe('Brave extension host functions', () => {
       const ext = createBraveExtension(VALID_CONFIG);
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'search').fn({ query: 'TypeScript tutorials' }, ctx);
+      const result = (await getCallable(ext, 'search').fn(
+        { query: 'TypeScript tutorials' },
+        ctx
+      )) as Record<string, unknown>;
 
-      // Verify it completes without error with 2 results in web.results
-      expect(true).toBe(true);
+      const web = result['web'] as { results?: unknown[] } | undefined;
+      expect(web).toBeDefined();
+      expect(Array.isArray(web?.results)).toBe(true);
+      expect(web?.results).toHaveLength(2);
     });
 
     it('sends GET to /res/v1/web/search with q param', async () => {

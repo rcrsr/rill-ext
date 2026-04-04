@@ -259,7 +259,7 @@ async function probeConfig(baseUrl: string, timeout: number): Promise<void> {
       method: 'GET',
       signal,
     });
-  } catch (_err: unknown) {
+  } catch {
     // EC-16: Instance unreachable
     throw new RuntimeError(
       'RILL-R004',
@@ -277,7 +277,7 @@ async function probeConfig(baseUrl: string, timeout: number): Promise<void> {
   let data: unknown;
   try {
     data = await response.json();
-  } catch (_err: unknown) {
+  } catch {
     // EC-15: Non-JSON or no formats field
     throw new RuntimeError(
       'RILL-R004',
