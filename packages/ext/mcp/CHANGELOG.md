@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.4] - 2026-04-05
+
+### Changed
+
+- `@modelcontextprotocol/sdk` updated from ^1.27.1 to ^1.29.0
+- Mock test server updated to use Zod schemas (SDK 1.29.0 requirement)
+
 ## [0.18.1] - 2026-04-03
 
 ### Fixed

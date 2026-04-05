@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-mcp",
-  "version": "0.18.1",
+  "version": "0.18.4",
   "description": "rill extension for Model Context Protocol (MCP) integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -24,15 +24,16 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.18.0"
+    "@rcrsr/rill": "~0.18.4"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.18.0",
+    "@rcrsr/rill": "~0.18.4",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
-    "@types/node": "^25.3.0",
+    "@types/node": "^25.5.2",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
-    "undici-types": "^7.22.0"
+    "undici-types": "^8.0.2",
+    "zod": "^4.3.6"
   },
   "files": [
     "dist"
@@ -50,6 +51,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }

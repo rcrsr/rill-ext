@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Monorepo Structure
 
-rill-ext is a pnpm workspace containing vendor extensions for the rill language runtime.
+rill-ext is a pnpm workspace containing official extensions for the rill language runtime.
 
 | Package | NPM Name | Vendor SDK |
 |---------|----------|------------|

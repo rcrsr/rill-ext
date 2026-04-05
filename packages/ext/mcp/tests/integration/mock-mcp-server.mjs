@@ -10,6 +10,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
 
 // ============================================================
 // CREATE SERVER
@@ -38,7 +39,6 @@ server.registerTool(
   'get_status',
   {
     description: 'Get server status as JSON',
-    inputSchema: { type: 'object', properties: {} },
   },
   async () => {
     return {
@@ -58,11 +58,7 @@ server.registerTool(
   {
     description: 'Echo back a message',
     inputSchema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string' },
-      },
-      required: ['message'],
+      message: z.string(),
     },
   },
   async (args) => {
@@ -82,7 +78,6 @@ server.registerTool(
   'get_image',
   {
     description: 'Get a test image',
-    inputSchema: { type: 'object', properties: {} },
   },
   async () => {
     // Return base64-encoded 1x1 PNG
@@ -104,12 +99,8 @@ server.registerTool(
   {
     description: 'Add two numbers',
     inputSchema: {
-      type: 'object',
-      properties: {
-        a: { type: 'number' },
-        b: { type: 'number' },
-      },
-      required: ['a', 'b'],
+      a: z.number(),
+      b: z.number(),
     },
   },
   async (args) => {

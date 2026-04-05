@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.18.4] - 2026-04-05
+
+### Changed
+
+- All vendor SDK dependencies updated to latest versions
+- TypeScript upgraded from 5.9.3 to 6.0.2
+- `tsconfig.base.json` adds `"types": ["node"]` for TypeScript 6 compatibility
+- All 22 `tsconfig.build.json` files refactored to extend `tsconfig.base.json`
+- Dev toolchain updated: vitest 4.1.2, eslint 10.2.0, @typescript-eslint 8.58.0
 
 ## [0.18.3] - 2026-04-05
 

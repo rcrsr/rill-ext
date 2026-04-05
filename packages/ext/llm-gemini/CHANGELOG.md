@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.18.4] - 2026-04-05
+
+### Changed
+
+- `@google/genai` updated from ^1.42.0 to ^1.48.0
+
 ## [0.18.3] - 2026-04-05
 
 ### Breaking Changes

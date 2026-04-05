@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-search-shared",
   "private": true,
-  "version": "0.18.1",
+  "version": "0.18.4",
   "description": "Shared utilities for rill search extensions",
   "license": "MIT",
   "type": "module",
@@ -18,10 +18,11 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.18.0"
+    "@rcrsr/rill": "~0.18.4"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.18.0"
+    "@rcrsr/rill": "~0.18.4",
+    "@types/node": "^25.5.2"
   },
   "repository": {
     "type": "git",

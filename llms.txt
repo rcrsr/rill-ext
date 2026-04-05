@@ -1,6 +1,6 @@
-# rill Vendor Extensions Index
+# rill Official Extensions Index
 
-> Discovery index for rill vendor extensions in this repository. Each entry lists the npm package, a summary, and a relative path to full documentation. Extensions load via `rill-config.json` mounts.
+> Discovery index for rill official extensions in this repository. Each entry lists the npm package, a summary, and a relative path to full documentation. Extensions load via `rill-config.json` mounts.
 
 ## How extensions load
 

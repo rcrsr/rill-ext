@@ -1,6 +1,6 @@
 # rill-ext
 
-> Vendor extensions for the rill language runtime. Extensions provide LLM, key-value storage, filesystem, vector database, web search, MCP, and Claude Code capabilities to rill scripts. Extensions in the same category share identical function signatures, so scripts swap providers (e.g., Anthropic to OpenAI) by changing one line in `rill-config.json`.
+> Official extensions for the rill language runtime. Extensions provide LLM, key-value storage, filesystem, vector database, web search, MCP, and Claude Code capabilities to rill scripts. Extensions in the same category share identical function signatures, so scripts swap providers (e.g., Anthropic to OpenAI) by changing one line in `rill-config.json`.
 
 ## Loading Extensions
 
