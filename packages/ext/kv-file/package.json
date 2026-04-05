@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-kv-file",
-  "version": "0.18.2",
+  "version": "0.18.3",
   "description": "rill extension for file-based JSON key-value storage",
   "license": "MIT",
   "author": "Andre Bremer",

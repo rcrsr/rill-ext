@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.18.3] - 2026-04-05
+
+- Import `FsExtensionContract` from `@rcrsr/rill-ext-fs-shared` instead of `@rcrsr/rill`
+
 ## [0.18.1] - 2026-04-03
 
 ### Fixed

@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-fs-shared",
   "private": true,
-  "version": "0.18.2",
+  "version": "0.18.3",
   "description": "Shared utilities for rill filesystem extensions",
   "license": "MIT",
   "type": "module",
