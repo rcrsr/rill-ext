@@ -2,7 +2,7 @@ import type { ApplicationCallable } from '@rcrsr/rill';
 
 /**
  * Contract type for kv extension implementations.
- * Enforces exact function structure for compile-time verification.
+ * Verifies required functions exist with expected callable types.
  *
  * Backend implementations must provide all 11 functions:
  * - get(mount, key): Retrieve a value
