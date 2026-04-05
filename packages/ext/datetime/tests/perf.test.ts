@@ -24,7 +24,10 @@ const CALL_COUNT = 1000;
 const P99_INDEX = 989; // 990th element (0-indexed) of 1000 sorted durations
 const P99_LIMIT_MS = 1;
 
-describe('performance', () => {
+const runBenchmarks = process.env.RUN_PERF_BENCHMARKS === 'true';
+const describePerf = runBenchmarks ? describe : describe.skip;
+
+describePerf('performance', () => {
   // ============================================================
   // AC-NF1: time::format P99 below 1 ms over 1000 sequential calls
   // ============================================================

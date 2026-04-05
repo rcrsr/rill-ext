@@ -33,6 +33,8 @@ const datetimeReturn = structureToTypeValue({ kind: 'datetime' } as { kind: stri
 // ============================================================
 
 const validZones = new Set<string>(Intl.supportedValuesOf('timeZone'));
+// Intl.supportedValuesOf may omit UTC on some runtimes
+validZones.add('UTC');
 
 function validateZone(zone: string): void {
   if (!validZones.has(zone)) {
@@ -152,10 +154,10 @@ function applyFormat(date: Date, pattern: string): string {
  * Throws EC-5 if not a number.
  */
 function extractDatetime(value: RillValue, _paramName: string): number {
-  if (typeof value !== 'number') {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new RuntimeError(
       'RILL-R004',
-      `expected datetime, got ${typeof value}`,
+      `expected datetime, got ${typeof value === 'number' ? String(value) : typeof value}`,
       undefined,
       { expected: 'datetime', got: typeof value },
     );
@@ -309,14 +311,29 @@ function parseWithPattern(str: string, pattern: string): number {
 
   const g = match.groups;
   const year = parseInt(g['YYYY'] ?? '1970', 10);
-  const month = parseInt(g['MM'] ?? '01', 10) - 1;
+  const month = parseInt(g['MM'] ?? '01', 10);
   const day = parseInt(g['DD'] ?? '01', 10);
   const hours = parseInt(g['HH'] ?? '00', 10);
   const minutes = parseInt(g['mm'] ?? '00', 10);
   const seconds = parseInt(g['ss'] ?? '00', 10);
   const ms = parseInt(g['SSS'] ?? '0', 10);
 
-  return Date.UTC(year, month, day, hours, minutes, seconds, ms);
+  // Validate ranges to prevent silent Date.UTC normalization
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (
+    month < 1 || month > 12 ||
+    day < 1 || day > daysInMonth ||
+    hours > 23 || minutes > 59 || seconds > 59 || ms > 999
+  ) {
+    throw new RuntimeError(
+      'RILL-R004',
+      `date component out of range in "${str}"`,
+      undefined,
+      { str, pattern },
+    );
+  }
+
+  return Date.UTC(year, month - 1, day, hours, minutes, seconds, ms);
 }
 
 // ============================================================
@@ -464,12 +481,12 @@ export function createDatetimeExtension(
     annotations: { description: 'UTC datetime value' },
   };
 
-  // Optional dt for tz::offset: defaultValue null so callers may omit it.
-  // When null is received, the function falls back to Date.now().
+  // Optional dt for tz::offset: callers may omit it.
+  // When undefined, the function falls back to Date.now().
   const dtOptionalParam: RillParam = {
     name: 'dt',
     type: { kind: 'datetime' } as { kind: string },
-    defaultValue: null,
+    defaultValue: undefined,
     annotations: { description: 'Instant for offset lookup; defaults to now' },
   };
 
