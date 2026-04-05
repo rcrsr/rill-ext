@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-datetime",
-  "version": "0.18.2",
+  "version": "0.18.3",
   "description": "rill extension for date and time operations",
   "license": "MIT",
   "author": "Andre Bremer",
