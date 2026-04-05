@@ -179,7 +179,7 @@ $result.usage.input     # Input tokens
 $result.usage.output    # Output tokens
 ```
 
-The `schema` parameter accepts a dict type expression. Field `.^description` annotations map to JSON Schema `description` properties. Fields with default values become optional.
+The `schema` parameter accepts a dict type expression. Field descriptions written with `^("...")` or `^(description: "...")` map to JSON Schema `description` properties. Fields with default values become optional.
 
 Fields using `closure` or `tuple` type are not representable in JSON Schema and throw:
 
@@ -286,7 +286,7 @@ The `tool_loop` result adds `turns` (number of LLM round-trips).
 
 - Missing schema → `RuntimeError RILL-R004: generate requires a type expression as schema`
 - Non-dict schema → `RuntimeError RILL-R004: generate requires a dict type as schema, got {kind}`
-- Unsupported field type → `RuntimeError RILL-R004: unsupported type for JSON Schema: {kind}`
+- Unsupported field type → `RuntimeError RILL-R004: unsupported type for JSON Schema: {kind}` or `unsupported type: {kind}`
 - JSON parse failure → `RuntimeError RILL-R004: generate: failed to parse response JSON: {detail}`
 
 ## Events
