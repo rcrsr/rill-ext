@@ -51,7 +51,6 @@ export { executeToolLoop, buildResponseMessages } from './tool-loop.js';
 // SCHEMA BUILDING
 // ============================================================
 export {
-  buildJsonSchema,
   buildJsonSchemaFromStructuralType,
   mapRillType,
 } from './schema.js';

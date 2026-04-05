@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.3] - 2026-04-05
+
+### Breaking Changes
+
+- `generate()` schema parameter changed from dict descriptor to rill type expression.
+  Pass a type value (e.g. `dict(name: string, age: number)`) instead of `{ schema: { name: "string" } }` in options.
+
+### Added
+
+- `generate()` reads field descriptions from `^("desc")` type annotations.
+
 ## [0.18.2] - 2026-04-04
 
 ### Fixed

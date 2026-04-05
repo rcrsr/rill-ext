@@ -8,6 +8,8 @@ import {
   createRuntimeContext,
   RuntimeError,
   type ApplicationCallable,
+  type RillTypeValue,
+  type TypeStructure,
 } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
@@ -15,6 +17,11 @@ import type { ExtensionEvent } from '@rcrsr/rill';
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
+
+/** Build a RillTypeValue from a TypeStructure for test usage. */
+function typeVal(structure: TypeStructure): RillTypeValue {
+  return { __rill_type: true, typeName: structure.kind, structure } as unknown as RillTypeValue;
 }
 
 // ============================================================
@@ -99,6 +106,9 @@ describe('generate() function', () => {
     mockCreate.mockReset();
   });
 
+  const PERSON_SCHEMA = typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, age: { type: { kind: 'number' } } } });
+  const NAME_SCHEMA = typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } } } });
+
   // --------------------------------------------------------
   // SUCCESS CASES
   // --------------------------------------------------------
@@ -114,7 +124,11 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate a person', options: { schema: { name: 'string', age: 'number' } } },
+        {
+          prompt: 'Generate a person',
+          schema: typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, age: { type: { kind: 'number' } } } }),
+          options: {},
+        },
         ctx
       )) as Record<string, unknown>;
 
@@ -137,14 +151,21 @@ describe('generate() function', () => {
       const result = (await getCallable(ext, 'generate').fn(
         {
           prompt: 'Generate an address',
-          options: {
-            schema: {
+          schema: typeVal({
+            kind: 'dict',
+            fields: {
               addr: {
-                type: 'dict',
-                properties: { street: 'string', city: 'string' },
+                type: {
+                  kind: 'dict',
+                  fields: {
+                    street: { type: { kind: 'string' } },
+                    city: { type: { kind: 'string' } },
+                  },
+                },
               },
             },
-          },
+          }),
+          options: {},
         },
         ctx
       )) as Record<string, unknown>;
@@ -168,7 +189,8 @@ describe('generate() function', () => {
       const result = (await getCallable(ext, 'generate').fn(
         {
           prompt: 'Generate tags',
-          options: { schema: { tags: { type: 'list', items: 'string' } } },
+          schema: typeVal({ kind: 'dict', fields: { tags: { type: { kind: 'list', element: { kind: 'string' } } } } }),
+          options: {},
         },
         ctx
       )) as Record<string, unknown>;
@@ -176,40 +198,6 @@ describe('generate() function', () => {
       const data = result['data'] as Record<string, unknown>;
       expect(Array.isArray(data['tags'])).toBe(true);
       expect(data['tags']).toEqual(['typescript', 'node', 'testing']);
-    });
-
-    // AC-5: Enum constraint included in provider schema
-    it('sends enum constraint in output_config schema to Anthropic API', async () => {
-      mockCreate.mockResolvedValue(
-        createMockGenerateResponse('{"status":"active"}')
-      );
-
-      const ext = createAnthropicExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      await getCallable(ext, 'generate').fn(
-        {
-          prompt: 'Get status',
-          options: {
-            schema: {
-              status: {
-                type: 'string',
-                enum: ['active', 'inactive', 'pending'],
-              },
-            },
-          },
-        },
-        ctx
-      );
-
-      const callArgs = mockCreate.mock.calls[0]![0] as Record<string, unknown>;
-      const outputConfig = callArgs['output_config'] as Record<string, unknown>;
-      const format = outputConfig['format'] as Record<string, unknown>;
-      const schema = format['schema'] as Record<string, unknown>;
-      const properties = schema['properties'] as Record<string, unknown>;
-      const statusProp = properties['status'] as Record<string, unknown>;
-
-      expect(statusProp['enum']).toEqual(['active', 'inactive', 'pending']);
     });
 
     // AC-6: Return dict contains exactly 6 keys
@@ -222,7 +210,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'Generate', schema: PERSON_SCHEMA, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -242,7 +230,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'Generate', schema: PERSON_SCHEMA, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -262,7 +250,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'Generate', schema: PERSON_SCHEMA, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -284,8 +272,8 @@ describe('generate() function', () => {
       await getCallable(ext, 'generate').fn(
         {
           prompt: 'Generate',
+          schema: NAME_SCHEMA,
           options: {
-            schema: { name: 'string' },
             system: 'Override system prompt.',
           },
         },
@@ -307,7 +295,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', options: { schema: { name: 'string' }, max_tokens: 512 } },
+        { prompt: 'Generate', schema: NAME_SCHEMA, options: { max_tokens: 512 } },
         ctx
       );
 
@@ -333,7 +321,8 @@ describe('generate() function', () => {
       await getCallable(ext, 'generate').fn(
         {
           prompt: 'Generate a name',
-          options: { schema: { name: 'string' }, messages: prependedMessages },
+          schema: NAME_SCHEMA,
+          options: { messages: prependedMessages },
         },
         ctx
       );
@@ -365,7 +354,7 @@ describe('generate() function', () => {
       });
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx);
+      await getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({ system: 'Factory system prompt.' })
@@ -387,7 +376,7 @@ describe('generate() function', () => {
         getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
-        message: "generate requires 'schema' option",
+        message: 'generate requires a type expression as schema',
       });
     });
 
@@ -403,60 +392,6 @@ describe('generate() function', () => {
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
-    // AC-19 / EC-4: Unsupported type throws RILL-R004 before HTTP
-    it('throws RILL-R004 for unsupported type before making HTTP call', async () => {
-      const ext = createAnthropicExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { ts: 'timestamp' } } }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('timestamp'),
-      });
-
-      expect(mockCreate).not.toHaveBeenCalled();
-    });
-
-    it('throws RILL-R004 for "integer" type before HTTP call', async () => {
-      const ext = createAnthropicExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { count: 'integer' } } }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('integer'),
-      });
-
-      expect(mockCreate).not.toHaveBeenCalled();
-    });
-
-    // AC-26 / EC-2: Enum on number type throws RILL-R004 before HTTP
-    it('throws RILL-R004 when enum is used on number type before HTTP call', async () => {
-      const ext = createAnthropicExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      await expect(
-        getCallable(ext, 'generate').fn(
-          {
-            prompt: 'Generate',
-            options: {
-              schema: {
-                code: { type: 'number', enum: ['1', '2', '3'] },
-              },
-            },
-          },
-          ctx
-        )
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('enum'),
-      });
-
-      expect(mockCreate).not.toHaveBeenCalled();
-    });
-
     // AC-21 / EC-5: "not json" response throws RILL-R004
     it('throws RILL-R004 when model returns non-JSON text', async () => {
       mockCreate.mockResolvedValue(createMockGenerateResponse('not json'));
@@ -465,7 +400,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
       });
@@ -479,7 +414,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
         message: expect.stringContaining('failed to parse response JSON'),
@@ -496,7 +431,7 @@ describe('generate() function', () => {
       let thrown: unknown;
       try {
         await getCallable(ext, 'generate').fn(
-          { prompt: 'Generate', options: { schema: { name: 'string' } } },
+          { prompt: 'Generate', schema: NAME_SCHEMA, options: {} },
           ctx
         );
       } catch (e) {
@@ -517,7 +452,7 @@ describe('generate() function', () => {
       let result: unknown = undefined;
       try {
         result = await getCallable(ext, 'generate').fn(
-          { prompt: 'Generate', options: { schema: { name: 'string' } } },
+          { prompt: 'Generate', schema: NAME_SCHEMA, options: {} },
           ctx
         );
       } catch {
@@ -538,7 +473,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
       ).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -546,18 +481,6 @@ describe('generate() function', () => {
       expect(errorEvents[0]!.error).toContain('Rate limit exceeded');
     });
 
-    // DEBT-1: generate requires options param with schema field
-    it('throws RILL-R004 when called without schema in options', async () => {
-      const ext = createAnthropicExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('schema'),
-      });
-    });
   });
 
   // --------------------------------------------------------
@@ -576,7 +499,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'Generate', schema: PERSON_SCHEMA, options: {} },
         ctx
       );
 
@@ -602,7 +525,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
       ).rejects.toThrow();
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -622,7 +545,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', options: { schema: { name: 'string' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
       ).rejects.toThrow();
 
       const generateEvents = events.filter(
@@ -642,8 +565,8 @@ describe('generate() function', () => {
 
       expect(getCallable(ext, 'generate').params).toEqual([
         { name: 'prompt', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'schema', type: { kind: 'type' }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
         { name: 'options', type: { kind: 'dict', fields: {
-          schema: { type: { kind: 'dict' } },
           system: { type: { kind: 'string' }, defaultValue: '' },
           max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
           messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },

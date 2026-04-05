@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, callable, type ApplicationCallable, type RillValue } from '@rcrsr/rill';
+import { createRuntimeContext, callable, type ApplicationCallable, type RillValue, type RillTypeValue, type TypeStructure } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
 
@@ -131,6 +131,11 @@ async function collectStreamChunks(stream: unknown): Promise<string[]> {
     }
   }
   return chunks;
+}
+
+/** Build a RillTypeValue from a TypeStructure for test usage. */
+function typeVal(structure: TypeStructure): RillTypeValue {
+  return { __rill_type: true, typeName: structure.kind, structure } as unknown as RillTypeValue;
 }
 
 // Mock the OpenAI SDK at module level
@@ -2104,7 +2109,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'describe a person', schema: typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, age: { type: { kind: 'number' } } } }), options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -2122,7 +2127,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'describe a person', options: { schema: { name: 'string' } } },
+        { prompt: 'describe a person', schema: typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } } } }), options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -2138,7 +2143,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'score this', options: { schema: { name: 'string', score: 'number' } } },
+        { prompt: 'score this', schema: typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, score: { type: { kind: 'number' } } } }), options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -2157,7 +2162,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'prompt', options: { schema: { ok: 'bool' }, system: 'override system' } },
+        { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { ok: { type: { kind: 'bool' } } } }), options: { system: 'override system' } },
         ctx
       );
 
@@ -2177,7 +2182,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'prompt', options: { schema: { result: 'string' }, max_tokens: 128 } },
+        { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { result: { type: { kind: 'string' } } } }), options: { max_tokens: 128 } },
         ctx
       );
 
@@ -2201,7 +2206,7 @@ describe('generate() function', () => {
       ];
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'final prompt', options: { schema: { answer: 'number' }, messages: prependedMessages } },
+        { prompt: 'final prompt', schema: typeVal({ kind: 'dict', fields: { answer: { type: { kind: 'number' } } } }), options: { messages: prependedMessages } },
         ctx
       );
 
@@ -2236,7 +2241,7 @@ describe('generate() function', () => {
       });
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { val: 'number' } } }, ctx);
+      await getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { val: { type: { kind: 'number' } } } }), options: {} }, ctx);
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         messages: Array<{ role: string; content: string }>;
@@ -2253,7 +2258,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+      await getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} }, ctx);
 
       const callArgs = mockCreate.mock.calls[0][0] as {
         response_format: {
@@ -2282,7 +2287,7 @@ describe('generate() function', () => {
         },
       });
 
-      await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+      await getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} }, ctx);
 
       const generateEvent = events.find(
         (e) => e['event'] === 'openai:generate'
@@ -2301,7 +2306,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow(
-        "generate requires 'schema' option"
+        'generate requires a type expression as schema'
       );
     });
 
@@ -2321,7 +2326,7 @@ describe('generate() function', () => {
 
       await expect(
         getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', options: { schema: { field: 'unsupported_type' } } },
+          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { field: { type: { kind: 'unsupported_type' } } } }), options: {} },
           ctx
         )
       ).rejects.toThrow('unsupported type: unsupported_type');
@@ -2337,7 +2342,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} }, ctx)
       ).rejects.toThrow('generate: failed to parse response JSON:');
     });
 
@@ -2354,7 +2359,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} }, ctx)
       ).rejects.toThrow('Rate limit exceeded');
     });
 
