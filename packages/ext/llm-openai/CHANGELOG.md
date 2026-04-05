@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `openai` updated from 6.27.0 to 6.33.0
+- `openai` updated from ^6.25.0 to ^6.33.0
 
 ## [0.18.3] - 2026-04-05
 

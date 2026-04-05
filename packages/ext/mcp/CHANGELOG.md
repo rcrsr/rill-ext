@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `@modelcontextprotocol/sdk` updated from 1.27.1 to 1.29.0
+- `@modelcontextprotocol/sdk` updated from ^1.27.1 to ^1.29.0
 - Mock test server updated to use Zod schemas (SDK 1.29.0 requirement)
 
 ## [0.18.1] - 2026-04-03

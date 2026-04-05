@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `ioredis` updated from 5.10.0 to 5.10.1
+- `ioredis` updated from ^5.9.3 to ^5.10.1
 
 ## [0.18.3] - 2026-04-05
 

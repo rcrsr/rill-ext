@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `@anthropic-ai/sdk` updated from 0.78.0 to 0.82.0
+- `@anthropic-ai/sdk` updated from ^0.78.0 to ^0.82.0
 
 ## [0.18.3] - 2026-04-05
 

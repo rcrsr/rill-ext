@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `@aws-sdk/client-s3` updated from 3.1003.0 to 3.1024.0
+- `@aws-sdk/client-s3` updated from ^3.997.0 to ^3.1024.0
 
 ## [0.18.3] - 2026-04-05
 

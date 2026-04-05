@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `@google/genai` updated from 1.44.0 to 1.48.0
+- `@google/genai` updated from ^1.42.0 to ^1.48.0
 
 ## [0.18.3] - 2026-04-05
 

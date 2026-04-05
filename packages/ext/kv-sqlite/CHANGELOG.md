@@ -4,7 +4,7 @@
 
 ### Changed
 
-- `better-sqlite3` updated from 12.6.2 to 12.8.0
+- `better-sqlite3` updated from ^12.6.2 to ^12.8.0
 
 ## [0.18.3] - 2026-04-05
 
