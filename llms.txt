@@ -111,6 +111,16 @@ Hashing, HMAC, UUID generation, and random bytes via node:crypto.
 
 Functions: `hash`, `hmac`, `uuid`, `random`
 
+## Datetime (1 package, 7 functions)
+
+Timezone conversion, date/time formatting, and parsing via the Intl API. Zero external dependencies.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-datetime` | [extension-datetime.md](packages/ext/datetime/docs/extension-datetime.md) |
+
+Functions: `iso`, `date`, `time`, `offset`, `zones`, `format`, `parse`
+
 ## Exec (1 package, dynamic functions)
 
 Sandboxed command execution with allowlist/blocklist. Generates one callable per allowed command.
