@@ -3,7 +3,7 @@
  * Defines configuration for SQLite key-value storage backend.
  */
 
-import type { SchemaEntry } from '@rcrsr/rill';
+import type { SchemaEntry } from '@rcrsr/rill-ext-kv-shared';
 
 // Re-export SchemaEntry for consumers of this extension
 export type { SchemaEntry };

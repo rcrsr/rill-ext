@@ -27,7 +27,7 @@ import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { Redis } from 'ioredis';
 import { createRedisKvExtension } from '../src/factory.js';
 import type { RedisKvExtensionConfig } from '../src/factory.js';
-import { createKvExtension } from '@rcrsr/rill/ext/kv';
+import { createKvFileExtension as createKvExtension } from '@rcrsr/rill-ext-kv-file';
 
 /**
  * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.

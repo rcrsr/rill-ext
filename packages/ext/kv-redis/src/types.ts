@@ -3,7 +3,7 @@
  * Defines configuration for Redis key-value storage backend.
  */
 
-import type { SchemaEntry } from '@rcrsr/rill';
+import type { SchemaEntry } from '@rcrsr/rill-ext-kv-shared';
 
 export type { SchemaEntry };
 

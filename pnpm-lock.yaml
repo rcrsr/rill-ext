@@ -236,6 +236,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.18.0
         version: 0.18.3
+      '@rcrsr/rill-ext-kv-file':
+        specifier: workspace:*
+        version: link:../kv-file
       '@rcrsr/rill-ext-kv-shared':
         specifier: workspace:*
         version: link:../../shared/ext-kv
