@@ -1,6 +1,6 @@
 # @rcrsr/rill-ext-datetime
 
-[rill](https://rill.run) extension for timezone conversion, date/time formatting, and parsing via the Intl API. Zero external dependencies.
+[rill](https://rill.run) extension for timezone conversion using the Intl API for timezone/DST resolution, with date/time token formatting and parsing. Zero external dependencies.
 
 ## Install
 
