@@ -91,6 +91,27 @@ importers:
         specifier: ^7.22.0
         version: 7.22.0
 
+  packages/ext/datetime:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ~0.18.0
+        version: 0.18.0
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-param
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.5
+      dts-bundle-generator:
+        specifier: ^9.5.1
+        version: 9.5.1
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.8)(typescript@5.9.3)
+      undici-types:
+        specifier: ^7.22.0
+        version: 7.22.0
+
   packages/ext/exec:
     devDependencies:
       '@rcrsr/rill':
