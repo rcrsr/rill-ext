@@ -30,6 +30,7 @@ All packages are published under `@rcrsr/` on npm. Provider categories (**LLM**,
 | **Integrations** | `rill-ext-mcp` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-mcp)](https://www.npmjs.com/package/@rcrsr/rill-ext-mcp) | [docs](packages/ext/mcp/docs/extension-mcp.md) | MCP server bridge |
 | | `rill-ext-claude-code` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-claude-code)](https://www.npmjs.com/package/@rcrsr/rill-ext-claude-code) | [docs](packages/ext/claude-code/docs/extension-claude-code.md) | Claude Code CLI |
 | **Standalone** | `rill-ext-crypto` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-crypto)](https://www.npmjs.com/package/@rcrsr/rill-ext-crypto) | [docs](packages/ext/crypto/docs/extension-crypto.md) | Hashing, HMAC, UUID, random |
+| | `rill-ext-datetime` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-datetime)](https://www.npmjs.com/package/@rcrsr/rill-ext-datetime) | [docs](packages/ext/datetime/docs/extension-datetime.md) | Timezone conversion, formatting, parsing |
 | | `rill-ext-exec` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-exec)](https://www.npmjs.com/package/@rcrsr/rill-ext-exec) | [docs](packages/ext/exec/docs/extension-exec.md) | Sandboxed command execution |
 | | `rill-ext-fetch` | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-fetch)](https://www.npmjs.com/package/@rcrsr/rill-ext-fetch) | [docs](packages/ext/fetch/docs/extension-fetch.md) | HTTP with endpoint allowlisting |
 
