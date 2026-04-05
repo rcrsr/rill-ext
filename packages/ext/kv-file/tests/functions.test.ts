@@ -16,8 +16,7 @@ describe('kv-file functions', () => {
   let storePath: string;
 
   beforeEach(async () => {
-    tempDir = path.join(os.tmpdir(), `rill-kv-file-test-${Date.now()}`);
-    await fs.mkdir(tempDir, { recursive: true });
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rill-kv-file-test-'));
     storePath = path.join(tempDir, 'test-store.json');
   });
 

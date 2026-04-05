@@ -37,6 +37,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          set -o pipefail
           for dir in packages/ext/*/; do
             dir="${dir%/}"
             [ -f "$dir/package.json" ] || continue
@@ -50,15 +51,18 @@ jobs:
             fi
             echo "Publishing $NAME@$VERSION..."
             cd "$dir"
-            if pnpm publish --access public --no-git-checks 2>&1 | tee /tmp/publish.log; then
+            PUBLISH_LOG=$(mktemp)
+            if pnpm publish --access public --no-git-checks 2>&1 | tee "$PUBLISH_LOG"; then
               echo "Published $NAME@$VERSION"
-            elif grep -q 'You cannot publish over the previously published versions' /tmp/publish.log; then
+            elif grep -Eqi '(EPUBLISHCONFLICT|E403|cannot publish over( the)? previously published versions|cannot modify pre-existing version)' "$PUBLISH_LOG"; then
               echo "Skipping $NAME@$VERSION (already published, confirmed by registry)"
             else
               echo "Failed to publish $NAME@$VERSION"
-              cat /tmp/publish.log
+              cat "$PUBLISH_LOG"
+              rm -f "$PUBLISH_LOG"
               exit 1
             fi
+            rm -f "$PUBLISH_LOG"
             cd "$GITHUB_WORKSPACE"
           done
 
