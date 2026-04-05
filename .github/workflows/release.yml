@@ -50,7 +50,15 @@ jobs:
             fi
             echo "Publishing $NAME@$VERSION..."
             cd "$dir"
-            pnpm publish --access public --no-git-checks
+            if pnpm publish --access public --no-git-checks 2>&1 | tee /tmp/publish.log; then
+              echo "Published $NAME@$VERSION"
+            elif grep -q 'You cannot publish over the previously published versions' /tmp/publish.log; then
+              echo "Skipping $NAME@$VERSION (already published, confirmed by registry)"
+            else
+              echo "Failed to publish $NAME@$VERSION"
+              cat /tmp/publish.log
+              exit 1
+            fi
             cd "$GITHUB_WORKSPACE"
           done
 
