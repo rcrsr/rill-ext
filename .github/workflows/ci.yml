@@ -7,7 +7,28 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '**/*.ts'
+              - '**/*.js'
+              - '**/*.json'
+              - '**/*.yaml'
+              - '**/*.yml'
+              - '**/*.cjs'
+              - '**/*.mjs'
+
   check:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -15,42 +36,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Detect code changes
-        id: changes
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-          else
-            BASE="${{ github.event.before }}"
-          fi
-          CODE_CHANGED=$(git diff --name-only "$BASE" HEAD -- . ':!**/*.md' ':!**/*.txt' ':!LICENSE' | head -1)
-          if [ -z "$CODE_CHANGED" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Enable Corepack
-        if: steps.changes.outputs.skip == 'false'
         run: corepack enable
 
       - uses: actions/setup-node@v5
-        if: steps.changes.outputs.skip == 'false'
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
       - name: Install dependencies
-        if: steps.changes.outputs.skip == 'false'
         run: pnpm install --frozen-lockfile
 
       - name: Run checks
-        if: steps.changes.outputs.skip == 'false'
         run: pnpm -r run check
-
-      - name: Skip (docs only)
-        if: steps.changes.outputs.skip == 'true'
-        run: echo "No code changes, skipping checks"
