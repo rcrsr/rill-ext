@@ -14,6 +14,8 @@ import {
   createRuntimeContext,
   RuntimeError,
   type ApplicationCallable,
+  type RillTypeValue,
+  type TypeStructure,
 } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
@@ -37,6 +39,11 @@ function createGenerateMockResponse(jsonContent: string) {
     text: jsonContent,
     modelVersion: 'gemini-2.0-flash-001',
   };
+}
+
+/** Build a RillTypeValue from a TypeStructure for test usage. */
+function typeVal(structure: TypeStructure): RillTypeValue {
+  return { __rill_type: true, typeName: structure.kind, structure } as unknown as RillTypeValue;
 }
 
 // Mock the Google GenAI SDK at module level
@@ -75,6 +82,9 @@ describe('generate() function', () => {
     mockGenerateContent.mockReset();
   });
 
+  const PERSON_SCHEMA = typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, age: { type: { kind: 'number' } } } });
+  const NAME_SCHEMA = typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } } } });
+
   describe('success cases', () => {
     // AC-1: data field contains schema-matching keys
     it('returns data dict with keys matching the schema', async () => {
@@ -86,7 +96,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'describe a person', schema: PERSON_SCHEMA, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -107,7 +117,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'describe a person', schema: PERSON_SCHEMA, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -133,7 +143,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'rate something', options: { schema: { score: 'number' } } },
+        { prompt: 'rate something', schema: typeVal({ kind: 'dict', fields: { score: { type: { kind: 'number' } } } }), options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -156,7 +166,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'describe a person', schema: PERSON_SCHEMA, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -179,7 +189,11 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'question', options: { schema: { answer: 'string' }, system: 'Override system.' } },
+        {
+          prompt: 'question',
+          schema: typeVal({ kind: 'dict', fields: { answer: { type: { kind: 'string' } } } }),
+          options: { system: 'Override system.' },
+        },
         ctx
       );
 
@@ -202,7 +216,11 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'prompt', options: { schema: { result: 'string' }, max_tokens: 512 } },
+        {
+          prompt: 'prompt',
+          schema: typeVal({ kind: 'dict', fields: { result: { type: { kind: 'string' } } } }),
+          options: { max_tokens: 512 },
+        },
         ctx
       );
 
@@ -230,7 +248,11 @@ describe('generate() function', () => {
       ];
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'final prompt', options: { schema: { summary: 'string' }, messages: priorMessages } },
+        {
+          prompt: 'final prompt',
+          schema: typeVal({ kind: 'dict', fields: { summary: { type: { kind: 'string' } } } }),
+          options: { messages: priorMessages },
+        },
         ctx
       );
 
@@ -267,7 +289,14 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(configWithSystem);
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { value: 'number' } } }, ctx);
+      await getCallable(ext, 'generate').fn(
+        {
+          prompt: 'prompt',
+          schema: typeVal({ kind: 'dict', fields: { value: { type: { kind: 'number' } } } }),
+          options: {},
+        },
+        ctx
+      );
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -281,12 +310,12 @@ describe('generate() function', () => {
 
   describe('error cases', () => {
     // AC-18/EC-3: Missing schema throws RILL-R004
-    it('throws RILL-R004 with "generate requires \'schema\' option" when schema is absent', async () => {
+    it('throws RILL-R004 with "generate requires a type expression as schema" when schema is absent', async () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
       await expect(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow(
-        "generate requires 'schema' option"
+        'generate requires a type expression as schema'
       );
     });
 
@@ -323,7 +352,11 @@ describe('generate() function', () => {
 
       await expect(
         getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', options: { schema: { field: 'unsupported_type' } } },
+          {
+            prompt: 'prompt',
+            schema: typeVal({ kind: 'dict', fields: { field: { type: { kind: 'unsupported_type' } } } }),
+            options: {},
+          },
           ctx
         )
       ).rejects.toThrow('unsupported type: unsupported_type');
@@ -341,7 +374,10 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn(
+          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          ctx
+        )
       ).rejects.toThrow('generate: failed to parse response JSON:');
     });
 
@@ -356,7 +392,10 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+        await getCallable(ext, 'generate').fn(
+          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          ctx
+        );
       } catch (err) {
         thrown = err;
       }
@@ -380,7 +419,10 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+        await getCallable(ext, 'generate').fn(
+          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          ctx
+        );
       } catch (err) {
         thrown = err;
       }
@@ -399,21 +441,11 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn(
+          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          ctx
+        )
       ).rejects.toThrow();
-    });
-
-    // DEBT-1: generate requires options param with schema field
-    it('throws RILL-R004 when called without schema in options', async () => {
-      const ext = createGeminiExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('schema'),
-      });
     });
 
     // AC-27/EC-6: Provider API error emits gemini:error
@@ -434,7 +466,10 @@ describe('generate() function', () => {
       });
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn(
+          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          ctx
+        )
       ).rejects.toThrow();
 
       const errorEvent = events.find((e) => e['event'] === 'gemini:error');
@@ -463,7 +498,7 @@ describe('generate() function', () => {
       });
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
+        { prompt: 'describe a person', schema: PERSON_SCHEMA, options: {} },
         ctx
       );
 
@@ -494,7 +529,10 @@ describe('generate() function', () => {
       });
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn(
+          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          ctx
+        )
       ).rejects.toThrow();
 
       expect(events).toHaveLength(1);

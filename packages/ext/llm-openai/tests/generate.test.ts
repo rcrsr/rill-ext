@@ -20,6 +20,8 @@ import {
   createRuntimeContext,
   RuntimeError,
   type ApplicationCallable,
+  type RillTypeValue,
+  type TypeStructure,
 } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
@@ -30,6 +32,11 @@ import type { OpenAIExtensionConfig } from '../src/types.js';
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
+
+/** Build a RillTypeValue from a TypeStructure for test usage. */
+function typeVal(structure: TypeStructure): RillTypeValue {
+  return { __rill_type: true, typeName: structure.kind, structure } as unknown as RillTypeValue;
 }
 
 const mockCreate = vi.fn();
@@ -92,6 +99,11 @@ const baseConfig: OpenAIExtensionConfig = {
 // ============================================================
 
 describe('generate() function', () => {
+  const PERSON_SCHEMA = typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, age: { type: { kind: 'number' } } } });
+  const NAME_SCHEMA = typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } } } });
+  const NUMBER_SCHEMA = typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } });
+  const SCORE_SCHEMA = typeVal({ kind: 'dict', fields: { score: { type: { kind: 'number' } } } });
+
   beforeEach(() => {
     mockCreate.mockReset();
   });
@@ -107,7 +119,11 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'describe a person', options: { schema: { name: 'string', age: 'number' } } },
+        {
+          prompt: 'describe a person',
+          schema: PERSON_SCHEMA,
+          options: {},
+        },
         ctx
       )) as Record<string, unknown>;
 
@@ -126,7 +142,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'rate something', options: { schema: { score: 'number' } } },
+        { prompt: 'rate something', schema: SCORE_SCHEMA, options: {} },
         ctx
       )) as Record<string, unknown>;
 
@@ -136,21 +152,6 @@ describe('generate() function', () => {
   });
 
   describe('error cases', () => {
-    // AC-19/EC-4: no HTTP call when unsupported type
-    it('makes no API call when schema contains unsupported type', async () => {
-      const ext = createOpenAIExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      await expect(
-        getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', options: { schema: { field: 'unsupported_type' } } },
-          ctx
-        )
-      ).rejects.toThrow();
-
-      expect(mockCreate).not.toHaveBeenCalled();
-    });
-
     // AC-23/EC-5: parse error is a RuntimeError instance
     it('throws a RuntimeError instance when response is not valid JSON', async () => {
       mockCreate.mockResolvedValue(createGenerateMockResponse('not json'));
@@ -160,7 +161,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+        await getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -177,7 +178,7 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+        await getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -194,13 +195,13 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
       ).rejects.toThrow('generate: failed to parse response JSON:');
 
       // Verify message contains the native JSON parse error detail
       let thrown: unknown;
       try {
-        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx);
+        await getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx);
       } catch (err) {
         thrown = err;
       }
@@ -221,12 +222,12 @@ describe('generate() function', () => {
 
       // Must reject, never resolve to a value
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
       ).rejects.toThrow();
     });
 
-    // DEBT-1: generate requires options param with schema field
-    it('throws RILL-R004 when called without schema in options', async () => {
+    // EC-4: missing schema arg throws RILL-R004
+    it('throws RILL-R004 when called without schema argument', async () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
@@ -234,7 +235,7 @@ describe('generate() function', () => {
         getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
       ).rejects.toMatchObject({
         errorId: 'RILL-R004',
-        message: expect.stringContaining('schema'),
+        message: expect.stringContaining('generate requires a type expression as schema'),
       });
     });
 
@@ -257,7 +258,7 @@ describe('generate() function', () => {
       });
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: { schema: { x: 'number' } } }, ctx)
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
       ).rejects.toThrow();
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');

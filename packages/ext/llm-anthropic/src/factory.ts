@@ -14,6 +14,7 @@ import {
   type RillFunction,
   type RillValue,
   type RuntimeContext,
+  type TypeStructure,
 } from '@rcrsr/rill';
 import {
   type LlmExtensionContract,
@@ -25,7 +26,7 @@ import {
   validateEmbedModel,
   mapProviderError,
   executeToolLoop,
-  buildJsonSchema,
+  buildJsonSchemaFromStructuralType,
   buildResponseMessages,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
@@ -1095,8 +1096,8 @@ export function createAnthropicExtension(
     generate: {
       params: [
         p.str('prompt'),
+        { name: 'schema', type: { kind: 'type' } as { kind: string }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
         p.dict('options', undefined, {}, {
-          schema: { type: { kind: 'dict' } },
           system: { type: { kind: 'string' }, defaultValue: '' },
           max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
           messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
@@ -1108,23 +1109,25 @@ export function createAnthropicExtension(
         try {
           // Extract arguments
           const prompt = args['prompt'] as string;
+          const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-          // EC-3: Validate schema option is present
-          if (
-            !('schema' in options) ||
-            options['schema'] === null ||
-            options['schema'] === undefined
-          ) {
+          // EC-3: Validate schema is a type value with dict structure
+          if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
             throw new RuntimeError(
               'RILL-R004',
-              "generate requires 'schema' option"
+              'generate requires a type expression as schema'
+            );
+          }
+          if (schemaArg.structure.kind !== 'dict') {
+            throw new RuntimeError(
+              'RILL-R004',
+              `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
             );
           }
 
-          // EC-4: Build JSON Schema — delegates type validation to buildJsonSchema
-          const rillSchema = options['schema'] as Record<string, unknown>;
-          const jsonSchema = buildJsonSchema(rillSchema);
+          // EC-4: Build JSON Schema from TypeStructure
+          const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
 
           // Extract options
           const system =

@@ -4,14 +4,9 @@
  * @module
  */
 
-import type { RillValue } from '@rcrsr/rill';
+import type { SchemaEntry } from '@rcrsr/rill-ext-kv-shared';
 
-/** Schema entry defining type and default for a key. */
-export interface SchemaEntry {
-  readonly type: 'string' | 'number' | 'bool' | 'list' | 'dict';
-  readonly default: RillValue;
-  readonly description?: string | undefined;
-}
+export type { SchemaEntry };
 
 /** Configuration for a single KV mount. */
 export interface KvFileMountConfig {

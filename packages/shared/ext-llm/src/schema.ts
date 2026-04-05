@@ -12,6 +12,7 @@ import {
 } from '@rcrsr/rill';
 
 type ListTypeStructure = Extract<TypeStructure, { kind: 'list' }>;
+type DictTypeStructure = Extract<TypeStructure, { kind: 'dict' }>;
 type ClosureTypeStructure = Extract<TypeStructure, { kind: 'closure' }>;
 
 /**
@@ -98,6 +99,16 @@ function buildPropertyFromStructuralType(rillType: TypeStructure): JsonSchemaPro
   }
 
   if (rillType.kind === 'dict') {
+    const dictType = rillType as DictTypeStructure;
+    if (dictType.fields && Object.keys(dictType.fields).length > 0) {
+      const nested = buildDictSchema(dictType);
+      return {
+        type: 'object',
+        properties: nested.properties,
+        required: nested.required,
+        additionalProperties: false,
+      };
+    }
     return { type: 'object' };
   }
 
@@ -106,17 +117,57 @@ function buildPropertyFromStructuralType(rillType: TypeStructure): JsonSchemaPro
 }
 
 /**
- * Build a JSON Schema object from a RillType.
+ * Build a JSON Schema object from a dict TypeStructure with named fields.
  *
- * For the closure variant:
+ * Iterates dict.fields (Record<string, RillFieldDef>).
+ * - Field description from fieldDef.annotations?.['description'].
+ * - Fields without defaultValue are required.
+ * - Recurses into nested dicts and lists.
+ */
+function buildDictSchema(dictType: DictTypeStructure): JsonSchemaObject {
+  const properties: Record<string, JsonSchemaProperty> = {};
+  const required: string[] = [];
+  const fields = dictType.fields ?? {};
+
+  for (const [name, fieldDef] of Object.entries(fields)) {
+    const property = buildPropertyFromStructuralType(fieldDef.type);
+
+    // Description from .^description annotation
+    const description = fieldDef.annotations?.['description'];
+    if (typeof description === 'string') {
+      property.description = description;
+    }
+
+    properties[name] = property;
+
+    // Fields without a defaultValue are required
+    if (fieldDef.defaultValue === undefined) {
+      required.push(name);
+    }
+  }
+
+  return { type: 'object', properties, required, additionalProperties: false };
+}
+
+/**
+ * Build a JSON Schema object from a TypeStructure.
+ *
+ * Supports two variants:
+ *
+ * **dict** — for generate() structured output:
+ * - Iterates type.fields (Record<string, RillFieldDef>).
+ * - Field descriptions from fieldDef.annotations?.['description'].
+ * - Fields without defaultValue are required.
+ *
+ * **closure** — for tool_loop() tool parameters:
  * - Iterates type.params (array of RillFieldDef).
  * - Matches each entry to params[i] by position for metadata.
  * - annotations.description from rillParam.annotations['description'].
  * - annotations.enum from rillParam.annotations['enum'].
  * - optional = rillParam.defaultValue !== undefined.
  * - Non-optional params added to required[].
- * - additionalProperties: false always present.
  *
+ * @throws RuntimeError RILL-R004 for unsupported top-level kind
  * @throws RuntimeError RILL-R004 for closure/tuple type in param position (EC-3)
  * @throws RuntimeError RILL-R004 for unsupported type name (EC-3)
  */
@@ -124,151 +175,49 @@ export function buildJsonSchemaFromStructuralType(
   type: TypeStructure,
   params?: RillParam[]
 ): JsonSchemaObject {
-  const properties: Record<string, JsonSchemaProperty> = {};
-  const required: string[] = [];
-
-  if (type.kind === 'closure') {
-    const closureParams = (type as ClosureTypeStructure).params ?? [];
-    for (let i = 0; i < closureParams.length; i++) {
-      const fieldDef = closureParams[i]!;
-      const paramName = fieldDef.name ?? `param${i}`;
-      const paramType = fieldDef.type;
-      const rillParam = params?.[i];
-
-      const property = buildPropertyFromStructuralType(paramType);
-
-      // Map annotations.description
-      const description = rillParam?.annotations['description'];
-      if (typeof description === 'string') {
-        property.description = description;
-      }
-
-      // Map annotations.enum (stored as RillValue — a JS array)
-      const enumAnnotation = rillParam?.annotations['enum'];
-      if (Array.isArray(enumAnnotation)) {
-        property.enum = enumAnnotation as string[];
-      }
-
-      properties[paramName] = property;
-
-      // Params without a defaultValue are required (defaultValue === undefined means required)
-      if (rillParam === undefined || rillParam.defaultValue === undefined) {
-        required.push(paramName);
-      }
-    }
+  if (type.kind === 'dict') {
+    return buildDictSchema(type as DictTypeStructure);
   }
 
-  return { type: 'object', properties, required, additionalProperties: false };
-}
-
-/**
- * Build a JSON Schema object from a rill schema descriptor.
- *
- * Accepts a Record<string, unknown> dict descriptor.
- * Each value can be a simple type string (e.g., `"string"`)
- * or a full descriptor object (e.g., `{ type: "string", description: "..." }`).
- *
- * @example
- * buildJsonSchema({ name: "string", age: { type: "number", description: "Age in years" } })
- * // {
- * //   type: 'object',
- * //   properties: {
- * //     name: { type: 'string' },
- * //     age: { type: 'number', description: 'Age in years' }
- * //   },
- * //   required: ['name', 'age']
- * // }
- *
- * @throws RuntimeError RILL-R004 for unsupported rill types (EC-1)
- * @throws RuntimeError RILL-R004 for enum on non-string type (EC-2)
- */
-export function buildJsonSchema(
-  rillSchema: Record<string, unknown>
-): JsonSchemaObject {
-  const properties: Record<string, JsonSchemaProperty> = {};
-  const required: string[] = [];
-
-  for (const [key, value] of Object.entries(rillSchema)) {
-    if (typeof value === 'string') {
-      properties[key] = buildProperty(value);
-    } else if (typeof value === 'object' && value !== null) {
-      properties[key] = buildProperty(value as Record<string, unknown>);
-    } else {
-      throw new RuntimeError('RILL-R004', `unsupported type: ${String(value)}`);
-    }
-    required.push(key);
-  }
-
-  return { type: 'object', properties, required, additionalProperties: false };
-}
-
-/**
- * Build a JsonSchemaProperty from a single rill property descriptor.
- *
- * Accepts two forms:
- * - Simple string: `"string"` — just a type name
- * - Descriptor object: `{ type: "string", description?: "...", enum?: [...], items?: ..., properties?: {...} }`
- *
- * Throws RuntimeError RILL-R004 for unsupported types or invalid enum usage.
- */
-function buildProperty(
-  descriptor: string | Record<string, unknown>
-): JsonSchemaProperty {
-  // Form 1: simple string — just a type name
-  if (typeof descriptor === 'string') {
-    const jsonType = mapRillType(descriptor);
-    return { type: jsonType };
-  }
-
-  // Forms 2–5: descriptor object
-  const rillType = descriptor['type'];
-  if (typeof rillType !== 'string') {
+  if (type.kind !== 'closure') {
     throw new RuntimeError(
       'RILL-R004',
-      `unsupported type: ${String(rillType)}`
+      `unsupported schema kind: ${type.kind} (expected dict or closure)`
     );
   }
 
-  const jsonType = mapRillType(rillType);
-  const property: JsonSchemaProperty = { type: jsonType };
+  const properties: Record<string, JsonSchemaProperty> = {};
+  const required: string[] = [];
+  const closureParams = (type as ClosureTypeStructure).params ?? [];
 
-  // Optional description
-  const description = descriptor['description'];
-  if (typeof description === 'string') {
-    property.description = description;
-  }
+  for (let i = 0; i < closureParams.length; i++) {
+    const fieldDef = closureParams[i]!;
+    const paramName = fieldDef.name ?? `param${i}`;
+    const paramType = fieldDef.type;
+    const rillParam = params?.[i];
 
-  // EC-2: Enum constraint valid only for string type
-  if ('enum' in descriptor) {
-    if (rillType !== 'string') {
-      throw new RuntimeError('RILL-R004', 'enum is only valid for string type');
+    const property = buildPropertyFromStructuralType(paramType);
+
+    // Map annotations.description
+    const description = rillParam?.annotations['description'];
+    if (typeof description === 'string') {
+      property.description = description;
     }
-    const enumValues = descriptor['enum'];
-    if (Array.isArray(enumValues)) {
-      property.enum = enumValues as string[];
-    }
-  }
 
-  // Form 4: list with items sub-schema
-  if (rillType === 'list' && 'items' in descriptor) {
-    const items = descriptor['items'];
-    if (typeof items === 'string') {
-      property.items = buildProperty(items);
-    } else if (typeof items === 'object' && items !== null) {
-      property.items = buildProperty(items as Record<string, unknown>);
+    // Map annotations.enum (stored as RillValue — a JS array)
+    const enumAnnotation = rillParam?.annotations['enum'];
+    if (Array.isArray(enumAnnotation)) {
+      property.enum = enumAnnotation as string[];
     }
-  }
 
-  // Form 3: nested dict with properties sub-schema
-  if (rillType === 'dict' && 'properties' in descriptor) {
-    const nestedProps = descriptor['properties'];
-    if (typeof nestedProps === 'object' && nestedProps !== null) {
-      const subSchema = buildJsonSchema(nestedProps as Record<string, unknown>);
-      property.properties = subSchema.properties;
-      property.required = subSchema.required;
-      property.additionalProperties = false;
+    properties[paramName] = property;
+
+    // Params without a defaultValue are required (defaultValue === undefined means required)
+    if (rillParam === undefined || rillParam.defaultValue === undefined) {
+      required.push(paramName);
     }
   }
 
-  return property;
+  return { type: 'object', properties, required, additionalProperties: false };
 }
+
