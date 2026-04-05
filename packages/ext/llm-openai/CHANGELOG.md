@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.18.4] - 2026-04-05
+
+### Changed
+
+- `openai` updated from 6.27.0 to 6.33.0
+
 ## [0.18.3] - 2026-04-05
 
 ### Breaking Changes

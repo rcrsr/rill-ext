@@ -33,6 +33,7 @@
     // Consistency
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "types": ["node"],
 
     // Composite for project references
     "composite": true

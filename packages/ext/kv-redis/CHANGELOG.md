@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.18.4] - 2026-04-05
+
+### Changed
+
+- `ioredis` updated from 5.10.0 to 5.10.1
+
 ## [0.18.3] - 2026-04-05
 
 ### Changed
