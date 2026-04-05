@@ -1112,11 +1112,17 @@ export function createAnthropicExtension(
           const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-          // EC-3: Validate schema is a type value
+          // EC-3: Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
             throw new RuntimeError(
               'RILL-R004',
               'generate requires a type expression as schema'
+            );
+          }
+          if (schemaArg.structure.kind !== 'dict') {
+            throw new RuntimeError(
+              'RILL-R004',
+              `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
             );
           }
 

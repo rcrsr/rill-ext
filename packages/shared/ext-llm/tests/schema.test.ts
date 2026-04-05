@@ -1,12 +1,12 @@
 /**
- * Unit tests for buildJsonSchemaFromStructuralType and mapRillType.
+ * Unit tests for buildJsonSchemaFromStructuralType.
  *
  * Covers closure variant (tool parameters), dict variant (structured output),
- * all rill type mappings, and error contracts (AC-18, EC-3).
+ * and error contracts.
  *
- * AC-10: buildJsonSchemaFromStructuralType closure output matches expected JSON Schema
- * AC-18: buildJsonSchemaFromStructuralType unsupported type → RILL-R004
- * EC-3: buildJsonSchemaFromStructuralType receives closure/tuple kind → RILL-R004
+ * AC-10: closure output matches expected JSON Schema
+ * AC-18: unsupported type in param position → RILL-R004
+ * EC-3: closure/tuple kind in param position → RILL-R004
  */
 
 import { describe, it, expect } from 'vitest';

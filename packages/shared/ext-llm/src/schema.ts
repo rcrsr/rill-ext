@@ -120,7 +120,7 @@ function buildPropertyFromStructuralType(rillType: TypeStructure): JsonSchemaPro
  * Build a JSON Schema object from a dict TypeStructure with named fields.
  *
  * Iterates dict.fields (Record<string, RillFieldDef>).
- * - Field description from fieldDef.defaultValue when it's a string annotation.
+ * - Field description from fieldDef.annotations?.['description'].
  * - Fields without defaultValue are required.
  * - Recurses into nested dicts and lists.
  */
@@ -156,7 +156,7 @@ function buildDictSchema(dictType: DictTypeStructure): JsonSchemaObject {
  *
  * **dict** — for generate() structured output:
  * - Iterates type.fields (Record<string, RillFieldDef>).
- * - Field descriptions from annotation defaultValue.
+ * - Field descriptions from fieldDef.annotations?.['description'].
  * - Fields without defaultValue are required.
  *
  * **closure** — for tool_loop() tool parameters:
@@ -167,6 +167,7 @@ function buildDictSchema(dictType: DictTypeStructure): JsonSchemaObject {
  * - optional = rillParam.defaultValue !== undefined.
  * - Non-optional params added to required[].
  *
+ * @throws RuntimeError RILL-R004 for unsupported top-level kind
  * @throws RuntimeError RILL-R004 for closure/tuple type in param position (EC-3)
  * @throws RuntimeError RILL-R004 for unsupported type name (EC-3)
  */
@@ -178,37 +179,42 @@ export function buildJsonSchemaFromStructuralType(
     return buildDictSchema(type as DictTypeStructure);
   }
 
+  if (type.kind !== 'closure') {
+    throw new RuntimeError(
+      'RILL-R004',
+      `unsupported schema kind: ${type.kind} (expected dict or closure)`
+    );
+  }
+
   const properties: Record<string, JsonSchemaProperty> = {};
   const required: string[] = [];
+  const closureParams = (type as ClosureTypeStructure).params ?? [];
 
-  if (type.kind === 'closure') {
-    const closureParams = (type as ClosureTypeStructure).params ?? [];
-    for (let i = 0; i < closureParams.length; i++) {
-      const fieldDef = closureParams[i]!;
-      const paramName = fieldDef.name ?? `param${i}`;
-      const paramType = fieldDef.type;
-      const rillParam = params?.[i];
+  for (let i = 0; i < closureParams.length; i++) {
+    const fieldDef = closureParams[i]!;
+    const paramName = fieldDef.name ?? `param${i}`;
+    const paramType = fieldDef.type;
+    const rillParam = params?.[i];
 
-      const property = buildPropertyFromStructuralType(paramType);
+    const property = buildPropertyFromStructuralType(paramType);
 
-      // Map annotations.description
-      const description = rillParam?.annotations['description'];
-      if (typeof description === 'string') {
-        property.description = description;
-      }
+    // Map annotations.description
+    const description = rillParam?.annotations['description'];
+    if (typeof description === 'string') {
+      property.description = description;
+    }
 
-      // Map annotations.enum (stored as RillValue — a JS array)
-      const enumAnnotation = rillParam?.annotations['enum'];
-      if (Array.isArray(enumAnnotation)) {
-        property.enum = enumAnnotation as string[];
-      }
+    // Map annotations.enum (stored as RillValue — a JS array)
+    const enumAnnotation = rillParam?.annotations['enum'];
+    if (Array.isArray(enumAnnotation)) {
+      property.enum = enumAnnotation as string[];
+    }
 
-      properties[paramName] = property;
+    properties[paramName] = property;
 
-      // Params without a defaultValue are required (defaultValue === undefined means required)
-      if (rillParam === undefined || rillParam.defaultValue === undefined) {
-        required.push(paramName);
-      }
+    // Params without a defaultValue are required (defaultValue === undefined means required)
+    if (rillParam === undefined || rillParam.defaultValue === undefined) {
+      required.push(paramName);
     }
   }
 
