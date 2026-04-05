@@ -162,42 +162,29 @@ $result.content  # Final response
 $result.turns    # Number of LLM round-trips
 ```
 
-**generate(prompt, options)** — Structured output extraction:
+**generate(prompt, schema, options)** — Structured output extraction:
 
 ```rill
-[name: "string", age: "number", active: "bool"] => $schema
-
-openai::generate("Extract user info: Alice, 30, active", [
-  schema: $schema,
-]) => $result
+openai::generate(
+  "Extract user info: Alice, 30, active",
+  dict(
+    ^("Full name") name: string
+    ^("Age in years") age: number
+    active: bool
+  )
+) => $result
 $result.data            # Parsed dict matching schema keys
 $result.raw             # Original JSON string from model
 $result.usage.input     # Input tokens
 $result.usage.output    # Output tokens
 ```
 
-**generate with structured output schema:**
+The `schema` parameter accepts a dict type expression. Field `.^description` annotations map to JSON Schema `description` properties. Fields with default values become optional.
 
-Define a closure with typed and annotated params, then pass its `^input` structural type as `schema`:
-
-```rill
-|^("Full name") name: string, ^(description: "Age in years") age: number, active: bool = false| { "test" } => $extractor
-
-openai::generate("Extract user info: Alice, 30, active", [
-  schema: $extractor.^input,
-  system: "Extract structured data from the input.",
-]) => $result
-$result.data.name    # Extracted name field
-$result.data.age     # Extracted age field
-$result.data.active  # Extracted active field (optional)
-```
-
-The extension converts the structural type to a JSON Schema object via `buildJsonSchemaFromStructuralType()` before sending to the provider. Field `description` and `enum` annotations map to JSON Schema `description` and `enum` properties.
-
-Params using `closure` or `tuple` type are not representable in JSON Schema and throw:
+Fields using `closure` or `tuple` type are not representable in JSON Schema and throw:
 
 ```text
-# Error: generate schema field 'fn' uses unsupported type 'closure'
+# Error: unsupported type for JSON Schema: closure
 ```
 
 ### Per-Call Options
@@ -209,7 +196,6 @@ Params using `closure` or `tuple` type are not representable in JSON Schema and 
 | `max_turns` | number | tool_loop | Limit LLM round-trips |
 | `max_errors` | number | tool_loop | Consecutive error limit (default: 3) |
 | `messages` | list | tool_loop, generate | Prepend conversation history |
-| `schema` | dict or RillStructuralType | generate (required) | Dict descriptor (legacy) or `RillStructuralType` value (from `$closure.^input`) for structured output |
 
 ## Streaming
 
@@ -298,10 +284,10 @@ The `tool_loop` result adds `turns` (number of LLM round-trips).
 
 **Generate errors**:
 
-- Missing schema → `RuntimeError RILL-R004: generate requires 'schema' option`
-- Unsupported type in schema → `RuntimeError RILL-R004: unsupported schema type '{type}'`
-- Shape field with `closure` or `tuple` type → `RuntimeError RILL-R004: generate schema field '{name}' uses unsupported type '{type}'`
-- JSON parse failure → `RuntimeError RILL-R004: generate response parse failed: {detail}`
+- Missing schema → `RuntimeError RILL-R004: generate requires a type expression as schema`
+- Non-dict schema → `RuntimeError RILL-R004: generate requires a dict type as schema, got {kind}`
+- Unsupported field type → `RuntimeError RILL-R004: unsupported type for JSON Schema: {kind}`
+- JSON parse failure → `RuntimeError RILL-R004: generate: failed to parse response JSON: {detail}`
 
 ## Events
 
