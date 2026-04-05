@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.18.3] - 2026-04-05
+
+### Changed
+
+- Import `KvExtensionContract` and `SchemaEntry` from `@rcrsr/rill-ext-kv-shared` instead of `@rcrsr/rill`
+
+### Fixed
+
+- Integration test import of `createKvFileExtension` from removed `@rcrsr/rill/ext/kv` subpath
+
 ## [0.18.1] - 2026-04-03
 
 ### Fixed

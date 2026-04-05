@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-kv-shared",
   "private": true,
-  "version": "0.18.2",
+  "version": "0.18.3",
   "description": "Shared utilities for rill key-value extensions",
   "license": "MIT",
   "type": "module",

@@ -7,9 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-04-05
+
 ### Added
 
-- New `@rcrsr/rill-ext-datetime` extension provides timezone conversion and time formatting/parsing using the system Intl API
+- New `@rcrsr/rill-ext-datetime` extension with timezone conversion, date/time formatting, and parsing via the Intl API
+- New `@rcrsr/rill-ext-kv-shared` shared package with `KvExtensionContract` and `SchemaEntry` types
+- New `@rcrsr/rill-ext-fs-shared` shared package with `FsExtensionContract` type
+- LICENSE files added to 9 extensions that were missing them
+
+### Changed (Breaking)
+
+- `generate()` on all 3 LLM extensions accepts a rill type expression as the schema
+  parameter instead of a dict descriptor in options. Field descriptions read from
+  `.^description` annotations on `RillFieldDef`.
+- `buildJsonSchema` removed from `@rcrsr/rill-ext-llm-shared`; use
+  `buildJsonSchemaFromStructuralType` with dict `TypeStructure` instead
+
+### Changed
+
+- KV extensions (`kv-file`, `kv-redis`, `kv-sqlite`) import `KvExtensionContract`
+  and `SchemaEntry` from `@rcrsr/rill-ext-kv-shared` instead of `@rcrsr/rill`
+- FS extensions (`fs-local`, `fs-s3`) import `FsExtensionContract` from
+  `@rcrsr/rill-ext-fs-shared` instead of `@rcrsr/rill`
+- All packages resolve `@rcrsr/rill@~0.18.0` to 0.18.3 for `RillFieldDef.annotations`
+
+### Fixed
+
+- CI release workflow catches E403 "already published" errors instead of failing
+- `kv-redis` integration test imports `createKvFileExtension` from `@rcrsr/rill-ext-kv-file`
+  instead of removed `@rcrsr/rill/ext/kv` subpath
 
 ## [0.18.2] - 2026-04-04
 
