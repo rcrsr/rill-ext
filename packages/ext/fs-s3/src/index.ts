@@ -15,7 +15,8 @@ import {
 } from '@aws-sdk/client-s3';
 import type { S3FsConfig, S3FsMountConfig } from './types.js';
 import { createRequire } from 'node:module';
-import { structureToTypeValue, toCallable, type ExtensionConfigSchema, type ExtensionFactoryResult, type ExtensionManifest, type FsExtensionContract, type RillFunction, type RillValue } from '@rcrsr/rill';
+import { structureToTypeValue, toCallable, type ExtensionConfigSchema, type ExtensionFactoryResult, type ExtensionManifest, type RillFunction, type RillValue } from '@rcrsr/rill';
+import type { FsExtensionContract } from '@rcrsr/rill-ext-fs-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 const _require = createRequire(import.meta.url);

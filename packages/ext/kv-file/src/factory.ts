@@ -10,10 +10,10 @@ import {
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryResult,
-  type KvExtensionContract,
   type RillFunction,
   type RillValue,
 } from '@rcrsr/rill';
+import type { KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { KvFileExtensionConfig, KvFileMountConfig } from './types.js';
 import { createStore } from './store.js';

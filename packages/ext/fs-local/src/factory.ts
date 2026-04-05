@@ -11,10 +11,10 @@ import {
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryResult,
-  type FsExtensionContract,
   type RillFunction,
   type RillValue,
 } from '@rcrsr/rill';
+import type { FsExtensionContract } from '@rcrsr/rill-ext-fs-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { FsLocalExtensionConfig, MountConfig } from './types.js';
 import {

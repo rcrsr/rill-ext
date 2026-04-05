@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@rcrsr/rill": "~0.18.0",
+    "@rcrsr/rill-ext-kv-shared": "workspace:*",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/node": "^25.3.0",
     "dts-bundle-generator": "^9.5.1",

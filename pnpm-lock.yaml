@@ -156,6 +156,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.18.0
         version: 0.18.0
+      '@rcrsr/rill-ext-fs-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-fs
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -181,6 +184,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.18.0
         version: 0.18.0
+      '@rcrsr/rill-ext-fs-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-fs
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -202,6 +208,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.18.0
         version: 0.18.0
+      '@rcrsr/rill-ext-kv-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-kv
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -227,6 +236,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.18.0
         version: 0.18.0
+      '@rcrsr/rill-ext-kv-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-kv
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -252,6 +264,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.18.0
         version: 0.18.0
+      '@rcrsr/rill-ext-kv-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-kv
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -583,6 +598,18 @@ importers:
       undici-types:
         specifier: ^7.22.0
         version: 7.22.0
+
+  packages/shared/ext-fs:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ~0.18.0
+        version: 0.18.0
+
+  packages/shared/ext-kv:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ~0.18.0
+        version: 0.18.0
 
   packages/shared/ext-llm:
     devDependencies:

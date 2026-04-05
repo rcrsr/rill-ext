@@ -1,0 +1,30 @@
+{
+  "name": "@rcrsr/rill-ext-kv-shared",
+  "private": true,
+  "version": "0.18.2",
+  "description": "Shared utilities for rill key-value extensions",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config ../../../eslint.config.js src/",
+    "check": "pnpm run build && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@rcrsr/rill": "~0.18.0"
+  },
+  "devDependencies": {
+    "@rcrsr/rill": "~0.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git",
+    "directory": "packages/shared/ext-kv"
+  }
+}
