@@ -6,7 +6,8 @@
 import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { anyTypeValue, structureToTypeValue, toCallable, type ExtensionFactoryResult, type KvExtensionContract, type RillFunction, type RillValue } from '@rcrsr/rill';
+import { anyTypeValue, structureToTypeValue, toCallable, type ExtensionFactoryResult, type RillFunction, type RillValue } from '@rcrsr/rill';
+import type { KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { SqliteKvConfig, SqliteKvMountConfig } from './types.js';
 
