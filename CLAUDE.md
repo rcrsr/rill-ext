@@ -31,6 +31,8 @@ rill-ext is a pnpm workspace containing vendor extensions for the rill language 
 | `packages/ext/kv-file` | `@rcrsr/rill-ext-kv-file` | node:fs (built-in) |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
 | `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` (private) | -- |
+| `packages/shared/ext-kv` | `@rcrsr/rill-ext-kv-shared` (private) | -- |
+| `packages/shared/ext-fs` | `@rcrsr/rill-ext-fs-shared` (private) | -- |
 | `packages/shared/ext-param` | `@rcrsr/rill-ext-param-shared` (private) | -- |
 | `packages/shared/ext-search` | `@rcrsr/rill-ext-search-shared` (private) | -- |
 
@@ -107,6 +109,8 @@ Shared packages (`packages/shared/`) are **bundled into** the consuming extensio
 
 - **ext-llm-shared**: Validation (`validateApiKey`, `validateModel`, `validateTemperature`), error mapping (`mapProviderError`), JSON Schema building (`buildJsonSchema`), and tool loop orchestration (`executeToolLoop`). All 3 LLM extensions depend on this.
 - **ext-vector-shared**: Error mapping, event emission, batch execution, disposal state, distance normalization, and function wrappers. All 3 vector DB extensions depend on this.
+- **ext-kv-shared**: Contract type (`KvExtensionContract`) for compile-time verification of KV extension function signatures. All 3 KV extensions depend on this.
+- **ext-fs-shared**: Contract type (`FsExtensionContract`) for compile-time verification of FS extension function signatures. Both FS extensions depend on this.
 - **ext-param-shared**: Parameter construction helpers (`p.*`) for building `RillParam` objects. All extensions that declare typed host function parameters depend on this.
 - **ext-search-shared**: Validation (`assertRequired`, `validateBaseUrl`), error mapping (`mapSearchError`, `mapProviderSearchError`), event emission, function wrapper (`createSearchFunctionWrapper`), disposal and in-flight request tracking. All 5 search extensions depend on this.
 

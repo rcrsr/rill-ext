@@ -584,6 +584,18 @@ importers:
         specifier: ^7.22.0
         version: 7.22.0
 
+  packages/shared/ext-fs:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ~0.18.0
+        version: 0.18.0
+
+  packages/shared/ext-kv:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ~0.18.0
+        version: 0.18.0
+
   packages/shared/ext-llm:
     devDependencies:
       '@rcrsr/rill':
