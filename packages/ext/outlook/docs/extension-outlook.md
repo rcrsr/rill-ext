@@ -123,14 +123,14 @@ Write operations (`send`, `reply`, `create_event`) are disabled by default. Enab
 List messages from the configured folder, ordered by received date descending.
 
 ```rill
-outlook::inbox() => $result
+$mail.inbox() => $result
 $result.messages -> log
 ```
 
 With options:
 
 ```rill
-outlook::inbox([top: 10, unread: true]) => $result
+$mail.inbox([top: 10, unread: true]) => $result
 ```
 
 | Parameter | Type | Default | Description |
@@ -149,7 +149,7 @@ outlook::inbox([top: 10, unread: true]) => $result
 List messages from a specific sender address.
 
 ```rill
-outlook::from("alice@example.com") => $result
+$mail.from("alice@example.com") => $result
 $result.messages -> log
 ```
 
@@ -169,7 +169,7 @@ $result.messages -> log
 Fetch a single message by ID with full body content.
 
 ```rill
-outlook::read("AAMkAGI2...") => $message
+$mail.read("AAMkAGI2...") => $message
 $message.body -> log
 ```
 
@@ -184,7 +184,7 @@ $message.body -> log
 Search messages using a keyword query string.
 
 ```rill
-outlook::search("budget report") => $result
+$mail.search("budget report") => $result
 $result.messages -> log
 ```
 
@@ -207,7 +207,7 @@ $result.messages -> log
 Send an email message.
 
 ```rill
-outlook::send(["bob@example.com"], "Hello", "Message body") => $result
+$mail.send(["bob@example.com"], "Hello", "Message body") => $result
 ```
 
 | Parameter | Type | Description |
@@ -229,7 +229,7 @@ outlook::send(["bob@example.com"], "Hello", "Message body") => $result
 Reply to an existing message.
 
 ```rill
-outlook::reply("AAMkAGI2...", "Thanks for the update.") => $result
+$mail.reply("AAMkAGI2...", "Thanks for the update.") => $result
 ```
 
 | Parameter | Type | Description |
@@ -250,7 +250,7 @@ outlook::reply("AAMkAGI2...", "Thanks for the update.") => $result
 Create a draft message without sending.
 
 ```rill
-outlook::draft(["bob@example.com"], "Draft subject", "Draft body") => $draft
+$mail.draft(["bob@example.com"], "Draft subject", "Draft body") => $draft
 $draft.id -> log
 ```
 
@@ -273,7 +273,7 @@ $draft.id -> log
 Set the follow-up flag on a message.
 
 ```rill
-outlook::flag("AAMkAGI2...") => $result
+$mail.flag("AAMkAGI2...") => $result
 ```
 
 | Parameter | Type | Description |
@@ -294,7 +294,7 @@ outlook::flag("AAMkAGI2...") => $result
 List calendar events within a time range.
 
 ```rill
-outlook::events(1743897600000, 1743984000000) => $result
+$mail.events(1743897600000, 1743984000000) => $result
 $result.events -> log
 ```
 
@@ -315,7 +315,7 @@ $result.events -> log
 List all calendar events scheduled for today.
 
 ```rill
-outlook::today() => $result
+$mail.today() => $result
 $result.events -> log
 ```
 
@@ -332,7 +332,7 @@ No parameters.
 Check free/busy availability for a list of attendees.
 
 ```rill
-outlook::free_busy(1743897600000, 1743984000000, ["alice@example.com"]) => $result
+$mail.free_busy(1743897600000, 1743984000000, ["alice@example.com"]) => $result
 $result.schedules -> log
 ```
 
@@ -356,7 +356,7 @@ $result.schedules -> log
 Create a new calendar event.
 
 ```rill
-outlook::create_event("Team Sync", 1743897600000, 1743901200000, [location: "Conference Room A"]) => $result
+$mail.create_event("Team Sync", 1743897600000, 1743901200000, [location: "Conference Room A"]) => $result
 ```
 
 | Parameter | Type | Description |
