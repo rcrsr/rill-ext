@@ -140,3 +140,23 @@ HTTP client with pre-defined endpoints, automatic retries, and concurrency limit
 | `@rcrsr/rill-ext-fetch` | [extension-fetch.md](packages/ext/fetch/docs/extension-fetch.md) |
 
 Functions: per-endpoint callables (auto-generated from config), `endpoints`
+
+## Azure AI Foundry (1 package, 10 functions)
+
+LLM inference, content safety, Bing grounding, and Azure AI Search via Azure AI Foundry. Supports `api-key` and Entra ID auth.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-foundry` | [extension-foundry.md](packages/ext/foundry/docs/extension-foundry.md) |
+
+Functions: `message`, `messages`, `embed`, `embed_batch`, `tool_loop`, `generate`, `shield`, `ground`, `search`, `usage`
+
+## Outlook (1 package, 12 functions)
+
+Microsoft Outlook mail and calendar via the Graph API. Supports bearer token and session auth.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-outlook` | [extension-outlook.md](packages/ext/outlook/docs/extension-outlook.md) |
+
+Functions: `inbox`, `from`, `search`, `read`, `send`, `draft`, `reply`, `flag`, `events`, `today`, `free_busy`, `create_event`
