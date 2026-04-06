@@ -82,7 +82,7 @@ export async function graphFetch(
   }
 
   if (!response.ok) {
-    throw mapGraphError(response.status, path.split('?')[0]);
+    throw mapGraphError(response.status, path.split('?')[0] ?? path);
   }
 
   // 202 Accepted and 204 No Content carry no response body
