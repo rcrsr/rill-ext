@@ -401,6 +401,27 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
 
+  packages/ext/outlook:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ~0.18.4
+        version: 0.18.4
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-param
+      '@types/node':
+        specifier: ^25.5.2
+        version: 25.5.2
+      dts-bundle-generator:
+        specifier: ^9.5.1
+        version: 9.5.1
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.8)(typescript@6.0.2)
+      undici-types:
+        specifier: ^8.0.2
+        version: 8.0.2
+
   packages/ext/search-brave:
     devDependencies:
       '@rcrsr/rill':

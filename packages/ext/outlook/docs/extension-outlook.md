@@ -1,0 +1,459 @@
+# outlook Extension
+
+*Microsoft Outlook mail and calendar integration for rill scripts via the Graph API*
+
+Provides 12 host functions covering mail read, mail write, calendar read, and calendar write operations. All requests go to `https://graph.microsoft.com/v1.0` using native `fetch`. The extension manages in-flight request tracking, capability gating, and clean disposal.
+
+Use this extension when your script needs to read or send Outlook mail, query calendar events, or check free/busy availability.
+
+## Quick Start
+
+```json
+{
+  "extensions": {
+    "mounts": {
+      "outlook": "@rcrsr/rill-ext-outlook"
+    },
+    "config": {
+      "outlook": {
+        "auth": {
+          "type": "bearer",
+          "token": "${OUTLOOK_TOKEN}"
+        }
+      }
+    }
+  }
+}
+```
+
+Rill script — load the extension as a handle and call functions via dot-path:
+
+```rill
+use<ext:outlook> => $mail
+$mail.inbox() => $result
+$result.messages -> log
+```
+
+Call a function directly without an intermediate variable:
+
+```rill
+use<ext:outlook.inbox>() => $result
+```
+
+## Configuration
+
+```json
+{
+  "extensions": {
+    "config": {
+      "outlook": {
+        "auth": {
+          "type": "bearer",
+          "token": "${OUTLOOK_TOKEN}"
+        },
+        "capabilities": {
+          "mail": { "send": true },
+          "calendar": { "create": true }
+        },
+        "mail": {
+          "maxResults": 25,
+          "folders": ["inbox", "sentitems"]
+        },
+        "mailbox": "shared@example.com"
+      }
+    }
+  }
+}
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `auth` | object | — | Authentication configuration (required). |
+| `auth.type` | string | — | `"bearer"` or `"session"` (required). |
+| `auth.token` | string | — | Static Bearer token. Required when `auth.type` is `"bearer"`. |
+| `auth.tokenVar` | string | — | RuntimeContext variable name holding the token. Required when `auth.type` is `"session"`. |
+| `capabilities` | object | See defaults below | Operation permission flags. Partial overrides merged with defaults. |
+| `capabilities.mail.read` | boolean | `true` | Allow inbox, from, read, and search operations. |
+| `capabilities.mail.send` | boolean | `false` | Allow send and reply operations. |
+| `capabilities.mail.draft` | boolean | `true` | Allow draft operations. |
+| `capabilities.mail.flag` | boolean | `true` | Allow flag operations. |
+| `capabilities.mail.search` | boolean | `true` | Allow search operations. |
+| `capabilities.calendar.read` | boolean | `true` | Allow events, today, and free_busy operations. |
+| `capabilities.calendar.create` | boolean | `false` | Allow create_event operations. |
+| `mail.maxResults` | number | `50` | Maximum messages returned per query. Range: 1-1000. |
+| `mail.folders` | string[] | `["inbox"]` | Allowlist of accessible folder names. |
+| `mailbox` | string | — | Shared mailbox UPN or user ID. When absent, uses `/me/` endpoint. |
+
+### Authentication Modes
+
+**Bearer mode** — supply a static token directly:
+
+```json
+{ "auth": { "type": "bearer", "token": "${OUTLOOK_TOKEN}" } }
+```
+
+**Session mode** — read the token from a RuntimeContext variable at call time:
+
+```json
+{ "auth": { "type": "session", "tokenVar": "user_token" } }
+```
+
+Session mode supports per-user tokens in multi-tenant scripts. The variable is resolved from the RuntimeContext chain at each call.
+
+### Default Capabilities
+
+| Capability | Default |
+|------------|---------|
+| `mail.read` | `true` |
+| `mail.send` | `false` |
+| `mail.draft` | `true` |
+| `mail.flag` | `true` |
+| `mail.search` | `true` |
+| `calendar.read` | `true` |
+| `calendar.create` | `false` |
+
+Write operations (`send`, `reply`, `create_event`) are disabled by default. Enable them explicitly when needed.
+
+## Functions
+
+### Mail — Read
+
+#### inbox
+
+List messages from the configured folder, ordered by received date descending.
+
+```rill
+outlook::inbox() => $result
+$result.messages -> log
+```
+
+With options:
+
+```rill
+outlook::inbox([top: 10, unread: true]) => $result
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `top` | number | `maxResults` | Number of messages to return. Capped at `maxResults`. |
+| `unread` | boolean | — | When `true`, returns only unread messages. |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `messages` | list | List of message dicts. See message shape below. |
+
+#### from
+
+List messages from a specific sender address.
+
+```rill
+outlook::from("alice@example.com") => $result
+$result.messages -> log
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `address` | string | — | Sender email address to filter by (required). |
+| `top` | number | `maxResults` | Number of messages to return. Capped at `maxResults`. |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `messages` | list | List of message dicts. |
+
+#### read
+
+Fetch a single message by ID with full body content.
+
+```rill
+outlook::read("AAMkAGI2...") => $message
+$message.body -> log
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `messageId` | string | Graph API message ID (required). |
+
+**Result Dict:** Single message dict (see shape below).
+
+#### search
+
+Search messages using a keyword query string.
+
+```rill
+outlook::search("budget report") => $result
+$result.messages -> log
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | — | Search keyword string (required). |
+| `top` | number | `maxResults` | Number of messages to return. Capped at `maxResults`. |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `messages` | list | List of message dicts. |
+| `query` | string | The query string used. |
+
+### Mail — Write
+
+#### send
+
+Send an email message.
+
+```rill
+outlook::send(["bob@example.com"], "Hello", "Message body") => $result
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `to` | list | List of recipient email addresses (required). Single string auto-wrapped. |
+| `subject` | string | Message subject (required). |
+| `body` | string | Message body as plain text (required). |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sent` | boolean | Always `true` when successful. |
+| `to` | list | Resolved recipient list. |
+| `subject` | string | Message subject sent. |
+
+#### reply
+
+Reply to an existing message.
+
+```rill
+outlook::reply("AAMkAGI2...", "Thanks for the update.") => $result
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `messageId` | string | ID of the message to reply to (required). |
+| `body` | string | Reply body as plain text (required). |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sent` | boolean | Always `true` when successful. |
+| `to` | string | Original sender address. |
+| `subject` | string | Reply subject (prefixed with `Re:`). |
+
+#### draft
+
+Create a draft message without sending.
+
+```rill
+outlook::draft(["bob@example.com"], "Draft subject", "Draft body") => $draft
+$draft.id -> log
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `to` | list | List of recipient email addresses (required). Single string auto-wrapped. |
+| `subject` | string | Message subject (required). |
+| `body` | string | Message body as plain text (required). |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Graph API ID of the created draft. |
+| `to` | list | Recipient list. |
+| `subject` | string | Draft subject. |
+
+#### flag
+
+Set the follow-up flag on a message.
+
+```rill
+outlook::flag("AAMkAGI2...") => $result
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `messageId` | string | ID of the message to flag (required). |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Message ID that was flagged. |
+| `flagged` | boolean | Always `true` when successful. |
+
+### Calendar — Read
+
+#### events
+
+List calendar events within a time range.
+
+```rill
+outlook::events(1743897600000, 1743984000000) => $result
+$result.events -> log
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `start` | number | Start of range as epoch milliseconds (required). |
+| `end` | number | End of range as epoch milliseconds (required). |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `events` | list | List of calendar event dicts. |
+| `range` | string | ISO 8601 interval string (`start/end`). |
+
+#### today
+
+List all calendar events scheduled for today.
+
+```rill
+outlook::today() => $result
+$result.events -> log
+```
+
+No parameters.
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `events` | list | List of today's calendar event dicts. |
+
+#### free_busy
+
+Check free/busy availability for a list of attendees.
+
+```rill
+outlook::free_busy(1743897600000, 1743984000000, ["alice@example.com"]) => $result
+$result.schedules -> log
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `start` | number | Start of range as epoch milliseconds (required). |
+| `end` | number | End of range as epoch milliseconds (required). |
+| `attendees` | list | List of email addresses to check availability for (required). |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `schedules` | list | List of schedule availability dicts per attendee. |
+| `range` | string | ISO 8601 interval string (`start/end`). |
+
+### Calendar — Write
+
+#### create_event
+
+Create a new calendar event.
+
+```rill
+outlook::create_event("Team Sync", 1743897600000, 1743901200000, [location: "Conference Room A"]) => $result
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `title` | string | Event subject/title (required). |
+| `start` | number | Start time as epoch milliseconds (required). |
+| `end` | number | End time as epoch milliseconds (required). |
+| `options` | dict | Optional event fields (see below). |
+
+**Options Dict:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `location` | string | Event location display name. |
+| `body` | string | Event body/notes as plain text. |
+| `attendees` | list | List of attendee email addresses. |
+
+**Result Dict:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Graph API ID of the created event. |
+| `title` | string | Event subject. |
+| `start` | string | Start time as ISO 8601 string. |
+| `end` | string | End time as ISO 8601 string. |
+
+### Message Dict Shape
+
+All mail read functions return message dicts with this shape:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Graph API message ID. |
+| `subject` | string | Message subject. |
+| `from` | string | Sender email address. |
+| `to` | list | List of recipient email addresses. |
+| `receivedAt` | string | Received timestamp as ISO 8601 string. |
+| `body` | string | Message body as plain text. |
+| `isRead` | boolean | Whether the message has been read. |
+| `hasAttachments` | boolean | Whether the message has attachments. |
+| `folder` | string | Folder name the message resides in. |
+
+## Error Behavior
+
+| Condition | Error Code | Message |
+|-----------|------------|---------|
+| Missing or invalid `auth` config | `RILL-R004` | `outlook: auth is required` |
+| Invalid `auth.type` value | `RILL-R004` | `outlook: auth.type must be 'bearer' or 'session'` |
+| Bearer mode missing token | `RILL-R004` | `outlook: auth.token is required` |
+| Session mode missing tokenVar | `RILL-R004` | `outlook: auth.tokenVar is required` |
+| `maxResults` out of range | `RILL-R004` | `outlook: maxResults must be 1-1000` |
+| Empty folders array | `RILL-R004` | `outlook: folders must be non-empty` |
+| Session token variable not found | `RILL-R004` | `outlook: session token '{name}' not found` |
+| Capability disabled | `RILL-R004` | `outlook: {capability} capability is disabled` |
+| Empty `to` list on send/draft | `RILL-R004` | `outlook: to is required` |
+| Empty `subject` on send/draft | `RILL-R004` | `outlook: subject is required` |
+| Empty `body` on send/reply/draft | `RILL-R004` | `outlook: body is required` |
+| `start` after `end` on events/free_busy | `RILL-R004` | `outlook: start must be before end` |
+| HTTP 401 from Graph API | `RILL-R004` | `outlook: authentication failed (401)` |
+| HTTP 403 from Graph API | `RILL-R004` | `outlook: insufficient permissions for {operation}` |
+| HTTP 404 from Graph API | `RILL-R004` | `outlook: message '{id}' not found` |
+| HTTP 429 from Graph API | `RILL-R004` | `outlook: rate limit exceeded` |
+| HTTP 5xx from Graph API | `RILL-R004` | `outlook: server error ({status})` |
+| Request timeout or abort | `RILL-R004` | `outlook: request timeout` |
+| Network connection failure | `RILL-R004` | `outlook: connection failed` |
+| Called after `dispose()` | `RILL-R004` | `outlook: operation cancelled` |
+
+## Events
+
+The extension emits runtime events for observability. Listen with `ctx.on()` in the host application.
+
+**Mail events:**
+
+| Event | Fields |
+|-------|--------|
+| `outlook:mail:read` | `duration` (ms), `folder` (string), `messageCount` (number) |
+| `outlook:mail:search` | `duration` (ms), `query` (string), `resultCount` (number) |
+| `outlook:mail:send` | `duration` (ms), `to` (string), `subject` (string) |
+| `outlook:mail:draft` | `duration` (ms), `to` (string), `subject` (string) |
+| `outlook:mail:flag` | `duration` (ms), `messageId` (string) |
+
+**Calendar events:**
+
+| Event | Fields |
+|-------|--------|
+| `outlook:calendar:read` | `duration` (ms), `eventCount` (number), `range` (string) |
+| `outlook:calendar:create` | `duration` (ms), `title` (string) |
+
+**Error events** (emitted when any request fails):
+
+| Event | Fields |
+|-------|--------|
+| `outlook:error` | `duration` (ms), `error` (string) |
+
+## See Also
+
+- [rill](https://github.com/rcrsr/rill) — Core language runtime
+- [Extensions Guide](https://github.com/rcrsr/rill/blob/main/docs/integration-extensions.md) — Extension contract and patterns
+- [Host API Reference](https://github.com/rcrsr/rill/blob/main/docs/ref-host-api.md) — Runtime context and host functions
+- [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/api/overview) — Underlying API reference
