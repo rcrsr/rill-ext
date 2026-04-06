@@ -29,6 +29,7 @@ rill-ext is a pnpm workspace containing official extensions for the rill languag
 | `packages/ext/fetch` | `@rcrsr/rill-ext-fetch` | fetch (native) |
 | `packages/ext/fs-local` | `@rcrsr/rill-ext-fs-local` | node:fs (built-in) |
 | `packages/ext/kv-file` | `@rcrsr/rill-ext-kv-file` | node:fs (built-in) |
+| `packages/ext/outlook` | `@rcrsr/rill-ext-outlook` | fetch (native) |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
 | `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` (private) | -- |
 | `packages/shared/ext-kv` | `@rcrsr/rill-ext-kv-shared` (private) | -- |
