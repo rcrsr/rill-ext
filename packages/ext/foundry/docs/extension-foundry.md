@@ -2,6 +2,18 @@
 
 *Azure AI Foundry integration for rill scripts — LLM inference, content safety, Bing grounding, and AI Search*
 
+## Contents
+
+- [Quick Start](#quick-start)
+- [Configuration Reference](#configuration-reference)
+- [Functions](#functions)
+- [Streaming](#streaming)
+- [Full Tier 2 Example](#full-tier-2-example)
+- [Error Reference](#error-reference)
+- [Events](#events)
+- [Using OpenAI Extension with Foundry](#using-openai-extension-with-foundry)
+- [See Also](#see-also)
+
 This extension connects rill scripts to Azure AI Foundry services. Ten functions cover the core operations. `message` and `messages` handle single and multi-turn LLM inference via `AzureOpenAI`. `embed` and `embed_batch` generate vector embeddings. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured output matching a schema dict. `shield` evaluates text for prompt injection attacks via Azure AI Content Safety. `ground` answers queries with Bing search citations. `search` queries Azure AI Search indexes. `usage` returns accumulated token counts.
 
 The host sets endpoint, auth, and model at creation time. Scripts never handle credentials. Each call emits a structured event (`foundry:message`, `foundry:tool_call`) for host-side logging and metrics.
@@ -168,7 +180,7 @@ Required when using any LLM function (`message`, `messages`, `embed`, `embed_bat
 | `embedModel` | string | No | — | Deployment name for embedding operations |
 | `timeout` | number | No | 30000 | Request timeout in ms |
 
-#### Decision D-1: apiVersion is required
+#### apiVersion is required
 
 `AzureOpenAI` (from the `openai` SDK) has no built-in default for `apiVersion`. The constructor throws when it is omitted. Always set `apiVersion` explicitly.
 

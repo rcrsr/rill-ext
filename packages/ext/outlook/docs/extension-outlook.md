@@ -2,6 +2,16 @@
 
 *Microsoft Outlook mail and calendar integration for rill scripts via the Graph API*
 
+## Contents
+
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Functions](#functions)
+- [Message Dict Shape](#message-dict-shape)
+- [Error Behavior](#error-behavior)
+- [Events](#events)
+- [See Also](#see-also)
+
 Provides 12 host functions covering mail read, mail write, calendar read, and calendar write operations. All requests go to `https://graph.microsoft.com/v1.0` using native `fetch`. The extension manages in-flight request tracking, capability gating, and clean disposal.
 
 Use this extension when your script needs to read or send Outlook mail, query calendar events, or check free/busy availability.
