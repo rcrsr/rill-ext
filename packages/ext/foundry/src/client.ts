@@ -6,6 +6,7 @@
  *   - cognitiveservices.azure.com/.default — Content Safety and AI Search REST calls
  */
 
+import { RuntimeError } from '@rcrsr/rill';
 import { AzureOpenAI } from 'openai';
 import type { FoundryAuth, FoundryInferenceConfig } from './types.js';
 
@@ -103,6 +104,8 @@ export async function buildRestAuthHeaders(
   const { DefaultAzureCredential } = await import('@azure/identity');
   const credential = auth.credential ?? new DefaultAzureCredential();
   const tokenResponse = await credential.getToken(SCOPE_COGNITIVE);
-  const token = tokenResponse?.token ?? '';
-  return { Authorization: `Bearer ${token}` };
+  if (!tokenResponse?.token) {
+    throw new RuntimeError('RILL-R004', 'foundry: failed to acquire Entra token');
+  }
+  return { Authorization: `Bearer ${tokenResponse.token}` };
 }

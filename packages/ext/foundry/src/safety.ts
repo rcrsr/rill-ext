@@ -257,7 +257,12 @@ async function runShieldRequest(
 
 /**
  * Extract the primary prompt text from host function arguments.
- * Uses the 'text' argument if present, otherwise falls back to empty string.
+ *
+ * Checks arg shapes in order:
+ * 1. `args['text']` — string (message, tool_loop)
+ * 2. `args['prompt']` — string (generate)
+ * 3. `args['messages']` — list of dicts; returns `content` from the last dict where `role === 'user'`
+ * 4. Falls back to empty string
  *
  * @param args - Host function arguments dict
  * @returns Prompt text string
@@ -267,5 +272,29 @@ function extractPromptText(args: Record<string, RillValue>): string {
   if (typeof text === 'string') {
     return text;
   }
+
+  const prompt = args['prompt'];
+  if (typeof prompt === 'string') {
+    return prompt;
+  }
+
+  const messages = args['messages'];
+  if (Array.isArray(messages)) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (
+        typeof msg === 'object' &&
+        msg !== null &&
+        !Array.isArray(msg) &&
+        (msg as Record<string, RillValue>)['role'] === 'user'
+      ) {
+        const content = (msg as Record<string, RillValue>)['content'];
+        if (typeof content === 'string') {
+          return content;
+        }
+      }
+    }
+  }
+
   return '';
 }

@@ -256,7 +256,8 @@ async function runSearchRequest(
 /**
  * Extract the document ID from an Azure AI Search result item.
  * Tries common key field names: 'id', 'ID', 'key'.
- * Falls back to empty string if none found.
+ * Falls back to the first non-metadata field (fields not starting with '@') with a truthy value.
+ * Returns empty string if no suitable field is found.
  *
  * @param item - Raw search result item
  * @returns Document ID as string
@@ -266,6 +267,18 @@ function extractDocumentId(item: Record<string, unknown>): string {
     const value = item[key];
     if (value !== undefined && value !== null) {
       return String(value);
+    }
+  }
+  for (const key of Object.keys(item)) {
+    if (!key.startsWith('@')) {
+      const value = item[key];
+      const isScalar =
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean';
+      if (isScalar && value) {
+        return String(value);
+      }
     }
   }
   return '';
