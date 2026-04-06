@@ -242,8 +242,8 @@ outlook::reply("AAMkAGI2...", "Thanks for the update.") => $result
 | Field | Type | Description |
 |-------|------|-------------|
 | `sent` | boolean | Always `true` when successful. |
-| `to` | string | Original sender address. |
-| `subject` | string | Reply subject (prefixed with `Re:`). |
+| `to` | list | Always empty (`[]`). Graph API returns HTTP 202 with no response body, so no recipient data is available. |
+| `subject` | string | Always empty (`''`). Graph API returns HTTP 202 with no response body, so no subject data is available. |
 
 #### draft
 
@@ -371,8 +371,8 @@ outlook::create_event("Team Sync", 1743897600000, 1743901200000, [location: "Con
 | Option | Type | Description |
 |--------|------|-------------|
 | `location` | string | Event location display name. |
-| `body` | string | Event body/notes as plain text. |
 | `attendees` | list | List of attendee email addresses. |
+| `isOnline` | boolean | When `true`, creates an online meeting link. |
 
 **Result Dict:**
 
@@ -380,8 +380,8 @@ outlook::create_event("Team Sync", 1743897600000, 1743901200000, [location: "Con
 |-------|------|-------------|
 | `id` | string | Graph API ID of the created event. |
 | `title` | string | Event subject. |
-| `start` | string | Start time as ISO 8601 string. |
-| `end` | string | End time as ISO 8601 string. |
+| `start` | number | Start time as epoch milliseconds. |
+| `end` | number | End time as epoch milliseconds. |
 
 ### Message Dict Shape
 
@@ -391,13 +391,13 @@ All mail read functions return message dicts with this shape:
 |-------|------|-------------|
 | `id` | string | Graph API message ID. |
 | `subject` | string | Message subject. |
+| `preview` | string | Short body preview text. |
 | `from` | string | Sender email address. |
 | `to` | list | List of recipient email addresses. |
-| `receivedAt` | string | Received timestamp as ISO 8601 string. |
-| `body` | string | Message body as plain text. |
-| `isRead` | boolean | Whether the message has been read. |
+| `date` | number | Received timestamp as epoch milliseconds. |
+| `unread` | boolean | Whether the message has not been read. |
+| `flagged` | boolean | Whether the message is flagged for follow-up. |
 | `hasAttachments` | boolean | Whether the message has attachments. |
-| `folder` | string | Folder name the message resides in. |
 
 ## Error Behavior
 
@@ -410,7 +410,7 @@ All mail read functions return message dicts with this shape:
 | `maxResults` out of range | `RILL-R004` | `outlook: maxResults must be 1-1000` |
 | Empty folders array | `RILL-R004` | `outlook: folders must be non-empty` |
 | Session token variable not found | `RILL-R004` | `outlook: session token '{name}' not found` |
-| Capability disabled | `RILL-R004` | `outlook: {capability} capability is disabled` |
+| Capability disabled | `RILL-R004` | `outlook: {capability} not enabled` |
 | Empty `to` list on send/draft | `RILL-R004` | `outlook: to is required` |
 | Empty `subject` on send/draft | `RILL-R004` | `outlook: subject is required` |
 | Empty `body` on send/reply/draft | `RILL-R004` | `outlook: body is required` |

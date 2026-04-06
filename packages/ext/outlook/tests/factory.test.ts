@@ -82,12 +82,12 @@ describe('createOutlookExtension', () => {
       expect((caught as RuntimeError).message).toBe('outlook: auth.token is required');
     });
 
-    it('throws RILL-R004 when bearer token is whitespace', () => {
+    it('accepts whitespace-only bearer token at config time', () => {
       // The config validation only checks !token or token === ''
       // A whitespace-only token passes config validation (resolved to the token string)
       // This test documents the current behavior: whitespace is accepted at config time
       expect(() =>
-        createOutlookExtension({ auth: { type: 'bearer', token: 'valid-token' } })
+        createOutlookExtension({ auth: { type: 'bearer', token: '   ' } })
       ).not.toThrow();
     });
 

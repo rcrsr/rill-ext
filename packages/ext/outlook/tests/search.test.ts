@@ -79,7 +79,7 @@ describe('search() host function', () => {
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('$search=');
-    expect(url).toContain('meeting notes');
+    expect(url).toContain('meeting%20notes');
   });
 
   it('wraps query value in double quotes in $search [AC-4]', async () => {

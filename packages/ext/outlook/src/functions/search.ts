@@ -32,8 +32,9 @@ export async function search(
     config.maxResults
   );
 
-  // $search uses double-quoted value per Graph API spec
-  const path = `messages?$search="${query}"&$top=${top}`;
+  // $search uses double-quoted value per Graph API spec; encode the query to
+  // handle special characters and spaces safely in the URL.
+  const path = `messages?$search="${encodeURIComponent(query)}"&$top=${top}`;
 
   const response = await graphFetch(
     'GET',
@@ -41,7 +42,9 @@ export async function search(
     config.auth,
     config.mailbox,
     ctx,
-    controller
+    controller,
+    undefined,
+    { ConsistencyLevel: 'eventual' }
   );
 
   const data = response as { value?: unknown[] };

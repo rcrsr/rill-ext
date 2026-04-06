@@ -28,15 +28,8 @@ export { createOutlookExtension } from './factory.js';
 
 /**
  * Config schema for Outlook extension.
- * The rill ExtensionConfigSchema type supports only flat string/number/boolean
- * fields. Nested auth and capabilities fields are documented here as strings;
- * the factory validates the full structure at runtime.
- *
- * Leaf-level fields:
- *   auth.type    — 'bearer' or 'session' (required)
- *   auth.token   — Bearer token (required when auth.type = 'bearer')
- *   auth.tokenVar — RuntimeContext variable name (required when auth.type = 'session')
- *   mailbox      — Shared mailbox UPN/ID (optional, uses /me/ when absent)
+ * Only flat fields are representable in ExtensionConfigSchema.
+ * Auth and capabilities are validated at runtime by the factory.
  */
 export const configSchema: ExtensionConfigSchema = {
   mailbox: { type: 'string' },

@@ -36,7 +36,7 @@ export async function inbox(
     config.maxResults
   );
 
-  const base = folder !== undefined ? `mailFolders/${folder}/messages` : 'messages';
+  const base = folder !== undefined ? `mailFolders/${encodeURIComponent(folder)}/messages` : 'messages';
 
   let path: string;
   if (unread === true) {
@@ -57,5 +57,5 @@ export async function inbox(
   const data = response as { value?: unknown[] };
   const messages = (data.value ?? []).map(normalizeMessage);
 
-  return { messages } as unknown as RillValue;
+  return { messages, folder: folder ?? 'inbox' } as unknown as RillValue;
 }

@@ -206,7 +206,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
       const messages = dict['messages'] as RillValue[] | undefined;
       return {
         event: `${PROVIDER}:mail:read`,
-        folder: 'inbox' as RillValue,
+        folder: (dict['folder'] ?? 'inbox') as RillValue,
         messageCount: (messages?.length ?? 0) as RillValue,
       };
     },
@@ -221,7 +221,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
       const messages = dict['messages'] as RillValue[] | undefined;
       return {
         event: `${PROVIDER}:mail:read`,
-        folder: 'inbox' as RillValue,
+        folder: 'from' as RillValue,
         messageCount: (messages?.length ?? 0) as RillValue,
       };
     },
@@ -464,7 +464,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
         p.str('title'),
         p.num('start'),
         p.num('end'),
-        p.dict('options'),
+        p.dict('options', undefined, {}),
       ],
       returnType: dictReturnType,
     }),

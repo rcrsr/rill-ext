@@ -45,7 +45,8 @@ export async function graphFetch(
   mailbox: string | undefined,
   ctx: RuntimeContext,
   controller: AbortController,
-  body?: unknown
+  body?: unknown,
+  extraHeaders?: Record<string, string>
 ): Promise<unknown> {
   const token = resolveToken(auth, ctx);
 
@@ -62,6 +63,7 @@ export async function graphFetch(
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
+    ...extraHeaders,
   };
 
   // Only set Content-Type for requests with a body
