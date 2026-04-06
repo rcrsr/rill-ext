@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New `@rcrsr/rill-ext-foundry` extension integrating Azure AI Foundry with LLM, embedding, and grounding capabilities
 - New `@rcrsr/rill-ext-outlook` extension providing access to Microsoft Graph mail and calendar operations including inbox, search, send, draft, reply, flag, events, free-busy, and event creation
 
 ## [0.18.4] - 2026-04-05

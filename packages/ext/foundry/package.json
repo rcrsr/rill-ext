@@ -1,0 +1,63 @@
+{
+  "name": "@rcrsr/rill-ext-foundry",
+  "version": "0.18.4",
+  "description": "rill extension for Azure AI Foundry integration",
+  "license": "MIT",
+  "author": "Andre Bremer",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "rill",
+    "azure",
+    "foundry",
+    "llm",
+    "extension",
+    "ai",
+    "scripting"
+  ],
+  "scripts": {
+    "build": "tsup && dts-bundle-generator --config dts-bundle-generator.config.cjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config ../../../eslint.config.js src/",
+    "check": "pnpm run build && pnpm run test && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@azure/identity": "^4.13.0",
+    "@rcrsr/rill": "~0.18.4"
+  },
+  "peerDependenciesMeta": {
+    "@azure/identity": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@azure/msal-node": "^5.1.2",
+    "@rcrsr/rill": "~0.18.4",
+    "@rcrsr/rill-ext-llm-shared": "workspace:^",
+    "@rcrsr/rill-ext-param-shared": "workspace:*",
+    "@types/node": "^25.5.2",
+    "dts-bundle-generator": "^9.5.1",
+    "tsup": "^8.5.1",
+    "undici-types": "^8.0.2"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git",
+    "directory": "packages/ext/foundry"
+  },
+  "homepage": "https://github.com/rcrsr/rill-ext/tree/main/packages/ext/foundry#readme",
+  "bugs": {
+    "url": "https://github.com/rcrsr/rill-ext/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "openai": "^6.33.0"
+  }
+}
