@@ -37,6 +37,9 @@ const ROLE_MARKER_RE = /^@@\s+(\w+)\s*$/;
  * for each role is all lines between that marker and the next marker (or
  * EOF), joined verbatim (no trimming).
  *
+ * Any text before the first `@@ role` marker is emitted as a leading
+ * entry with role `user` (the documented default).
+ *
  * Interior `##` markdown headings are not treated as role markers and
  * remain part of the enclosing role's content (AC-19).
  *
@@ -48,23 +51,26 @@ export function splitRoleMessages(body: string): RoleMessage[] {
 
   let currentRole: string | null = null;
   let currentLines: string[] = [];
+  let sawMarker = false;
 
   for (const line of lines) {
     const match = ROLE_MARKER_RE.exec(line);
     if (match !== null) {
-      // Flush the previous role entry before starting a new one
       if (currentRole !== null) {
         messages.push({ role: currentRole, content: currentLines.join('\n') });
+      } else if (currentLines.length > 0 && currentLines.some((l) => l.length > 0)) {
+        messages.push({ role: 'user', content: currentLines.join('\n') });
       }
       currentRole = match[1] as string;
       currentLines = [];
+      sawMarker = true;
     } else {
       currentLines.push(line);
     }
   }
 
   // EC-5: no role markers found
-  if (currentRole === null) {
+  if (!sawMarker) {
     throw new RuntimeError(
       'RILL-R001',
       'prompt body must contain at least one role marker (@@ role)',
@@ -72,7 +78,7 @@ export function splitRoleMessages(body: string): RoleMessage[] {
   }
 
   // Flush the final role entry
-  messages.push({ role: currentRole, content: currentLines.join('\n') });
+  messages.push({ role: currentRole as string, content: currentLines.join('\n') });
 
   return messages;
 }

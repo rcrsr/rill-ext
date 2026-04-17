@@ -41,9 +41,13 @@ export async function traversePromptFiles(basePath: string): Promise<TraversalEn
     const entries = await readdir(currentPath, { withFileTypes: true });
 
     for (const entry of entries) {
-      // readdir default: does not follow symlinks. isDirectory() on a symlink
-      // pointing to a directory returns false when withFileTypes is used without
-      // followSymlinks, so symlinked directories are skipped automatically.
+      // Skip symlinks explicitly: isDirectory() returns false for symlinked
+      // directories, but symlinked files still match the suffix check below
+      // and would otherwise be read even when they point outside basePath.
+      if (entry.isSymbolicLink()) {
+        continue;
+      }
+
       const fullPath = join(currentPath, entry.name);
 
       if (entry.isDirectory()) {

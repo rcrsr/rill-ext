@@ -19,7 +19,7 @@ Every prompt file has two parts: a YAML frontmatter block and a template body.
 description: One-sentence summary of what this prompt does.
 params:
   - question: string
-  - max_words: number = 200
+  - max_words: num = 200
 output: string
 ---
 Answer the following question in {max_words} words or fewer.
@@ -51,7 +51,7 @@ Examples:
 ```yaml
 params:
   - question: string
-  - temperature: number = 0.7
+  - temperature: num = 0.7
   - tags: list
   - context: dict
 ```
@@ -140,8 +140,8 @@ The body uses single-brace substitution for named params. The rules below cover 
 | Param type | Coercion |
 |------------|---------|
 | string | Used as-is |
-| number | `String(value)` |
-| boolean | `String(value)` (`"true"` or `"false"`) |
+| num | `String(value)` |
+| bool | `String(value)` (`"true"` or `"false"`) |
 | null / undefined | Empty string |
 | dict | Raises `RILL-R004` (EC-16) |
 | list | Raises `RILL-R004` (EC-16) |

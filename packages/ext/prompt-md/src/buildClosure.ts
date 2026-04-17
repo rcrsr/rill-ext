@@ -82,7 +82,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
           // dict, list, callable, or other non-primitive — EC-16
           throw new RuntimeError(
             'RILL-R004',
-            `prompt parameter "${param.name}" must be a string, number, or boolean value for interpolation`,
+            `prompt parameter "${param.name}" must be a string, num, or bool value for interpolation`,
           );
         }
       }

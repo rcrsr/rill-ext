@@ -89,6 +89,29 @@ describe('splitRoleMessages', () => {
   });
 
   // ============================================================
+  // PRE-MARKER CONTENT → default role 'user'
+  // ============================================================
+
+  describe('pre-marker content', () => {
+    it('emits a leading user entry when text precedes the first @@ marker', () => {
+      const body = 'preamble line 1\npreamble line 2\n@@ assistant\nreply';
+      const result = splitRoleMessages(body);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ role: 'user', content: 'preamble line 1\npreamble line 2' });
+      expect(result[1]).toEqual({ role: 'assistant', content: 'reply' });
+    });
+
+    it('ignores blank-only preamble', () => {
+      const body = '\n\n@@ system\nprompt';
+      const result = splitRoleMessages(body);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({ role: 'system', content: 'prompt' });
+    });
+  });
+
+  // ============================================================
   // EC-5: NO ROLE MARKERS
   // ============================================================
 

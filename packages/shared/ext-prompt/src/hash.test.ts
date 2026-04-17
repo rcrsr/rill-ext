@@ -35,10 +35,10 @@ describe('computeContentHash', () => {
     });
 
     it('returns a known SHA-256 value for deterministic input', () => {
-      // SHA-256("params\noutput\nbody") verified externally
+      // SHA-256 of "params\noutput\nbody", verified via:
+      //   printf 'params\noutput\nbody' | sha256sum
       const result = computeContentHash('params', 'output', 'body');
-      expect(result).toBe('61396d16a71b2fa3e7c2e5d28f4d9e2e06fe55e5c8e0e49e08b8e5b8e7e9c5a9'.length > 0 ? result : '');
-      // Structural check: 64 lowercase hex chars
+      expect(result).toBe('0194cbe082524911328762aac6e2880289a8e4e0e506e7de24c6f2ae45c98f22');
       expect(result).toMatch(/^[0-9a-f]{64}$/);
     });
   });

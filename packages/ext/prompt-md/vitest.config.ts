@@ -1,10 +1,12 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 // Resolve LLM extension package names to their source files for integration
 // tests. This avoids declaring cross-extension devDependencies (§EXT.2.1 /
 // AC-20) while still importing via package names (not relative source paths).
-const repoRoot = path.resolve(import.meta.dirname, '../../..');
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(currentDir, '../../..');
 
 export default defineConfig({
   resolve: {

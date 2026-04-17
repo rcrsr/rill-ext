@@ -10,6 +10,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { RuntimeError } from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
 
@@ -389,9 +390,7 @@ body
 
 describe('AC-20: package.json has no cross-extension dependencies', () => {
   it('does not reference any packages/ext/* sibling in dependencies', async () => {
-    const pkgPath = path.resolve(
-      new URL('../package.json', import.meta.url).pathname,
-    );
+    const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
     const raw = await fs.readFile(pkgPath, 'utf-8');
     const pkg = JSON.parse(raw) as {
       dependencies?: Record<string, string>;
