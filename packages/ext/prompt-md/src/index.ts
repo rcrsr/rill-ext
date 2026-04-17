@@ -9,7 +9,7 @@
  */
 
 import { createRequire } from 'node:module';
-import type { ExtensionConfigSchema } from '@rcrsr/rill';
+import type { ExtensionConfigSchema, ExtensionManifest } from '@rcrsr/rill';
 
 // ============================================================
 // VERSION
@@ -37,4 +37,16 @@ export { createPromptMdExtension } from './factory.js';
 
 export const configSchema: ExtensionConfigSchema = {
   basePath: { type: 'string' },
+};
+
+// ============================================================
+// EXTENSION MANIFEST
+// ============================================================
+
+import { createPromptMdExtension as _factory } from './factory.js';
+
+export const extensionManifest: ExtensionManifest = {
+  factory: _factory,
+  configSchema,
+  version: VERSION,
 };
