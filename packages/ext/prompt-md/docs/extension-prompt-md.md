@@ -2,7 +2,7 @@
 
 *Markdown prompt loader for rill scripts*
 
-This extension loads `.prompt.md` files from a directory tree and exposes each file as a typed callable. Scripts invoke prompts by resolution name, pass named arguments, and receive either a rendered string or a list of role-tagged message dicts. The list form passes directly into any LLM extension's `messages()` call.
+This extension loads `.prompt.md` files from a directory tree and exposes each file as a typed callable. Scripts invoke prompts by resolution name, pass positional arguments in the order the params are declared in frontmatter, and receive either a rendered string or a list of role-tagged message dicts. The list form passes directly into any LLM extension's `messages()` call.
 
 ## Overview
 
@@ -242,8 +242,9 @@ use<ext:llm>    => $llm
 use<ext:prompt> => $prompt
 
 # Invoke the prompt closure with the question param.
+# Args are positional and bind to params in declaration order.
 # The closure returns list[{ role, content }] because output is "list".
-$prompt.agents_research([question: "What caused the 2008 financial crisis?"]) => $messages
+$prompt.agents_research("What caused the 2008 financial crisis?") => $messages
 
 # Pass the message list directly into messages().
 # No per-provider formatting needed -- the shape is identical for all LLM extensions.
