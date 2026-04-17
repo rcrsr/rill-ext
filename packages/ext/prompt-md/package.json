@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-prompt-md",
-  "version": "0.18.4",
+  "version": "0.18.5",
   "description": "rill extension for loading markdown prompt files with frontmatter",
   "license": "MIT",
   "author": "Andre Bremer",
