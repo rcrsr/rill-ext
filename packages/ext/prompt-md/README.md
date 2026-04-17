@@ -16,8 +16,8 @@ npm install @rcrsr/rill-ext-prompt-md
 ---
 description: Summarize a passage in a bounded word count.
 params:
-  - passage: string
-  - max_words: num = 200
+  - "passage: string"
+  - "max_words: num = 200"
 output: string
 ---
 Summarize the following passage in {max_words} words or fewer.

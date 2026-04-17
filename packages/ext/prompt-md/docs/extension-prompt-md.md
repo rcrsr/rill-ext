@@ -18,8 +18,8 @@ Every prompt file has two parts: a YAML frontmatter block and a template body.
 ---
 description: One-sentence summary of what this prompt does.
 params:
-  - question: string
-  - max_words: num = 200
+  - "question: string"
+  - "max_words: num = 200"
 output: string
 ---
 Answer the following question in {max_words} words or fewer.
@@ -46,14 +46,16 @@ name: type
 name: type = default
 ```
 
+Each entry MUST be a quoted YAML string. Unquoted form (`- name: type`) is parsed by YAML as a map and rejected at load time with `RILL-R004` (`params entries must be strings`).
+
 Examples:
 
 ```yaml
 params:
-  - question: string
-  - temperature: num = 0.7
-  - tags: list
-  - context: dict
+  - "question: string"
+  - "temperature: num = 0.7"
+  - "tags: list"
+  - "context: dict"
 ```
 
 A param without a default is required. A param with a default is optional at call time. The extension raises `RILL-R004` when a required param is missing at invocation.
@@ -93,7 +95,7 @@ Use `@@ role` lines to split a single file body into multiple conversation turns
 ---
 description: Research assistant prompt.
 params:
-  - question: string
+  - "question: string"
 output: list
 ---
 @@ system
@@ -173,7 +175,7 @@ This example loads a research prompt with `output: list` and passes the result d
 ---
 description: Answers a research question with a cited response.
 params:
-  - question: string
+  - "question: string"
 output: list
 ---
 @@ system
