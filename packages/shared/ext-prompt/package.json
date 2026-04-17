@@ -1,0 +1,33 @@
+{
+  "name": "@rcrsr/rill-ext-prompt-shared",
+  "private": true,
+  "version": "0.18.4",
+  "description": "Shared utilities for rill prompt extensions",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config ../../../eslint.config.js src/",
+    "check": "pnpm run build && pnpm run test && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@rcrsr/rill": "~0.18.4"
+  },
+  "devDependencies": {
+    "@rcrsr/rill": "~0.18.4",
+    "@rcrsr/rill-ext-param-shared": "workspace:*",
+    "vitest": "^4.1.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git",
+    "directory": "packages/shared/ext-prompt"
+  }
+}

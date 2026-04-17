@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New `@rcrsr/rill-ext-prompt-md` extension loads typed prompt templates from `.prompt.md` files, validates at startup, and exposes them as callables for LLM `messages()` entry points
 - New `@rcrsr/rill-ext-foundry` extension for Azure AI Foundry: LLM inference via `AzureOpenAI`, content safety prompt shielding, Bing grounding with citations, and Azure AI Search. Supports `api-key` and Entra ID auth. 10 host functions: `message`, `messages`, `embed`, `embed_batch`, `tool_loop`, `generate`, `shield`, `ground`, `search`, `usage`
 - New `@rcrsr/rill-ext-outlook` extension providing access to Microsoft Graph mail and calendar operations including inbox, search, send, draft, reply, flag, events, free-busy, and event creation
 

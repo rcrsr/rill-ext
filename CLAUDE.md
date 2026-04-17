@@ -31,12 +31,14 @@ rill-ext is a pnpm workspace containing official extensions for the rill languag
 | `packages/ext/kv-file` | `@rcrsr/rill-ext-kv-file` | node:fs (built-in) |
 | `packages/ext/outlook` | `@rcrsr/rill-ext-outlook` | fetch (native) |
 | `packages/ext/foundry` | `@rcrsr/rill-ext-foundry` | openai, @azure/identity (optional) |
+| `packages/ext/prompt-md` | `@rcrsr/rill-ext-prompt-md` | yaml |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
 | `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` (private) | -- |
 | `packages/shared/ext-kv` | `@rcrsr/rill-ext-kv-shared` (private) | -- |
 | `packages/shared/ext-fs` | `@rcrsr/rill-ext-fs-shared` (private) | -- |
 | `packages/shared/ext-param` | `@rcrsr/rill-ext-param-shared` (private) | -- |
 | `packages/shared/ext-search` | `@rcrsr/rill-ext-search-shared` (private) | -- |
+| `packages/shared/ext-prompt` | `@rcrsr/rill-ext-prompt-shared` (private) | -- |
 
 ## Commands
 
