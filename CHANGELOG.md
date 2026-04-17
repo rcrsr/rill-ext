@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.5] - 2026-04-17
+
 ### Added
 
 - New `@rcrsr/rill-ext-prompt-md` extension loads typed prompt templates from `.prompt.md` files, validates at startup, and exposes them as callables for LLM `messages()` entry points
