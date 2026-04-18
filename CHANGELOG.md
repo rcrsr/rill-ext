@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.6] - 2026-04-17
+
+### Changed (Breaking)
+
+- `@rcrsr/rill-ext-prompt-md` peer dep on `@rcrsr/rill` bumped from `~0.18.4` to `~0.18.6` to consume the re-exported `tokenize`, `createParserState`, and `parseTypeRef`
+- Frontmatter `params` type grammar delegates to rill's `parseTypeRef`. Legacy alias `num` is hard-rejected; use `number`. Legacy alias `callable` is hard-rejected and has no replacement — function-typed params are not supported
+- Param type names `closure`, `iterator`, `stream`, `vector`, and `type` are hard-rejected because they render through `formatValue` as placeholder strings (e.g. `type(closure)`, `vector(model, Nd)`) with no useful meaning in prompt text
+
+### Added
+
+- `@rcrsr/rill-ext-prompt-md` frontmatter `params` now accepts full rill type expressions, including parameterized and nested forms (e.g. `list(dict(title: string, body: string))`)
+- Template interpolation in prompts renders every `RillValue` via rill's canonical `formatValue` stringifier; dicts and lists produce rill literal syntax
+
+### Fixed
+
+- `@rcrsr/rill-ext-prompt-md` README and docs no longer show invalid unquoted YAML for `params` entries; each entry must be a YAML string literal
+
 ## [0.18.5] - 2026-04-17
 
 ### Added
