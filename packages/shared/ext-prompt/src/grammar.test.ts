@@ -262,7 +262,7 @@ describe('parseParamGrammar', () => {
       }
     });
 
-    it('rejects callable (use closure)', () => {
+    it('rejects callable — no function-typed params supported in prompt-md', () => {
       try {
         parseParamGrammar('fn: callable');
         expect.fail('should have thrown');
@@ -328,10 +328,6 @@ describe('parseParamGrammar', () => {
 
     it('throws RuntimeError when list has a default', () => {
       expect(() => parseParamGrammar('tags: list = []')).toThrow(RuntimeError);
-    });
-
-    it('throws RuntimeError when closure has a default', () => {
-      expect(() => parseParamGrammar('fn: closure = something')).toThrow(RuntimeError);
     });
 
     it('throws RuntimeError when any has a default', () => {

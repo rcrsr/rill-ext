@@ -51,10 +51,13 @@ function validateName(name: string): void {
  *
  * The type portion is any static rill type expression accepted by rill's
  * parseTypeRef. Examples: `string`, `number`, `bool`, `dict`, `list`,
- * `any`, `closure`, `list(string)`, `dict(a: string, b: number)`.
+ * `any`, `list(string)`, `dict(a: string, b: number)`.
  *
  * Note: `num` and `callable` are NOT accepted (not valid rill type names).
  * Dynamic refs ($T) and unions (A | B) are rejected by typeRefToStructure.
+ * Non-renderable types (`closure`, `iterator`, `stream`, `vector`, `type`)
+ * are rejected — their `formatValue` output is placeholder text with no
+ * useful meaning in a prompt.
  * Defaults remain scalar-only in v0 (string, number, bool).
  *
  * @param entry - A single entry string from the params list
