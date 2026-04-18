@@ -19,7 +19,7 @@ Every prompt file has two parts: a YAML frontmatter block and a template body.
 description: One-sentence summary of what this prompt does.
 params:
   - "question: string"
-  - "max_words: num = 200"
+  - "max_words: number = 200"
 output: string
 ---
 Answer the following question in {max_words} words or fewer.
@@ -39,7 +39,7 @@ The frontmatter block starts and ends with `---` on its own line. The template b
 
 ### Params Grammar
 
-Each entry in `params` follows the rill param grammar.
+Each entry in `params` follows the format:
 
 ```
 name: type
@@ -48,14 +48,21 @@ name: type = default
 
 Each entry MUST be a quoted YAML string. Unquoted form (`- name: type`) is parsed by YAML as a map and rejected at load time with `RILL-R004` (`params entries must be strings`).
 
+**Supported type names:** `string`, `number`, `bool`, `dict`, `list`, `any`, `closure`.
+
+Note: `num` and `callable` are NOT accepted. Use `number` and `closure` — those are rill's canonical type names.
+
+**Defaults** are supported only on scalar types (`string`, `number`, `bool`) in v0. Dict, list, closure, and any params cannot have defaults.
+
 Examples:
 
 ```yaml
 params:
   - "question: string"
-  - "temperature: num = 0.7"
+  - "temperature: number = 0.7"
   - "tags: list"
   - "context: dict"
+  - "articles: list"
 ```
 
 A param without a default is required. A param with a default is optional at call time. The extension raises `RILL-R004` when a required param is missing at invocation.
@@ -139,17 +146,14 @@ The body uses single-brace substitution for named params. The rules below cover 
 
 ### Type Coercion
 
-| Param type | Coercion |
-|------------|---------|
-| string | Used as-is |
-| num | `String(value)` |
-| bool | `String(value)` (`"true"` or `"false"`) |
-| null / undefined | Empty string |
-| dict | Raises `RILL-R004` (EC-16) |
-| list | Raises `RILL-R004` (EC-16) |
-| callable | Raises `RILL-R004` (EC-16) |
+All values render via `formatValue` from `@rcrsr/rill`, which is rill's canonical stringifier. Dicts and lists produce rill literal syntax, not JSON. If you want JSON, stringify in the rill script before passing the value in.
 
-Pass only scalar values into interpolation positions. Use `output: list` with multiple sections to compose structured inputs that include dict context.
+| Param type | Interpolation rendering |
+|------------|------------------------|
+| string | Used as-is |
+| number, bool | `formatValue()` canonical string |
+| null / undefined | Empty string |
+| dict, list, closure, other | `formatValue()` canonical rill literal |
 
 ## Closure Annotations
 
@@ -263,7 +267,6 @@ The `$messages` value is a list of `{ role, content }` dicts. `messages()` on `@
 |-----------|------|-------------|
 | `output: dict` in frontmatter | RILL-R004 | `dict` output is reserved in v0 |
 | Missing required param at invocation | RILL-R004 | Param has no default and was not passed |
-| Dict/list/callable in interpolation position | RILL-R004 | Only scalars coerce to string |
 | File fails YAML parse | RILL-R004 | Frontmatter is not valid YAML |
 | Missing `description` or `params` or `output` | RILL-R004 | Required frontmatter field absent |
 | File not found at `basePath` | RILL-R004 | `basePath` does not exist or is not a directory |
