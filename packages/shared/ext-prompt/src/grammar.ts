@@ -5,22 +5,37 @@
  *   name: type
  *   name: type = default
  *
- * Dispatches to p.* helpers from @rcrsr/rill-ext-param-shared.
  * Covers IR-3, EC-3, EC-4.
+ *
+ * Type parsing is delegated to rill's public parser (tokenize +
+ * createParserState + parseTypeRef), then adapted via typeRefToStructure.
+ * Rejections enforced by typeRefToStructure: dynamic $T refs, union types
+ * (A | B), and unsupported parameterizations (e.g. tuple(T)). The legacy
+ * aliases `num` and `callable` are rejected by rill's parser since they are
+ * not valid rill type names.
  */
 
-import { RuntimeError, type RillParam } from '@rcrsr/rill';
-import { p } from '@rcrsr/rill-ext-param-shared';
+import {
+  RuntimeError,
+  tokenize,
+  createParserState,
+  parseTypeRef,
+  type RillParam,
+  type TypeStructure,
+} from '@rcrsr/rill';
+import { typeRefToStructure } from './typeRefToStructure.js';
 
 // ============================================================
-// SUPPORTED TYPES
+// NAME VALIDATION
 // ============================================================
 
-const SUPPORTED_TYPES = ['string', 'num', 'bool', 'dict', 'list', 'callable'] as const;
-type SupportedType = (typeof SUPPORTED_TYPES)[number];
-
-function isSupportedType(value: string): value is SupportedType {
-  return (SUPPORTED_TYPES as readonly string[]).includes(value);
+function validateName(name: string): void {
+  if (name === '') {
+    throw new RuntimeError('RILL-R001', 'param name must not be empty');
+  }
+  if (/\s/.test(name)) {
+    throw new RuntimeError('RILL-R001', 'param name must be a valid identifier');
+  }
 }
 
 // ============================================================
@@ -33,6 +48,17 @@ function isSupportedType(value: string): value is SupportedType {
  * Supported forms:
  *   - `name: type`
  *   - `name: type = default`
+ *
+ * The type portion is any static rill type expression accepted by rill's
+ * parseTypeRef. Examples: `string`, `number`, `bool`, `dict`, `list`,
+ * `any`, `list(string)`, `dict(a: string, b: number)`.
+ *
+ * Note: `num` and `callable` are NOT accepted (not valid rill type names).
+ * Dynamic refs ($T) and unions (A | B) are rejected by typeRefToStructure.
+ * Non-renderable types (`closure`, `iterator`, `stream`, `vector`, `type`)
+ * are rejected — their `formatValue` output is placeholder text with no
+ * useful meaning in a prompt.
+ * Defaults remain scalar-only in v0 (string, number, bool).
  *
  * @param entry - A single entry string from the params list
  * @returns A fully-formed RillParam
@@ -49,94 +75,94 @@ export function parseParamGrammar(entry: string): RillParam {
   }
 
   const name = entry.slice(0, colonIdx).trim();
+  validateName(name);
   const rest = entry.slice(colonIdx + 1).trim();
 
-  // Split rest on `=` to separate type from optional default
-  const eqIdx = rest.indexOf('=');
-  const typeName = (eqIdx === -1 ? rest : rest.slice(0, eqIdx)).trim();
+  // Depth-aware split on the first top-level '='.
+  let eqIdx = -1;
+  let depth = 0;
+  for (let i = 0; i < rest.length; i++) {
+    const c = rest[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth--;
+    else if (c === '=' && depth === 0) {
+      eqIdx = i;
+      break;
+    }
+  }
+  const typeExpr = (eqIdx === -1 ? rest : rest.slice(0, eqIdx)).trim();
   const rawDefault = eqIdx === -1 ? undefined : rest.slice(eqIdx + 1).trim();
 
-  // EC-4: unrecognized type
-  if (!isSupportedType(typeName)) {
+  // Delegate type parsing to rill.
+  let structure: TypeStructure;
+  try {
+    const tokens = tokenize(typeExpr);
+    const state = createParserState(tokens);
+    const ref = parseTypeRef(state);
+    structure = typeRefToStructure(ref);
+  } catch (err) {
+    if (err instanceof RuntimeError) throw err;
     throw new RuntimeError(
       'RILL-R001',
-      `unrecognized param type "${typeName}" — supported types: ${SUPPORTED_TYPES.join(', ')}`,
+      `failed to parse param type "${typeExpr}": ${String((err as Error).message ?? err)}`,
     );
   }
 
-  return buildParam(name, typeName, rawDefault);
+  const defaultValue = rawDefault === undefined ? undefined : coerceDefault(name, structure, rawDefault);
+
+  return {
+    name,
+    type: structure,
+    defaultValue,
+    annotations: {},
+  };
 }
 
 // ============================================================
-// DISPATCHER
+// DEFAULT COERCION
 // ============================================================
 
-function buildParam(name: string, typeName: SupportedType, rawDefault: string | undefined): RillParam {
-  switch (typeName) {
-    case 'string': {
-      // p.str has no default parameter — overwrite defaultValue when a default is provided
-      const param = p.str(name);
-      if (rawDefault !== undefined) {
-        return { ...param, defaultValue: rawDefault };
-      }
-      return param;
+/**
+ * Coerces a raw default string (from `= default` suffix) to a RillValue.
+ * Only supports defaults on scalar types in v0 (string, number, bool).
+ * Rejects defaults on list/dict/closure/any with RILL-R001.
+ */
+function coerceDefault(
+  name: string,
+  structure: TypeStructure,
+  raw: string,
+): string | number | boolean {
+  if (structure.kind === 'string') {
+    // Strip surrounding quotes if present; otherwise use verbatim.
+    if (
+      (raw.startsWith('"') && raw.endsWith('"')) ||
+      (raw.startsWith("'") && raw.endsWith("'"))
+    ) {
+      return raw.slice(1, -1);
     }
-
-    case 'num': {
-      if (rawDefault !== undefined) {
-        const parsed = Number(rawDefault);
-        if (!Number.isFinite(parsed)) {
-          throw new RuntimeError(
-            'RILL-R001',
-            `default value for num param "${name}" is not a valid number: "${rawDefault}"`,
-          );
-        }
-        return p.num(name, undefined, parsed);
-      }
-      return p.num(name);
-    }
-
-    case 'bool': {
-      if (rawDefault !== undefined) {
-        if (rawDefault !== 'true' && rawDefault !== 'false') {
-          throw new RuntimeError(
-            'RILL-R001',
-            `default value for bool param "${name}" must be "true" or "false", got: "${rawDefault}"`,
-          );
-        }
-        return p.bool(name, undefined, rawDefault === 'true');
-      }
-      return p.bool(name);
-    }
-
-    case 'dict': {
-      if (rawDefault !== undefined) {
-        throw new RuntimeError(
-          'RILL-R001',
-          `defaults for dict params are not supported in v0 (param: "${name}")`,
-        );
-      }
-      return p.dict(name);
-    }
-
-    case 'list': {
-      if (rawDefault !== undefined) {
-        throw new RuntimeError(
-          'RILL-R001',
-          `defaults for list params are not supported in v0 (param: "${name}")`,
-        );
-      }
-      return p.list(name);
-    }
-
-    case 'callable': {
-      if (rawDefault !== undefined) {
-        throw new RuntimeError(
-          'RILL-R001',
-          `defaults for callable params are not supported (param: "${name}")`,
-        );
-      }
-      return p.callable(name);
-    }
+    return raw;
   }
+  if (structure.kind === 'number') {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) {
+      throw new RuntimeError(
+        'RILL-R001',
+        `default value for number param "${name}" is not a valid number: "${raw}"`,
+      );
+    }
+    return n;
+  }
+  if (structure.kind === 'bool') {
+    if (raw !== 'true' && raw !== 'false') {
+      throw new RuntimeError(
+        'RILL-R001',
+        `default value for bool param "${name}" must be "true" or "false", got: "${raw}"`,
+      );
+    }
+    return raw === 'true';
+  }
+  throw new RuntimeError(
+    'RILL-R001',
+    `defaults for param type "${structure.kind}" are not supported in v0 (param: "${name}")`,
+  );
 }

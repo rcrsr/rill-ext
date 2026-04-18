@@ -2,9 +2,16 @@
  * Unit tests for parseParamGrammar.
  *
  * Covers:
- *   IR-3  — happy path dispatch for all 6 types, with and without defaults
+ *   IR-3  — happy path dispatch for all supported types, with and without defaults
  *   EC-3  — malformed entry (no `:` separator) → RuntimeError RILL-R001
  *   EC-4  — unrecognized type → RuntimeError RILL-R001
+ *
+ * Both `num` and `callable` are hard-rejected (not valid rill type names).
+ * Non-renderable types (closure, iterator, stream, vector, type) are also
+ * hard-rejected because they produce placeholder strings, not useful prompt text.
+ *
+ * Parameterized types (e.g. list(string), dict(a: string, b: number)) are
+ * parsed via rill's parseTypeRef and adapted via typeRefToStructure.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -24,8 +31,8 @@ describe('parseParamGrammar', () => {
       expect(result.defaultValue).toBeUndefined();
     });
 
-    it('parses num param', () => {
-      const result = parseParamGrammar('count: num');
+    it('parses number param', () => {
+      const result = parseParamGrammar('count: number');
       expect(result.name).toBe('count');
       expect(result.type).toEqual({ kind: 'number' });
       expect(result.defaultValue).toBeUndefined();
@@ -52,10 +59,10 @@ describe('parseParamGrammar', () => {
       expect(result.defaultValue).toBeUndefined();
     });
 
-    it('parses callable param', () => {
-      const result = parseParamGrammar('handler: callable');
-      expect(result.name).toBe('handler');
-      expect(result.type).toEqual({ kind: 'closure' });
+    it('parses any param', () => {
+      const result = parseParamGrammar('value: any');
+      expect(result.name).toBe('value');
+      expect(result.type).toEqual({ kind: 'any' });
       expect(result.defaultValue).toBeUndefined();
     });
   });
@@ -65,19 +72,19 @@ describe('parseParamGrammar', () => {
   // ============================================================
 
   describe('happy path — with default (IR-3)', () => {
-    it('parses num with integer default', () => {
-      const result = parseParamGrammar('count: num = 3');
+    it('parses number with integer default', () => {
+      const result = parseParamGrammar('count: number = 3');
       expect(result.name).toBe('count');
       expect(result.defaultValue).toBe(3);
     });
 
-    it('parses num with float default', () => {
-      const result = parseParamGrammar('ratio: num = 1.5');
+    it('parses number with float default', () => {
+      const result = parseParamGrammar('ratio: number = 1.5');
       expect(result.defaultValue).toBe(1.5);
     });
 
-    it('parses num with negative default', () => {
-      const result = parseParamGrammar('offset: num = -2');
+    it('parses number with negative default', () => {
+      const result = parseParamGrammar('offset: number = -2');
       expect(result.defaultValue).toBe(-2);
     });
 
@@ -120,13 +127,68 @@ describe('parseParamGrammar', () => {
     });
 
     it('trims whitespace around default', () => {
-      const result = parseParamGrammar('count: num =   7  ');
+      const result = parseParamGrammar('count: number =   7  ');
       expect(result.defaultValue).toBe(7);
     });
 
     it('trims whitespace around string default', () => {
       const result = parseParamGrammar('tone: string =   neutral  ');
       expect(result.defaultValue).toBe('neutral');
+    });
+  });
+
+  // ============================================================
+  // PARAMETERIZED TYPES
+  // ============================================================
+
+  describe('parseParamGrammar — parameterized types', () => {
+    it('parses list(string)', () => {
+      const result = parseParamGrammar('items: list(string)');
+      expect(result.name).toBe('items');
+      expect(result.type).toEqual({ kind: 'list', element: { kind: 'string' } });
+    });
+
+    it('parses list(number)', () => {
+      const result = parseParamGrammar('scores: list(number)');
+      expect(result.type).toEqual({ kind: 'list', element: { kind: 'number' } });
+    });
+
+    it('parses dict(string)', () => {
+      const result = parseParamGrammar('lookup: dict(string)');
+      expect(result.type).toEqual({ kind: 'dict', valueType: { kind: 'string' } });
+    });
+
+    it('parses dict(a: string, b: number)', () => {
+      const result = parseParamGrammar('point: dict(a: string, b: number)');
+      expect(result.type).toEqual({
+        kind: 'dict',
+        fields: {
+          a: { type: { kind: 'string' } },
+          b: { type: { kind: 'number' } },
+        },
+      });
+    });
+
+    it('parses list(dict(a: string, b: string))', () => {
+      const result = parseParamGrammar('articles: list(dict(a: string, b: string))');
+      expect(result.type).toEqual({
+        kind: 'list',
+        element: {
+          kind: 'dict',
+          fields: {
+            a: { type: { kind: 'string' } },
+            b: { type: { kind: 'string' } },
+          },
+        },
+      });
+    });
+
+    it('parses list(list(string))', () => {
+      const result = parseParamGrammar('matrix: list(list(string))');
+      expect(result.type).toEqual({
+        kind: 'list',
+        element: { kind: 'list', element: { kind: 'string' } },
+      });
     });
   });
 
@@ -159,7 +221,7 @@ describe('parseParamGrammar', () => {
   });
 
   // ============================================================
-  // EC-4: UNRECOGNIZED TYPE
+  // EC-4: UNRECOGNIZED / REJECTED TYPE
   // ============================================================
 
   describe('unrecognized type (EC-4)', () => {
@@ -167,7 +229,7 @@ describe('parseParamGrammar', () => {
       expect(() => parseParamGrammar('x: widget')).toThrow(RuntimeError);
     });
 
-    it('throws with error code RILL-R001', () => {
+    it('throws with error code RILL-R001 for unknown type', () => {
       try {
         parseParamGrammar('x: widget');
         expect.fail('should have thrown');
@@ -181,13 +243,78 @@ describe('parseParamGrammar', () => {
       expect(() => parseParamGrammar('x: String')).toThrow(RuntimeError);
     });
 
-    it('throws for type with wrong casing (e.g. NUM)', () => {
-      expect(() => parseParamGrammar('x: NUM')).toThrow(RuntimeError);
+    it('throws for type with wrong casing (e.g. NUMBER)', () => {
+      expect(() => parseParamGrammar('x: NUMBER')).toThrow(RuntimeError);
     });
 
     it('throws for empty type', () => {
       expect(() => parseParamGrammar('x: ')).toThrow(RuntimeError);
     });
+
+    // Hard reject legacy aliases — no backward compat
+    it('rejects num (use number)', () => {
+      try {
+        parseParamGrammar('count: num');
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
+    });
+
+    it('rejects callable — no function-typed params supported in prompt-md', () => {
+      try {
+        parseParamGrammar('fn: callable');
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
+    });
+
+    it('rejects dynamic ref $T', () => {
+      try {
+        parseParamGrammar('x: $T');
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
+    });
+
+    it('rejects union type string | number', () => {
+      try {
+        parseParamGrammar('x: string | number');
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
+    });
+
+    it('rejects dict with mixed named and positional args', () => {
+      try {
+        parseParamGrammar('x: dict(string, b: number)');
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
+    });
+
+    // Non-renderable types — produce placeholder strings, not prompt text
+    const nonRenderableTypes = ['closure', 'iterator', 'stream', 'vector', 'type'] as const;
+    for (const typeName of nonRenderableTypes) {
+      it(`rejects ${typeName} with RILL-R001`, () => {
+        try {
+          parseParamGrammar(`x: ${typeName}`);
+          expect.fail('should have thrown');
+        } catch (err) {
+          expect(err).toBeInstanceOf(RuntimeError);
+          expect((err as RuntimeError).errorId).toBe('RILL-R001');
+        }
+      });
+    }
   });
 
   // ============================================================
@@ -203,8 +330,8 @@ describe('parseParamGrammar', () => {
       expect(() => parseParamGrammar('tags: list = []')).toThrow(RuntimeError);
     });
 
-    it('throws RuntimeError when callable has a default', () => {
-      expect(() => parseParamGrammar('fn: callable = something')).toThrow(RuntimeError);
+    it('throws RuntimeError when any has a default', () => {
+      expect(() => parseParamGrammar('val: any = something')).toThrow(RuntimeError);
     });
   });
 
@@ -213,8 +340,8 @@ describe('parseParamGrammar', () => {
   // ============================================================
 
   describe('invalid default values', () => {
-    it('throws RuntimeError for non-numeric default on num type', () => {
-      expect(() => parseParamGrammar('count: num = abc')).toThrow(RuntimeError);
+    it('throws RuntimeError for non-numeric default on number type', () => {
+      expect(() => parseParamGrammar('count: number = abc')).toThrow(RuntimeError);
     });
 
     it('throws RuntimeError for mixed-case bool default', () => {

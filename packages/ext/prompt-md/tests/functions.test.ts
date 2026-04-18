@@ -9,7 +9,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { RuntimeError, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, formatValue, type ApplicationCallable } from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
 import {
   ANNOTATION_KEY_ID,
@@ -443,65 +443,105 @@ Some context here.
   });
 });
 
-// ── EC-16: non-string interpolation value at call time ───────────────────────
+// ── formatValue interpolation: dicts and lists render via formatValue ─────────
 
-describe('EC-16: non-string interpolation value throws RILL-R004', () => {
-  it('throws RILL-R004 when a dict is passed as a param value', async () => {
+describe('formatValue interpolation: non-string values render via rill formatValue', () => {
+  it('renders a dict via formatValue in interpolation position', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
-      'needs-string.prompt.md',
+      'dict-param.prompt.md',
       `---
-description: Needs string param
+description: Dict param renders via formatValue
 params:
-  - "name: string"
+  - "data: dict"
 output: string
 ---
-Hello {name}!
+Result: {data}
 `,
     );
 
     const ext = await createPromptMdExtension({ basePath: dir });
     const dict = asDict(ext.value);
 
-    let caught: unknown;
-    try {
-      // Pass a dict (object) instead of a string value
-      await dict['needs-string']!.fn({ name: { nested: 'value' } }, {} as never);
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    // Dict should not throw — it formats via rill's formatValue
+    const result = await dict['dict-param']!.fn({ data: { key: 'val' } }, {} as never);
+    expect(typeof result).toBe('string');
+    expect(result as string).toContain('Result:');
   });
 
-  it('throws RILL-R004 when a list is passed as a param value', async () => {
+  it('renders a list via formatValue in interpolation position', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
-      'needs-string2.prompt.md',
+      'list-param.prompt.md',
       `---
-description: Needs string param 2
+description: List param renders via formatValue
 params:
-  - "tag: string"
+  - "items: list"
 output: string
 ---
-Tag: {tag}
+Items: {items}
 `,
     );
 
     const ext = await createPromptMdExtension({ basePath: dir });
     const dict = asDict(ext.value);
 
-    let caught: unknown;
-    try {
-      // Pass a list instead of a string value
-      await dict['needs-string2']!.fn({ tag: ['a', 'b'] }, {} as never);
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    // List should not throw — it formats via rill's formatValue
+    const result = await dict['list-param']!.fn({ items: ['a', 'b'] }, {} as never);
+    expect(typeof result).toBe('string');
+    expect(result as string).toContain('Items:');
+  });
+});
+
+// ── nested-type param: list(dict(title: string, body: string)) ───────────────
+
+describe('nested-type param: list(dict(title: string, body: string))', () => {
+  it('parses nested type structure, invokes successfully, and interpolates via formatValue', async () => {
+    const dir = await tempDir();
+    await writePrompt(
+      dir,
+      'articles.prompt.md',
+      `---
+description: Article composer.
+params:
+  - "articles: list(dict(title: string, body: string))"
+output: string
+---
+Articles: {articles}
+`,
+    );
+
+    const ext = await createPromptMdExtension({ basePath: dir });
+    const dict = asDict(ext.value);
+    const callable = dict['articles']!;
+
+    // Verify the parsed RillParam type is the expected nested TypeStructure
+    const params = callable.params;
+    expect(params).toHaveLength(1);
+    expect(params[0]!.name).toBe('articles');
+    expect(params[0]!.type).toEqual({
+      kind: 'list',
+      element: {
+        kind: 'dict',
+        fields: {
+          title: { type: { kind: 'string' } },
+          body: { type: { kind: 'string' } },
+        },
+      },
+    });
+
+    // Invoke with a matching value
+    const articles = [
+      { title: 'A', body: 'B' },
+      { title: 'C', body: 'D' },
+    ];
+    const result = await callable.fn({ articles }, {} as never);
+
+    // formatValue produces the canonical rill literal for the list
+    const expected = `Articles: ${formatValue(articles)}\n`;
+    expect(result).toBe(expected);
   });
 });
 

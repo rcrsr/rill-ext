@@ -18,8 +18,8 @@ Every prompt file has two parts: a YAML frontmatter block and a template body.
 ---
 description: One-sentence summary of what this prompt does.
 params:
-  - question: string
-  - max_words: num = 200
+  - "question: string"
+  - "max_words: number = 200"
 output: string
 ---
 Answer the following question in {max_words} words or fewer.
@@ -39,21 +39,48 @@ The frontmatter block starts and ends with `---` on its own line. The template b
 
 ### Params Grammar
 
-Each entry in `params` follows the rill param grammar.
+Each entry in `params` follows the format:
 
 ```
 name: type
 name: type = default
 ```
 
+Each entry MUST be a quoted YAML string. Unquoted form (`- name: type`) is parsed by YAML as a map and rejected at load time with `RILL-R004` (`params entries must be strings`).
+
+**Type expression** is any static rill type accepted by rill's type-ref grammar. The grammar supports all of rill's built-in type names and parameterized forms.
+
+**Supported scalar names:** `string`, `number`, `bool`, `dict`, `list`, `any`, `tuple`, `ordered`, `datetime`, `duration`.
+
+Note: `num` and `callable` are NOT accepted. Use `number` — `num` is not a valid rill type name. `callable` is not a valid rill type name.
+
+**Parameterized forms:**
+
+| Form | Meaning |
+|------|---------|
+| `list(T)` | Homogeneous list of type T |
+| `dict(T)` | Dict with all values of type T |
+| `dict(a: T1, b: T2)` | Dict with named, typed fields |
+| `list(dict(a: string, b: string))` | Nested composition |
+| `list(list(string))` | Nested lists |
+
+**Rejected in v0:**
+
+- Dynamic refs (`$T`) — frontmatter has no runtime type scope.
+- Union types (`string | number`) — not supported in v0.
+- The following type names are rejected because they have no useful text rendering in a prompt: `closure`, `iterator`, `stream`, `vector`, `type`. These render via `formatValue` as placeholder strings (e.g. `type(closure)`, `vector(model, Nd)`) that produce garbage in rendered prompt text.
+
+**Defaults** are supported only on scalar types (`string`, `number`, `bool`) in v0. Dict, list, and any params cannot have defaults.
+
 Examples:
 
 ```yaml
 params:
-  - question: string
-  - temperature: num = 0.7
-  - tags: list
-  - context: dict
+  - "question: string"
+  - "temperature: number = 0.7"
+  - "tags: list"
+  - "context: dict"
+  - "articles: list(dict(title: string, body: string))"
 ```
 
 A param without a default is required. A param with a default is optional at call time. The extension raises `RILL-R004` when a required param is missing at invocation.
@@ -93,7 +120,7 @@ Use `@@ role` lines to split a single file body into multiple conversation turns
 ---
 description: Research assistant prompt.
 params:
-  - question: string
+  - "question: string"
 output: list
 ---
 @@ system
@@ -137,17 +164,14 @@ The body uses single-brace substitution for named params. The rules below cover 
 
 ### Type Coercion
 
-| Param type | Coercion |
-|------------|---------|
-| string | Used as-is |
-| num | `String(value)` |
-| bool | `String(value)` (`"true"` or `"false"`) |
-| null / undefined | Empty string |
-| dict | Raises `RILL-R004` (EC-16) |
-| list | Raises `RILL-R004` (EC-16) |
-| callable | Raises `RILL-R004` (EC-16) |
+All values render via `formatValue` from `@rcrsr/rill`, which is rill's canonical stringifier. Dicts and lists produce rill literal syntax, not JSON. If you want JSON, stringify in the rill script before passing the value in.
 
-Pass only scalar values into interpolation positions. Use `output: list` with multiple sections to compose structured inputs that include dict context.
+| Param type | Interpolation rendering |
+|------------|------------------------|
+| string | Used as-is |
+| number, bool | `formatValue()` canonical string |
+| null / undefined | Empty string |
+| dict, list, other | `formatValue()` canonical rill literal |
 
 ## Closure Annotations
 
@@ -173,7 +197,7 @@ This example loads a research prompt with `output: list` and passes the result d
 ---
 description: Answers a research question with a cited response.
 params:
-  - question: string
+  - "question: string"
 output: list
 ---
 @@ system
@@ -261,7 +285,6 @@ The `$messages` value is a list of `{ role, content }` dicts. `messages()` on `@
 |-----------|------|-------------|
 | `output: dict` in frontmatter | RILL-R004 | `dict` output is reserved in v0 |
 | Missing required param at invocation | RILL-R004 | Param has no default and was not passed |
-| Dict/list/callable in interpolation position | RILL-R004 | Only scalars coerce to string |
 | File fails YAML parse | RILL-R004 | Frontmatter is not valid YAML |
 | Missing `description` or `params` or `output` | RILL-R004 | Required frontmatter field absent |
 | File not found at `basePath` | RILL-R004 | `basePath` does not exist or is not a directory |

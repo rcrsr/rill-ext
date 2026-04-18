@@ -16,8 +16,8 @@ npm install @rcrsr/rill-ext-prompt-md
 ---
 description: Summarize a passage in a bounded word count.
 params:
-  - passage: string
-  - max_words: num = 200
+  - "passage: string"
+  - "max_words: number = 200"
 output: string
 ---
 Summarize the following passage in {max_words} words or fewer.
@@ -58,6 +58,8 @@ rill-run
 ## Documentation
 
 See [full documentation](docs/extension-prompt-md.md) for file format, frontmatter grammar, `@@ role` convention, interpolation rules, closure annotations, and a runnable LLM round-trip example.
+
+Nested type expressions like `list(dict(title: string, body: string))` are supported in param declarations. See the Params Grammar section in the full docs for the complete type syntax.
 
 ## License
 

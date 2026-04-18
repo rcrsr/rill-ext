@@ -6,10 +6,10 @@
  * - Interpolates {name} placeholders in the body
  * - Returns a rill string (output: 'string') or rill list of role dicts (output: 'list')
  *
- * Covers IR-9, AC-4, AC-14, EC-16, EC-17.
+ * Covers IR-9, AC-4, AC-14, EC-17.
  */
 
-import { anyTypeValue, RuntimeError, toCallable, type ApplicationCallable, type RillValue } from '@rcrsr/rill';
+import { anyTypeValue, formatValue, RuntimeError, toCallable, type ApplicationCallable, type RillValue } from '@rcrsr/rill';
 import {
   interpolate,
   splitRoleMessages,
@@ -36,14 +36,8 @@ import type { ParsedPrompt } from './parseFile.js';
  *   ^output      — 'string' or 'list' (rill string)
  *
  * The closure fn:
- *   - Coerces string/number/boolean arg values to string for interpolation.
- *   - Throws RILL-R004 (EC-16) for non-coercible values (dict, list, callable, null).
+ *   - Coerces values via `formatValue` from `@rcrsr/rill` (rill's canonical stringifier).
  *   - Wraps uncaught errors in RILL-R004 (EC-17); re-throws existing RuntimeErrors.
- *
- * [SPEC] EC-16 coercion policy: the spec does not define coercion rules for
- * non-string param types. This implementation coerces string/number/boolean via
- * String(), and throws EC-16 for dict/list/callable/null. Primitives coerce
- * losslessly and match the typical usage of num/bool params in prompt templates.
  *
  * @param parsed - Fully validated ParsedPrompt from parseFile.
  * @returns An ApplicationCallable wrapping the prompt logic.
@@ -67,7 +61,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
   // ── Closure fn ────────────────────────────────────────────────────────────
   const fn = async (args: Record<string, RillValue>): Promise<RillValue> => {
     try {
-      // Build interpolation values: coerce primitives, reject others (EC-16).
+      // Build interpolation values via rill's canonical formatValue; null/undefined → empty string.
       const values: Record<string, string> = {};
       for (const param of parsed.params) {
         const raw = args[param.name] as RillValue | undefined;
@@ -76,15 +70,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
           values[param.name] = '';
           continue;
         }
-        if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
-          values[param.name] = String(raw);
-        } else {
-          // dict, list, callable, or other non-primitive — EC-16
-          throw new RuntimeError(
-            'RILL-R004',
-            `prompt parameter "${param.name}" must be a string, num, or bool value for interpolation`,
-          );
-        }
+        values[param.name] = formatValue(raw);
       }
 
       // Interpolate body with resolved values.
@@ -104,7 +90,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
         content,
       })) as RillValue[];
     } catch (err) {
-      // Re-throw RuntimeErrors as-is (EC-16 and any RILL-R001 propagated from splitRoleMessages).
+      // Re-throw RuntimeErrors as-is (any RILL-R001 propagated from splitRoleMessages).
       if (err instanceof RuntimeError) {
         throw err;
       }

@@ -26,6 +26,7 @@ export { splitRoleMessages } from './roles.js';
 // PARAM GRAMMAR PARSING
 // ============================================================
 export { parseParamGrammar } from './grammar.js';
+export { typeRefToStructure } from './typeRefToStructure.js';
 
 // ============================================================
 // TEMPLATE INTERPOLATION AND SCANNING
