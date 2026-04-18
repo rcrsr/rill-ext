@@ -11,6 +11,7 @@
  *   - dynamic ref rejection
  *   - union ref rejection
  *   - mixed named/positional args in dict(...) rejected
+ *   - non-renderable type rejection (closure, iterator, stream, vector, type)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -23,7 +24,7 @@ import { typeRefToStructure } from './typeRefToStructure.js';
 
 describe('typeRefToStructure', () => {
   describe('bare scalars', () => {
-    const scalars = ['string', 'number', 'bool', 'any', 'closure'] as const;
+    const scalars = ['string', 'number', 'bool', 'any'] as const;
     for (const typeName of scalars) {
       it(`converts bare ${typeName}`, () => {
         const ref: TypeRef = { kind: 'static', typeName };
@@ -276,6 +277,42 @@ describe('typeRefToStructure', () => {
         args: [{ value: { kind: 'static', typeName: 'string' } }],
       };
       expect(() => typeRefToStructure(ref)).toThrow(RuntimeError);
+    });
+  });
+
+  // ============================================================
+  // NON-RENDERABLE TYPE REJECTION
+  // ============================================================
+
+  describe('non-renderable type rejection', () => {
+    const nonRenderableTypes = ['closure', 'iterator', 'stream', 'vector', 'type'] as const;
+
+    for (const typeName of nonRenderableTypes) {
+      it(`rejects bare ${typeName} with RILL-R001`, () => {
+        const ref: TypeRef = { kind: 'static', typeName };
+        try {
+          typeRefToStructure(ref);
+          expect.fail('should have thrown');
+        } catch (err) {
+          expect(err).toBeInstanceOf(RuntimeError);
+          expect((err as RuntimeError).errorId).toBe('RILL-R001');
+        }
+      });
+    }
+
+    it('rejects parameterized non-renderable (vector with args) with RILL-R001', () => {
+      const ref: TypeRef = {
+        kind: 'static',
+        typeName: 'vector',
+        args: [{ value: { kind: 'static', typeName: 'string' } }],
+      };
+      try {
+        typeRefToStructure(ref);
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
     });
   });
 });

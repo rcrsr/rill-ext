@@ -6,6 +6,7 @@
 
 - Peer dep on `@rcrsr/rill` bumped to `~0.18.6` to consume re-exported `tokenize`, `createParserState`, and `parseTypeRef`
 - `params` type grammar delegates to rill's `parseTypeRef`. Legacy aliases `num` and `callable` are hard-rejected (use `number` and `closure`)
+- Param type names `closure`, `iterator`, `stream`, `vector`, and `type` are hard-rejected. These render as placeholder strings (e.g. `type(closure)`, `vector(model, Nd)`) and have no useful rendering in prompt templates.
 - Interpolation renders every `RillValue` via rill's `formatValue`; dicts and lists no longer throw but produce rill canonical literal syntax (not JSON)
 
 ### Added

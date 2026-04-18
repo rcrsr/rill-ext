@@ -6,8 +6,9 @@
  *   EC-3  — malformed entry (no `:` separator) → RuntimeError RILL-R001
  *   EC-4  — unrecognized type → RuntimeError RILL-R001
  *
- * Canonical type names used: number (not num), closure (not callable).
  * Both `num` and `callable` are hard-rejected (not valid rill type names).
+ * Non-renderable types (closure, iterator, stream, vector, type) are also
+ * hard-rejected because they produce placeholder strings, not useful prompt text.
  *
  * Parameterized types (e.g. list(string), dict(a: string, b: number)) are
  * parsed via rill's parseTypeRef and adapted via typeRefToStructure.
@@ -62,13 +63,6 @@ describe('parseParamGrammar', () => {
       const result = parseParamGrammar('value: any');
       expect(result.name).toBe('value');
       expect(result.type).toEqual({ kind: 'any' });
-      expect(result.defaultValue).toBeUndefined();
-    });
-
-    it('parses closure param', () => {
-      const result = parseParamGrammar('handler: closure');
-      expect(result.name).toBe('handler');
-      expect(result.type).toEqual({ kind: 'closure' });
       expect(result.defaultValue).toBeUndefined();
     });
   });
@@ -307,6 +301,20 @@ describe('parseParamGrammar', () => {
         expect((err as RuntimeError).errorId).toBe('RILL-R001');
       }
     });
+
+    // Non-renderable types — produce placeholder strings, not prompt text
+    const nonRenderableTypes = ['closure', 'iterator', 'stream', 'vector', 'type'] as const;
+    for (const typeName of nonRenderableTypes) {
+      it(`rejects ${typeName} with RILL-R001`, () => {
+        try {
+          parseParamGrammar(`x: ${typeName}`);
+          expect.fail('should have thrown');
+        } catch (err) {
+          expect(err).toBeInstanceOf(RuntimeError);
+          expect((err as RuntimeError).errorId).toBe('RILL-R001');
+        }
+      });
+    }
   });
 
   // ============================================================

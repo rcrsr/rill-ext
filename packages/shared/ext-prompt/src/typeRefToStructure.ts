@@ -1,6 +1,14 @@
 import { RuntimeError, type FieldArg, type RillFieldDef, type TypeRef, type TypeStructure } from '@rcrsr/rill';
 
 /**
+ * Type names that are valid rill identifiers but have no useful text rendering
+ * in a prompt context. They produce placeholder strings (e.g. `type(closure)`,
+ * `vector(model, Nd)`) via formatValue and are rejected at grammar time so the
+ * failure is declarative rather than latent garbage in the rendered prompt.
+ */
+const NON_RENDERABLE_TYPE_NAMES = new Set(['closure', 'iterator', 'stream', 'vector', 'type']);
+
+/**
  * Converts a static rill TypeRef AST node to a TypeStructure.
  * Used by the prompt-md param grammar to accept full rill type expressions
  * (e.g. `list(dict(a: string, b: string))`) in frontmatter.
@@ -8,6 +16,8 @@ import { RuntimeError, type FieldArg, type RillFieldDef, type TypeRef, type Type
  * Rejects:
  *   - Dynamic refs ($var): frontmatter has no runtime scope.
  *   - Union refs (A | B): not supported in v0 frontmatter.
+ *   - Non-renderable types (closure, iterator, stream, vector, type):
+ *     these produce placeholder strings, not prompt-useful text.
  *
  * Throws RuntimeError RILL-R001 on rejection.
  */
@@ -26,6 +36,13 @@ export function typeRefToStructure(ref: TypeRef): TypeStructure {
   }
   // static
   const { typeName, args } = ref;
+
+  if (NON_RENDERABLE_TYPE_NAMES.has(typeName)) {
+    throw new RuntimeError(
+      'RILL-R001',
+      `"${typeName}" params are not supported in prompt-md — prompts render text, not ${typeName}-shaped values`,
+    );
+  }
 
   if (!args || args.length === 0) {
     // bare type name

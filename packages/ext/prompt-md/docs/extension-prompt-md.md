@@ -50,9 +50,9 @@ Each entry MUST be a quoted YAML string. Unquoted form (`- name: type`) is parse
 
 **Type expression** is any static rill type accepted by rill's type-ref grammar. The grammar supports all of rill's built-in type names and parameterized forms.
 
-**Supported scalar names:** `string`, `number`, `bool`, `dict`, `list`, `any`, `closure`, `tuple`, `ordered`, `vector`, `type`, `iterator`, `stream`, `datetime`, `duration`.
+**Supported scalar names:** `string`, `number`, `bool`, `dict`, `list`, `any`, `tuple`, `ordered`, `datetime`, `duration`.
 
-Note: `num` and `callable` are NOT accepted. Use `number` and `closure` — those are rill's canonical type names.
+Note: `num` and `callable` are NOT accepted. Use `number` — `num` is not a valid rill type name. `callable` is not a valid rill type name.
 
 **Parameterized forms:**
 
@@ -68,8 +68,9 @@ Note: `num` and `callable` are NOT accepted. Use `number` and `closure` — thos
 
 - Dynamic refs (`$T`) — frontmatter has no runtime type scope.
 - Union types (`string | number`) — not supported in v0.
+- The following type names are rejected because they have no useful text rendering in a prompt: `closure`, `iterator`, `stream`, `vector`, `type`. These render via `formatValue` as placeholder strings (e.g. `type(closure)`, `vector(model, Nd)`) that produce garbage in rendered prompt text.
 
-**Defaults** are supported only on scalar types (`string`, `number`, `bool`) in v0. Dict, list, closure, and any params cannot have defaults.
+**Defaults** are supported only on scalar types (`string`, `number`, `bool`) in v0. Dict, list, and any params cannot have defaults.
 
 Examples:
 
@@ -170,7 +171,7 @@ All values render via `formatValue` from `@rcrsr/rill`, which is rill's canonica
 | string | Used as-is |
 | number, bool | `formatValue()` canonical string |
 | null / undefined | Empty string |
-| dict, list, closure, other | `formatValue()` canonical rill literal |
+| dict, list, other | `formatValue()` canonical rill literal |
 
 ## Closure Annotations
 
