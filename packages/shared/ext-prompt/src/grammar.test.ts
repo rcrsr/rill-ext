@@ -7,7 +7,10 @@
  *   EC-4  — unrecognized type → RuntimeError RILL-R001
  *
  * Canonical type names used: number (not num), closure (not callable).
- * Both `num` and `callable` are hard-rejected as unrecognized types.
+ * Both `num` and `callable` are hard-rejected (not valid rill type names).
+ *
+ * Parameterized types (e.g. list(string), dict(a: string, b: number)) are
+ * parsed via rill's parseTypeRef and adapted via typeRefToStructure.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -141,6 +144,61 @@ describe('parseParamGrammar', () => {
   });
 
   // ============================================================
+  // PARAMETERIZED TYPES
+  // ============================================================
+
+  describe('parseParamGrammar — parameterized types', () => {
+    it('parses list(string)', () => {
+      const result = parseParamGrammar('items: list(string)');
+      expect(result.name).toBe('items');
+      expect(result.type).toEqual({ kind: 'list', element: { kind: 'string' } });
+    });
+
+    it('parses list(number)', () => {
+      const result = parseParamGrammar('scores: list(number)');
+      expect(result.type).toEqual({ kind: 'list', element: { kind: 'number' } });
+    });
+
+    it('parses dict(string)', () => {
+      const result = parseParamGrammar('lookup: dict(string)');
+      expect(result.type).toEqual({ kind: 'dict', valueType: { kind: 'string' } });
+    });
+
+    it('parses dict(a: string, b: number)', () => {
+      const result = parseParamGrammar('point: dict(a: string, b: number)');
+      expect(result.type).toEqual({
+        kind: 'dict',
+        fields: {
+          a: { type: { kind: 'string' } },
+          b: { type: { kind: 'number' } },
+        },
+      });
+    });
+
+    it('parses list(dict(a: string, b: string))', () => {
+      const result = parseParamGrammar('articles: list(dict(a: string, b: string))');
+      expect(result.type).toEqual({
+        kind: 'list',
+        element: {
+          kind: 'dict',
+          fields: {
+            a: { type: { kind: 'string' } },
+            b: { type: { kind: 'string' } },
+          },
+        },
+      });
+    });
+
+    it('parses list(list(string))', () => {
+      const result = parseParamGrammar('matrix: list(list(string))');
+      expect(result.type).toEqual({
+        kind: 'list',
+        element: { kind: 'list', element: { kind: 'string' } },
+      });
+    });
+  });
+
+  // ============================================================
   // EC-3: MISSING COLON SEPARATOR
   // ============================================================
 
@@ -169,7 +227,7 @@ describe('parseParamGrammar', () => {
   });
 
   // ============================================================
-  // EC-4: UNRECOGNIZED TYPE
+  // EC-4: UNRECOGNIZED / REJECTED TYPE
   // ============================================================
 
   describe('unrecognized type (EC-4)', () => {
@@ -177,7 +235,7 @@ describe('parseParamGrammar', () => {
       expect(() => parseParamGrammar('x: widget')).toThrow(RuntimeError);
     });
 
-    it('throws with error code RILL-R001', () => {
+    it('throws with error code RILL-R001 for unknown type', () => {
       try {
         parseParamGrammar('x: widget');
         expect.fail('should have thrown');
@@ -213,6 +271,36 @@ describe('parseParamGrammar', () => {
     it('rejects callable (use closure)', () => {
       try {
         parseParamGrammar('fn: callable');
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
+    });
+
+    it('rejects dynamic ref $T', () => {
+      try {
+        parseParamGrammar('x: $T');
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
+    });
+
+    it('rejects union type string | number', () => {
+      try {
+        parseParamGrammar('x: string | number');
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(RuntimeError);
+        expect((err as RuntimeError).errorId).toBe('RILL-R001');
+      }
+    });
+
+    it('rejects dict with mixed named and positional args', () => {
+      try {
+        parseParamGrammar('x: dict(string, b: number)');
         expect.fail('should have thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(RuntimeError);

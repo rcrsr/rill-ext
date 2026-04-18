@@ -9,7 +9,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { RuntimeError, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, formatValue, type ApplicationCallable } from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
 import {
   ANNOTATION_KEY_ID,
@@ -492,6 +492,56 @@ Items: {items}
     const result = await dict['list-param']!.fn({ items: ['a', 'b'] }, {} as never);
     expect(typeof result).toBe('string');
     expect(result as string).toContain('Items:');
+  });
+});
+
+// ── nested-type param: list(dict(title: string, body: string)) ───────────────
+
+describe('nested-type param: list(dict(title: string, body: string))', () => {
+  it('parses nested type structure, invokes successfully, and interpolates via formatValue', async () => {
+    const dir = await tempDir();
+    await writePrompt(
+      dir,
+      'articles.prompt.md',
+      `---
+description: Article composer.
+params:
+  - "articles: list(dict(title: string, body: string))"
+output: string
+---
+Articles: {articles}
+`,
+    );
+
+    const ext = await createPromptMdExtension({ basePath: dir });
+    const dict = asDict(ext.value);
+    const callable = dict['articles']!;
+
+    // Verify the parsed RillParam type is the expected nested TypeStructure
+    const params = callable.params;
+    expect(params).toHaveLength(1);
+    expect(params[0]!.name).toBe('articles');
+    expect(params[0]!.type).toEqual({
+      kind: 'list',
+      element: {
+        kind: 'dict',
+        fields: {
+          title: { type: { kind: 'string' } },
+          body: { type: { kind: 'string' } },
+        },
+      },
+    });
+
+    // Invoke with a matching value
+    const articles = [
+      { title: 'A', body: 'B' },
+      { title: 'C', body: 'D' },
+    ];
+    const result = await callable.fn({ articles }, {} as never);
+
+    // formatValue produces the canonical rill literal for the list
+    const expected = `Articles: ${formatValue(articles)}\n`;
+    expect(result).toBe(expected);
   });
 });
 

@@ -7,15 +7,23 @@
  *
  * Covers IR-3, EC-3, EC-4.
  *
- * NOTE: Full delegation to rill's tokenize + parseTypeRef API is blocked because
- * @rcrsr/rill@0.18.4 does not expose parseTypeRef / createParserState via its
- * top-level package exports field ("." only). This implementation maintains a
- * hand-maintained type whitelist using rill's canonical type names (number, not
- * num; closure, not callable). Parameterized types (list(T), dict(a: T, b: T))
- * are not yet supported; extend when rill exposes a parser subpath export.
+ * Type parsing is delegated to rill's public parser (tokenize +
+ * createParserState + parseTypeRef), then adapted via typeRefToStructure.
+ * Rejections enforced by typeRefToStructure: dynamic $T refs, union types
+ * (A | B), and unsupported parameterizations (e.g. tuple(T)). The legacy
+ * aliases `num` and `callable` are rejected by rill's parser since they are
+ * not valid rill type names.
  */
 
-import { RuntimeError, type RillParam, type TypeStructure } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  tokenize,
+  createParserState,
+  parseTypeRef,
+  type RillParam,
+  type TypeStructure,
+} from '@rcrsr/rill';
+import { typeRefToStructure } from './typeRefToStructure.js';
 
 // ============================================================
 // NAME VALIDATION
@@ -31,17 +39,6 @@ function validateName(name: string): void {
 }
 
 // ============================================================
-// SUPPORTED TYPES
-// ============================================================
-
-const SUPPORTED_TYPES = ['string', 'number', 'bool', 'dict', 'list', 'any', 'closure'] as const;
-type SupportedType = (typeof SUPPORTED_TYPES)[number];
-
-function isSupportedType(value: string): value is SupportedType {
-  return (SUPPORTED_TYPES as readonly string[]).includes(value);
-}
-
-// ============================================================
 // PARSER
 // ============================================================
 
@@ -52,8 +49,13 @@ function isSupportedType(value: string): value is SupportedType {
  *   - `name: type`
  *   - `name: type = default`
  *
- * The type portion must be one of: string, number, bool, dict, list, any, closure.
- * Note: `num` and `callable` are NOT accepted. Use `number` and `closure`.
+ * The type portion is any static rill type expression accepted by rill's
+ * parseTypeRef. Examples: `string`, `number`, `bool`, `dict`, `list`,
+ * `any`, `closure`, `list(string)`, `dict(a: string, b: number)`.
+ *
+ * Note: `num` and `callable` are NOT accepted (not valid rill type names).
+ * Dynamic refs ($T) and unions (A | B) are rejected by typeRefToStructure.
+ * Defaults remain scalar-only in v0 (string, number, bool).
  *
  * @param entry - A single entry string from the params list
  * @returns A fully-formed RillParam
@@ -73,8 +75,7 @@ export function parseParamGrammar(entry: string): RillParam {
   validateName(name);
   const rest = entry.slice(colonIdx + 1).trim();
 
-  // Find the `=` that separates type-expr from default.
-  // Track parentheses depth so we don't split on `=` inside future parameterized types.
+  // Depth-aware split on the first top-level '='.
   let eqIdx = -1;
   let depth = 0;
   for (let i = 0; i < rest.length; i++) {
@@ -89,15 +90,21 @@ export function parseParamGrammar(entry: string): RillParam {
   const typeExpr = (eqIdx === -1 ? rest : rest.slice(0, eqIdx)).trim();
   const rawDefault = eqIdx === -1 ? undefined : rest.slice(eqIdx + 1).trim();
 
-  // EC-4: unrecognized type
-  if (!isSupportedType(typeExpr)) {
+  // Delegate type parsing to rill.
+  let structure: TypeStructure;
+  try {
+    const tokens = tokenize(typeExpr);
+    const state = createParserState(tokens);
+    const ref = parseTypeRef(state);
+    structure = typeRefToStructure(ref);
+  } catch (err) {
+    if (err instanceof RuntimeError) throw err;
     throw new RuntimeError(
       'RILL-R001',
-      `unrecognized param type "${typeExpr}" — supported types: ${SUPPORTED_TYPES.join(', ')}`,
+      `failed to parse param type "${typeExpr}": ${String((err as Error).message ?? err)}`,
     );
   }
 
-  const structure: TypeStructure = { kind: typeExpr } as TypeStructure;
   const defaultValue = rawDefault === undefined ? undefined : coerceDefault(name, structure, rawDefault);
 
   return {

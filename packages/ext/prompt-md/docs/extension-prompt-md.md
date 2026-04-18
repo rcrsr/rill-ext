@@ -48,9 +48,26 @@ name: type = default
 
 Each entry MUST be a quoted YAML string. Unquoted form (`- name: type`) is parsed by YAML as a map and rejected at load time with `RILL-R004` (`params entries must be strings`).
 
-**Supported type names:** `string`, `number`, `bool`, `dict`, `list`, `any`, `closure`.
+**Type expression** is any static rill type accepted by rill's type-ref grammar. The grammar supports all of rill's built-in type names and parameterized forms.
+
+**Supported scalar names:** `string`, `number`, `bool`, `dict`, `list`, `any`, `closure`, `tuple`, `ordered`, `vector`, `type`, `iterator`, `stream`, `datetime`, `duration`.
 
 Note: `num` and `callable` are NOT accepted. Use `number` and `closure` — those are rill's canonical type names.
+
+**Parameterized forms:**
+
+| Form | Meaning |
+|------|---------|
+| `list(T)` | Homogeneous list of type T |
+| `dict(T)` | Dict with all values of type T |
+| `dict(a: T1, b: T2)` | Dict with named, typed fields |
+| `list(dict(a: string, b: string))` | Nested composition |
+| `list(list(string))` | Nested lists |
+
+**Rejected in v0:**
+
+- Dynamic refs (`$T`) — frontmatter has no runtime type scope.
+- Union types (`string | number`) — not supported in v0.
 
 **Defaults** are supported only on scalar types (`string`, `number`, `bool`) in v0. Dict, list, closure, and any params cannot have defaults.
 
@@ -62,7 +79,7 @@ params:
   - "temperature: number = 0.7"
   - "tags: list"
   - "context: dict"
-  - "articles: list"
+  - "articles: list(dict(title: string, body: string))"
 ```
 
 A param without a default is required. A param with a default is optional at call time. The extension raises `RILL-R004` when a required param is missing at invocation.

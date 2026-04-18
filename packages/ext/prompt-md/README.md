@@ -59,6 +59,8 @@ rill-run
 
 See [full documentation](docs/extension-prompt-md.md) for file format, frontmatter grammar, `@@ role` convention, interpolation rules, closure annotations, and a runnable LLM round-trip example.
 
+Nested type expressions like `list(dict(title: string, body: string))` are supported in param declarations. See the Params Grammar section in the full docs for the complete type syntax.
+
 ## License
 
 MIT

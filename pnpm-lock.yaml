@@ -469,8 +469,8 @@ importers:
         specifier: ^1.48.0
         version: 1.48.0(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))
       '@rcrsr/rill':
-        specifier: ~0.18.4
-        version: 0.18.4
+        specifier: ~0.18.6
+        version: 0.18.6
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -727,8 +727,8 @@ importers:
   packages/shared/ext-prompt:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.18.4
-        version: 0.18.4
+        specifier: ~0.18.6
+        version: 0.18.6
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../ext-param
@@ -1270,6 +1270,10 @@ packages:
 
   '@rcrsr/rill@0.18.4':
     resolution: {integrity: sha512-Ns8o9VWGVZUvLwplvxtuWxIYZ7vkoei5kqvBFt8jfhXOwTCQOWIjCEAd4uA0jqQVZCH+k+KP6tNfRYTyFLqSLw==}
+    engines: {node: '>=20.0.0'}
+
+  '@rcrsr/rill@0.18.6':
+    resolution: {integrity: sha512-e3qmTaGtrnAPvjA3ZM9ivggOs41XWJF4czqKy8FUuDkQ/ss7xwPYF/wdxi5suKqKpl0ULlMNFCIZ9xV2Ink4dA==}
     engines: {node: '>=20.0.0'}
 
   '@rollup/rollup-android-arm-eabi@4.60.1':
@@ -3856,6 +3860,8 @@ snapshots:
   '@qdrant/openapi-typescript-fetch@1.2.6': {}
 
   '@rcrsr/rill@0.18.4': {}
+
+  '@rcrsr/rill@0.18.6': {}
 
   '@rollup/rollup-android-arm-eabi@4.60.1':
     optional: true
