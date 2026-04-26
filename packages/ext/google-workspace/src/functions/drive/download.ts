@@ -1,0 +1,85 @@
+/**
+ * drive_download callable — download a file from Google Drive as base64.
+ * IR-11: drive_download(fileId: str) → str (base64-encoded content)
+ * Capability: drive.download
+ * Scope: drive.readonly
+ */
+
+import { RuntimeError } from '@rcrsr/rill';
+import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import { resolveToken } from '../../auth/resolve.js';
+import { mapGoogleError, mapFetchError } from '../../errors.js';
+import type { GoogleAuth } from '../../types.js';
+import type { TokenCache } from '../../auth/resolve.js';
+
+const DRIVE_BASE = 'https://www.googleapis.com/drive/v3';
+const DRIVE_READ_SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
+
+/** Fixed request timeout per AC-11. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+export interface DriveDownloadDeps {
+  readonly auth: GoogleAuth;
+  readonly cache: TokenCache;
+}
+
+/**
+ * Factory returning the drive_download inner function.
+ * [DEVIATION] Uses raw fetch + resolveToken instead of googleFetch because
+ * googleFetch always returns response.json(), but download needs raw bytes
+ * (arrayBuffer) to base64-encode.
+ * AC-12: Returns base64-encoded string (rill primitive).
+ */
+export function makeDriveDownload(deps: DriveDownloadDeps): (
+  args: Record<string, RillValue>,
+  ctx: RuntimeContext,
+  controller: AbortController
+) => Promise<RillValue> {
+  return async (
+    args: Record<string, RillValue>,
+    ctx: RuntimeContext,
+    controller: AbortController
+  ): Promise<RillValue> => {
+    const fileId = args['fileId'];
+    if (typeof fileId !== 'string' || fileId.trim() === '') {
+      throw new RuntimeError('RILL-R004', 'google: fileId must be a non-empty string');
+    }
+
+    // AC-11: combine caller signal with 30s hard timeout
+    const combinedSignal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    ]);
+
+    // Resolve Bearer token
+    const token = await resolveToken(
+      deps.auth,
+      ctx,
+      deps.cache,
+      DRIVE_READ_SCOPES,
+      combinedSignal
+    );
+
+    // GET /files/{id}?alt=media returns raw file bytes
+    const url = `${DRIVE_BASE}/files/${encodeURIComponent(fileId)}?alt=media`;
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: combinedSignal,
+      });
+    } catch (error) {
+      throw mapFetchError(error, 'drive');
+    }
+
+    if (!response.ok) {
+      throw mapGoogleError(response.status, 'drive', 'download', fileId);
+    }
+
+    const buffer = await response.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+
+    return base64 as unknown as RillValue;
+  };
+}

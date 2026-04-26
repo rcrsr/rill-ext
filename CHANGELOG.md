@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New `@rcrsr/rill-ext-google-workspace` extension providing access to Gmail, Google Drive, and Google Calendar via 17 callables, supporting bearer token, session, and service account authentication
+
 ## [0.18.6] - 2026-04-17
 
 ### Changed (Breaking)

@@ -1,0 +1,104 @@
+/**
+ * Authenticated HTTP wrapper for Google Workspace API requests.
+ * Implements IR-27: token resolution, signal combination, error mapping.
+ */
+
+import { RuntimeError } from '@rcrsr/rill';
+import type { RuntimeContext } from '@rcrsr/rill';
+import type { GoogleAuth } from './types.js';
+import type { TokenCache } from './auth/resolve.js';
+import { resolveToken } from './auth/resolve.js';
+import { mapGoogleError, mapFetchError } from './errors.js';
+
+/** Fixed request timeout per AC-11. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Perform an authenticated Google API request (IR-27).
+ *
+ * Resolves the Bearer token via resolveToken, combines abort signals,
+ * builds the request, and maps HTTP/network errors to RuntimeError.
+ *
+ * The IR-27 public signature lists (auth, ctx) as resolver params.
+ * This implementation widens to also accept cache, scopes, and resourceId
+ * because resolveToken requires them and mapGoogleError needs service/operation.
+ * The factory closure will bind these to produce per-service helpers. [SPEC]
+ *
+ * @param method - HTTP method (GET, POST, PATCH, DELETE, etc.)
+ * @param baseUrl - HTTPS base URL (e.g. "https://gmail.googleapis.com")
+ * @param path - Path appended to baseUrl (e.g. "/gmail/v1/users/me/messages")
+ * @param service - Google service identifier for error messages
+ * @param operation - Operation name for 403 scope error (e.g. "send")
+ * @param auth - Validated GoogleAuth discriminated union
+ * @param ctx - RuntimeContext for session token lookup
+ * @param controller - AbortController from the calling host function
+ * @param cache - Factory-scoped token cache (service-account mode)
+ * @param scopes - OAuth2 scopes for service-account token exchange
+ * @param body - Optional request body (serialized as JSON)
+ * @param headers - Optional extra request headers
+ * @param resourceId - Optional resource ID for 404 error messages
+ * @returns Parsed JSON response body, or null for 202/204 responses
+ * @throws RuntimeError (RILL-R004) on HTTP errors [EC-14..EC-18]
+ * @throws RuntimeError (RILL-R004) on network/abort errors [EC-19, EC-20]
+ * @throws RuntimeError (RILL-R004) if baseUrl is not HTTPS
+ */
+export async function googleFetch(
+  method: string,
+  baseUrl: string,
+  path: string,
+  service: 'gmail' | 'drive' | 'calendar',
+  operation: string,
+  auth: GoogleAuth,
+  ctx: RuntimeContext,
+  controller: AbortController,
+  cache: TokenCache,
+  scopes: string[],
+  body?: unknown,
+  headers?: Record<string, string>,
+  resourceId?: string
+): Promise<unknown> {
+  // Security defense in depth: assert HTTPS-only baseUrl
+  if (!baseUrl.startsWith('https://')) {
+    throw new RuntimeError('RILL-R004', 'google: baseUrl must be HTTPS');
+  }
+
+  // AC-11: combine caller signal with 30s hard timeout
+  const combinedSignal = AbortSignal.any([
+    controller.signal,
+    AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  ]);
+
+  // Resolve Bearer token — pass combinedSignal so exchange honors the 30s limit
+  const token = await resolveToken(auth, ctx, cache, scopes, combinedSignal);
+
+  const url = `${baseUrl}${path}`;
+
+  const requestHeaders: Record<string, string> = {
+    ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    ...(headers ?? {}),
+    Authorization: `Bearer ${token}`,
+  };
+
+  const init =
+    body !== undefined
+      ? { method, headers: requestHeaders, signal: combinedSignal, body: JSON.stringify(body) }
+      : { method, headers: requestHeaders, signal: combinedSignal };
+
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (error) {
+    throw mapFetchError(error, service);
+  }
+
+  if (!response.ok) {
+    throw mapGoogleError(response.status, service, operation, resourceId);
+  }
+
+  // 202 Accepted and 204 No Content carry no response body
+  if (response.status === 202 || response.status === 204) {
+    return null;
+  }
+
+  return response.json() as Promise<unknown>;
+}
