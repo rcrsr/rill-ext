@@ -84,8 +84,16 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
       );
     }
 
-    // Decode base64 content to bytes
-    const bytes = Buffer.from(content, 'base64');
+    // Decode base64 content to bytes. Node's Buffer.from(_, 'base64') silently
+    // skips characters outside the base64 alphabet, which can corrupt uploads.
+    // Validate strictly against standard or URL-safe base64, then normalize to
+    // standard alphabet before decoding.
+    const stripped = content.replace(/\s+/g, '');
+    if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(stripped) || stripped.length % 4 === 1) {
+      throw new RuntimeError('RILL-R004', 'google: content is not valid base64');
+    }
+    const normalized = stripped.replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Buffer.from(normalized, 'base64');
     const byteLength = bytes.length;
 
     // EC-9: Check maxUploadBytes (inclusive: == is allowed per BC-8)

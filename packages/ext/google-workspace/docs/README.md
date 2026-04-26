@@ -12,7 +12,7 @@
 - [See Also](#see-also)
 
 Provides 17 host functions covering Gmail read/write, Drive file management, and Calendar events.
-All requests go to `https://www.googleapis.com` using native `fetch`.
+Requests go to Google API endpoints using native `fetch`, including `https://www.googleapis.com` and service-specific hosts such as `https://gmail.googleapis.com`.
 The extension manages in-flight request tracking, capability gating, and clean disposal.
 
 Use this extension when your script needs to read or send Gmail, manage Drive files, or query Calendar events.
