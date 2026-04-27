@@ -1,0 +1,17 @@
+# Calendar scheduling demo: free/busy lookup followed by event creation.
+# calendar.freeBusy is default-true; calendar.create is opted in via rill-config.json.
+# Timestamps must include a timezone offset (e.g. "Z" or "+02:00").
+
+$context.attendees -> .split(",") -> map .trim -> filter (!.empty) => $attendees
+
+gw.calendar_free_busy($attendees, $context.start, $context.end) => $busy
+"Free/busy result: {$busy}" -> log
+
+gw.calendar_create_event(
+  $context.title,
+  $context.start,
+  $context.end,
+  dict[attendees: $attendees, sendUpdates: "all"]
+) => $event_id
+
+"Created event ID: {$event_id}" -> log

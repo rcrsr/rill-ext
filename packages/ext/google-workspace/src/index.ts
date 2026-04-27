@@ -1,4 +1,5 @@
-import type { ExtensionConfigSchema } from '@rcrsr/rill';
+import type { ExtensionConfigSchema, ExtensionManifest } from '@rcrsr/rill';
+import { createGoogleWorkspaceExtension as _factory } from './factory.js';
 
 export const VERSION = '0.1.0';
 
@@ -60,3 +61,18 @@ export { mapGoogleError, mapFetchError } from './errors.js';
  * Blocked-on: rill core support for nested types in ExtensionConfigSchema.
  */
 export const configSchema: ExtensionConfigSchema = {};
+
+// ============================================================
+// EXTENSION MANIFEST
+// ============================================================
+
+/**
+ * Manifest consumed by `rill-run` and other config-driven hosts.
+ * `rill-run` mounts the extension at the configured path and passes the
+ * `extensions.config[mount]` object to the factory.
+ */
+export const extensionManifest: ExtensionManifest = {
+  factory: _factory,
+  configSchema,
+  version: VERSION,
+};
