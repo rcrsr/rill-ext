@@ -2,9 +2,15 @@
  * Error mapping utilities for search extensions.
  *
  * Converts fetch errors and HTTP failures into invalid RillValues via
- * `ctx.invalidate`. The atom code names (e.g. `EXT_SEARCH_BRAVE_HTTP`)
- * are supplied by each consuming extension; this shared layer is
- * provider-agnostic.
+ * `ctx.invalidate`, using rill core's pre-registered generic atoms
+ * (`#TIMEOUT`, `#AUTH`, `#FORBIDDEN`, `#RATE_LIMIT`, `#QUOTA_EXCEEDED`,
+ * `#NOT_FOUND`, `#CONFLICT`, `#UNAVAILABLE`, `#PROTOCOL`,
+ * `#INVALID_INPUT`).
+ *
+ * Provider-specific failures decompose into
+ * (generic atom, meta.provider, meta.raw.kind). Host scripts match
+ * coarsely (`guard #UNAVAILABLE`) or finely
+ * (`guard #UNAVAILABLE && raw.kind == 'summarizer_key_missing'`).
  */
 
 import {
@@ -14,60 +20,76 @@ import {
 } from '@rcrsr/rill';
 
 /**
+ * Map an HTTP status code to a generic atom name.
+ * Returns `'UNAVAILABLE'` for unrecognized statuses.
+ */
+function atomForStatus(status: number): string {
+  if (status === 401) return 'AUTH';
+  if (status === 403) return 'FORBIDDEN';
+  if (status === 404) return 'NOT_FOUND';
+  if (status === 408) return 'TIMEOUT';
+  if (status === 409 || status === 412) return 'CONFLICT';
+  if (status === 429) return 'RATE_LIMIT';
+  if (status === 402) return 'QUOTA_EXCEEDED';
+  if (status >= 500 && status <= 599) return 'UNAVAILABLE';
+  if (status >= 400 && status <= 499) return 'INVALID_INPUT';
+  return 'UNAVAILABLE';
+}
+
+/**
+ * Map a status code to a human-readable kind tag for `meta.raw.kind`.
+ */
+function kindForStatus(status: number): string {
+  if (status === 401) return 'authentication_failed';
+  if (status === 403) return 'forbidden';
+  if (status === 404) return 'not_found';
+  if (status === 408) return 'request_timeout';
+  if (status === 409 || status === 412) return 'conflict';
+  if (status === 429) return 'rate_limit_exceeded';
+  if (status === 402) return 'quota_exceeded';
+  if (status >= 500 && status <= 599) return 'server_error';
+  return 'http_error';
+}
+
+/**
  * Convert a fetch error or network failure to an invalid RillValue.
- *
- * Maps error conditions by RuntimeHaltSignal (timeout/disposal),
- * AbortError name (legacy DOMException from undici), TypeError
- * (network failure), SyntaxError (malformed body), or HTTP status code
- * to an invalid RillValue carrying a registered atom and a structured
- * `raw` payload.
  *
  * @param ctx - Runtime context (provides `invalidate`)
  * @param provider - Provider name (e.g., "exa", "tavily", "serper", "brave")
  * @param error - Error caught from fetch operation
- * @param errorCode - Atom name registered by the consuming extension for HTTP / generic errors
- * @returns Invalid RillValue with provider-prefixed message and structured raw payload
  */
 export function mapSearchError(
   ctx: RuntimeContext,
   provider: string,
-  error: unknown,
-  errorCode: string
+  error: unknown
 ): RillValue {
-  // Halt signal from rill-internal cooperative cancellation
   if (error instanceof RuntimeHaltSignal) {
     return ctx.invalidate(error, {
       code: 'TIMEOUT',
       provider,
-      raw: { message: `${provider}: request cancelled` },
+      raw: { kind: 'request_cancelled', message: `${provider}: request cancelled` },
     });
   }
 
-  // EC-4: AbortError name — legacy DOMException from native fetch / undici
   if (error instanceof Error && error.name === 'AbortError') {
     return ctx.invalidate(error, {
       code: 'TIMEOUT',
       provider,
-      raw: { message: `${provider}: request timeout` },
+      raw: { kind: 'request_timeout', message: `${provider}: request timeout` },
     });
   }
 
-  // EC-5: TypeError — network failure (DNS, connection refused, etc.)
   if (error instanceof TypeError) {
     return ctx.invalidate(error, {
-      code: errorCode,
+      code: 'UNAVAILABLE',
       provider,
-      raw: {
-        kind: 'connection_failed',
-        message: `${provider}: connection failed`,
-      },
+      raw: { kind: 'connection_failed', message: `${provider}: connection failed` },
     });
   }
 
-  // EC-6: SyntaxError from JSON.parse — non-JSON response
   if (error instanceof SyntaxError) {
     return ctx.invalidate(error, {
-      code: errorCode,
+      code: 'PROTOCOL',
       provider,
       raw: {
         kind: 'unexpected_response_format',
@@ -76,7 +98,6 @@ export function mapSearchError(
     });
   }
 
-  // EC-1/2/3: HTTP error objects with a status property
   if (
     typeof error === 'object' &&
     error !== null &&
@@ -84,100 +105,69 @@ export function mapSearchError(
     typeof (error as { status: unknown }).status === 'number'
   ) {
     const status = (error as { status: number }).status;
+    const code = atomForStatus(status);
+    const kind = kindForStatus(status);
+    const message =
+      status === 401 ? `${provider}: authentication failed`
+      : status === 403 ? `${provider}: forbidden`
+      : status === 404 ? `${provider}: not found`
+      : status === 429 ? `${provider}: rate limit exceeded`
+      : status === 402 ? `${provider}: quota exceeded`
+      : status >= 500 ? `${provider}: server error (${status})`
+      : `${provider}: request failed (${status})`;
 
-    // EC-1: HTTP 401 or 403 — authentication failure
-    if (status === 401 || status === 403) {
-      return ctx.invalidate(error, {
-        code: errorCode,
-        provider,
-        raw: {
-          kind: 'authentication_failed',
-          status,
-          message: `${provider}: authentication failed`,
-        },
-      });
-    }
-
-    // EC-2: HTTP 429 — rate limit
-    if (status === 429) {
-      return ctx.invalidate(error, {
-        code: errorCode,
-        provider,
-        raw: {
-          kind: 'rate_limit_exceeded',
-          status,
-          message: `${provider}: rate limit exceeded`,
-        },
-      });
-    }
-
-    // EC-3: HTTP 5xx — server error
-    if (status >= 500 && status <= 599) {
-      return ctx.invalidate(error, {
-        code: errorCode,
-        provider,
-        raw: {
-          kind: 'server_error',
-          status,
-          message: `${provider}: server error (${status})`,
-        },
-      });
-    }
+    return ctx.invalidate(error, {
+      code,
+      provider,
+      raw: { kind, status, message },
+    });
   }
 
-  // EC-7: Unknown error — use message if available
   const message = error instanceof Error ? error.message : String(error);
   return ctx.invalidate(error, {
-    code: errorCode,
+    code: 'UNAVAILABLE',
     provider,
-    raw: { message: `${provider}: ${message}` },
+    raw: { kind: 'unknown_error', message: `${provider}: ${message}` },
   });
 }
 
 /**
- * Map provider-specific HTTP status codes and response bodies to an
- * invalid RillValue. Falls back to {@link mapSearchError} for generic
- * status mappings.
+ * Map a provider HTTP status + body to an invalid RillValue.
+ * Handles provider-specific quirks (Tavily 432/433, Exa 402, Brave 403)
+ * by emitting the appropriate generic atom plus a discriminating
+ * `meta.raw.kind`. Falls back to {@link mapSearchError} for generic
+ * status codes.
  *
  * @param ctx - Runtime context
- * @param provider - Provider name (e.g., "exa", "tavily", "serper", "brave")
+ * @param provider - Provider name
  * @param status - HTTP response status code
  * @param body - Parsed response body (any JSON value)
- * @param errorCode - Atom name for HTTP / generic errors
  */
 export function mapProviderSearchError(
   ctx: RuntimeContext,
   provider: string,
   status: number,
-  body: unknown,
-  errorCode: string
+  body: unknown
 ): RillValue {
-  // EC-8: Exa 402 — credits depleted
   if (provider === 'exa' && status === 402) {
     return ctx.invalidate(new Error('exa: credits depleted'), {
-      code: errorCode,
+      code: 'QUOTA_EXCEEDED',
       provider,
       raw: { kind: 'credits_depleted', status, message: 'exa: credits depleted' },
     });
   }
 
-  // EC-9: Tavily 432 — plan limit exceeded
   if (provider === 'tavily' && status === 432) {
     return ctx.invalidate(new Error('tavily: plan limit exceeded'), {
-      code: errorCode,
+      code: 'QUOTA_EXCEEDED',
       provider,
-      raw: {
-        kind: 'plan_limit_exceeded',
-        status,
-        message: 'tavily: plan limit exceeded',
-      },
+      raw: { kind: 'plan_limit_exceeded', status, message: 'tavily: plan limit exceeded' },
     });
   }
 
-  // EC-10: Tavily 433 — pay-as-you-go limit exceeded
   if (provider === 'tavily' && status === 433) {
     return ctx.invalidate(new Error('tavily: pay-as-you-go limit exceeded'), {
-      code: errorCode,
+      code: 'QUOTA_EXCEEDED',
       provider,
       raw: {
         kind: 'payg_limit_exceeded',
@@ -187,20 +177,18 @@ export function mapProviderSearchError(
     });
   }
 
-  // EC-11: Brave 403 with error code field — access denied
   if (provider === 'brave' && status === 403) {
     const braveBody = body as { error?: { code?: unknown } } | null | undefined;
     const code = braveBody?.error?.code;
     if (code !== undefined && code !== null) {
       const message = `brave: access denied (${String(code)})`;
       return ctx.invalidate(new Error(message), {
-        code: errorCode,
+        code: 'FORBIDDEN',
         provider,
         raw: { kind: 'access_denied', status, providerCode: String(code), message },
       });
     }
   }
 
-  // Fall back to generic HTTP status code mapping
-  return mapSearchError(ctx, provider, { status }, errorCode);
+  return mapSearchError(ctx, provider, { status });
 }

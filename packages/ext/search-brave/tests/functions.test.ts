@@ -7,8 +7,32 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type ApplicationCallable,
+  type ExtensionFactoryCtx,
+  type RillValue,
+} from "@rcrsr/rill";
 import { createBraveExtension } from '../src/factory.js';
+
+function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
+  return {
+    signal: signal ?? new AbortController().signal,
+    registerErrorCode: () => {},
+  };
+}
+
+async function expectInvalidWithMessage(
+  promise: Promise<unknown>,
+  needle: string
+): Promise<RillValue> {
+  const result = (await promise) as RillValue;
+  expect(isInvalid(result)).toBe(true);
+  expect(getStatus(result).message).toContain(needle);
+  return result;
+}
 
 // ============================================================
 // TEST HELPERS
@@ -101,7 +125,7 @@ describe('Brave extension host functions', () => {
   describe('search()', () => {
     it('returns web results dict [AC-2]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -114,7 +138,7 @@ describe('Brave extension host functions', () => {
 
     it('returns result count from web.results [AC-2]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -131,7 +155,7 @@ describe('Brave extension host functions', () => {
     it('sends GET to /res/v1/web/search with q param', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'TypeScript' }, ctx);
@@ -146,7 +170,7 @@ describe('Brave extension host functions', () => {
     it('sends X-Subscription-Token header', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
@@ -158,7 +182,7 @@ describe('Brave extension host functions', () => {
     it('sends Cache-Control: no-cache header', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
@@ -170,7 +194,7 @@ describe('Brave extension host functions', () => {
     it('respects custom baseUrl', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createBraveExtension({ apiKey: 'test-key', baseUrl: 'https://custom.search.brave.com' });
+      const ext = createBraveExtension({ apiKey: 'test-key', baseUrl: 'https://custom.search.brave.com' }, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
@@ -180,26 +204,26 @@ describe('Brave extension host functions', () => {
     });
 
     it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: authentication failed'
+      );
     });
 
     it('maps HTTP 403 with code to access denied [EC-11, AC-28]', async () => {
@@ -207,54 +231,59 @@ describe('Brave extension host functions', () => {
         type: 'ErrorResponse',
         error: { id: 'err-1', status: 403, detail: 'Plan restricted', code: 'PLAN_RESTRICTED' },
       });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: access denied (PLAN_RESTRICTED)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: access denied (PLAN_RESTRICTED)'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: server error (500)'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Failed to fetch'));
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('The operation was aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
@@ -263,27 +292,29 @@ describe('Brave extension host functions', () => {
         status: 200,
         json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
       });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: unexpected response format'
+      );
     });
 
     it('maps unknown error with message [EC-7]', async () => {
       globalThis.fetch = mockFetchReject(new Error('Something went wrong'));
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: Something went wrong');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: Something went wrong'
+      );
     });
 
     it('emits success event on successful search [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -301,14 +332,12 @@ describe('Brave extension host functions', () => {
 
     it('emits error event on failed search [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -320,13 +349,14 @@ describe('Brave extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave: operation cancelled'
+      );
     });
   });
 
@@ -337,7 +367,7 @@ describe('Brave extension host functions', () => {
   describe('news()', () => {
     it('returns results tuple [AC-3]', async () => {
       globalThis.fetch = mockFetchJson(200, NEWS_RESPONSE);
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'news').fn(
@@ -352,7 +382,7 @@ describe('Brave extension host functions', () => {
     it('sends GET to /res/v1/news/search with q param', async () => {
       const mockFetch = mockFetchJson(200, NEWS_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'news').fn({ query: 'TypeScript news' }, ctx);
@@ -364,26 +394,26 @@ describe('Brave extension host functions', () => {
     });
 
     it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'news').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave: authentication failed'
+      );
     });
 
     it('maps HTTP 403 with code to access denied [EC-11, AC-28]', async () => {
@@ -391,69 +421,75 @@ describe('Brave extension host functions', () => {
         type: 'ErrorResponse',
         error: { id: 'err-2', status: 403, detail: 'Plan restricted', code: 'SUBSCRIPTION_EXPIRED' },
       });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: access denied (SUBSCRIPTION_EXPIRED)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave: access denied (SUBSCRIPTION_EXPIRED)'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave: server error (500)'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Network error'));
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
       globalThis.fetch = mockFetchNonJson();
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave: unexpected response format'
+      );
     });
 
     it('emits success event on success [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, NEWS_RESPONSE);
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -472,14 +508,12 @@ describe('Brave extension host functions', () => {
 
     it('emits error event on failure [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'news').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -491,13 +525,14 @@ describe('Brave extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave: operation cancelled'
+      );
     });
   });
 
@@ -519,7 +554,7 @@ describe('Brave extension host functions', () => {
           status: 200,
           json: vi.fn().mockResolvedValue(SUMMARIZE_STEP2_RESPONSE),
         });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'summarize').fn(
@@ -546,7 +581,7 @@ describe('Brave extension host functions', () => {
           json: vi.fn().mockResolvedValue(SUMMARIZE_STEP2_RESPONSE),
         });
       globalThis.fetch = mockFetch;
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'summarize').fn({ query: 'What is TypeScript?' }, ctx);
@@ -569,7 +604,7 @@ describe('Brave extension host functions', () => {
           json: vi.fn().mockResolvedValue(SUMMARIZE_STEP2_RESPONSE),
         });
       globalThis.fetch = mockFetch;
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'summarize').fn({ query: 'What is TypeScript?' }, ctx);
@@ -580,16 +615,15 @@ describe('Brave extension host functions', () => {
     });
 
     it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'summarize').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('throws brave: summarizer key not found when key absent [EC-19, AC-33]', async () => {
@@ -599,12 +633,13 @@ describe('Brave extension host functions', () => {
         web: { results: [] },
         // No summarizer field
       });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: summarizer key not found');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: summarizer key not found'
+      );
     });
 
     it('throws brave: summarizer key not found when summarizer has no key [EC-19, AC-33]', async () => {
@@ -613,12 +648,13 @@ describe('Brave extension host functions', () => {
         web: { results: [] },
         summarizer: {},
       });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: summarizer key not found');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: summarizer key not found'
+      );
     });
 
     it('throws brave: summarizer request failed when step 2 fails [EC-18, AC-32]', async () => {
@@ -633,22 +669,24 @@ describe('Brave extension host functions', () => {
           status: 500,
           json: vi.fn().mockResolvedValue({ error: 'Internal Server Error' }),
         });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'What is TypeScript?' }, ctx)
-      ).rejects.toThrow('brave: summarizer request failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'What is TypeScript?' }, ctx),
+        'brave: summarizer request failed'
+      );
     });
 
     it('maps step 1 HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: authentication failed'
+      );
     });
 
     it('maps step 1 HTTP 403 with code to access denied [EC-11, AC-28]', async () => {
@@ -656,54 +694,59 @@ describe('Brave extension host functions', () => {
         type: 'ErrorResponse',
         error: { id: 'err-3', status: 403, detail: 'Plan restricted', code: 'PLAN_RESTRICTED' },
       });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: access denied (PLAN_RESTRICTED)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: access denied (PLAN_RESTRICTED)'
+      );
     });
 
     it('maps step 1 HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: rate limit exceeded'
+      );
     });
 
     it('maps step 1 HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: server error (500)'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Failed to fetch'));
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('The operation was aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: request timeout'
+      );
     });
 
     it('maps step 1 non-JSON to unexpected format [EC-6, AC-31]', async () => {
@@ -712,12 +755,13 @@ describe('Brave extension host functions', () => {
         status: 200,
         json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
       });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: unexpected response format'
+      );
     });
 
     it('emits success event on successful summarize [AC-11]', async () => {
@@ -732,7 +776,7 @@ describe('Brave extension host functions', () => {
           status: 200,
           json: vi.fn().mockResolvedValue(SUMMARIZE_STEP2_RESPONSE),
         });
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -750,14 +794,12 @@ describe('Brave extension host functions', () => {
 
     it('emits error event on failure [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'summarize').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -769,13 +811,14 @@ describe('Brave extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('brave: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave: operation cancelled'
+      );
     });
   });
 
@@ -805,7 +848,7 @@ describe('Brave extension host functions', () => {
         });
       });
 
-      const ext = createBraveExtension(VALID_CONFIG);
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       // Start search without awaiting — request stays in-flight
@@ -815,7 +858,7 @@ describe('Brave extension host functions', () => {
       await ext.dispose!();
 
       // The in-flight request should reject with mapped AbortError
-      await expect(promise).rejects.toThrow('brave: request timeout');
+      await expectInvalidWithMessage(promise, 'brave: request timeout');
     });
   });
 });

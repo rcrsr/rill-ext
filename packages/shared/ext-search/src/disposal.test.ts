@@ -12,7 +12,6 @@ import {
 import { createDisposalState, checkDisposed, dispose } from './disposal.js';
 
 // Use the pre-registered generic atom for disposal in tests.
-const DISPOSED_CODE = 'DISPOSED';
 
 function makeCtx(): RuntimeContext {
   return createRuntimeContext();
@@ -39,21 +38,21 @@ describe('checkDisposed', () => {
 
   it('returns null when not disposed', () => {
     const state = createDisposalState();
-    expect(checkDisposed(ctx, state, provider, DISPOSED_CODE)).toBeNull();
+    expect(checkDisposed(ctx, state, provider)).toBeNull();
   });
 
   it('returns invalid RillValue when disposed', () => {
     const state = { isDisposed: true };
-    const result = checkDisposed(ctx, state, provider, DISPOSED_CODE);
+    const result = checkDisposed(ctx, state, provider);
     expect(result).not.toBeNull();
     const status = getStatus(result!);
-    expect(status.code.name).toBe(DISPOSED_CODE);
+    expect(status.code.name).toBe('DISPOSED');
     expect(status.message).toBe(`${provider}: operation cancelled`);
   });
 
   it('includes provider name in disposed message', () => {
     const state = { isDisposed: true };
-    const result = checkDisposed(ctx, state, 'my-search-ext', DISPOSED_CODE);
+    const result = checkDisposed(ctx, state, 'my-search-ext');
     expect(getStatus(result!).message).toBe('my-search-ext: operation cancelled');
   });
 });
@@ -114,7 +113,7 @@ describe('dispose', () => {
     const provider = 'testsearch';
     const state = createDisposalState();
     await dispose(state);
-    const result = checkDisposed(ctx, state, provider, DISPOSED_CODE);
+    const result = checkDisposed(ctx, state, provider);
     expect(result).not.toBeNull();
     expect(getStatus(result!).message).toBe(`${provider}: operation cancelled`);
   });

@@ -18,10 +18,7 @@ import { createDisposalState } from './disposal.js';
 import { createInFlightState } from './request.js';
 
 // Pre-registered generic atoms for use in shared tests.
-const DISPOSED_CODE = 'DISPOSED';
-const ERROR_CODE = 'R001';
 
-const atoms = { disposedCode: DISPOSED_CODE, errorCode: ERROR_CODE };
 
 function makeCtx(opts?: { signal?: AbortSignal; onLogEvent?: (e: unknown) => void }): RuntimeContext {
   return createRuntimeContext({
@@ -39,12 +36,7 @@ describe('createSearchFunctionWrapper', () => {
       const inFlightState = createInFlightState();
       disposalState.isDisposed = true;
 
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const fn = vi.fn(async () => ({
         result: 'ok' as RillValue,
         query: 'test',
@@ -64,12 +56,7 @@ describe('createSearchFunctionWrapper', () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
       let capturedSize = 0;
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const wrappedFn = wrap('search', async () => {
         capturedSize = inFlightState.controllers.size;
         return { result: 'ok' as RillValue, query: 'q', resultCount: 1 };
@@ -82,12 +69,7 @@ describe('createSearchFunctionWrapper', () => {
     it('removes controller from inFlightState after error', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const wrappedFn = wrap('search', async () => {
         throw new Error('fetch failed');
       });
@@ -102,12 +84,7 @@ describe('createSearchFunctionWrapper', () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
       const outer = new AbortController();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       let capturedSignal: AbortSignal | undefined;
       const wrappedFn = wrap('search', async (_args, _ctx, signal) => {
         capturedSignal = signal;
@@ -131,12 +108,7 @@ describe('createSearchFunctionWrapper', () => {
     it('uses the per-request controller signal when ctx.signal is undefined', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       let captured: AbortSignal | undefined;
       const wrappedFn = wrap('search', async (_args, _ctx, signal) => {
         captured = signal;
@@ -153,12 +125,7 @@ describe('createSearchFunctionWrapper', () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
       const onLogEvent = vi.fn();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const wrappedFn = wrap('search', async () => ({
         result: ['r1', 'r2'] as RillValue,
         query: 'TypeScript',
@@ -180,12 +147,7 @@ describe('createSearchFunctionWrapper', () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
       const onLogEvent = vi.fn();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const wrappedFn = wrap('search', async () => {
         throw new Error('fetch error');
       });
@@ -206,12 +168,7 @@ describe('createSearchFunctionWrapper', () => {
     it('maps TypeError to connection_failed invalid value', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const wrappedFn = wrap('search', async () => {
         throw new TypeError('Failed to fetch');
       });
@@ -223,12 +180,7 @@ describe('createSearchFunctionWrapper', () => {
     it('maps AbortError name to TIMEOUT', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const wrappedFn = wrap('search', async () => {
         const err = new Error('Aborted');
         err.name = 'AbortError';
@@ -244,12 +196,7 @@ describe('createSearchFunctionWrapper', () => {
     it('returns the result value from inner fn on success', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const expected = { items: ['a', 'b'], count: 2 };
       const wrappedFn = wrap('search', async () => ({
         result: expected as unknown as RillValue,
@@ -265,12 +212,7 @@ describe('createSearchFunctionWrapper', () => {
     it('all operations check the same disposal state', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState,
-        atoms
-      );
+      const wrap = createSearchFunctionWrapper(provider, disposalState, inFlightState);
       const search = wrap('search', async () => ({
         result: 'ok' as RillValue,
         query: 'q',

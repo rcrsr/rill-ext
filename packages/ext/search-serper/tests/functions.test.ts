@@ -7,8 +7,32 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type ApplicationCallable,
+  type ExtensionFactoryCtx,
+  type RillValue,
+} from "@rcrsr/rill";
 import { createSerperExtension } from '../src/factory.js';
+
+function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
+  return {
+    signal: signal ?? new AbortController().signal,
+    registerErrorCode: () => {},
+  };
+}
+
+async function expectInvalidWithMessage(
+  promise: Promise<unknown>,
+  needle: string
+): Promise<RillValue> {
+  const result = (await promise) as RillValue;
+  expect(isInvalid(result)).toBe(true);
+  expect(getStatus(result).message).toContain(needle);
+  return result;
+}
 
 // ============================================================
 // TEST HELPERS
@@ -101,7 +125,7 @@ describe('Serper extension host functions', () => {
   describe('search()', () => {
     it('returns organic results [AC-2]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -115,7 +139,7 @@ describe('Serper extension host functions', () => {
 
     it('returns search_parameters field [AC-2]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -128,7 +152,7 @@ describe('Serper extension host functions', () => {
 
     it('omits optional fields when absent [AC-38]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -151,7 +175,7 @@ describe('Serper extension host functions', () => {
         relatedSearches: [{ query: 'JavaScript' }],
       };
       globalThis.fetch = mockFetchJson(200, responseWithOptionals);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -168,7 +192,7 @@ describe('Serper extension host functions', () => {
     it('sends POST to /search with X-API-KEY header', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test query' }, ctx);
@@ -183,7 +207,7 @@ describe('Serper extension host functions', () => {
     it('sends query as q in request body', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'my search query' }, ctx);
@@ -196,7 +220,7 @@ describe('Serper extension host functions', () => {
     it('respects custom baseUrl', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createSerperExtension({ apiKey: 'test-key', baseUrl: 'https://custom.serper.dev' });
+      const ext = createSerperExtension({ apiKey: 'test-key', baseUrl: 'https://custom.serper.dev' }, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
@@ -206,68 +230,72 @@ describe('Serper extension host functions', () => {
     });
 
     it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, { message: 'Unauthorized' });
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'serper: authentication failed'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'serper: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'serper: server error (500)'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Failed to fetch'));
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'serper: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('The operation was aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'serper: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
@@ -276,27 +304,29 @@ describe('Serper extension host functions', () => {
         status: 200,
         json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
       });
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'serper: unexpected response format'
+      );
     });
 
     it('maps unknown error with message [EC-7]', async () => {
       globalThis.fetch = mockFetchReject(new Error('Something went wrong'));
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: Something went wrong');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'serper: Something went wrong'
+      );
     });
 
     it('emits success event on successful search [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -315,14 +345,12 @@ describe('Serper extension host functions', () => {
 
     it('emits error event on failed search [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -334,13 +362,14 @@ describe('Serper extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'serper: operation cancelled'
+      );
     });
   });
 
@@ -351,7 +380,7 @@ describe('Serper extension host functions', () => {
   describe('news()', () => {
     it('returns news results tuple [AC-3]', async () => {
       globalThis.fetch = mockFetchJson(200, NEWS_RESPONSE);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'news').fn(
@@ -366,7 +395,7 @@ describe('Serper extension host functions', () => {
     it('sends POST to /news with q in body', async () => {
       const mockFetch = mockFetchJson(200, NEWS_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'news').fn({ query: 'latest TypeScript news' }, ctx);
@@ -379,83 +408,88 @@ describe('Serper extension host functions', () => {
     });
 
     it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'news').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'serper: authentication failed'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'serper: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'serper: server error (500)'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Network error'));
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'serper: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'serper: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
       globalThis.fetch = mockFetchNonJson();
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'serper: unexpected response format'
+      );
     });
 
     it('emits success event on success [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, NEWS_RESPONSE);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -474,14 +508,12 @@ describe('Serper extension host functions', () => {
 
     it('emits error event on failure [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'news').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -493,13 +525,14 @@ describe('Serper extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'serper: operation cancelled'
+      );
     });
   });
 
@@ -510,7 +543,7 @@ describe('Serper extension host functions', () => {
   describe('images()', () => {
     it('returns images tuple with expected fields [AC-4]', async () => {
       globalThis.fetch = mockFetchJson(200, IMAGES_RESPONSE);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'images').fn(
@@ -534,7 +567,7 @@ describe('Serper extension host functions', () => {
     it('sends POST to /images with q in body', async () => {
       const mockFetch = mockFetchJson(200, IMAGES_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'images').fn({ query: 'TypeScript logo' }, ctx);
@@ -547,83 +580,88 @@ describe('Serper extension host functions', () => {
     });
 
     it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'images').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'images').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'images').fn({ query: 'test' }, ctx),
+        'serper: authentication failed'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'images').fn({ query: 'test' }, ctx),
+        'serper: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'images').fn({ query: 'test' }, ctx),
+        'serper: server error (500)'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Network error'));
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'images').fn({ query: 'test' }, ctx),
+        'serper: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'images').fn({ query: 'test' }, ctx),
+        'serper: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
       globalThis.fetch = mockFetchNonJson();
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'images').fn({ query: 'test' }, ctx),
+        'serper: unexpected response format'
+      );
     });
 
     it('emits success event on success [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, IMAGES_RESPONSE);
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -642,14 +680,12 @@ describe('Serper extension host functions', () => {
 
     it('emits error event on failure [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'images').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -661,13 +697,14 @@ describe('Serper extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'images').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('serper: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'images').fn({ query: 'test' }, ctx),
+        'serper: operation cancelled'
+      );
     });
   });
 
@@ -697,7 +734,7 @@ describe('Serper extension host functions', () => {
         });
       });
 
-      const ext = createSerperExtension(VALID_CONFIG);
+      const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       // Start search without awaiting — request stays in-flight
@@ -707,7 +744,7 @@ describe('Serper extension host functions', () => {
       await ext.dispose!();
 
       // The in-flight request should reject with mapped AbortError
-      await expect(promise).rejects.toThrow('serper: request timeout');
+      await expectInvalidWithMessage(promise, 'serper: request timeout');
     });
   });
 });

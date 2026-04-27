@@ -5,8 +5,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { RuntimeError, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, type ApplicationCallable, type ExtensionFactoryCtx } from '@rcrsr/rill';
 import { createBraveExtension } from '../src/factory.js';
+
+function makeFactoryCtx(): ExtensionFactoryCtx {
+  return {
+    signal: new AbortController().signal,
+    registerErrorCode: () => {},
+  };
+}
 
 // ============================================================
 // TEST HELPERS
@@ -25,41 +32,41 @@ describe('createBraveExtension', () => {
     it('throws RILL-R004 for missing apiKey [EC-13, AC-14]', () => {
       let caught: unknown;
       try {
-        createBraveExtension({ apiKey: undefined as unknown as string });
+        createBraveExtension({ apiKey: undefined as unknown as string }, makeFactoryCtx());
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
       expect((caught as RuntimeError).message).toContain('apiKey is required');
     });
 
     it('throws RILL-R004 for empty apiKey [EC-13, AC-14]', () => {
       let caught: unknown;
       try {
-        createBraveExtension({ apiKey: '' });
+        createBraveExtension({ apiKey: '' }, makeFactoryCtx());
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
       expect((caught as RuntimeError).message).toContain('apiKey is required');
     });
 
     it('throws RILL-R004 for invalid baseUrl (non-http)', () => {
       let caught: unknown;
       try {
-        createBraveExtension({ apiKey: 'test-key', baseUrl: 'ftp://bad.example.com' });
+        createBraveExtension({ apiKey: 'test-key', baseUrl: 'ftp://bad.example.com' }, makeFactoryCtx());
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
     });
 
     it('accepts valid config with apiKey only [AC-1]', () => {
       expect(() =>
-        createBraveExtension({ apiKey: 'brave-test-key' })
+        createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx())
       ).not.toThrow();
     });
 
@@ -68,7 +75,7 @@ describe('createBraveExtension', () => {
         createBraveExtension({
           apiKey: 'brave-test-key',
           baseUrl: 'https://custom.search.brave.com',
-        })
+        }, makeFactoryCtx())
       ).not.toThrow();
     });
 
@@ -77,7 +84,7 @@ describe('createBraveExtension', () => {
         createBraveExtension({
           apiKey: 'brave-test-key',
           baseUrl: 'http://localhost:8080',
-        })
+        }, makeFactoryCtx())
       ).not.toThrow();
     });
 
@@ -86,60 +93,60 @@ describe('createBraveExtension', () => {
         createBraveExtension({
           apiKey: 'brave-test-key',
           timeout: 15000,
-        })
+        }, makeFactoryCtx())
       ).not.toThrow();
     });
   });
 
   describe('factory shape [AC-1]', () => {
     it('returns value and dispose', () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       expect(ext).toHaveProperty('value');
       expect(ext).toHaveProperty('dispose');
     });
 
     it('returns all three host functions', () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       expect(getCallable(ext, 'search')).toBeDefined();
       expect(getCallable(ext, 'news')).toBeDefined();
       expect(getCallable(ext, 'summarize')).toBeDefined();
     });
 
     it('each host function has a callable fn', () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       for (const name of ['search', 'news', 'summarize']) {
         expect(typeof getCallable(ext, name).fn).toBe('function');
       }
     });
 
     it('each host function has params array', () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       for (const name of ['search', 'news', 'summarize']) {
         expect(Array.isArray(getCallable(ext, name).params)).toBe(true);
       }
     });
 
     it('dispose is a function', () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       expect(typeof ext.dispose).toBe('function');
     });
 
     it('search has query (string) param and options (dict) param', () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       const search = getCallable(ext, 'search');
       expect(search.params[0]).toMatchObject({ name: 'query', type: { kind: 'string' } });
       expect(search.params[1]).toMatchObject({ name: 'options', type: { kind: 'dict' } });
     });
 
     it('news has query (string) param and options (dict) param', () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       const news = getCallable(ext, 'news');
       expect(news.params[0]).toMatchObject({ name: 'query', type: { kind: 'string' } });
       expect(news.params[1]).toMatchObject({ name: 'options', type: { kind: 'dict' } });
     });
 
     it('summarize has query (string) param and options (dict) param', () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       const summarize = getCallable(ext, 'summarize');
       expect(summarize.params[0]).toMatchObject({ name: 'query', type: { kind: 'string' } });
       expect(summarize.params[1]).toMatchObject({ name: 'options', type: { kind: 'dict' } });
@@ -148,18 +155,18 @@ describe('createBraveExtension', () => {
 
   describe('dispose lifecycle', () => {
     it('dispose with no in-flight requests resolves [AC-34]', async () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       await expect(ext.dispose!()).resolves.toBeUndefined();
     });
 
     it('dispose twice is idempotent [AC-35]', async () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       await ext.dispose!();
       await expect(ext.dispose!()).resolves.toBeUndefined();
     });
 
     it('dispose three times does not throw [AC-35]', async () => {
-      const ext = createBraveExtension({ apiKey: 'brave-test-key' });
+      const ext = createBraveExtension({ apiKey: 'brave-test-key' }, makeFactoryCtx());
       await ext.dispose!();
       await ext.dispose!();
       await expect(ext.dispose!()).resolves.toBeUndefined();
