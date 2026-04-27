@@ -15,7 +15,6 @@ import {
   type RuntimeContext,
 } from '@rcrsr/rill';
 import type { CommandConfig, CommandResult } from './types.js';
-import { EXT_EXEC_CONFIG, EXT_EXEC_TIMEOUT } from './errors.js';
 
 const execFileAsync = promisify(execFile);
 const PROVIDER = 'exec';
@@ -38,7 +37,7 @@ function validateArgs(
         return ctx.invalidate(
           new Error(`arg "${arg}" not permitted for command "${commandName}"`),
           {
-            code: EXT_EXEC_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: {
               kind: 'arg_not_permitted',
@@ -58,7 +57,7 @@ function validateArgs(
         return ctx.invalidate(
           new Error(`arg "${arg}" is blocked for command "${commandName}"`),
           {
-            code: EXT_EXEC_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: {
               kind: 'arg_blocked',
@@ -85,7 +84,7 @@ function validateStdin(
     return ctx.invalidate(
       new Error(`command "${commandName}" does not support stdin`),
       {
-        code: EXT_EXEC_CONFIG,
+        code: 'INVALID_INPUT',
         provider: PROVIDER,
         raw: { kind: 'stdin_not_supported', commandName },
       },
@@ -189,7 +188,7 @@ export async function runCommand(
         return ctx.invalidate(
           new Error(`binary not found: ${config.binary}`),
           {
-            code: EXT_EXEC_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: {
               kind: 'binary_not_found',
@@ -213,7 +212,7 @@ export async function runCommand(
         return ctx.invalidate(
           new Error('command output exceeds size limit'),
           {
-            code: EXT_EXEC_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: {
               kind: 'maxbuffer_exceeded',
@@ -229,7 +228,7 @@ export async function runCommand(
         return ctx.invalidate(
           new Error(`command "${commandName}" timed out (${timeoutMs}ms)`),
           {
-            code: EXT_EXEC_TIMEOUT,
+            code: 'TIMEOUT',
             provider: PROVIDER,
             raw: { kind: 'timeout', commandName, timeoutMs },
           },
@@ -244,7 +243,7 @@ export async function runCommand(
         return ctx.invalidate(
           new Error(`command "${commandName}" aborted`),
           {
-            code: EXT_EXEC_TIMEOUT,
+            code: 'TIMEOUT',
             provider: PROVIDER,
             raw: { kind: 'aborted', commandName },
           },

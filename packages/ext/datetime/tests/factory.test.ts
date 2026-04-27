@@ -135,7 +135,7 @@ describe('datetime extension factory', () => {
 
       const result = await ext.value.iso.fn({ dt: Date.now(), zone: 'UTC' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/datetime: operation cancelled/);
     });
 
@@ -145,7 +145,7 @@ describe('datetime extension factory', () => {
 
       const result = await ext.value.zones.fn({}, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/datetime: operation cancelled/);
     });
 
@@ -155,7 +155,7 @@ describe('datetime extension factory', () => {
 
       const result = await ext.value.format.fn({ dt: Date.now(), pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/datetime: operation cancelled/);
     });
   });

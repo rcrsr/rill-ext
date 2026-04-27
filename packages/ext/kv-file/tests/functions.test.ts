@@ -136,7 +136,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/Cannot merge into non-dict/);
     });
   });
@@ -166,7 +166,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/not declared in schema/);
     });
 
@@ -180,7 +180,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/not declared in schema/);
     });
 
@@ -194,7 +194,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/expects number/);
     });
 
@@ -218,7 +218,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/Mount 'nonexistent' not found/);
     });
 
@@ -270,7 +270,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/read-only/);
     });
   });
@@ -300,7 +300,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('UNAVAILABLE');
       expect(status.message).toMatch(/state file corrupt/);
     });
   });
@@ -316,7 +316,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/exceeds size limit/);
     });
 
@@ -332,7 +332,7 @@ describe('kv-file functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/exceeds entry limit/);
     });
   });

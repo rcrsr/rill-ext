@@ -97,7 +97,7 @@ describe('runner: argument validation', () => {
 
     const result = await runCommand('echo', config, ['forbidden'], undefined, undefined, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/not permitted/);
   });
 
@@ -119,7 +119,7 @@ describe('runner: argument validation', () => {
 
     const result = await runCommand('echo', config, ['--danger'], undefined, undefined, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/is blocked/);
   });
 });
@@ -130,7 +130,7 @@ describe('runner: stdin validation', () => {
 
     const result = await runCommand('echo', config, ['test'], 'stdin data', undefined, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/does not support stdin/);
   });
 });
@@ -150,21 +150,21 @@ describe('runner: error handling', () => {
   it('returns invalid value when binary not found', async () => {
     const result = await runCommand('fake', { binary: '/nonexistent/binary' }, [], undefined, undefined, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/binary not found/);
   });
 
   it('returns invalid value when command times out', async () => {
     const result = await runCommand('sleep', { binary: 'sleep', timeout: 100 }, ['10'], undefined, undefined, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('TIMEOUT');
     expect(status.message).toMatch(/timed out.*100ms/);
   });
 
   it('returns invalid value when output exceeds maxBuffer', async () => {
     const result = await runCommand('sh', { binary: 'sh', maxBuffer: 10 }, ['-c', `echo ${'a'.repeat(100)}`], undefined, undefined, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/exceeds size limit/);
   });
 });

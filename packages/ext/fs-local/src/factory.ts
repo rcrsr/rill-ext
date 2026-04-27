@@ -29,11 +29,6 @@ import {
   initializeMount,
   parseMountPath,
 } from './sandbox.js';
-import {
-  EXT_FS_LOCAL_CONFIG,
-  EXT_FS_LOCAL_IO,
-  EXT_FS_LOCAL_PATH,
-} from './errors.js';
 
 const PROVIDER = 'fs-local';
 
@@ -45,11 +40,8 @@ const PROVIDER = 'fs-local';
  */
 export async function createLocalFsExtension(
   config: FsLocalExtensionConfig,
-  ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx,
 ): Promise<ExtensionFactoryResult> {
-  ctx.registerErrorCode(EXT_FS_LOCAL_CONFIG, 'runtime');
-  ctx.registerErrorCode(EXT_FS_LOCAL_IO, 'runtime');
-  ctx.registerErrorCode(EXT_FS_LOCAL_PATH, 'runtime');
 
   // Validate required configuration (factory-init: throw R005)
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
@@ -91,7 +83,7 @@ export async function createLocalFsExtension(
       return runCtx.invalidate(
         new Error(`file exceeds size limit (${size} > ${max})`),
         {
-          code: EXT_FS_LOCAL_IO,
+          code: 'UNAVAILABLE',
           provider: PROVIDER,
           raw: { kind: 'file_too_large', path: filePath, size, max },
         },
@@ -250,7 +242,7 @@ export async function createLocalFsExtension(
       return runCtx.invalidate(
         new Error(`mount "${mountName}" not configured`),
         {
-          code: EXT_FS_LOCAL_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'mount_uninitialized', mountName },
         },
@@ -378,7 +370,7 @@ export async function createLocalFsExtension(
       return runCtx.invalidate(
         new Error(`mount "${mountName}" not configured`),
         {
-          code: EXT_FS_LOCAL_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'mount_uninitialized', mountName },
         },
@@ -390,7 +382,7 @@ export async function createLocalFsExtension(
       return runCtx.invalidate(
         new Error(`mount "${mountName}" does not permit write`),
         {
-          code: EXT_FS_LOCAL_PATH,
+          code: 'FORBIDDEN',
           provider: PROVIDER,
           raw: { kind: 'mode_violation', mountName, mode: mount.mode },
         },
@@ -409,7 +401,7 @@ export async function createLocalFsExtension(
       return runCtx.invalidate(
         new Error('path escapes mount boundary'),
         {
-          code: EXT_FS_LOCAL_PATH,
+          code: 'FORBIDDEN',
           provider: PROVIDER,
           raw: {
             kind: 'path_escape',
@@ -456,7 +448,7 @@ export async function createLocalFsExtension(
       return runCtx.invalidate(
         new Error('path escapes mount boundary'),
         {
-          code: EXT_FS_LOCAL_PATH,
+          code: 'FORBIDDEN',
           provider: PROVIDER,
           raw: {
             kind: 'symlink_escape',
@@ -518,7 +510,7 @@ export async function createLocalFsExtension(
       return runCtx.invalidate(
         new Error('copy requires same mount for src and dest'),
         {
-          code: EXT_FS_LOCAL_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: {
             kind: 'cross_mount',
@@ -560,7 +552,7 @@ export async function createLocalFsExtension(
           return runCtx.invalidate(
             new Error(`file not found: ${srcPath}`),
             {
-              code: EXT_FS_LOCAL_IO,
+              code: 'UNAVAILABLE',
               provider: PROVIDER,
               raw: { kind: 'file_not_found', path: resolvedSrc },
             },
@@ -590,7 +582,7 @@ export async function createLocalFsExtension(
       return runCtx.invalidate(
         new Error('move requires same mount for src and dest'),
         {
-          code: EXT_FS_LOCAL_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: {
             kind: 'cross_mount',
@@ -627,7 +619,7 @@ export async function createLocalFsExtension(
           return runCtx.invalidate(
             new Error(`file not found: ${srcPath}`),
             {
-              code: EXT_FS_LOCAL_IO,
+              code: 'UNAVAILABLE',
               provider: PROVIDER,
               raw: { kind: 'file_not_found', path: resolvedSrc },
             },

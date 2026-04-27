@@ -11,7 +11,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { RuntimeError, type RillValue, type RuntimeContext } from '@rcrsr/rill';
 import type { MountConfig } from './types.js';
-import { EXT_FS_LOCAL_PATH } from './errors.js';
 
 const PROVIDER = 'fs-local';
 
@@ -58,7 +57,7 @@ export async function resolvePath(
     return ctx.invalidate(
       new Error(`mount "${mountName}" not configured`),
       {
-        code: EXT_FS_LOCAL_PATH,
+        code: 'FORBIDDEN',
         provider: PROVIDER,
         raw: { kind: 'unknown_mount', mountName },
       },
@@ -71,7 +70,7 @@ export async function resolvePath(
     return ctx.invalidate(
       new Error(`mount "${mountName}" not initialized (missing resolvedPath)`),
       {
-        code: EXT_FS_LOCAL_PATH,
+        code: 'FORBIDDEN',
         provider: PROVIDER,
         raw: { kind: 'mount_uninitialized', mountName },
       },
@@ -92,7 +91,7 @@ export async function resolvePath(
     return ctx.invalidate(
       new Error('path escapes mount boundary'),
       {
-        code: EXT_FS_LOCAL_PATH,
+        code: 'FORBIDDEN',
         provider: PROVIDER,
         raw: {
           kind: 'path_escape',
@@ -125,7 +124,7 @@ export async function resolvePath(
         return ctx.invalidate(
           new Error(`permission denied: ${normalized}`),
           {
-            code: EXT_FS_LOCAL_PATH,
+            code: 'FORBIDDEN',
             provider: PROVIDER,
             raw: { kind: 'permission_denied', path: normalized, code },
           },
@@ -138,7 +137,7 @@ export async function resolvePath(
               `parent directory does not exist: ${path.dirname(normalized)}`,
             ),
             {
-              code: EXT_FS_LOCAL_PATH,
+              code: 'FORBIDDEN',
               provider: PROVIDER,
               raw: { kind: 'parent_missing', path: normalized },
             },
@@ -147,7 +146,7 @@ export async function resolvePath(
         return ctx.invalidate(
           new Error(`file not found: ${normalized}`),
           {
-            code: EXT_FS_LOCAL_PATH,
+            code: 'FORBIDDEN',
             provider: PROVIDER,
             raw: { kind: 'file_not_found', path: normalized },
           },
@@ -165,7 +164,7 @@ export async function resolvePath(
     return ctx.invalidate(
       new Error('path escapes mount boundary'),
       {
-        code: EXT_FS_LOCAL_PATH,
+        code: 'FORBIDDEN',
         provider: PROVIDER,
         raw: {
           kind: 'symlink_escape',
@@ -185,7 +184,7 @@ export async function resolvePath(
       return ctx.invalidate(
         new Error(`file type not permitted in mount "${mountName}"`),
         {
-          code: EXT_FS_LOCAL_PATH,
+          code: 'FORBIDDEN',
           provider: PROVIDER,
           raw: { kind: 'glob_mismatch', mountName, glob: mount.glob, filename },
         },
@@ -198,7 +197,7 @@ export async function resolvePath(
     return ctx.invalidate(
       new Error(`mount "${mountName}" does not permit ${operation}`),
       {
-        code: EXT_FS_LOCAL_PATH,
+        code: 'FORBIDDEN',
         provider: PROVIDER,
         raw: { kind: 'mode_violation', mountName, mode: mount.mode, operation },
       },
@@ -345,7 +344,7 @@ export function parseMountPath(
   return ctx.invalidate(
     new Error(`no mount matches path "${fullPath}"`),
     {
-      code: EXT_FS_LOCAL_PATH,
+      code: 'FORBIDDEN',
       provider: PROVIDER,
       raw: { kind: 'no_mount_match', path: fullPath },
     },

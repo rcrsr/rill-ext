@@ -25,11 +25,6 @@ import {
   type EndpointArg,
   type Semaphore,
 } from './request.js';
-import {
-  EXT_FETCH_CONFIG,
-  EXT_FETCH_HTTP,
-  EXT_FETCH_TIMEOUT,
-} from './errors.js';
 
 // ============================================================
 // PARAMETER MAPPING
@@ -141,11 +136,11 @@ function processArguments(
  */
 export function createFetchExtension(
   config: FetchExtensionConfig,
-  ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
-  ctx.registerErrorCode(EXT_FETCH_CONFIG, 'runtime');
-  ctx.registerErrorCode(EXT_FETCH_HTTP, 'runtime');
-  ctx.registerErrorCode(EXT_FETCH_TIMEOUT, 'runtime');
+  // Failures emit rill-core generic atoms (#TIMEOUT, #UNAVAILABLE, #AUTH,
+  // #FORBIDDEN, #RATE_LIMIT, #PROTOCOL, etc.) directly via ctx.invalidate.
+  // No per-extension atom registration required.
 
   const timeout = config.timeout ?? 30000;
   const retries = config.retries ?? 0;

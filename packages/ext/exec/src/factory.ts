@@ -17,7 +17,6 @@ import {
 } from '@rcrsr/rill';
 import type { CommandConfig, CommandResult, ExecExtensionConfig } from './types.js';
 import { runCommand } from './runner.js';
-import { EXT_EXEC_CONFIG, EXT_EXEC_TIMEOUT } from './errors.js';
 
 /**
  * Creates an exec extension with sandboxed command execution.
@@ -28,8 +27,6 @@ export function createExecExtension(
   config: ExecExtensionConfig,
   ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
-  ctx.registerErrorCode(EXT_EXEC_CONFIG, 'runtime');
-  ctx.registerErrorCode(EXT_EXEC_TIMEOUT, 'runtime');
 
   const globalTimeout = config.timeout ?? 30000;
   const globalMaxOutputSize = config.maxOutputSize ?? 1048576;

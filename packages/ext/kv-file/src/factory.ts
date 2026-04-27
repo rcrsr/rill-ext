@@ -21,7 +21,6 @@ import type { KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { KvFileExtensionConfig, KvFileMountConfig } from './types.js';
 import { createStore, type KvStore } from './store.js';
-import { EXT_KV_FILE_CONFIG, EXT_KV_FILE_IO } from './errors.js';
 
 const anyReturn = structureToTypeValue({ kind: 'any' });
 const boolReturn = structureToTypeValue({ kind: 'bool' });
@@ -38,10 +37,8 @@ const PROVIDER = 'kv-file';
  */
 export function createFileKvExtension(
   config: KvFileExtensionConfig,
-  ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
-  ctx.registerErrorCode(EXT_KV_FILE_CONFIG, 'runtime');
-  ctx.registerErrorCode(EXT_KV_FILE_IO, 'runtime');
 
   let mounts: Record<string, KvFileMountConfig>;
 
@@ -98,7 +95,7 @@ export function createFileKvExtension(
         invalid: runCtx.invalidate(
           new Error(`Mount '${mountName}' not found`),
           {
-            code: EXT_KV_FILE_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: {
               kind: 'unknown_mount',
@@ -195,7 +192,7 @@ export function createFileKvExtension(
       return runCtx.invalidate(
         new Error(`Cannot merge into non-dict value at key "${key}"`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'merge_non_dict', key, currentType: typeof currentValue },
         },
@@ -259,7 +256,7 @@ export function createFileKvExtension(
       return runCtx.invalidate(
         new Error(`Mount '${mountName}' not found`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: {
             kind: 'unknown_mount',

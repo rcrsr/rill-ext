@@ -17,7 +17,6 @@ import {
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { DatetimeExtensionConfig } from './types.js';
-import { EXT_DATETIME_CONFIG } from './errors.js';
 
 // ============================================================
 // RETURN TYPE CONSTANTS
@@ -196,9 +195,8 @@ function getLocalComponents(
  */
 export function createDatetimeExtension(
   _config: DatetimeExtensionConfig = {},
-  ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
-  ctx.registerErrorCode(EXT_DATETIME_CONFIG, 'runtime');
 
   let disposed = false;
 
@@ -211,7 +209,7 @@ export function createDatetimeExtension(
       return runCtx.invalidate(
         new Error('datetime: operation cancelled'),
         {
-          code: EXT_DATETIME_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'disposed' },
         },
@@ -225,7 +223,7 @@ export function createDatetimeExtension(
       return runCtx.invalidate(
         new Error(`unknown timezone: "${zone}"`),
         {
-          code: EXT_DATETIME_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'invalid_timezone', zone },
         },
@@ -259,7 +257,7 @@ export function createDatetimeExtension(
           return runCtx.invalidate(
             new Error(`unknown format token: "${unknownToken}"`),
             {
-              code: EXT_DATETIME_CONFIG,
+              code: 'INVALID_INPUT',
               provider: PROVIDER,
               raw: { kind: 'unknown_format_token', token: unknownToken },
             },
@@ -285,7 +283,7 @@ export function createDatetimeExtension(
         invalid: runCtx.invalidate(
           new Error(`expected datetime, got ${got}`),
           {
-            code: EXT_DATETIME_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: { kind: 'invalid_argument', expected: 'datetime', got: typeof value },
           },
@@ -308,7 +306,7 @@ export function createDatetimeExtension(
         invalid: runCtx.invalidate(
           new Error(`expected string, got ${typeof value}`),
           {
-            code: EXT_DATETIME_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: { kind: 'invalid_argument', expected: 'string', got: typeof value },
           },
@@ -354,7 +352,7 @@ export function createDatetimeExtension(
         invalid: runCtx.invalidate(
           new Error(`cannot parse "${str}" with pattern "${pattern}"`),
           {
-            code: EXT_DATETIME_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: { kind: 'parse_mismatch', str, pattern },
           },
@@ -382,7 +380,7 @@ export function createDatetimeExtension(
         invalid: runCtx.invalidate(
           new Error(`date component out of range in "${str}"`),
           {
-            code: EXT_DATETIME_CONFIG,
+            code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: { kind: 'date_out_of_range', str, pattern },
           },

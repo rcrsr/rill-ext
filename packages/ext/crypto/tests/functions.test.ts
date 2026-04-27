@@ -62,7 +62,7 @@ describe('hash()', () => {
       makeRuntimeCtx(),
     );
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/unsupported algorithm/);
   });
 
@@ -130,7 +130,7 @@ describe('hmac()', () => {
     const ext = mk();
     const result = await ext.value.hmac.fn({ input: 'message' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/hmacKey required/);
   });
 
@@ -141,7 +141,7 @@ describe('hmac()', () => {
       makeRuntimeCtx(),
     );
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
   });
 
   it('uses default algorithm when not specified', async () => {
@@ -242,7 +242,7 @@ describe('random()', () => {
     const ext = mk();
     const result = await ext.value.random.fn({ bytes: -1 }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/bytes must be a non-negative integer/);
   });
 
@@ -250,14 +250,14 @@ describe('random()', () => {
     const ext = mk();
     const result = await ext.value.random.fn({ bytes: 1.5 }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
   });
 
   it('returns invalid value when bytes exceeds 1MB limit', async () => {
     const ext = mk();
     const result = await ext.value.random.fn({ bytes: 1_048_577 }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/must not exceed 1048576/);
   });
 

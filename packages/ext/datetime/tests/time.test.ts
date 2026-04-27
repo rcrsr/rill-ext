@@ -80,7 +80,7 @@ describe('time::format', () => {
       const ext = mk();
       const result = await getFormatFn(ext)({ dt: DT_2026_03_13, pattern: 'XXXX' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
     });
 
     it('includes the unknown token in the error message', async () => {
@@ -94,7 +94,7 @@ describe('time::format', () => {
       const ext = mk();
       const result = await getFormatFn(ext)({ dt: DT_2026_03_13, pattern: 'Z' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
     });
   });
 
@@ -103,7 +103,7 @@ describe('time::format', () => {
       const ext = mk();
       const result = await getFormatFn(ext)({ dt: '2026-03-13', pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/expected datetime/);
       expect(status.message).toMatch(/string/);
     });
@@ -112,14 +112,14 @@ describe('time::format', () => {
       const ext = mk();
       const result = await getFormatFn(ext)({ dt: null, pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
     });
 
     it('returns invalid value when dt is a boolean', async () => {
       const ext = mk();
       const result = await getFormatFn(ext)({ dt: true, pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/expected datetime/);
     });
   });
@@ -129,7 +129,7 @@ describe('time::format', () => {
       const ext = mk();
       const result = await getFormatFn(ext)({ dt: DT_2026_03_13, pattern: 42 }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/expected string/);
       expect(status.message).toMatch(/number/);
     });
@@ -138,7 +138,7 @@ describe('time::format', () => {
       const ext = mk();
       const result = await getFormatFn(ext)({ dt: DT_2026_03_13, pattern: null }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
     });
   });
 });
@@ -211,7 +211,7 @@ describe('time::parse', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/cannot parse/);
       expect(status.message).toMatch(/2026-03-13 08:30:45\+05:30/);
     });
@@ -223,7 +223,7 @@ describe('time::parse', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/Z/);
     });
   });
@@ -244,7 +244,7 @@ describe('time::parse', () => {
       const ext = mk();
       const result = await getParseFn(ext)({ str: '---::.', pattern: '---::.' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/cannot parse/);
     });
   });
@@ -254,7 +254,7 @@ describe('time::parse', () => {
       const ext = mk();
       const result = await getParseFn(ext)({ str: '', pattern: '' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
     });
 
     it('format with empty pattern returns empty string', async () => {
@@ -269,7 +269,7 @@ describe('time::parse', () => {
       const ext = mk();
       const result = await getParseFn(ext)({ str: '2026', pattern: 'XXXX' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/XXXX/);
     });
   });
@@ -279,7 +279,7 @@ describe('time::parse', () => {
       const ext = mk();
       const result = await getParseFn(ext)({ str: 'abc', pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
     });
 
     it('includes both input string and pattern in the error message', async () => {
@@ -294,7 +294,7 @@ describe('time::parse', () => {
       const ext = mk();
       const result = await getParseFn(ext)({ str: '2026', pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
     });
   });
 
@@ -303,7 +303,7 @@ describe('time::parse', () => {
       const ext = mk();
       const result = await getParseFn(ext)({ str: 42, pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/expected string/);
     });
 
@@ -311,7 +311,7 @@ describe('time::parse', () => {
       const ext = mk();
       const result = await getParseFn(ext)({ str: '2026-03-13', pattern: false }, makeRuntimeCtx());
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/expected string/);
     });
   });

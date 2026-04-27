@@ -280,7 +280,7 @@ describe('executeRequest - response parsing', () => {
       makeRuntimeCtx()
     );
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('PROTOCOL');
     expect(status.message).toMatch(/invalid JSON response/);
   });
 });
@@ -302,7 +302,7 @@ describe('executeRequest - HTTP errors', () => {
       makeRuntimeCtx()
     );
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('NOT_FOUND');
     expect(status.message).toMatch(/HTTP 404/);
     expect(status.message).toMatch(/Not Found/);
   });
@@ -323,7 +323,7 @@ describe('executeRequest - HTTP errors', () => {
       makeRuntimeCtx()
     );
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('UNAVAILABLE');
     expect(status.message).toMatch(/HTTP 503/);
     expect(status.message).toMatch(/after 2 retries/);
     expect(fetchCallCount).toBe(3); // initial + 2 retries
@@ -340,7 +340,7 @@ describe('executeRequest - HTTP errors', () => {
       makeRuntimeCtx()
     );
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('UNAVAILABLE');
     expect(status.message).toMatch(/network error/);
     expect(fetchCallCount).toBe(3); // initial + 2 retries
   });
@@ -443,7 +443,7 @@ describe('executeRequest - retry logic', () => {
       'body',
       makeRuntimeCtx()
     );
-    expect(getStatus(result).code.name).toBe('R001');
+    expect(getStatus(result).code.name).toBe('INVALID_INPUT');
     expect(fetchCallCount).toBe(1);
   });
 });
@@ -467,7 +467,7 @@ describe('executeRequest - timeout', () => {
       makeRuntimeCtx()
     );
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('TIMEOUT');
   });
 });
 

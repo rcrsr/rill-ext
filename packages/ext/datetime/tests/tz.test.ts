@@ -77,7 +77,7 @@ describe('tz::iso', () => {
     const ext = getExt();
     const result = await getIso(ext)({ dt: DT_EST, zone: 'Fake/Zone' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/Fake\/Zone/);
   });
 
@@ -85,7 +85,7 @@ describe('tz::iso', () => {
     const ext = getExt();
     const result = await getIso(ext)({ dt: '2026-03-08T06:00:00Z', zone: 'America/New_York' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/expected datetime/);
   });
 
@@ -93,7 +93,7 @@ describe('tz::iso', () => {
     const ext = getExt();
     const result = await getIso(ext)({ dt: { value: 0 }, zone: 'America/New_York' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/expected datetime/);
   });
 
@@ -101,7 +101,7 @@ describe('tz::iso', () => {
     const ext = getExt();
     const result = await getIso(ext)({ dt: DT_EPOCH, zone: 9 }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/expected string/);
   });
 });
@@ -127,7 +127,7 @@ describe('tz::date', () => {
     const ext = getExt();
     const result = await getDate(ext)({ dt: '2026-04-01', zone: 'Asia/Tokyo' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/expected datetime/);
   });
 
@@ -135,7 +135,7 @@ describe('tz::date', () => {
     const ext = getExt();
     const result = await getDate(ext)({ dt: DT_EPOCH, zone: 'Fake/Zone' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/Fake\/Zone/);
   });
 });
@@ -167,7 +167,7 @@ describe('tz::time', () => {
     const ext = getExt();
     const result = await getTime(ext)({ dt: 'noon', zone: 'Asia/Tokyo' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/expected datetime/);
   });
 });
@@ -211,7 +211,7 @@ describe('tz::offset', () => {
     const ext = getExt();
     const result = await getOffset(ext)({ zone: 'Fake/Zone' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/Fake\/Zone/);
   });
 
@@ -219,7 +219,7 @@ describe('tz::offset', () => {
     const ext = getExt();
     const result = await getOffset(ext)({ zone: 42 }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/expected string/);
   });
 
@@ -227,7 +227,7 @@ describe('tz::offset', () => {
     const ext = getExt();
     const result = await getOffset(ext)({ zone: 'America/New_York', dt: 'yesterday' }, makeRuntimeCtx());
     const status = getStatus(result);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/expected datetime/);
   });
 });

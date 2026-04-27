@@ -133,7 +133,7 @@ describe('createLocalFsExtension - factory', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result as never);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('UNAVAILABLE');
       expect(status.message).toMatch(/exceeds size limit/);
     });
 

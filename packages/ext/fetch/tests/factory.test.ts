@@ -610,7 +610,7 @@ describe('createFetchExtension', () => {
 
       const result = await requestPromise;
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('TIMEOUT');
     });
 
     it('aborts when ctx.signal fires', async () => {
@@ -642,7 +642,7 @@ describe('createFetchExtension', () => {
 
       const result = await requestPromise;
       const status = getStatus(result);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('TIMEOUT');
     });
   });
 

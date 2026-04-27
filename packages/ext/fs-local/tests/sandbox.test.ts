@@ -114,7 +114,7 @@ describe('resolvePath - EC-1: unknown mount name', () => {
     const result = await resolvePath('unknown', 'file.txt', mounts, 'read', makeRuntimeCtx());
     expect(isInvalid(result as RillValue)).toBe(true);
     const status = getStatus(result as RillValue);
-    expect(status.code.name).toBe('R001');
+    expect(status.code.name).toBe('FORBIDDEN');
     expect(status.message).toMatch(/mount "unknown" not configured/);
   });
 });

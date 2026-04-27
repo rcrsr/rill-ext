@@ -12,7 +12,24 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import { EXT_FETCH_HTTP, EXT_FETCH_TIMEOUT } from './errors.js';
+/**
+ * Map an HTTP status code to a rill-core generic atom name.
+ * 401 → AUTH, 403 → FORBIDDEN, 404 → NOT_FOUND, 408 → TIMEOUT,
+ * 409/412 → CONFLICT, 429 → RATE_LIMIT, 402 → QUOTA_EXCEEDED,
+ * 5xx → UNAVAILABLE, other 4xx → INVALID_INPUT.
+ */
+function atomForStatus(status: number): string {
+  if (status === 401) return 'AUTH';
+  if (status === 403) return 'FORBIDDEN';
+  if (status === 404) return 'NOT_FOUND';
+  if (status === 408) return 'TIMEOUT';
+  if (status === 409 || status === 412) return 'CONFLICT';
+  if (status === 429) return 'RATE_LIMIT';
+  if (status === 402) return 'QUOTA_EXCEEDED';
+  if (status >= 500 && status <= 599) return 'UNAVAILABLE';
+  if (status >= 400 && status <= 499) return 'INVALID_INPUT';
+  return 'UNAVAILABLE';
+}
 
 // ============================================================
 // TYPE DEFINITIONS
@@ -301,7 +318,7 @@ export async function executeRequest(
               return ctx.invalidate(
                 new Error(`${namespace}: HTTP ${status} — ${body}`),
                 {
-                  code: EXT_FETCH_HTTP,
+                  code: atomForStatus(status),
                   provider: PROVIDER,
                   raw: {
                     kind: 'http_error',
@@ -334,7 +351,7 @@ export async function executeRequest(
                     `${namespace}: HTTP ${status} after ${retryLimit} retries`,
                   ),
                   {
-                    code: EXT_FETCH_HTTP,
+                    code: atomForStatus(status),
                     provider: PROVIDER,
                     raw: {
                       kind: 'http_error_retries_exhausted',
@@ -355,7 +372,7 @@ export async function executeRequest(
               return ctx.invalidate(
                 new Error(`${namespace}: invalid JSON response`),
                 {
-                  code: EXT_FETCH_HTTP,
+                  code: 'PROTOCOL',
                   provider: PROVIDER,
                   raw: { kind: 'invalid_json', namespace },
                 },
@@ -368,7 +385,7 @@ export async function executeRequest(
               return ctx.invalidate(
                 new Error(`${namespace}: invalid JSON response`),
                 {
-                  code: EXT_FETCH_HTTP,
+                  code: 'PROTOCOL',
                   provider: PROVIDER,
                   raw: { kind: 'invalid_json', namespace },
                 },
@@ -391,7 +408,7 @@ export async function executeRequest(
       // Timeout - no retry
       if (error instanceof Error && error.name === 'AbortError') {
         return ctx.invalidate(error, {
-          code: EXT_FETCH_TIMEOUT,
+          code: 'TIMEOUT',
           provider: PROVIDER,
           raw: {
             kind: 'request_timeout',
@@ -417,7 +434,7 @@ export async function executeRequest(
           continue;
         } else {
           return ctx.invalidate(error, {
-            code: EXT_FETCH_HTTP,
+            code: 'UNAVAILABLE',
             provider: PROVIDER,
             raw: {
               kind: 'network_error',
@@ -435,7 +452,7 @@ export async function executeRequest(
   }
 
   return ctx.invalidate(lastError ?? new Error('unknown error'), {
-    code: EXT_FETCH_HTTP,
+    code: 'UNAVAILABLE',
     provider: PROVIDER,
     raw: {
       kind: 'network_error',

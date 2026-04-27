@@ -15,7 +15,6 @@ import {
   type RuntimeContext,
 } from '@rcrsr/rill';
 import type { SchemaEntry } from './types.js';
-import { EXT_KV_FILE_CONFIG, EXT_KV_FILE_IO } from './errors.js';
 
 const PROVIDER = 'kv-file';
 
@@ -92,7 +91,7 @@ export async function createStore(
           ctx.invalidate(
             new Error('state file corrupt — reset or delete to recover'),
             {
-              code: EXT_KV_FILE_IO,
+              code: 'UNAVAILABLE',
               provider: PROVIDER,
               raw: { kind: 'corrupt_file', path: storePath },
             },
@@ -111,7 +110,7 @@ export async function createStore(
         ctx.invalidate(
           new Error('state file corrupt — reset or delete to recover'),
           {
-            code: EXT_KV_FILE_IO,
+            code: 'UNAVAILABLE',
             provider: PROVIDER,
             raw: { kind: 'corrupt_file', path: storePath },
           },
@@ -169,7 +168,7 @@ export async function createStore(
       return runCtx.invalidate(
         new Error(`Mount '${mount}' is read-only (mode: ${mode})`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'read_only', mode, path: storePath },
         },
@@ -210,7 +209,7 @@ export async function createStore(
       return runCtx.invalidate(
         new Error(`key "${key}" expects ${expectedType}, got ${actualType}`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'type_mismatch', key, expectedType, actualType, location },
         },
@@ -228,7 +227,7 @@ export async function createStore(
       return runCtx.invalidate(
         new Error(`key "${key}" not declared in schema`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'undeclared_key', key },
         },
@@ -249,7 +248,7 @@ export async function createStore(
       return runCtx.invalidate(
         new Error(`key "${key}" not declared in schema`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'undeclared_key', key },
         },
@@ -266,7 +265,7 @@ export async function createStore(
       return runCtx.invalidate(
         new Error(`value for "${key}" exceeds size limit`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'value_too_large', key, size: valueSize, max: maxValueSize },
         },
@@ -277,7 +276,7 @@ export async function createStore(
       return runCtx.invalidate(
         new Error(`store exceeds entry limit (${data.size + 1} > ${maxEntries})`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'entry_limit', count: data.size + 1, max: maxEntries },
         },
@@ -299,7 +298,7 @@ export async function createStore(
       return runCtx.invalidate(
         new Error(`store exceeds size limit (${storeSize} > ${maxStoreSize})`),
         {
-          code: EXT_KV_FILE_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'store_limit', size: storeSize, max: maxStoreSize },
         },

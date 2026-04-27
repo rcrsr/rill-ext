@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { getStatus, type RillValue } from '@rcrsr/rill';
+import { getStatus, isInvalid, type RillValue } from '@rcrsr/rill';
 import { createLocalFsExtension } from '../src/factory.js';
 import type { FsLocalExtensionConfig } from '../src/types.js';
 import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
@@ -27,9 +27,9 @@ async function makeExt(config: FsLocalExtensionConfig): Promise<CallableDict> {
 }
 
 function expectInvalid(result: unknown, messageRegex?: RegExp): void {
-  const status = getStatus(result as RillValue);
-  expect(status.code.name).toBe('R001');
+  expect(isInvalid(result as RillValue)).toBe(true);
   if (messageRegex) {
+    const status = getStatus(result as RillValue);
     expect(status.message).toMatch(messageRegex);
   }
 }
@@ -104,7 +104,7 @@ describe('fs-local extension functions', () => {
         makeRuntimeCtx(),
       );
       const status = getStatus(result as RillValue);
-      expect(status.code.name).toBe('R001');
+      expect(status.code.name).toBe('FORBIDDEN');
       expect(status.message).not.toContain('file not found');
       expect(status.message).toContain('does not permit');
     });

@@ -18,7 +18,6 @@ import {
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { CryptoExtensionConfig } from './types.js';
-import { EXT_CRYPTO_CONFIG } from './errors.js';
 
 const stringReturn = structureToTypeValue({ kind: 'string' });
 const PROVIDER = 'crypto';
@@ -30,9 +29,8 @@ const PROVIDER = 'crypto';
  */
 export function createCryptoExtension(
   config: CryptoExtensionConfig = {},
-  ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
-  ctx.registerErrorCode(EXT_CRYPTO_CONFIG, 'runtime');
 
   const defaultAlgorithm = config.defaultAlgorithm ?? 'sha256';
   const hmacKey = config.hmacKey;
@@ -51,7 +49,7 @@ export function createCryptoExtension(
       return runCtx.invalidate(
         new Error(`unsupported algorithm: ${algorithm}`),
         {
-          code: EXT_CRYPTO_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: {
             kind: 'unsupported_algorithm',
@@ -86,7 +84,7 @@ export function createCryptoExtension(
       return runCtx.invalidate(
         new Error('hmacKey required for hmac() — set in config'),
         {
-          code: EXT_CRYPTO_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'missing_hmac_key' },
         },
@@ -115,7 +113,7 @@ export function createCryptoExtension(
       return runCtx.invalidate(
         new Error('bytes must be a non-negative integer'),
         {
-          code: EXT_CRYPTO_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'invalid_bytes', bytes },
         },
@@ -125,7 +123,7 @@ export function createCryptoExtension(
       return runCtx.invalidate(
         new Error(`bytes must not exceed ${MAX_RANDOM_BYTES} (1MB)`),
         {
-          code: EXT_CRYPTO_CONFIG,
+          code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'bytes_too_large', bytes, max: MAX_RANDOM_BYTES },
         },
