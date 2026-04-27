@@ -1,4 +1,4 @@
-import { RuntimeError } from '@rcrsr/rill';
+import { type RillValue, type RuntimeContext } from '@rcrsr/rill';
 import type { DisposalState } from './types.js';
 
 /**
@@ -10,16 +10,29 @@ export function createDisposalState(): DisposalState {
 }
 
 /**
- * Throw RuntimeError if extension instance has been disposed.
- * @param state - DisposalState object to check
- * @param provider - Extension provider name for error message
- * @throws RuntimeError (RILL-R004) when state.isDisposed === true
+ * Return an invalid RillValue when the extension instance is disposed,
+ * otherwise null.
+ *
+ * @param ctx - Runtime context (provides `invalidate`)
+ * @param state - DisposalState to check
+ * @param provider - Extension provider name for diagnostic message
+ * @param disposedCode - Atom name registered by the consuming extension for disposal
  */
-export function checkDisposed(state: DisposalState, provider: string): void {
-  if (state.isDisposed) {
-    // EC-12: disposed extension throws RILL-R004
-    throw new RuntimeError('RILL-R004', `${provider}: operation cancelled`);
+export function checkDisposed(
+  ctx: RuntimeContext,
+  state: DisposalState,
+  provider: string,
+  disposedCode: string
+): RillValue | null {
+  if (!state.isDisposed) {
+    return null;
   }
+  const error = new Error(`${provider}: operation cancelled`);
+  return ctx.invalidate(error, {
+    code: disposedCode,
+    provider,
+    raw: { kind: 'disposed', message: `${provider}: operation cancelled` },
+  });
 }
 
 /**
@@ -34,12 +47,10 @@ export async function dispose(
   state: DisposalState,
   cleanup?: () => Promise<void>
 ): Promise<void> {
-  // IR-6: Idempotent — return if already disposed
   if (state.isDisposed) {
     return;
   }
 
-  // Invoke cleanup callback if provided; errors are logged, not thrown
   if (cleanup) {
     try {
       await cleanup();
@@ -49,6 +60,5 @@ export async function dispose(
     }
   }
 
-  // Set disposal flag after cleanup completes
   state.isDisposed = true;
 }

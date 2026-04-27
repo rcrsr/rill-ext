@@ -5,7 +5,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { executeBatch } from '../src/batch.js';
-import { RuntimeError } from '@rcrsr/rill';
 
 describe('executeBatch', () => {
   // Helper to create mock items
@@ -43,11 +42,9 @@ describe('executeBatch', () => {
     };
   };
 
-  // Mock error mapper
-  const mapError = (error: unknown): RuntimeError => {
-    const message = error instanceof Error ? error.message : String(error);
-    return new RuntimeError('RILL-R004', message);
-  };
+  // Mock error mapper now returns the error message string directly
+  const mapError = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
 
   describe('EC-13, AC-3: All items succeed', () => {
     it('returns {succeeded: 5} when all 5 items pass validation and execution', async () => {

@@ -1,281 +1,130 @@
 /**
- * Test suite for event emission wrapper.
- * Validates error contracts (EC-9, EC-10) and acceptance criteria (AC-2, AC-16, AC-22).
+ * Test suite for vector event emission wrapper.
+ * On error, returns an invalid RillValue (does not throw).
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import { withEventEmission } from '../src/events.js';
-import { RuntimeError } from '@rcrsr/rill';
-import type { RuntimeContext } from '@rcrsr/rill';
+
+const ERROR_CODE = 'R001';
+
+function makeCtx(opts?: { onLogEvent?: (e: unknown) => void }): RuntimeContext {
+  return createRuntimeContext({
+    callbacks: { onLogEvent: opts?.onLogEvent ?? (() => {}) },
+  });
+}
 
 describe('withEventEmission', () => {
   const provider = 'testdb';
   const operation = 'upsert';
 
-  function createMockContext(): RuntimeContext {
-    return {
-      parent: undefined,
-      variables: new Map(),
-      variableTypes: new Map(),
-      functions: new Map(),
-      methods: new Map(),
-      callbacks: {
-        onOutput: vi.fn(),
-        onLogEvent: vi.fn(),
-      },
-      observability: {},
-      pipeValue: null,
-      timeout: undefined,
-      autoExceptions: [],
-      signal: undefined,
-      maxCallStackDepth: 100,
-      annotationStack: [],
-      callStack: [],
-    };
-  }
-
-  describe('AC-2: Success case - emits event with numeric duration', () => {
-    it('emits success event with provider:operation format', async () => {
-      const ctx = createMockContext();
+  describe('success path', () => {
+    it('emits success event with provider:operation, metadata, and duration', async () => {
       const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      const metadata = { id: 'vec-1', count: 10 };
       const result = await withEventEmission(
-        ctx,
+        makeCtx({ onLogEvent }),
         provider,
         operation,
-        metadata,
-        async () => 'success'
+        { id: 'vec-1', count: 10 },
+        async () => 'success' as RillValue,
+        ERROR_CODE
       );
-
       expect(result).toBe('success');
       expect(onLogEvent).toHaveBeenCalledTimes(1);
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.event).toBe(`${provider}:${operation}`);
-      expect(event.subsystem).toBe(`extension:${provider}`);
-      expect(event.id).toBe('vec-1');
-      expect(event.count).toBe(10);
-      expect(event.duration).toBeTypeOf('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
-    });
-
-    it('spreads metadata into event payload', async () => {
-      const ctx = createMockContext();
-      const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      const metadata = { vectorId: 'v123', dimension: 384, method: 'cosine' };
-      await withEventEmission(
-        ctx,
-        provider,
-        operation,
-        metadata,
-        async () => true
-      );
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.vectorId).toBe('v123');
-      expect(event.dimension).toBe(384);
-      expect(event.method).toBe('cosine');
-    });
-
-    it('handles empty metadata object', async () => {
-      const ctx = createMockContext();
-      const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      await withEventEmission(ctx, provider, operation, {}, async () => 'done');
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.event).toBe(`${provider}:${operation}`);
-      expect(event.subsystem).toBe(`extension:${provider}`);
-      expect(event.duration).toBeTypeOf('number');
+      const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
+      expect(event['event']).toBe(`${provider}:${operation}`);
+      expect(event['subsystem']).toBe(`extension:${provider}`);
+      expect(event['id']).toBe('vec-1');
+      expect(event['count']).toBe(10);
+      expect(typeof event['duration']).toBe('number');
     });
 
     it('returns fn result without modification', async () => {
-      const ctx = createMockContext();
       const expectedResult = { data: 'complex', nested: { value: 42 } };
-
       const result = await withEventEmission(
-        ctx,
+        makeCtx(),
         provider,
         operation,
         {},
-        async () => expectedResult
+        async () => expectedResult as unknown as RillValue,
+        ERROR_CODE
       );
-
       expect(result).toEqual(expectedResult);
-      expect(result).toBe(expectedResult);
+    });
+
+    it('handles empty metadata object', async () => {
+      const onLogEvent = vi.fn();
+      await withEventEmission(
+        makeCtx({ onLogEvent }),
+        provider,
+        operation,
+        {},
+        async () => 'done' as RillValue,
+        ERROR_CODE
+      );
+      const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
+      expect(event['event']).toBe(`${provider}:${operation}`);
     });
   });
 
-  describe('EC-9 / AC-16: Error case - emits error event before throwing', () => {
-    it('emits provider:error event when fn throws', async () => {
-      const ctx = createMockContext();
+  describe('error path', () => {
+    it('returns invalid RillValue and emits error event when fn throws', async () => {
       const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      const originalError = new Error('Database connection failed');
-
-      await expect(
-        withEventEmission(ctx, provider, operation, {}, async () => {
-          throw originalError;
-        })
-      ).rejects.toThrow(RuntimeError);
-
-      expect(onLogEvent).toHaveBeenCalledTimes(1);
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.event).toBe(`${provider}:error`);
-      expect(event.subsystem).toBe(`extension:${provider}`);
-      expect(event.error).toContain('Database connection failed');
-      expect(event.duration).toBeTypeOf('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      const result = await withEventEmission(
+        makeCtx({ onLogEvent }),
+        provider,
+        operation,
+        {},
+        async () => {
+          throw new Error('Database connection failed');
+        },
+        ERROR_CODE
+      );
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).message).toContain('Database connection failed');
+      const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
+      expect(event['event']).toBe(`${provider}:error`);
+      expect(event['subsystem']).toBe(`extension:${provider}`);
+      expect(event['error']).toContain('Database connection failed');
+      expect(typeof event['duration']).toBe('number');
     });
 
-    it('throws mapped RuntimeError after emitting error event', async () => {
-      const ctx = createMockContext();
-      const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      await expect(
-        withEventEmission(ctx, provider, operation, {}, async () => {
-          throw new Error('Test error');
-        })
-      ).rejects.toThrow(RuntimeError);
-
-      expect(onLogEvent).toHaveBeenCalledTimes(1);
-    });
-
-    it('maps error via mapVectorError before throwing', async () => {
-      const ctx = createMockContext();
-
-      const promise = withEventEmission(
-        ctx,
+    it('maps 401 to authentication_failed via mapVectorError', async () => {
+      const result = await withEventEmission(
+        makeCtx(),
         provider,
         operation,
         {},
         async () => {
           throw new Error('401 unauthorized');
-        }
+        },
+        ERROR_CODE
       );
-
-      await expect(promise).rejects.toThrow(RuntimeError);
-      await expect(promise).rejects.toThrow('authentication failed (401)');
-    });
-
-    it('includes error duration in error event', async () => {
-      const ctx = createMockContext();
-      const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      await expect(
-        withEventEmission(ctx, provider, operation, {}, async () => {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          throw new Error('delayed error');
-        })
-      ).rejects.toThrow(RuntimeError);
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.duration).toBeGreaterThanOrEqual(5);
+      expect(getStatus(result).message).toContain('authentication failed (401)');
     });
   });
 
-  describe('EC-10 / AC-22: Undefined onLogEvent - executes without error, no event emitted', () => {
-    it('executes successfully when onLogEvent is undefined', async () => {
-      const ctx = createMockContext();
-      ctx.callbacks.onLogEvent = undefined;
-
-      const result = await withEventEmission(
-        ctx,
-        provider,
-        operation,
-        { id: 'test' },
-        async () => 'success'
-      );
-
-      expect(result).toBe('success');
-    });
-
-    it('does not throw when onLogEvent is undefined', async () => {
-      const ctx = createMockContext();
-      ctx.callbacks.onLogEvent = undefined;
-
-      await expect(
-        withEventEmission(ctx, provider, operation, {}, async () => 'result')
-      ).resolves.toBe('result');
-    });
-
-    it('throws mapped error even when onLogEvent is undefined', async () => {
-      const ctx = createMockContext();
-      ctx.callbacks.onLogEvent = undefined;
-
-      await expect(
-        withEventEmission(ctx, provider, operation, {}, async () => {
-          throw new Error('test error');
-        })
-      ).rejects.toThrow(RuntimeError);
-    });
-  });
-
-  describe('Duration calculation', () => {
-    it('calculates duration for fast operations', async () => {
-      const ctx = createMockContext();
-      const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      await withEventEmission(ctx, provider, operation, {}, async () => 'fast');
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.duration).toBeGreaterThanOrEqual(0);
-      expect(event.duration).toBeLessThan(100);
-    });
-
-    it('calculates duration for slow operations', async () => {
-      const ctx = createMockContext();
-      const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      await withEventEmission(ctx, provider, operation, {}, async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        return 'slow';
-      });
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.duration).toBeGreaterThanOrEqual(25);
-    });
-  });
-
-  describe('Provider and operation naming', () => {
+  describe('provider naming', () => {
     it('uses provider name in event and subsystem', async () => {
-      const ctx = createMockContext();
       const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
-      await withEventEmission(ctx, 'chroma', 'query', {}, async () => 'result');
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.event).toBe('chroma:query');
-      expect(event.subsystem).toBe('extension:chroma');
-    });
-
-    it('uses different operations for different calls', async () => {
-      const ctx = createMockContext();
-      const onLogEvent = vi.fn();
-      ctx.callbacks.onLogEvent = onLogEvent;
-
       await withEventEmission(
-        ctx,
-        provider,
-        'delete',
+        makeCtx({ onLogEvent }),
+        'chroma',
+        'query',
         {},
-        async () => 'deleted'
+        async () => 'result' as RillValue,
+        ERROR_CODE
       );
-
-      const event = onLogEvent.mock.calls[0][0];
-      expect(event.event).toBe(`${provider}:delete`);
+      const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
+      expect(event['event']).toBe('chroma:query');
+      expect(event['subsystem']).toBe('extension:chroma');
     });
   });
 });

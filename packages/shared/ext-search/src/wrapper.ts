@@ -1,25 +1,40 @@
 /**
  * Function wrapper factory for search extensions.
- * Combines disposal check, in-flight tracking, timing, event emission, and error mapping.
+ * Combines disposal check, in-flight tracking, timing, event emission,
+ * and error mapping. Errors and disposal both surface as invalid
+ * RillValues via `ctx.invalidate`; the wrapped function never throws.
  */
 
-import { type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import { type RillValue, type RuntimeContext, getStatus } from '@rcrsr/rill';
 import type { DisposalState, InFlightState } from './types.js';
 import { checkDisposed } from './disposal.js';
 import { trackRequest } from './request.js';
 import { mapSearchError } from './errors.js';
 import { emitSuccessEvent, emitErrorEvent } from './events.js';
 
+/** Atom names supplied by the consuming extension at factory init. */
+export interface SearchWrapperAtoms {
+  /** Atom registered for the disposed/cancelled state. */
+  readonly disposedCode: string;
+  /** Atom registered for HTTP / generic operation failures. */
+  readonly errorCode: string;
+}
+
 /**
- * Type for a wrapped host function that executes with disposal protection,
- * in-flight tracking, timing, and event emission.
+ * Type for a wrapped host function.
+ *
+ * The inner `fn` receives an `AbortSignal` composed from the extension
+ * lifecycle signal (when present on `ctx`) and a per-request controller
+ * tracked in `inFlightState`. It must propagate the signal to its fetch
+ * call so that `dispose()` and host-level cancellation abort in-flight
+ * work.
  */
 export type WrapFunction = (
   operation: string,
   fn: (
     args: Record<string, RillValue>,
     ctx: RuntimeContext,
-    controller: AbortController
+    signal: AbortSignal
   ) => Promise<{ result: RillValue; query: string; resultCount: number }>
 ) => (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue>;
 
@@ -27,75 +42,67 @@ export type WrapFunction = (
  * Create a function wrapper that adds disposal check, in-flight tracking,
  * timing, event emission, and error mapping.
  *
- * The returned `wrap` function wraps individual host function operations:
- * 1. Checks disposal state; throws RILL-R004 if disposed
- * 2. Creates an AbortController and registers it in inFlightState
- * 3. Records start time
- * 4. Invokes the operation function with the controller
- * 5. Removes the controller from inFlightState after completion
- * 6. Emits success event with duration, query, and result_count on success
- * 7. Maps errors via mapSearchError and emits error event on failure
+ * The returned `wrap` factory wraps individual host function operations:
+ * 1. Check disposal state; return invalid value when disposed.
+ * 2. Create an AbortController and register it in inFlightState.
+ * 3. Compose `ctx.signal` (if present) with the per-request controller.
+ * 4. Record start time.
+ * 5. Invoke the operation with the composed signal.
+ * 6. Remove the controller from inFlightState after completion.
+ * 7. Emit success / error events with duration metadata.
+ * 8. Map errors via {@link mapSearchError} to an invalid RillValue.
  *
  * @param provider - Extension provider name (e.g., "exa", "tavily")
  * @param disposalState - DisposalState to check before operations
  * @param inFlightState - InFlightState to register controllers with
- * @returns WrapFunction factory
- *
- * @example
- * ```typescript
- * const wrap = createSearchFunctionWrapper('exa', disposalState, inFlightState);
- *
- * const search = wrap('search', async (args, ctx, controller) => {
- *   const result = await fetchSearch(args, controller.signal);
- *   return { result, query: String(args['query']), resultCount: result.length };
- * });
- * ```
+ * @param atoms - Atom names registered by the consuming extension
  */
 export function createSearchFunctionWrapper(
   provider: string,
   disposalState: DisposalState,
-  inFlightState: InFlightState
+  inFlightState: InFlightState,
+  atoms: SearchWrapperAtoms
 ): WrapFunction {
   return (operation, fn) => {
     return async (
       args: Record<string, RillValue>,
       ctx: RuntimeContext
     ): Promise<RillValue> => {
-      // IR-3: Check disposal state before execution
-      checkDisposed(disposalState, provider);
+      // IR-3: Check disposal before execution
+      const disposedResult = checkDisposed(
+        ctx,
+        disposalState,
+        provider,
+        atoms.disposedCode
+      );
+      if (disposedResult !== null) {
+        return disposedResult;
+      }
 
-      // Create AbortController and register in inFlightState
+      // Create AbortController, register in inFlightState
       const controller = new AbortController();
       trackRequest(inFlightState, controller);
 
-      // Record start time
+      // Compose ctx.signal (when present) with the per-request controller
+      const signal: AbortSignal =
+        ctx.signal !== undefined
+          ? AbortSignal.any([ctx.signal, controller.signal])
+          : controller.signal;
+
       const startTime = Date.now();
 
       try {
-        // Execute wrapped function with controller
-        const { result, query, resultCount } = await fn(args, ctx, controller);
-
-        // Calculate duration
+        const { result, query, resultCount } = await fn(args, ctx, signal);
         const duration = Date.now() - startTime;
-
-        // IR-3: Emit success event
         emitSuccessEvent(ctx, provider, operation, duration, query, resultCount);
-
         return result;
       } catch (error: unknown) {
-        // Calculate duration
         const duration = Date.now() - startTime;
-
-        // Map error via mapSearchError
-        const mappedError = mapSearchError(provider, error);
-
-        // IR-3: Emit error event
-        emitErrorEvent(ctx, provider, duration, mappedError.message);
-
-        // Throw mapped error
-        throw mappedError;
+        const invalid = mapSearchError(ctx, provider, error, atoms.errorCode);
+        const status = getStatus(invalid);
+        emitErrorEvent(ctx, provider, duration, status.message);
+        return invalid;
       } finally {
-        // IR-3: Remove controller from inFlightState after completion
         inFlightState.controllers.delete(controller);
       }
     };

@@ -1,10 +1,12 @@
 /**
  * Function wrapper factory for vector database extensions.
- * Combines disposal check, timing, event emission, and error mapping.
+ * Disposal and errors surface as invalid RillValues via ctx.invalidate;
+ * the wrapped function never throws.
  */
 
 import {
   emitExtensionEvent,
+  getStatus,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -12,37 +14,31 @@ import type { DisposalState } from './types.js';
 import { checkDisposed } from './disposal.js';
 import { mapVectorError } from './errors.js';
 
+/** Atom names supplied by the consuming extension at factory init. */
+export interface VectorWrapperAtoms {
+  /** Atom registered for the disposed/cancelled state. */
+  readonly disposedCode: string;
+  /** Atom registered for SDK / API failures. */
+  readonly errorCode: string;
+}
+
 /**
- * Create a function wrapper that adds disposal check, timing, events, and error mapping.
- *
- * Returns a factory function that wraps individual operations. The wrapper:
- * 1. Checks disposal state before execution
- * 2. Records operation timing
- * 3. Emits success events with duration and metadata
- * 4. Maps errors via mapVectorError and emits error events
- *
- * @param provider - Extension provider name (e.g., "chroma", "pinecone")
- * @param state - DisposalState object to check before operations
- * @returns Factory function that wraps operations
- *
- * @example
- * ```typescript
- * const state = createDisposalState('chroma');
- * const wrap = createFunctionWrapper('chroma', state);
- *
- * const query = wrap(
- *   'query',
- *   async (args, ctx) => { return results; },
- *   (args) => ({ collection: args['collection'] })
- * );
- * ```
+ * Create a function wrapper that adds disposal check, timing, events,
+ * and error mapping. Composes `ctx.signal` lifecycle into per-call
+ * cancellation via `signal` argument. Vector SDKs that cannot accept a
+ * per-call signal must dispose themselves on `ctx.signal.abort` from
+ * the consuming extension's factory.
  */
 export function createFunctionWrapper(
   provider: string,
-  state: DisposalState
+  state: DisposalState,
+  atoms: VectorWrapperAtoms
 ): (
   operation: string,
-  fn: (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue>,
+  fn: (
+    args: Record<string, RillValue>,
+    ctx: RuntimeContext
+  ) => Promise<RillValue>,
   metadata?: (args: Record<string, RillValue>) => Record<string, unknown>
 ) => (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue> {
   return (operation, fn, metadata) => {
@@ -51,42 +47,31 @@ export function createFunctionWrapper(
       ctx: RuntimeContext
     ): Promise<RillValue> => {
       // EC-20: Check disposal state first
-      checkDisposed(state, provider);
+      const disposed = checkDisposed(ctx, state, provider, atoms.disposedCode);
+      if (disposed !== null) return disposed;
 
-      // Record start time
       const startTime = Date.now();
-
       try {
-        // Execute wrapped function
         const result = await fn(args, ctx);
-
-        // Calculate duration
         const duration = Date.now() - startTime;
-
-        // AC-9: Emit success event with duration and metadata
         emitExtensionEvent(ctx, {
           event: `${provider}:${operation}`,
           subsystem: `extension:${provider}`,
           duration,
           ...(metadata ? metadata(args) : {}),
         });
-
         return result;
       } catch (error: unknown) {
-        // EC-21: Map error via mapVectorError
         const duration = Date.now() - startTime;
-        const mappedError = mapVectorError(provider, error);
-
-        // Emit error event
+        const invalid = mapVectorError(ctx, provider, error, atoms.errorCode);
+        const status = getStatus(invalid);
         emitExtensionEvent(ctx, {
           event: `${provider}:error`,
           subsystem: `extension:${provider}`,
-          error: mappedError.message,
+          error: status.message,
           duration,
         });
-
-        // Throw mapped error
-        throw mappedError;
+        return invalid;
       }
     };
   };

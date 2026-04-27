@@ -63,7 +63,7 @@ const RILL_TYPE_MAP: Record<string, string> = {
 export function mapRillType(rillType: string): string {
   const jsonType = RILL_TYPE_MAP[rillType];
   if (jsonType === undefined) {
-    throw new RuntimeError('RILL-R004', `unsupported type: ${rillType}`);
+    throw new RuntimeError('RILL-R005', `unsupported type: ${rillType}`);
   }
   return jsonType;
 }
@@ -80,7 +80,7 @@ export function mapRillType(rillType: string): string {
 function buildPropertyFromStructuralType(rillType: TypeStructure): JsonSchemaProperty {
   if (rillType.kind === 'closure' || rillType.kind === 'tuple') {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `unsupported type for JSON Schema: ${rillType.kind}`
     );
   }
@@ -181,7 +181,7 @@ export function buildJsonSchemaFromStructuralType(
 
   if (type.kind !== 'closure') {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `unsupported schema kind: ${type.kind} (expected dict or closure)`
     );
   }

@@ -240,7 +240,7 @@ describe('buildJsonSchemaFromStructuralType', () => {
         thrown = e as RuntimeError;
       }
       expect(thrown).toBeInstanceOf(RuntimeError);
-      expect(thrown?.errorId).toBe('RILL-R004');
+      expect(thrown?.errorId).toBe('RILL-R005');
     });
 
     it('AC-18/EC-3: tuple type in param throws RuntimeError RILL-R004', () => {
@@ -254,7 +254,7 @@ describe('buildJsonSchemaFromStructuralType', () => {
         thrown = e as RuntimeError;
       }
       expect(thrown).toBeInstanceOf(RuntimeError);
-      expect(thrown?.errorId).toBe('RILL-R004');
+      expect(thrown?.errorId).toBe('RILL-R005');
     });
   });
 

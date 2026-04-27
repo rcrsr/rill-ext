@@ -47,7 +47,7 @@ export function mapProviderError(
     const { status, message } = detected;
     if (status !== undefined) {
       return new RuntimeError(
-        'RILL-R004',
+        'RILL-R005',
         `${providerName} API error (HTTP ${status}): ${message}`,
         undefined,
         { cause: error }
@@ -55,7 +55,7 @@ export function mapProviderError(
     }
     // Status not present, but provider error detected
     return new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `${providerName} API error: ${message}`,
       undefined,
       { cause: error }
@@ -65,7 +65,7 @@ export function mapProviderError(
   // EC-13: Detector returns null → fallback to generic error message
   if (error instanceof Error) {
     return new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `${providerName} error: ${error.message}`,
       undefined,
       { cause: error }
@@ -74,7 +74,7 @@ export function mapProviderError(
 
   // Unknown error type
   return new RuntimeError(
-    'RILL-R004',
+    'RILL-R005',
     `${providerName} error: Unknown error`,
     undefined,
     { cause: error }

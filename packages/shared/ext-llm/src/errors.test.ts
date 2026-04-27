@@ -26,7 +26,7 @@ describe('mapProviderError', () => {
       const result = mapProviderError('Anthropic', originalError, detector);
 
       expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
+      expect(result.errorId).toBe('RILL-R005');
       expect(result.message).toBe(
         'Anthropic API error (HTTP 401): Invalid API key'
       );
@@ -42,7 +42,7 @@ describe('mapProviderError', () => {
       const result = mapProviderError('OpenAI', originalError, detector);
 
       expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
+      expect(result.errorId).toBe('RILL-R005');
       expect(result.message).toBe('OpenAI API error: Rate limit exceeded');
     });
 
@@ -85,7 +85,7 @@ describe('mapProviderError', () => {
       const result = mapProviderError('OpenAI', originalError, detector);
 
       expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
+      expect(result.errorId).toBe('RILL-R005');
       expect(result.message).toBe('OpenAI error: Network timeout');
     });
 
@@ -97,7 +97,7 @@ describe('mapProviderError', () => {
       const result = mapProviderError('Provider', unknownError, detector);
 
       expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
+      expect(result.errorId).toBe('RILL-R005');
       expect(result.message).toBe('Provider error: Unknown error');
     });
 

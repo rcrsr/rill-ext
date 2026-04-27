@@ -2459,7 +2459,7 @@ describe('executeToolLoop yieldChunk', () => {
           yieldChunk
         )
       ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
+        errorId: 'RILL-R005',
         message: expect.stringContaining('stream connection lost'),
       });
     });

@@ -25,6 +25,8 @@ interface RuntimeContextLike {
   readonly parent?: RuntimeContextLike | undefined;
   readonly variables: Map<string, RillValue>;
   pipeValue: RillValue;
+  readonly metadata?: Record<string, string> | undefined;
+  readonly hostContext: Record<string, unknown>;
 }
 
 // ============================================================
@@ -49,7 +51,7 @@ async function executeToolCall(
   // EC-15: Tool name not in tool map
   if (!isDict(tools)) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       'tool_loop: tools must be a dict of name → callable'
     );
   }
@@ -58,13 +60,13 @@ async function executeToolCall(
   const toolFn = toolsDict[toolName];
 
   if (toolFn === undefined || toolFn === null) {
-    throw new RuntimeError('RILL-R004', `Unknown tool: ${toolName}`);
+    throw new RuntimeError('RILL-R005', `Unknown tool: ${toolName}`);
   }
 
   // Validate tool is callable
   if (!isCallable(toolFn)) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `Invalid tool input for ${toolName}: tool must be callable`
     );
   }
@@ -72,7 +74,7 @@ async function executeToolCall(
   // EC-16: Tool input validation
   if (typeof toolInput !== 'object' || toolInput === null) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `Invalid tool input for ${toolName}: input must be an object`
     );
   }
@@ -87,7 +89,7 @@ async function executeToolCall(
     callable.kind !== 'script'
   ) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `Invalid tool input for ${toolName}: tool must be application, runtime, or script callable`
     );
   }
@@ -100,7 +102,7 @@ async function executeToolCall(
     if (callable.kind === 'script') {
       if (!context) {
         throw new RuntimeError(
-          'RILL-R004',
+          'RILL-R005',
           `Invalid tool input for ${toolName}: script callable requires a runtime context`
         );
       }
@@ -125,6 +127,7 @@ async function executeToolCall(
       parent: undefined,
       variables: new Map<string, RillValue>(),
       pipeValue: null,
+      hostContext: {},
     };
     const result = callable.fn(inputDict, ctx);
     return result instanceof Promise ? await result : result;
@@ -137,7 +140,7 @@ async function executeToolCall(
     // Wrap other errors
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `Invalid tool input for ${toolName}: ${message}`
     );
   }
@@ -295,12 +298,12 @@ export async function executeToolLoop(
 ): Promise<ToolLoopResult> {
   // Validate tools parameter
   if (tools === undefined) {
-    throw new RuntimeError('RILL-R004', 'tools parameter is required');
+    throw new RuntimeError('RILL-R005', 'tools parameter is required');
   }
 
   if (!isDict(tools)) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       'tool_loop: tools must be a dict of name → callable'
     );
   }
@@ -314,7 +317,7 @@ export async function executeToolLoop(
     // EC-3: RuntimeCallable (builtins) cannot be used as tools
     if (isRuntimeCallable(fnValue)) {
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R005',
         `tool_loop: builtin "${name}" cannot be used as a tool — wrap in a closure`
       );
     }
@@ -322,7 +325,7 @@ export async function executeToolLoop(
     // EC-2: Value must be a callable
     if (!isCallable(fnValue)) {
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R005',
         `tool_loop: tool "${name}" is not a callable`
       );
     }
@@ -386,7 +389,7 @@ export async function executeToolLoop(
   while (turnCount < maxTurns) {
     // Check cancellation before each turn
     if (signal?.aborted) {
-      throw new RuntimeError('RILL-R004', 'tool_loop cancelled');
+      throw new RuntimeError('RILL-R005', 'tool_loop cancelled');
     }
 
     turnCount++;
@@ -413,7 +416,7 @@ export async function executeToolLoop(
       // is not available in ToolLoopCallbacks interface
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R005',
         `Provider API error: ${message}`,
         undefined,
         { cause: error }
@@ -550,7 +553,7 @@ export async function executeToolLoop(
         // EC-14: Consecutive errors exceed maxErrors
         if (consecutiveErrors >= maxErrors) {
           throw new RuntimeError(
-            'RILL-R004',
+            'RILL-R005',
             `Tool execution failed: ${maxErrors} consecutive errors (last: ${name}: ${originalError})`
           );
         }

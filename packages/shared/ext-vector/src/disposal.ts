@@ -1,45 +1,43 @@
-import { RuntimeError } from '@rcrsr/rill';
+import { type RillValue, type RuntimeContext } from '@rcrsr/rill';
 import type { DisposalState } from './types.js';
 
 /**
  * Create a mutable disposal state tracker initialized to not-disposed.
  * @param _provider - Extension provider name (reserved for future error context)
- * @returns DisposalState object with isDisposed set to false
  */
 export function createDisposalState(_provider: string): DisposalState {
   return { isDisposed: false };
 }
 
 /**
- * Throw RuntimeError if extension instance has been disposed.
- * @param state - DisposalState object to check
- * @param provider - Extension provider name for error message
- * @throws RuntimeError (RILL-R004) when state.isDisposed === true
+ * Return an invalid RillValue when the extension instance is disposed,
+ * otherwise null.
+ *
+ * @param ctx - Runtime context (provides `invalidate`)
+ * @param state - DisposalState to check
+ * @param provider - Extension provider name for diagnostic message
+ * @param disposedCode - Atom name registered by the consuming extension for disposal
  */
-export function checkDisposed(state: DisposalState, provider: string): void {
-  if (state.isDisposed) {
-    throw new RuntimeError('RILL-R004', `${provider}: operation cancelled`);
-  }
+export function checkDisposed(
+  ctx: RuntimeContext,
+  state: DisposalState,
+  provider: string,
+  disposedCode: string
+): RillValue | null {
+  if (!state.isDisposed) return null;
+  const error = new Error(`${provider}: operation cancelled`);
+  return ctx.invalidate(error, {
+    code: disposedCode,
+    provider,
+    raw: { kind: 'disposed', message: `${provider}: operation cancelled` },
+  });
 }
 
-/**
- * Set disposal flag and invoke optional cleanup callback.
- * Idempotent: returns immediately if already disposed.
- * Cleanup errors are logged but do not propagate.
- *
- * @param state - DisposalState object to update
- * @param cleanup - Optional async cleanup callback
- */
 export async function dispose(
   state: DisposalState,
   cleanup?: () => Promise<void>
 ): Promise<void> {
-  // Idempotent: return if already disposed
-  if (state.isDisposed) {
-    return;
-  }
-
-  // Invoke cleanup callback if provided
+  if (state.isDisposed) return;
   if (cleanup) {
     try {
       await cleanup();
@@ -48,7 +46,5 @@ export async function dispose(
       console.warn(`Cleanup failed: ${message}`);
     }
   }
-
-  // Set disposal flag after cleanup completes
   state.isDisposed = true;
 }
