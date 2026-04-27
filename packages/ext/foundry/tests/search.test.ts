@@ -359,14 +359,15 @@ describe('search() host function', () => {
   // --------------------------------------------------------
 
   describe('search not configured [AC-21, EC-10]', () => {
-    it('throws RILL-R005 when search config absent [AC-21, EC-10]', async () => {
+    it('halts with #UNAVAILABLE when search config absent [AC-21, EC-10]', async () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithoutSearch());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      await expectRejectedHalt(
+        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
+        { code: 'UNAVAILABLE', provider: 'foundry' }
+      );
     });
 
     it('error message is "foundry: search not configured" [EC-10]', async () => {
@@ -400,16 +401,17 @@ describe('search() host function', () => {
   // --------------------------------------------------------
 
   describe('non-existent index [AC-22, EC-11]', () => {
-    it('throws RILL-R005 when index returns HTTP 404 [AC-22, EC-11]', async () => {
+    it('halts with #NOT_FOUND when index returns HTTP 404 [AC-22, EC-11]', async () => {
       globalThis.fetch = mockFetchJson(404, {});
 
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithSearch('missing-index'));
       const ctx = createRuntimeContext();
 
-      await expect(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      await expectRejectedHalt(
+        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
+        { code: 'NOT_FOUND', provider: 'foundry' }
+      );
     });
 
     it('error message includes index name [EC-11]', async () => {
@@ -419,9 +421,10 @@ describe('search() host function', () => {
       const ext = await createFoundryExtension(configWithSearch('missing-index'));
       const ctx = createRuntimeContext();
 
-      await expect(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      ).rejects.toThrow("foundry: search index 'missing-index' not found");
+      await expectRejectedHalt(
+        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
+        { message: "foundry: search index 'missing-index' not found" }
+      );
     });
   });
 
@@ -468,12 +471,13 @@ describe('search() host function', () => {
       const ext = await createFoundryExtension(configWithSearch('default-index'));
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'search').fn(
           { query: 'test', options: { index: 'other-index' } },
           ctx
-        )
-      ).rejects.toThrow("foundry: search index 'other-index' not found");
+        ),
+        { message: "foundry: search index 'other-index' not found" }
+      );
     });
   });
 

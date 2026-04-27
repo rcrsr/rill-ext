@@ -357,14 +357,15 @@ describe('ground() host function', () => {
   // --------------------------------------------------------
 
   describe('grounding not configured [AC-20, EC-9]', () => {
-    it('throws RILL-R005 when grounding config absent [AC-20, EC-9]', async () => {
+    it('halts with #UNAVAILABLE when grounding config absent [AC-20, EC-9]', async () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithoutGrounding());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      await expectRejectedHalt(
+        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
+        { code: 'UNAVAILABLE', provider: 'foundry' }
+      );
     });
 
     it('error message is "foundry: grounding connection not configured" [EC-9]', async () => {
@@ -463,16 +464,17 @@ describe('ground() host function', () => {
   // --------------------------------------------------------
 
   describe('error mapping', () => {
-    it('wraps unexpected error as RuntimeError with RILL-R005', async () => {
+    it('wraps unexpected error as halt via mapProviderError', async () => {
       mockResponsesCreate.mockRejectedValue(new Error('Network failure'));
 
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithGrounding());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      await expectRejectedHalt(
+        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
+        { provider: 'Foundry' }
+      );
     });
 
     it('error message includes original error message', async () => {

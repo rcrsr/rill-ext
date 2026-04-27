@@ -485,6 +485,12 @@ export async function executeToolLoop(
         response = await callbacks.callAPI(currentMessages, providerTools, signal);
       }
     } catch (error: unknown) {
+      // In-fn halts (e.g. middleware-shielded callAPI) already carry a generic
+      // atom in `meta.code`; pass them through unchanged so host scripts match
+      // on the original atom (`#FORBIDDEN`, `#AUTH`, etc.).
+      if (error instanceof RuntimeHaltSignal) {
+        throw error;
+      }
       // Provider API errors surface via the optional detectError callback so
       // host scripts can `guard #AUTH`, `guard #RATE_LIMIT`, etc.
       if (context !== undefined && callbacks.detectError !== undefined) {

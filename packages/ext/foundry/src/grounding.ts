@@ -12,7 +12,16 @@
  * openai-node type definitions. Tool construction uses a type assertion.
  */
 
-import { RuntimeError, emitExtensionEvent, type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  RuntimeHaltSignal,
+  emitExtensionEvent,
+  getStatus,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
+import { detectFoundryError } from './errors.js';
 import type { AzureOpenAI } from 'openai';
 import type { ResponseOutputItem } from 'openai/resources/responses/responses.js';
 import type {
@@ -68,12 +77,12 @@ export async function callGround(
   disposed: { value: boolean }
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw new RuntimeError('RILL-R005', `${PROVIDER}: extension disposed`);
+    throw haltDisposed(ctx);
   }
 
   // EC-9: Grounding must be configured
   if (!config.grounding) {
-    throw new RuntimeError('RILL-R005', 'foundry: grounding connection not configured');
+    throw haltUnconfigured(ctx, 'grounding_unconfigured', 'foundry: grounding connection not configured');
   }
 
   const groundingConfig: FoundryGroundingConfig = config.grounding;
@@ -81,8 +90,9 @@ export async function callGround(
   // Falls back to inference.model if grounding.model is unset
   const model = groundingConfig.model ?? config.inference?.model;
   if (!model) {
-    throw new RuntimeError(
-      'RILL-R005',
+    throw haltInvalidInput(
+      ctx,
+      'model_missing',
       `${PROVIDER}: grounding requires a model — set grounding.model or inference.model`
     );
   }
@@ -129,6 +139,16 @@ export async function callGround(
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
 
+    if (error instanceof RuntimeHaltSignal) {
+      emitExtensionEvent(ctx, {
+        event: 'foundry:ground:error',
+        subsystem: `extension:${PROVIDER}`,
+        error: getStatus(error.value).message,
+        duration,
+      });
+      throw error;
+    }
+
     if (error instanceof RuntimeError) {
       emitExtensionEvent(ctx, {
         event: 'foundry:ground:error',
@@ -139,18 +159,61 @@ export async function callGround(
       throw error;
     }
 
-    const message = error instanceof Error ? error.message : String(error);
-    const rillError = new RuntimeError('RILL-R005', `${PROVIDER}: ${message}`);
-
+    const invalid = mapProviderError(ctx, 'Foundry', error, detectFoundryError);
     emitExtensionEvent(ctx, {
       event: 'foundry:ground:error',
       subsystem: `extension:${PROVIDER}`,
-      error: rillError.message,
+      error: getStatus(invalid).message,
       duration,
     });
-
-    throw rillError;
+    throw new RuntimeHaltSignal(invalid, true);
   }
+}
+
+// ============================================================
+// HALT HELPERS
+// ============================================================
+
+function haltDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  const message = `${PROVIDER}: extension disposed`;
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed', message },
+    }),
+    true
+  );
+}
+
+function haltUnconfigured(
+  ctx: RuntimeContext,
+  rawKind: string,
+  message: string
+): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code: 'UNAVAILABLE',
+      provider: PROVIDER,
+      raw: { kind: rawKind, message },
+    }),
+    true
+  );
+}
+
+function haltInvalidInput(
+  ctx: RuntimeContext,
+  rawKind: string,
+  message: string
+): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code: 'INVALID_INPUT',
+      provider: PROVIDER,
+      raw: { kind: rawKind, message },
+    }),
+    true
+  );
 }
 
 // ============================================================

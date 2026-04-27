@@ -15,6 +15,7 @@ import {
 } from '@rcrsr/rill';
 import { createFoundryExtension } from '../src/factory.js';
 import type { FoundryConfig } from '../src/types.js';
+import { expectThrowHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MOCK SETUP
@@ -503,8 +504,8 @@ describe('tool_loop() function', () => {
   });
 
   describe('error cases', () => {
-    // AC-7: empty prompt throws RuntimeError
-    it('throws RuntimeError for empty prompt', async () => {
+    // AC-7: empty prompt halts with #INVALID_INPUT
+    it('halts with #INVALID_INPUT for empty prompt', async () => {
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
 
@@ -512,12 +513,12 @@ describe('tool_loop() function', () => {
         tool: makeTool(() => 'result', { description: 'Tool' }),
       };
 
-      expect(() => {
+      expectThrowHalt(() => {
         getCallable(ext, 'tool_loop').fn(
           { prompt: '', tools, options: {} },
           ctx
         );
-      }).toThrow('prompt text cannot be empty');
+      }, { code: 'INVALID_INPUT', message: 'prompt text cannot be empty' });
     });
   });
 });

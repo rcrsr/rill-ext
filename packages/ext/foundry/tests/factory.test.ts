@@ -5,8 +5,9 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
-import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
+import { expectRejectedHalt, expectThrowHalt, expectHalt } from "./_halt-helpers.js";
 
 // ============================================================
 // MODULE MOCK
@@ -119,9 +120,9 @@ describe('createFoundryExtension', () => {
         auth: { type: 'oauth' } as unknown as FoundryConfig['auth'],
       } as FoundryConfig;
 
-      await expect(createFoundryExtension(config)).rejects.toThrow(
-        "foundry: auth.type must be 'api-key' or 'entra'"
-      );
+      await expectRejectedHalt(createFoundryExtension(config), {
+        message: "foundry: auth.type must be 'api-key' or 'entra'",
+      });
     });
 
     it('throws for auth.type empty string (EC-3)', async () => {
@@ -131,9 +132,9 @@ describe('createFoundryExtension', () => {
         auth: { type: '' } as unknown as FoundryConfig['auth'],
       } as FoundryConfig;
 
-      await expect(createFoundryExtension(config)).rejects.toThrow(
-        "foundry: auth.type must be 'api-key' or 'entra'"
-      );
+      await expectRejectedHalt(createFoundryExtension(config), {
+        message: "foundry: auth.type must be 'api-key' or 'entra'",
+      });
     });
 
     // Valid auth types accepted
@@ -221,10 +222,12 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(config);
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
       const messageFn = value['message']!;
+      const ctx = createRuntimeContext();
 
-      expect(() => messageFn.fn({ text: 'hello' }, {})).toThrow(
-        'foundry: inference not configured'
-      );
+      expectThrowHalt(() => messageFn.fn({ text: 'hello' }, ctx), {
+        code: 'UNAVAILABLE',
+        message: 'foundry: inference not configured',
+      });
     });
 
     // EC-5: Missing inference.model
@@ -239,10 +242,12 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(config);
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
       const messageFn = value['message']!;
+      const ctx = createRuntimeContext();
 
-      expect(() => messageFn.fn({ text: 'hello' }, {})).toThrow(
-        'foundry: model is required'
-      );
+      expectThrowHalt(() => messageFn.fn({ text: 'hello' }, ctx), {
+        code: 'INVALID_INPUT',
+        message: 'foundry: model is required',
+      });
     });
 
     // EC-6: Missing inference.apiVersion
@@ -257,10 +262,12 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(config);
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
       const messageFn = value['message']!;
+      const ctx = createRuntimeContext();
 
-      expect(() => messageFn.fn({ text: 'hello' }, {})).toThrow(
-        'foundry: inference.apiVersion is required'
-      );
+      expectThrowHalt(() => messageFn.fn({ text: 'hello' }, ctx), {
+        code: 'INVALID_INPUT',
+        message: 'foundry: inference.apiVersion is required',
+      });
     });
   });
 
@@ -341,10 +348,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
       const messageFn = value['message']!;
+      const ctx = createRuntimeContext();
 
-      expect(() => messageFn.fn({ text: 'hello' }, {})).toThrow(
-        'foundry: extension disposed'
-      );
+      expectThrowHalt(() => messageFn.fn({ text: 'hello' }, ctx), {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('messages() halts after dispose (EC-16)', async () => {
@@ -354,10 +363,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
       const messagesFn = value['messages']!;
+      const ctx = createRuntimeContext();
 
-      expect(() => messagesFn.fn({ messages: [{ role: 'user', content: 'hi' }] }, {})).toThrow(
-        'foundry: extension disposed'
-      );
+      expectThrowHalt(() => messagesFn.fn({ messages: [{ role: 'user', content: 'hi' }] }, ctx), {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('embed() halts after dispose (EC-16)', async () => {
@@ -367,8 +378,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const embedFn = value['embed']!;
+      const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(embedFn.fn({ text: 'hello' }, {}), { message: 'foundry: extension disposed' });
+      await expectRejectedHalt(embedFn.fn({ text: 'hello' }, ctx) as Promise<unknown>, {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('usage() halts after dispose (EC-16)', async () => {
@@ -378,10 +393,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
       const usageFn = value['usage']!;
+      const ctx = createRuntimeContext();
 
-      expect(() => usageFn.fn({}, {})).toThrow(
-        'foundry: extension disposed'
-      );
+      expectThrowHalt(() => usageFn.fn({}, ctx), {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('shield() halts after dispose (AC-27, EC-16)', async () => {
@@ -391,8 +408,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const shieldFn = value['shield']!;
+      const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(shieldFn.fn({ text: 'hello', documents: [] }, {}), { message: 'foundry: extension disposed' });
+      await expectRejectedHalt(shieldFn.fn({ text: 'hello', documents: [] }, ctx) as Promise<unknown>, {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('ground() halts after dispose (AC-27, EC-16)', async () => {
@@ -402,8 +423,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const groundFn = value['ground']!;
+      const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(groundFn.fn({ query: 'test query' }, {}), { message: 'foundry: extension disposed' });
+      await expectRejectedHalt(groundFn.fn({ query: 'test query' }, ctx) as Promise<unknown>, {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('search() halts after dispose (AC-27, EC-16)', async () => {
@@ -413,8 +438,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const searchFn = value['search']!;
+      const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(searchFn.fn({ query: 'test query', options: {} }, {}), { message: 'foundry: extension disposed' });
+      await expectRejectedHalt(searchFn.fn({ query: 'test query', options: {} }, ctx) as Promise<unknown>, {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('embed_batch() halts after dispose (AC-27, EC-16)', async () => {
@@ -424,8 +453,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const embedBatchFn = value['embed_batch']!;
+      const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(embedBatchFn.fn({ texts: ['hello', 'world'] }, {}), { message: 'foundry: extension disposed' });
+      await expectRejectedHalt(embedBatchFn.fn({ texts: ['hello', 'world'] }, ctx) as Promise<unknown>, {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('tool_loop() halts after dispose (AC-27, EC-16)', async () => {
@@ -435,10 +468,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
       const toolLoopFn = value['tool_loop']!;
+      const ctx = createRuntimeContext();
 
-      expect(() => toolLoopFn.fn({ prompt: 'hello', tools: {}, options: {} }, {})).toThrow(
-        'foundry: extension disposed'
-      );
+      expectThrowHalt(() => toolLoopFn.fn({ prompt: 'hello', tools: {}, options: {} }, ctx), {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
 
     it('generate() halts after dispose (AC-27, EC-16)', async () => {
@@ -448,8 +483,12 @@ describe('createFoundryExtension', () => {
 
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const generateFn = value['generate']!;
+      const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(generateFn.fn({ prompt: 'hello', schema: undefined, options: {} }, {}), { message: 'foundry: extension disposed' });
+      await expectRejectedHalt(generateFn.fn({ prompt: 'hello', schema: undefined, options: {} }, ctx) as Promise<unknown>, {
+        code: 'DISPOSED',
+        message: 'foundry: extension disposed',
+      });
     });
   });
 });

@@ -290,8 +290,8 @@ describe('generate() function', () => {
       , { message: 'generate requires a dict type as schema' });
     });
 
-    // AC-6: throws when response JSON is malformed
-    it('throws RuntimeError when response JSON cannot be parsed', async () => {
+    // AC-6: halts with #PROTOCOL when response JSON is malformed
+    it('halts with #PROTOCOL when response JSON cannot be parsed', async () => {
       mockCreate.mockResolvedValue(
         createGenerateMockResponse('not valid json {{{')
       );
@@ -299,11 +299,12 @@ describe('generate() function', () => {
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn(
           { prompt: 'test', schema: PERSON_SCHEMA, options: {} },
           ctx
-        )
+        ) as Promise<unknown>,
+        { code: 'PROTOCOL', message: 'failed to parse response JSON' }
       );
     });
   });
