@@ -10,6 +10,7 @@ import {
   VERSION,
   type SqliteKvConfig,
 } from '../src/index.js';
+import { makeFactoryCtx } from './_setup.js';
 
 const _require = createRequire(import.meta.url);
 const _pkg = _require('../package.json') as { version: string };
@@ -45,7 +46,7 @@ describe('Package scaffolding', () => {
           },
         },
       };
-      const result = createSqliteKvExtension(config);
+      const result = createSqliteKvExtension(config, makeFactoryCtx());
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('object');
@@ -64,7 +65,7 @@ describe('Package scaffolding', () => {
           },
         },
       };
-      const result = createSqliteKvExtension(config);
+      const result = createSqliteKvExtension(config, makeFactoryCtx());
 
       expect(() => result.dispose?.()).not.toThrow();
     });

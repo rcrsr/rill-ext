@@ -6,15 +6,40 @@
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
 import { createSqliteKvExtension } from '../src/factory.js';
 import type { SqliteKvConfig } from '../src/types.js';
+import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 /**
  * Extract a named callable from an ExtensionFactoryResult value dict.
+ * Auto-injects a runtime context and converts invalid RillValue results to
+ * thrown Errors so existing `.rejects.toThrow(...)` patterns continue to work.
  */
-function getCallable(ext: { value: unknown }, name: string): { fn: (args: Record<string, unknown>) => unknown } {
-  const value = ext.value as Record<string, { fn: (args: Record<string, unknown>) => unknown }>;
-  return value[name]!;
+function getCallable(
+  ext: { value: unknown },
+  name: string,
+): { fn: (args: Record<string, unknown>) => unknown } {
+  const value = ext.value as Record<
+    string,
+    { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
+  >;
+  const callable = value[name]!;
+  const checkInvalid = (r: unknown): unknown => {
+    if (isInvalid(r as RillValue)) {
+      throw new Error(getStatus(r as RillValue).message);
+    }
+    return r;
+  };
+  return {
+    fn: (args: Record<string, unknown>) => {
+      const result = callable.fn(args, makeRuntimeCtx());
+      if (result && typeof result === 'object' && 'then' in (result as object)) {
+        return (result as Promise<unknown>).then(checkInvalid);
+      }
+      return checkInvalid(result);
+    },
+  };
 }
 
 // Test database directory
@@ -47,7 +72,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Perform series of operations
       getCallable(ext, 'set').fn({ mount: 'state', key: 'phase', value: 'active' });
@@ -99,13 +124,13 @@ describe('Integration Tests', () => {
       };
 
       // Setup: populate database with test data
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       getCallable(ext, 'set').fn({ mount: 'state', key: 'data', value: 'test-value' });
       ext.dispose?.();
 
       // Execute 10 concurrent reads
       const readPromises = Array.from({ length: 10 }, async () => {
-        const reader = createSqliteKvExtension(config);
+        const reader = createSqliteKvExtension(config, makeFactoryCtx());
         const value = getCallable(reader, 'get').fn({ mount: 'state', key: 'data' });
         reader.dispose?.();
         return value;
@@ -141,7 +166,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Seed database with 100K entries
       console.log('Seeding 100K entries...');
@@ -201,7 +226,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Test all functions throw for unknown mount
       expect(() => getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
@@ -241,7 +266,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       try {
         getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' });
@@ -270,7 +295,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Test all write operations throw
       expect(() => getCallable(ext, 'set').fn({ mount: 'readonly-mount', key: 'key', value: 'value' })).toThrow(
@@ -301,7 +326,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const writer = createSqliteKvExtension(writeConfig);
+      const writer = createSqliteKvExtension(writeConfig, makeFactoryCtx());
       getCallable(writer, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
       writer.dispose?.();
 
@@ -316,7 +341,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const reader = createSqliteKvExtension(readConfig);
+      const reader = createSqliteKvExtension(readConfig, makeFactoryCtx());
 
       // Read operations should succeed
       expect(getCallable(reader, 'get').fn({ mount: 'readonly-mount', key: 'name' })).toBe('Alice');
@@ -341,7 +366,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       const result = getCallable(ext, 'keys').fn({ mount: 'empty-mount' });
       expect(result).toEqual([]);
@@ -361,7 +386,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       const result = getCallable(ext, 'getAll').fn({ mount: 'empty-mount' });
       expect(result).toEqual({});
@@ -381,7 +406,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       const result = getCallable(ext, 'schema').fn({ mount: 'empty-mount' });
       expect(result).toEqual([]);
@@ -405,7 +430,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Create string that JSON-encodes to exactly 102400 bytes
       // JSON string adds 2 bytes for quotes, so we need 102398 characters
@@ -437,7 +462,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Create string that JSON-encodes to 102401 bytes (1 byte over)
       const targetSize = sizeLimit - 1; // Account for JSON quotes, add 1 extra
@@ -470,7 +495,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Create object that exceeds size limit
       const largeObject = {
@@ -501,7 +526,7 @@ describe('Integration Tests', () => {
 
       // Execute 5 concurrent writes to same key
       const writePromises = Array.from({ length: 5 }, async (_, index) => {
-        const writer = createSqliteKvExtension(config);
+        const writer = createSqliteKvExtension(config, makeFactoryCtx());
         getCallable(writer, 'set').fn({ mount: 'shared', key: 'counter', value: index });
         writer.dispose?.();
       });
@@ -509,7 +534,7 @@ describe('Integration Tests', () => {
       await Promise.all(writePromises);
 
       // Verify database integrity: last writer wins
-      const reader = createSqliteKvExtension(config);
+      const reader = createSqliteKvExtension(config, makeFactoryCtx());
       const value = getCallable(reader, 'get').fn({ mount: 'shared', key: 'counter' });
 
       // Value should be one of the written values (0-4)
@@ -536,7 +561,7 @@ describe('Integration Tests', () => {
 
       // Execute 5 concurrent writes to different keys
       const writePromises = Array.from({ length: 5 }, async (_, index) => {
-        const writer = createSqliteKvExtension(config);
+        const writer = createSqliteKvExtension(config, makeFactoryCtx());
         getCallable(writer, 'set').fn({ mount: 'shared', key: `key-${index}`, value: `value-${index}` });
         writer.dispose?.();
       });
@@ -544,7 +569,7 @@ describe('Integration Tests', () => {
       await Promise.all(writePromises);
 
       // Verify all writes succeeded
-      const reader = createSqliteKvExtension(config);
+      const reader = createSqliteKvExtension(config, makeFactoryCtx());
       const keys = getCallable(reader, 'keys').fn({ mount: 'shared' });
 
       expect(keys).toHaveLength(5);
@@ -570,7 +595,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Set non-dict value
       getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
@@ -595,7 +620,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       getCallable(ext, 'set').fn({ mount: 'test', key: 'count', value: 42 });
 
@@ -618,7 +643,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       getCallable(ext, 'set').fn({ mount: 'test', key: 'items', value: [1, 2, 3] });
 

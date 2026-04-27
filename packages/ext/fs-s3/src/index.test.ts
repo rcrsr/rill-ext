@@ -1,7 +1,15 @@
 import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
+import type { ExtensionFactoryCtx } from '@rcrsr/rill';
 import { VERSION, createS3FsExtension } from './index.js';
 import type { S3FsMountConfig, S3Credentials, S3FsConfig } from './index.js';
+
+function makeFactoryCtx(): ExtensionFactoryCtx {
+  return {
+    signal: new AbortController().signal,
+    registerErrorCode: () => {},
+  };
+}
 
 const _require = createRequire(import.meta.url);
 const _pkg = _require('../package.json') as { version: string };
@@ -152,7 +160,7 @@ describe('S3 FS Extension', () => {
                 prefix: '',
               },
             },
-          })
+          }, makeFactoryCtx())
         ).toThrow('S3 configuration requires non-empty region');
       });
 
@@ -161,7 +169,7 @@ describe('S3 FS Extension', () => {
           createS3FsExtension({
             region: 'us-west-2',
             mounts: {},
-          })
+          }, makeFactoryCtx())
         ).toThrow('S3 configuration requires at least one mount');
       });
 
@@ -177,7 +185,7 @@ describe('S3 FS Extension', () => {
                 prefix: '',
               },
             },
-          })
+          }, makeFactoryCtx())
         ).toThrow('S3 endpoint must be a non-empty string');
       });
 
@@ -193,7 +201,7 @@ describe('S3 FS Extension', () => {
                 prefix: '',
               },
             },
-          })
+          }, makeFactoryCtx())
         ).toThrow('S3 endpoint must be a valid URL: not-a-valid-url');
       });
     });
@@ -215,7 +223,7 @@ describe('S3 FS Extension', () => {
               prefix: '',
             },
           },
-        });
+        }, makeFactoryCtx());
 
         expect(ext).toBeDefined();
         expect(ext.dispose).toBeDefined();
@@ -236,7 +244,7 @@ describe('S3 FS Extension', () => {
               prefix: 'data/',
             },
           },
-        });
+        }, makeFactoryCtx());
 
         expect(ext).toBeDefined();
         expect(ext.dispose).toBeDefined();
@@ -258,7 +266,7 @@ describe('S3 FS Extension', () => {
               prefix: 'files/',
             },
           },
-        });
+        }, makeFactoryCtx());
 
         expect(ext).toBeDefined();
         expect(typeof ext.dispose).toBe('function');
@@ -278,7 +286,7 @@ describe('S3 FS Extension', () => {
               prefix: '',
             },
           },
-        });
+        }, makeFactoryCtx());
 
         expect(ext.dispose).toBeDefined();
         const result = ext.dispose!();
@@ -302,7 +310,7 @@ describe('S3 FS Extension', () => {
               prefix: '',
             },
           },
-        });
+        }, makeFactoryCtx());
 
         expect(ext.dispose).toBeDefined();
         await expect(ext.dispose!()).resolves.toBeUndefined();
@@ -322,7 +330,7 @@ describe('S3 FS Extension', () => {
               prefix: '',
             },
           },
-        });
+        }, makeFactoryCtx());
 
         await ext.dispose!();
         await expect(ext.dispose!()).resolves.toBeUndefined();

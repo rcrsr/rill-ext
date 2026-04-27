@@ -10,6 +10,7 @@ import Database from 'better-sqlite3';
 import { anyTypeValue } from '@rcrsr/rill';
 import { createSqliteKvExtension } from '../src/factory.js';
 import type { SqliteKvConfig } from '../src/types.js';
+import { makeFactoryCtx } from './_setup.js';
 
 // Test database directory
 const TEST_DATA_DIR = join(process.cwd(), 'test-data');
@@ -26,7 +27,7 @@ describe('createSqliteKvExtension', () => {
     it('throws for missing mounts', () => {
       const config = {} as SqliteKvConfig;
 
-      expect(() => createSqliteKvExtension(config)).toThrow(
+      expect(() => createSqliteKvExtension(config, makeFactoryCtx())).toThrow(
         'at least one mount'
       );
     });
@@ -36,7 +37,7 @@ describe('createSqliteKvExtension', () => {
         mounts: {},
       };
 
-      expect(() => createSqliteKvExtension(config)).toThrow(
+      expect(() => createSqliteKvExtension(config, makeFactoryCtx())).toThrow(
         'at least one mount'
       );
     });
@@ -53,7 +54,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       expect(existsSync(join(TEST_DATA_DIR, 'nested', 'dir'))).toBe(true);
       ext.dispose?.();
     });
@@ -79,7 +80,7 @@ describe('createSqliteKvExtension', () => {
       };
 
       // SQLite will throw 'unable to open database file' when directory can't be created
-      expect(() => createSqliteKvExtension(config)).toThrow();
+      expect(() => createSqliteKvExtension(config, makeFactoryCtx())).toThrow();
     });
   });
 
@@ -96,7 +97,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       expect(existsSync(dbPath)).toBe(true);
       ext.dispose?.();
     });
@@ -120,7 +121,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Verify existing table still exists
       const verifyDb = new Database(dbPath, { readonly: true });
@@ -155,7 +156,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Verify both tables exist
       const db = new Database(dbPath, { readonly: true });
@@ -191,7 +192,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       expect(existsSync(db1Path)).toBe(true);
       expect(existsSync(db2Path)).toBe(true);
@@ -213,7 +214,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       ext.dispose?.();
 
       // Verify WAL mode persists
@@ -243,7 +244,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       ext.dispose?.();
 
       // Verify WAL mode still enabled
@@ -268,7 +269,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       ext.dispose?.();
 
       // Verify table schema
@@ -323,7 +324,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       ext.dispose?.();
 
       // Verify existing data preserved
@@ -351,7 +352,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       const value = ext.value as Record<string, unknown>;
 
       // Verify all 11 functions exist
@@ -382,7 +383,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       const value = ext.value as Record<string, { fn: unknown; params: unknown; annotations?: Record<string, unknown>; returnType: unknown }>;
 
       // Verify structure for one function (all follow same pattern)
@@ -408,7 +409,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Dispose should close database
       ext.dispose?.();
@@ -436,7 +437,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
       ext.dispose?.();
 
       // Both databases should be closable (not locked)
@@ -458,7 +459,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config);
+      const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       expect(() => {
         ext.dispose?.();
@@ -491,7 +492,7 @@ describe('createSqliteKvExtension', () => {
         },
       };
 
-      expect(() => createSqliteKvExtension(config)).toThrow();
+      expect(() => createSqliteKvExtension(config, makeFactoryCtx())).toThrow();
 
       // First database should be closed and accessible
       if (existsSync(db1Path)) {

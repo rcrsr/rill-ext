@@ -15,12 +15,27 @@ import {
 } from '@aws-sdk/client-s3';
 import type { S3FsConfig, S3FsMountConfig } from './types.js';
 import { createRequire } from 'node:module';
-import { structureToTypeValue, toCallable, type ExtensionConfigSchema, type ExtensionFactoryResult, type ExtensionManifest, type RillFunction, type RillValue } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  RuntimeHaltSignal,
+  structureToTypeValue,
+  toCallable,
+  type CallableFn,
+  type ExtensionConfigSchema,
+  type ExtensionFactoryCtx,
+  type ExtensionFactoryResult,
+  type ExtensionManifest,
+  type RillFunction,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import type { FsExtensionContract } from '@rcrsr/rill-ext-fs-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 const _require = createRequire(import.meta.url);
 const _pkg = _require('../package.json') as { version: string };
+
+const PROVIDER = 'fs-s3';
 
 // ============================================================
 // PUBLIC TYPES
@@ -28,84 +43,144 @@ const _pkg = _require('../package.json') as { version: string };
 export type { S3FsMountConfig, S3Credentials, S3FsConfig } from './types.js';
 
 // ============================================================
+// ERROR MAPPING
+// ============================================================
+
+interface S3ErrorLike {
+  name?: string;
+  message?: string;
+  $metadata?: { httpStatusCode?: number };
+}
+
+function mapS3Error(ctx: RuntimeContext, error: unknown): RillValue {
+  if (error instanceof RuntimeHaltSignal) {
+    return ctx.invalidate(error, {
+      code: 'TIMEOUT',
+      provider: PROVIDER,
+      raw: { kind: 'request_cancelled', message: 'fs-s3: request cancelled' },
+    });
+  }
+
+  if (error instanceof Error && error.name === 'AbortError') {
+    return ctx.invalidate(error, {
+      code: 'TIMEOUT',
+      provider: PROVIDER,
+      raw: { kind: 'request_timeout', message: 'fs-s3: request timeout' },
+    });
+  }
+
+  const err = error as S3ErrorLike;
+  const message = err?.message ?? String(error);
+  const status = err?.$metadata?.httpStatusCode;
+  const name = err?.name;
+
+  if (name === 'NoSuchKey' || name === 'NotFound' || name === 'NoSuchBucket') {
+    return ctx.invalidate(error, {
+      code: 'NOT_FOUND',
+      provider: PROVIDER,
+      raw: { kind: name === 'NoSuchBucket' ? 'bucket_missing' : 'object_missing', name, message },
+    });
+  }
+
+  if (name === 'QuotaExceededException' || status === 507) {
+    return ctx.invalidate(error, {
+      code: 'QUOTA_EXCEEDED',
+      provider: PROVIDER,
+      raw: { kind: 'quota_exceeded', name, status, message },
+    });
+  }
+
+  if (status === 401) {
+    return ctx.invalidate(error, {
+      code: 'AUTH',
+      provider: PROVIDER,
+      raw: { kind: 'authentication_failed', status, message },
+    });
+  }
+  if (status === 403 || name === 'AccessDenied') {
+    return ctx.invalidate(error, {
+      code: 'FORBIDDEN',
+      provider: PROVIDER,
+      raw: { kind: 'access_denied', name, status, message },
+    });
+  }
+  if (status === 404) {
+    return ctx.invalidate(error, {
+      code: 'NOT_FOUND',
+      provider: PROVIDER,
+      raw: { kind: 'object_missing', status, message },
+    });
+  }
+  if (status === 409 || status === 412) {
+    return ctx.invalidate(error, {
+      code: 'CONFLICT',
+      provider: PROVIDER,
+      raw: { kind: 'conflict', status, message },
+    });
+  }
+  if (status === 429) {
+    return ctx.invalidate(error, {
+      code: 'RATE_LIMIT',
+      provider: PROVIDER,
+      raw: { kind: 'rate_limit_exceeded', status, message },
+    });
+  }
+  if (status !== undefined && status >= 500) {
+    return ctx.invalidate(error, {
+      code: 'UNAVAILABLE',
+      provider: PROVIDER,
+      raw: { kind: 'server_error', status, message },
+    });
+  }
+
+  if (error instanceof TypeError) {
+    return ctx.invalidate(error, {
+      code: 'UNAVAILABLE',
+      provider: PROVIDER,
+      raw: { kind: 'connection_failed', message },
+    });
+  }
+
+  return ctx.invalidate(error, {
+    code: 'UNAVAILABLE',
+    provider: PROVIDER,
+    raw: { kind: 'unknown_error', name, status, message },
+  });
+}
+
+// ============================================================
 // FACTORY
 // ============================================================
 
 /**
  * Create S3 filesystem extension with S3-compatible storage backend.
- *
- * Initializes one S3Client shared across all mounts.
- * Returns 12 functions: read, write, append, list, find, exists, remove, stat, mkdir, copy, move, mounts.
- *
- * @param config - S3 client and mount configuration
- * @returns ExtensionResult with 12 filesystem functions and dispose handler
- * @throws Error if configuration is invalid (missing region, empty mounts)
- *
- * @example
- * ```typescript
- * // AWS S3 configuration
- * const fsExt = createS3FsExtension({
- *   region: 'us-west-2',
- *   credentials: {
- *     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
- *     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
- *   },
- *   mounts: {
- *     uploads: {
- *       mode: 'read-write',
- *       bucket: 'my-uploads',
- *       prefix: 'user-files/'
- *     }
- *   }
- * });
- *
- * // MinIO (S3-compatible service)
- * const fsExt = createS3FsExtension({
- *   region: 'us-east-1',
- *   credentials: {
- *     accessKeyId: 'minioadmin',
- *     secretAccessKey: 'minioadmin'
- *   },
- *   endpoint: 'http://localhost:9000',
- *   forcePathStyle: true,
- *   mounts: {
- *     local: {
- *       mode: 'read-write',
- *       bucket: 'test-bucket',
- *       prefix: ''
- *     }
- *   }
- * });
- * ```
  */
-export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult {
-  // AC-10: Configuration validation - region required
+export function createS3FsExtension(
+  config: S3FsConfig,
+  ctx: ExtensionFactoryCtx,
+): ExtensionFactoryResult {
   if (!config.region || config.region.trim() === '') {
-    throw new Error('S3 configuration requires non-empty region');
+    throw new RuntimeError('RILL-R005', 'S3 configuration requires non-empty region');
   }
 
-  // AC-10: Configuration validation - mounts required
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
-    throw new Error('S3 configuration requires at least one mount');
+    throw new RuntimeError('RILL-R005', 'S3 configuration requires at least one mount');
   }
 
-  // AC-10: Configuration validation - endpoint format if provided
   if (config.endpoint !== undefined) {
     if (typeof config.endpoint !== 'string' || config.endpoint.trim() === '') {
-      throw new Error('S3 endpoint must be a non-empty string');
+      throw new RuntimeError('RILL-R005', 'S3 endpoint must be a non-empty string');
     }
-
-    // Basic URL validation
     try {
       new URL(config.endpoint);
     } catch {
-      throw new Error(`S3 endpoint must be a valid URL: ${config.endpoint}`);
+      throw new RuntimeError(
+        'RILL-R005',
+        `S3 endpoint must be a valid URL: ${config.endpoint}`,
+      );
     }
   }
 
-  // AC-5: Initialize S3Client with configuration
-  // One client shared across all mounts per spec
-  // Build config object conditionally to satisfy exactOptionalPropertyTypes
   const clientConfig: {
     region: string;
     credentials?: { accessKeyId: string; secretAccessKey: string };
@@ -115,88 +190,133 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
     region: config.region,
   };
 
-  if (config.credentials !== undefined) {
-    clientConfig.credentials = config.credentials;
-  }
-  if (config.endpoint !== undefined) {
-    clientConfig.endpoint = config.endpoint;
-  }
-  if (config.forcePathStyle !== undefined) {
-    clientConfig.forcePathStyle = config.forcePathStyle;
-  }
+  if (config.credentials !== undefined) clientConfig.credentials = config.credentials;
+  if (config.endpoint !== undefined) clientConfig.endpoint = config.endpoint;
+  if (config.forcePathStyle !== undefined) clientConfig.forcePathStyle = config.forcePathStyle;
 
   const s3Client = new S3Client(clientConfig);
+
+  let disposed = false;
+  const dispose = async (): Promise<void> => {
+    if (disposed) return;
+    disposed = true;
+    s3Client.destroy();
+  };
+
+  if (ctx?.signal) {
+    if (ctx.signal.aborted) {
+      void dispose();
+    } else {
+      ctx.signal.addEventListener(
+        'abort',
+        () => {
+          void dispose();
+        },
+        { once: true },
+      );
+    }
+  }
+
+  function requestSignal(): AbortSignal {
+    return ctx?.signal ?? new AbortController().signal;
+  }
+
+  function disposedInvalid(runCtx: RuntimeContext): RillValue {
+    return runCtx.invalidate(new Error('S3 fs extension disposed'), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    });
+  }
 
   // ============================================================
   // HELPERS
   // ============================================================
 
-  /**
-   * Parse combined /mount/path string into mount config and S3 key.
-   * EC-13: Throws for unknown mount names.
-   * Matches rill core parseMountPath contract: longest mount name wins.
-   */
-  const parseMountPath = (
-    fullPath: string
-  ): { mount: S3FsMountConfig; mountName: string; relativePath: string; key: string } => {
+  type ParsedPath =
+    | {
+        ok: true;
+        mount: S3FsMountConfig;
+        mountName: string;
+        relativePath: string;
+        key: string;
+      }
+    | { ok: false; invalid: RillValue };
+
+  const parseMountPath = (runCtx: RuntimeContext, fullPath: string): ParsedPath => {
     const normalized = fullPath.startsWith('/') ? fullPath.slice(1) : fullPath;
-    const sortedNames = Object.keys(config.mounts).sort(
-      (a, b) => b.length - a.length
-    );
+    const sortedNames = Object.keys(config.mounts).sort((a, b) => b.length - a.length);
 
     for (const name of sortedNames) {
       if (normalized === name) {
         const mount = config.mounts[name]!;
-        return { mount, mountName: name, relativePath: '', key: mount.prefix };
+        return { ok: true, mount, mountName: name, relativePath: '', key: mount.prefix };
       }
       if (normalized.startsWith(name + '/')) {
         const mount = config.mounts[name]!;
         const relativePath = normalized.slice(name.length + 1);
-        return { mount, mountName: name, relativePath, key: mount.prefix + relativePath };
+        return {
+          ok: true,
+          mount,
+          mountName: name,
+          relativePath,
+          key: mount.prefix + relativePath,
+        };
       }
     }
 
-    throw new Error(`unknown mount in path: ${fullPath}`);
+    return {
+      ok: false,
+      invalid: runCtx.invalidate(new Error(`unknown mount in path: ${fullPath}`), {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: {
+          kind: 'unknown_mount',
+          path: fullPath,
+          availableMounts: Object.keys(config.mounts),
+        },
+      }),
+    };
   };
 
-  /**
-   * Check if mount mode permits operation.
-   * EC-10: Throws for read-only mounts on write operations.
-   */
   const checkMode = (
+    runCtx: RuntimeContext,
     mount: S3FsMountConfig,
-    operation: 'read' | 'write'
-  ): void => {
-    if (mount.mode === 'read-write') return;
-    if (mount.mode === 'read' && operation === 'read') return;
-    if (mount.mode === 'write' && operation === 'write') return;
-
-    throw new Error(
-      `mount does not permit ${operation} operations (mode: ${mount.mode})`
+    operation: 'read' | 'write',
+  ): RillValue | null => {
+    if (mount.mode === 'read-write') return null;
+    if (mount.mode === 'read' && operation === 'read') return null;
+    if (mount.mode === 'write' && operation === 'write') return null;
+    return runCtx.invalidate(
+      new Error(`mount does not permit ${operation} operations (mode: ${mount.mode})`),
+      {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: { kind: 'mode_not_permitted', mode: mount.mode, operation },
+      },
     );
   };
 
-  /**
-   * Check file size against limit.
-   * EC-9: Throws when file exceeds maxFileSize.
-   */
   const checkFileSize = (
+    runCtx: RuntimeContext,
     size: number,
     mount: S3FsMountConfig,
-    key: string
-  ): void => {
-    const max = mount.maxFileSize ?? 10485760; // 10MB default
+    key: string,
+  ): RillValue | null => {
+    const max = mount.maxFileSize ?? 10485760;
     if (size > max) {
-      throw new Error(
-        `file exceeds size limit (${size} > ${max} bytes): ${key}`
+      return runCtx.invalidate(
+        new Error(`file exceeds size limit (${size} > ${max} bytes): ${key}`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'file_too_large', size, maxFileSize: max, key },
+        },
       );
     }
+    return null;
   };
 
-  /**
-   * Match filename against glob pattern.
-   * Simple glob implementation for file filtering.
-   */
   const matchesGlob = (filename: string, pattern: string): boolean => {
     if (pattern === '*') return true;
     if (pattern.startsWith('*.') && !pattern.includes('{')) {
@@ -209,29 +329,26 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
       return extensions.some((ext) => filename.endsWith(ext));
     }
     if (pattern.startsWith('**/')) {
-      const subPattern = pattern.slice(3);
-      return matchesGlob(filename, subPattern);
+      return matchesGlob(filename, pattern.slice(3));
     }
     return false;
   };
 
-  /**
-   * Extract filename from S3 key.
-   */
   const getFilename = (key: string): string => {
     const parts = key.split('/');
     return parts[parts.length - 1] ?? '';
   };
 
-  /**
-   * Read S3 stream to string.
-   * Handles stream consumption to free socket connections.
-   */
   const streamToString = async (
-    output: GetObjectCommandOutput
-  ): Promise<string> => {
+    runCtx: RuntimeContext,
+    output: GetObjectCommandOutput,
+  ): Promise<string | RillValue> => {
     if (!output.Body) {
-      throw new Error('S3 response body is empty');
+      return runCtx.invalidate(new Error('S3 response body is empty'), {
+        code: 'PROTOCOL',
+        provider: PROVIDER,
+        raw: { kind: 'empty_body' },
+      });
     }
     return await output.Body.transformToString();
   };
@@ -240,289 +357,274 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
   // FUNCTIONS
   // ============================================================
 
-  /**
-   * Read file contents from S3.
-   * IR-12, EC-8 (not found), EC-9 (size limit)
-   */
-  const read = async (args: Record<string, RillValue>): Promise<string> => {
-    const { mount, relativePath, key } = parseMountPath(args['path'] as string);
-    checkMode(mount, 'read');
+  const read: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
+    const { mount, key } = parsed;
+    const modeCheck = checkMode(runCtx, mount, 'read');
+    if (modeCheck) return modeCheck;
 
     try {
-      // Check file size before reading
       const headResult = await s3Client.send(
-        new HeadObjectCommand({
-          Bucket: mount.bucket,
-          Key: key,
-        })
+        new HeadObjectCommand({ Bucket: mount.bucket, Key: key }),
+        { abortSignal: requestSignal() },
       );
-
       const size = headResult.ContentLength ?? 0;
-      checkFileSize(size, mount, key);
+      const sizeCheck = checkFileSize(runCtx, size, mount, key);
+      if (sizeCheck) return sizeCheck;
 
-      // Read file content
       const getResult = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: mount.bucket,
-          Key: key,
-        })
+        new GetObjectCommand({ Bucket: mount.bucket, Key: key }),
+        { abortSignal: requestSignal() },
       );
-
-      return await streamToString(getResult);
+      const content = await streamToString(runCtx, getResult);
+      return content;
     } catch (error) {
-      // EC-8: File not found
-      if (error && typeof error === 'object' && 'name' in error) {
-        if ((error as { name: string }).name === 'NoSuchKey') {
-          throw new Error(`file not found: ${relativePath}`, { cause: error });
-        }
-      }
-      throw error;
+      return mapS3Error(runCtx, error);
     }
   };
 
-  /**
-   * Write file contents to S3.
-   * IR-13, EC-10 (read-only mode)
-   */
-  const write = async (args: Record<string, RillValue>): Promise<string> => {
-    const { mount, key } = parseMountPath(args['path'] as string);
+  const write: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
+    const { mount, key } = parsed;
     const content = args['content'] as string;
-    checkMode(mount, 'write'); // EC-10
+    const modeCheck = checkMode(runCtx, mount, 'write');
+    if (modeCheck) return modeCheck;
     const contentSize = Buffer.byteLength(content, 'utf-8');
-    checkFileSize(contentSize, mount, key);
+    const sizeCheck = checkFileSize(runCtx, contentSize, mount, key);
+    if (sizeCheck) return sizeCheck;
 
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: mount.bucket,
-        Key: key,
-        Body: content,
-        ContentType: 'text/plain; charset=utf-8',
-      })
-    );
-
-    return String(contentSize);
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: mount.bucket,
+          Key: key,
+          Body: content,
+          ContentType: 'text/plain; charset=utf-8',
+        }),
+        { abortSignal: requestSignal() },
+      );
+      return String(contentSize);
+    } catch (error) {
+      return mapS3Error(runCtx, error);
+    }
   };
 
-  /**
-   * Append content to file in S3.
-   * IR-14: Read-then-write (not atomic)
-   */
-  const append = async (args: Record<string, RillValue>): Promise<string> => {
-    const { mount, key } = parseMountPath(args['path'] as string);
+  const append: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
+    const { mount, key } = parsed;
     const content = args['content'] as string;
-    checkMode(mount, 'write');
+    const modeCheck = checkMode(runCtx, mount, 'write');
+    if (modeCheck) return modeCheck;
 
-    // Read existing content (if file exists)
     let existingContent = '';
     try {
       const getResult = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: mount.bucket,
-          Key: key,
-        })
+        new GetObjectCommand({ Bucket: mount.bucket, Key: key }),
+        { abortSignal: requestSignal() },
       );
-      existingContent = await streamToString(getResult);
+      const stream = await streamToString(runCtx, getResult);
+      if (typeof stream !== 'string') return stream;
+      existingContent = stream;
     } catch (error) {
-      // File doesn't exist - start with empty content
-      if (error && typeof error === 'object' && 'name' in error) {
-        if ((error as { name: string }).name !== 'NoSuchKey') {
-          throw error;
-        }
-      } else {
-        throw error;
+      const name = (error as S3ErrorLike)?.name;
+      if (name !== 'NoSuchKey' && name !== 'NotFound') {
+        return mapS3Error(runCtx, error);
       }
     }
 
-    // Concatenate and write
     const newContent = existingContent + content;
     const contentSize = Buffer.byteLength(newContent, 'utf-8');
-    checkFileSize(contentSize, mount, key);
+    const sizeCheck = checkFileSize(runCtx, contentSize, mount, key);
+    if (sizeCheck) return sizeCheck;
 
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: mount.bucket,
-        Key: key,
-        Body: newContent,
-        ContentType: 'text/plain; charset=utf-8',
-      })
-    );
-
-    return String(Buffer.byteLength(content, 'utf-8'));
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: mount.bucket,
+          Key: key,
+          Body: newContent,
+          ContentType: 'text/plain; charset=utf-8',
+        }),
+        { abortSignal: requestSignal() },
+      );
+      return String(Buffer.byteLength(content, 'utf-8'));
+    } catch (error) {
+      return mapS3Error(runCtx, error);
+    }
   };
 
-  /**
-   * List objects in directory (non-recursive).
-   * IR-15: Uses delimiter '/' to list directory contents
-   */
-  const list = async (args: Record<string, RillValue>): Promise<RillValue[]> => {
-    const { mount, key } = parseMountPath(args['path'] as string);
-    checkMode(mount, 'read');
+  const list: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
+    const { mount, key } = parsed;
+    const modeCheck = checkMode(runCtx, mount, 'read');
+    if (modeCheck) return modeCheck;
 
     const prefix = key;
     const normalizedPrefix = prefix.endsWith('/') ? prefix : prefix + '/';
 
-    const result = await s3Client.send(
-      new ListObjectsV2Command({
-        Bucket: mount.bucket,
-        Prefix: normalizedPrefix,
-        Delimiter: '/', // Non-recursive
-      })
-    );
+    try {
+      const result = await s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: mount.bucket,
+          Prefix: normalizedPrefix,
+          Delimiter: '/',
+        }),
+        { abortSignal: requestSignal() },
+      );
 
-    const items: RillValue[] = [];
+      const items: RillValue[] = [];
 
-    // Add files
-    if (result.Contents) {
-      for (const obj of result.Contents) {
-        if (!obj.Key || obj.Key === normalizedPrefix) continue; // Skip directory marker
-
-        const filename = getFilename(obj.Key);
-        if (mount.glob && !matchesGlob(filename, mount.glob)) continue;
-
-        items.push({
-          name: filename,
-          type: 'file',
-          size: obj.Size ?? 0,
-        });
+      if (result.Contents) {
+        for (const obj of result.Contents) {
+          if (!obj.Key || obj.Key === normalizedPrefix) continue;
+          const filename = getFilename(obj.Key);
+          if (mount.glob && !matchesGlob(filename, mount.glob)) continue;
+          items.push({ name: filename, type: 'file', size: obj.Size ?? 0 });
+        }
       }
-    }
 
-    // Add subdirectories (common prefixes)
-    if (result.CommonPrefixes) {
-      for (const prefix of result.CommonPrefixes) {
-        if (!prefix.Prefix) continue;
-
-        const dirName = prefix.Prefix.slice(normalizedPrefix.length).replace(
-          /\/$/,
-          ''
-        );
-        items.push({
-          name: dirName,
-          type: 'directory',
-          size: 0,
-        });
+      if (result.CommonPrefixes) {
+        for (const cp of result.CommonPrefixes) {
+          if (!cp.Prefix) continue;
+          const dirName = cp.Prefix.slice(normalizedPrefix.length).replace(/\/$/, '');
+          items.push({ name: dirName, type: 'directory', size: 0 });
+        }
       }
-    }
 
-    return items;
+      return items;
+    } catch (error) {
+      return mapS3Error(runCtx, error);
+    }
   };
 
-  /**
-   * Find files matching glob pattern (recursive).
-   * IR-16: Recursive search with client-side glob filtering
-   */
-  const find = async (args: Record<string, RillValue>): Promise<RillValue[]> => {
-    const { mount } = parseMountPath(args['path'] as string);
+  const find: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
+    const { mount } = parsed;
     const pattern = (args['pattern'] as string | undefined) ?? '*';
-    checkMode(mount, 'read');
+    const modeCheck = checkMode(runCtx, mount, 'read');
+    if (modeCheck) return modeCheck;
 
     const results: string[] = [];
     let continuationToken: string | undefined;
 
-    // Recursive listing (no delimiter)
-    do {
-      const result = await s3Client.send(
-        new ListObjectsV2Command({
-          Bucket: mount.bucket,
-          Prefix: mount.prefix,
-          ContinuationToken: continuationToken,
-        })
-      );
+    try {
+      do {
+        const result = await s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: mount.bucket,
+            Prefix: mount.prefix,
+            ContinuationToken: continuationToken,
+          }),
+          { abortSignal: requestSignal() },
+        );
 
-      if (result.Contents) {
-        for (const obj of result.Contents) {
-          if (!obj.Key) continue;
-
-          const filename = getFilename(obj.Key);
-
-          // Apply pattern matching
-          if (matchesGlob(filename, pattern)) {
-            // Apply mount glob filter if present
-            if (!mount.glob || matchesGlob(filename, mount.glob)) {
-              // Return path relative to mount prefix
-              const relativePath = obj.Key.slice(mount.prefix.length);
-              results.push(relativePath);
+        if (result.Contents) {
+          for (const obj of result.Contents) {
+            if (!obj.Key) continue;
+            const filename = getFilename(obj.Key);
+            if (matchesGlob(filename, pattern)) {
+              if (!mount.glob || matchesGlob(filename, mount.glob)) {
+                const relativePath = obj.Key.slice(mount.prefix.length);
+                results.push(relativePath);
+              }
             }
           }
         }
-      }
 
-      continuationToken = result.NextContinuationToken;
-    } while (continuationToken);
+        continuationToken = result.NextContinuationToken;
+      } while (continuationToken);
 
-    return results;
+      return results;
+    } catch (error) {
+      return mapS3Error(runCtx, error);
+    }
   };
 
-  /**
-   * Check if file exists in S3.
-   * IR-17: Uses HeadObject
-   */
-  const exists = async (args: Record<string, RillValue>): Promise<boolean> => {
-    const { mount, key } = parseMountPath(args['path'] as string);
-    checkMode(mount, 'read');
+  const exists: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
+    const { mount, key } = parsed;
+    const modeCheck = checkMode(runCtx, mount, 'read');
+    if (modeCheck) return modeCheck;
 
     try {
       await s3Client.send(
-        new HeadObjectCommand({
-          Bucket: mount.bucket,
-          Key: key,
-        })
+        new HeadObjectCommand({ Bucket: mount.bucket, Key: key }),
+        { abortSignal: requestSignal() },
       );
       return true;
     } catch (error) {
-      if (error && typeof error === 'object' && 'name' in error) {
-        if ((error as { name: string }).name === 'NotFound') {
-          return false;
-        }
+      const name = (error as S3ErrorLike)?.name;
+      const status = (error as S3ErrorLike)?.$metadata?.httpStatusCode;
+      if (name === 'NotFound' || name === 'NoSuchKey' || status === 404) return false;
+      return mapS3Error(runCtx, error);
+    }
+  };
+
+  const remove: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
+    const { mount, key } = parsed;
+    const modeCheck = checkMode(runCtx, mount, 'write');
+    if (modeCheck) return modeCheck;
+
+    try {
+      try {
+        await s3Client.send(
+          new HeadObjectCommand({ Bucket: mount.bucket, Key: key }),
+          { abortSignal: requestSignal() },
+        );
+      } catch (error) {
+        const name = (error as S3ErrorLike)?.name;
+        const status = (error as S3ErrorLike)?.$metadata?.httpStatusCode;
+        if (name === 'NotFound' || name === 'NoSuchKey' || status === 404) return false;
+        return mapS3Error(runCtx, error);
       }
-      return false;
+
+      await s3Client.send(
+        new DeleteObjectCommand({ Bucket: mount.bucket, Key: key }),
+        { abortSignal: requestSignal() },
+      );
+      return true;
+    } catch (error) {
+      return mapS3Error(runCtx, error);
     }
   };
 
-  /**
-   * Delete file from S3.
-   * IR-18: Uses DeleteObject
-   */
-  const remove = async (args: Record<string, RillValue>): Promise<boolean> => {
-    const { mount, key } = parseMountPath(args['path'] as string);
-    checkMode(mount, 'write');
-
-    // Check if file exists before deleting
-    const fileExists = await exists(args);
-    if (!fileExists) {
-      return false;
-    }
-
-    await s3Client.send(
-      new DeleteObjectCommand({
-        Bucket: mount.bucket,
-        Key: key,
-      })
-    );
-
-    return true;
-  };
-
-  /**
-   * Get file metadata from S3.
-   * IR-19: Uses HeadObject, returns size and modified
-   */
-  const stat = async (
-    args: Record<string, RillValue>
-  ): Promise<Record<string, RillValue>> => {
-    const { mount, relativePath, key } = parseMountPath(args['path'] as string);
-    checkMode(mount, 'read');
+  const stat: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
+    const { mount, key } = parsed;
+    const modeCheck = checkMode(runCtx, mount, 'read');
+    if (modeCheck) return modeCheck;
 
     try {
       const result = await s3Client.send(
-        new HeadObjectCommand({
-          Bucket: mount.bucket,
-          Key: key,
-        })
+        new HeadObjectCommand({ Bucket: mount.bucket, Key: key }),
+        { abortSignal: requestSignal() },
       );
-
       const filename = getFilename(key);
-
       return {
         name: filename,
         type: 'file',
@@ -530,94 +632,93 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
         modified: result.LastModified?.toISOString() ?? '',
       };
     } catch (error) {
-      if (error && typeof error === 'object' && 'name' in error) {
-        if ((error as { name: string }).name === 'NotFound') {
-          throw new Error(`file not found: ${relativePath}`, { cause: error });
-        }
-      }
-      throw error;
+      return mapS3Error(runCtx, error);
     }
   };
 
-  /**
-   * Create directory (no-op for S3).
-   * IR-20, EC-12: S3 has no directories, returns true
-   */
-  const mkdir = async (args: Record<string, RillValue>): Promise<boolean> => {
-    // Validate mount exists (for consistency with other functions)
-    parseMountPath(args['path'] as string);
-
-    // S3 has no directories - this is a no-op
+  const mkdir: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const parsed = parseMountPath(runCtx, args['path'] as string);
+    if (!parsed.ok) return parsed.invalid;
     return true;
   };
 
-  /**
-   * Copy file within S3.
-   * IR-21: Uses CopyObject
-   */
-  const copy = async (args: Record<string, RillValue>): Promise<boolean> => {
-    const src = parseMountPath(args['src'] as string);
-    const dest = parseMountPath(args['dest'] as string);
+  const copy: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const src = parseMountPath(runCtx, args['src'] as string);
+    if (!src.ok) return src.invalid;
+    const dest = parseMountPath(runCtx, args['dest'] as string);
+    if (!dest.ok) return dest.invalid;
 
     if (src.mountName !== dest.mountName) {
-      throw new Error(
-        `copy requires same mount for src and dest (got "${src.mountName}" and "${dest.mountName}")`
+      return runCtx.invalidate(
+        new Error(
+          `copy requires same mount for src and dest (got "${src.mountName}" and "${dest.mountName}")`,
+        ),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: {
+            kind: 'cross_mount_copy',
+            srcMount: src.mountName,
+            destMount: dest.mountName,
+          },
+        },
       );
     }
 
-    checkMode(src.mount, 'read'); // Need read for source
-    checkMode(dest.mount, 'write'); // Need write for destination
+    const srcMode = checkMode(runCtx, src.mount, 'read');
+    if (srcMode) return srcMode;
+    const destMode = checkMode(runCtx, dest.mount, 'write');
+    if (destMode) return destMode;
 
-    // Check source file size
-    const headResult = await s3Client.send(
-      new HeadObjectCommand({
-        Bucket: src.mount.bucket,
-        Key: src.key,
-      })
-    );
+    try {
+      const headResult = await s3Client.send(
+        new HeadObjectCommand({ Bucket: src.mount.bucket, Key: src.key }),
+        { abortSignal: requestSignal() },
+      );
+      const size = headResult.ContentLength ?? 0;
+      const sizeCheck = checkFileSize(runCtx, size, dest.mount, dest.key);
+      if (sizeCheck) return sizeCheck;
 
-    const size = headResult.ContentLength ?? 0;
-    checkFileSize(size, dest.mount, dest.key);
-
-    await s3Client.send(
-      new CopyObjectCommand({
-        Bucket: src.mount.bucket,
-        CopySource: `${src.mount.bucket}/${src.key}`,
-        Key: dest.key,
-      })
-    );
-
-    return true;
+      await s3Client.send(
+        new CopyObjectCommand({
+          Bucket: src.mount.bucket,
+          CopySource: `${src.mount.bucket}/${src.key}`,
+          Key: dest.key,
+        }),
+        { abortSignal: requestSignal() },
+      );
+      return true;
+    } catch (error) {
+      return mapS3Error(runCtx, error);
+    }
   };
 
-  /**
-   * Move file within S3.
-   * IR-22: CopyObject + DeleteObject
-   */
-  const move = async (args: Record<string, RillValue>): Promise<boolean> => {
-    // Copy file
-    await copy(args);
+  const move: CallableFn = async (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const copied = await copy(args, runtimeCtx);
+    if (copied !== true) return copied;
 
-    // Delete source
-    const src = parseMountPath(args['src'] as string);
+    const src = parseMountPath(runCtx, args['src'] as string);
+    if (!src.ok) return src.invalid;
 
-    await s3Client.send(
-      new DeleteObjectCommand({
-        Bucket: src.mount.bucket,
-        Key: src.key,
-      })
-    );
-
-    return true;
+    try {
+      await s3Client.send(
+        new DeleteObjectCommand({ Bucket: src.mount.bucket, Key: src.key }),
+        { abortSignal: requestSignal() },
+      );
+      return true;
+    } catch (error) {
+      return mapS3Error(runCtx, error);
+    }
   };
 
-  /**
-   * List configured mounts.
-   * IR-23: Returns mount metadata
-   */
-  const mountsList = async (): Promise<RillValue[]> => {
+  const mountsList: CallableFn = async () => {
     const result: RillValue[] = [];
-
     for (const [name, mount] of Object.entries(config.mounts)) {
       result.push({
         name,
@@ -627,26 +728,11 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
         prefix: mount.prefix,
       });
     }
-
     return result;
   };
 
   // ============================================================
-  // DISPOSE
-  // ============================================================
-
-  /**
-   * Clean up S3 client resources.
-   * IC-6: Dispose cleans up S3 client properly.
-   */
-  const dispose = async (): Promise<void> => {
-    // AWS SDK v3 S3Client has destroy() method for cleanup
-    s3Client.destroy();
-  };
-
-  // ============================================================
   // EXTENSION RESULT
-  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
   // ============================================================
 
   const fnDict: {
@@ -655,35 +741,25 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
     mkdir: RillFunction; copy: RillFunction; move: RillFunction; mounts: RillFunction;
   } = {
     read: {
-      params: [
-        p.str('path', 'Combined /mount/path'),
-      ],
+      params: [p.str('path', 'Combined /mount/path')],
       fn: read,
       annotations: { description: 'Read file contents from S3' },
       returnType: structureToTypeValue({ kind: 'string' }),
     },
     write: {
-      params: [
-        p.str('path', 'Combined /mount/path'),
-        p.str('content', 'Content to write'),
-      ],
+      params: [p.str('path', 'Combined /mount/path'), p.str('content', 'Content to write')],
       fn: write,
       annotations: { description: 'Write file to S3, replacing if exists' },
       returnType: structureToTypeValue({ kind: 'string' }),
     },
     append: {
-      params: [
-        p.str('path', 'Combined /mount/path'),
-        p.str('content', 'Content to append'),
-      ],
+      params: [p.str('path', 'Combined /mount/path'), p.str('content', 'Content to append')],
       fn: append,
       annotations: { description: 'Append content to file in S3' },
       returnType: structureToTypeValue({ kind: 'string' }),
     },
     list: {
-      params: [
-        p.str('path', 'Combined /mount/path'),
-      ],
+      params: [p.str('path', 'Combined /mount/path')],
       fn: list,
       annotations: { description: 'List directory contents in S3' },
       returnType: structureToTypeValue({
@@ -708,25 +784,19 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
       returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
     },
     exists: {
-      params: [
-        p.str('path', 'Combined /mount/path'),
-      ],
+      params: [p.str('path', 'Combined /mount/path')],
       fn: exists,
       annotations: { description: 'Check if file exists in S3' },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
     remove: {
-      params: [
-        p.str('path', 'Combined /mount/path'),
-      ],
+      params: [p.str('path', 'Combined /mount/path')],
       fn: remove,
       annotations: { description: 'Delete file from S3' },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
     stat: {
-      params: [
-        p.str('path', 'Combined /mount/path'),
-      ],
+      params: [p.str('path', 'Combined /mount/path')],
       fn: stat,
       annotations: { description: 'Get file metadata from S3' },
       returnType: structureToTypeValue({
@@ -740,9 +810,7 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
       }),
     },
     mkdir: {
-      params: [
-        p.str('path', 'Combined /mount/path'),
-      ],
+      params: [p.str('path', 'Combined /mount/path')],
       fn: mkdir,
       annotations: { description: 'Create directory (no-op for S3)' },
       returnType: structureToTypeValue({ kind: 'bool' }),
@@ -800,7 +868,10 @@ export function createS3FsExtension(config: S3FsConfig): ExtensionFactoryResult 
     mounts: toCallable(fnDict.mounts),
   } satisfies FsExtensionContract;
 
-  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
+  return {
+    value: callableDict as unknown as RillValue,
+    dispose,
+  } satisfies ExtensionFactoryResult;
 }
 
 // ============================================================
