@@ -173,17 +173,28 @@ $info.config -> log
 
 ## Error Behavior
 
-**Validation errors** (before API call):
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #NOT_FOUND`) or finely
+(`guard #NOT_FOUND && raw.kind == 'collection_not_found'`).
 
-- Missing URL → `RuntimeError RILL-R004: qdrant: url is required`
-- Missing collection → `RuntimeError RILL-R004: qdrant: collection is required`
-- Vector dimension mismatch → `RuntimeError RILL-R004: qdrant: vector dimension mismatch`
+**Factory-time validation** (before any host fn runs):
 
-**API errors** (from Qdrant):
+- Missing URL → `RuntimeError RILL-R001: qdrant: url is required`
+- Missing collection → `RuntimeError RILL-R001: qdrant: collection is required`
 
-- Collection not found → `RuntimeError RILL-R004: qdrant: collection not found`
-- Network timeout → `RuntimeError RILL-R004: qdrant: request timeout`
-- Other API errors → `RuntimeError RILL-R004: qdrant: {API error message}`
+**Host-fn errors** (during operations):
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Authentication failure (401, "unauthorized") | `#AUTH` | `authentication_failed` |
+| Collection not found | `#NOT_FOUND` | `collection_not_found` |
+| ID not found (`get`) | `#NOT_FOUND` | `collection_not_found` |
+| Rate limit exceeded (429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Network timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| Vector dimension mismatch | `#TYPE_MISMATCH` | `dimension_mismatch` |
+| Collection already exists | `#CONFLICT` | `collection_exists` |
+| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `disposed` |
+| Other SDK errors | `#UNAVAILABLE` | `sdk_error` |
 
 ## Local Qdrant Setup
 

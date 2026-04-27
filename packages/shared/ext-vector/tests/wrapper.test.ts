@@ -14,8 +14,6 @@ import {
 import { createFunctionWrapper } from '../src/wrapper.js';
 import { createDisposalState } from '../src/disposal.js';
 
-const atoms = { disposedCode: 'DISPOSED', errorCode: 'R001' };
-
 function makeCtx(opts?: { onLogEvent?: (e: unknown) => void }): RuntimeContext {
   return createRuntimeContext({
     callbacks: { onLogEvent: opts?.onLogEvent ?? (() => {}) },
@@ -29,7 +27,7 @@ describe('createFunctionWrapper', () => {
     it('returns invalid RillValue when state is disposed', async () => {
       const state = createDisposalState(provider);
       state.isDisposed = true;
-      const wrap = createFunctionWrapper(provider, state, atoms);
+      const wrap = createFunctionWrapper(provider, state);
       const wrappedFn = wrap('query', async () => 'result' as RillValue);
       const result = await wrappedFn({}, makeCtx());
       expect(isInvalid(result)).toBe(true);
@@ -40,7 +38,7 @@ describe('createFunctionWrapper', () => {
       const state = createDisposalState(provider);
       state.isDisposed = true;
       const fn = vi.fn(async () => 'result' as RillValue);
-      const wrap = createFunctionWrapper(provider, state, atoms);
+      const wrap = createFunctionWrapper(provider, state);
       await wrap('query', fn)({}, makeCtx());
       expect(fn).not.toHaveBeenCalled();
     });
@@ -49,7 +47,7 @@ describe('createFunctionWrapper', () => {
   describe('error mapping', () => {
     it('returns invalid RillValue when fn throws', async () => {
       const state = createDisposalState(provider);
-      const wrap = createFunctionWrapper(provider, state, atoms);
+      const wrap = createFunctionWrapper(provider, state);
       const wrappedFn = wrap('query', async () => {
         throw new Error('401 unauthorized');
       });
@@ -60,7 +58,7 @@ describe('createFunctionWrapper', () => {
 
     it('emits error event on failure with duration and error message', async () => {
       const state = createDisposalState(provider);
-      const wrap = createFunctionWrapper(provider, state, atoms);
+      const wrap = createFunctionWrapper(provider, state);
       const onLogEvent = vi.fn();
       const wrappedFn = wrap('upsert', async () => {
         throw new Error('dimension mismatch');
@@ -80,7 +78,7 @@ describe('createFunctionWrapper', () => {
   describe('success event emission', () => {
     it('emits success event with duration and metadata', async () => {
       const state = createDisposalState(provider);
-      const wrap = createFunctionWrapper(provider, state, atoms);
+      const wrap = createFunctionWrapper(provider, state);
       const onLogEvent = vi.fn();
       const wrappedFn = wrap(
         'upsert',
@@ -109,14 +107,14 @@ describe('createFunctionWrapper', () => {
   describe('return value', () => {
     it('returns wrapped function result on success', async () => {
       const state = createDisposalState(provider);
-      const wrap = createFunctionWrapper(provider, state, atoms);
+      const wrap = createFunctionWrapper(provider, state);
       const wrappedFn = wrap('query', async () => 'success' as RillValue);
       expect(await wrappedFn({}, makeCtx())).toBe('success');
     });
 
     it('preserves complex return values', async () => {
       const state = createDisposalState(provider);
-      const wrap = createFunctionWrapper(provider, state, atoms);
+      const wrap = createFunctionWrapper(provider, state);
       const expected = { items: [1, 2, 3], count: 3 };
       const wrappedFn = wrap('query', async () => expected as unknown as RillValue);
       expect(await wrappedFn({}, makeCtx())).toEqual(expected);
@@ -126,7 +124,7 @@ describe('createFunctionWrapper', () => {
   describe('multiple operations share state', () => {
     it('all wrapped functions check same disposal state', async () => {
       const state = createDisposalState(provider);
-      const wrap = createFunctionWrapper(provider, state, atoms);
+      const wrap = createFunctionWrapper(provider, state);
       const query = wrap('query', async () => 'q' as RillValue);
       const upsert = wrap('upsert', async () => 'u' as RillValue);
       state.isDisposed = true;

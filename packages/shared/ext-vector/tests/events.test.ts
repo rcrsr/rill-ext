@@ -13,8 +13,6 @@ import {
 } from '@rcrsr/rill';
 import { withEventEmission } from '../src/events.js';
 
-const ERROR_CODE = 'R001';
-
 function makeCtx(opts?: { onLogEvent?: (e: unknown) => void }): RuntimeContext {
   return createRuntimeContext({
     callbacks: { onLogEvent: opts?.onLogEvent ?? (() => {}) },
@@ -34,7 +32,6 @@ describe('withEventEmission', () => {
         operation,
         { id: 'vec-1', count: 10 },
         async () => 'success' as RillValue,
-        ERROR_CODE
       );
       expect(result).toBe('success');
       expect(onLogEvent).toHaveBeenCalledTimes(1);
@@ -54,7 +51,6 @@ describe('withEventEmission', () => {
         operation,
         {},
         async () => expectedResult as unknown as RillValue,
-        ERROR_CODE
       );
       expect(result).toEqual(expectedResult);
     });
@@ -67,7 +63,6 @@ describe('withEventEmission', () => {
         operation,
         {},
         async () => 'done' as RillValue,
-        ERROR_CODE
       );
       const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
       expect(event['event']).toBe(`${provider}:${operation}`);
@@ -85,7 +80,6 @@ describe('withEventEmission', () => {
         async () => {
           throw new Error('Database connection failed');
         },
-        ERROR_CODE
       );
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).message).toContain('Database connection failed');
@@ -105,7 +99,6 @@ describe('withEventEmission', () => {
         async () => {
           throw new Error('401 unauthorized');
         },
-        ERROR_CODE
       );
       expect(getStatus(result).message).toContain('authentication failed (401)');
     });
@@ -120,7 +113,6 @@ describe('withEventEmission', () => {
         'query',
         {},
         async () => 'result' as RillValue,
-        ERROR_CODE
       );
       const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
       expect(event['event']).toBe('chroma:query');

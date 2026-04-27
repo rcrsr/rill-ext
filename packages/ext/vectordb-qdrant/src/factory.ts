@@ -5,10 +5,11 @@
 
 import { QdrantClient } from '@qdrant/js-client-rest';
 import {
-  RuntimeError,
   createVector,
+  getStatus,
   structureToTypeValue,
   toCallable,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillFunction,
   type RillValue,
@@ -28,133 +29,111 @@ import {
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { QdrantConfig } from './types.js';
 
-// ============================================================
-// FACTORY
-// ============================================================
+const PROVIDER = 'qdrant';
 
 /**
  * Create Qdrant extension instance.
- * Validates configuration and returns host functions with cleanup.
  *
  * @param config - Extension configuration
- * @returns ExtensionResult with 11 vector database functions and dispose
- * @throws Error for invalid configuration (AC-10)
- *
- * @example
- * ```typescript
- * const ext = createQdrantExtension({
- *   url: 'http://127.0.0.1:6333',
- *   collection: 'my_vectors',
- * });
- * // Use with rill runtime...
- * await ext.dispose();
- * ```
+ * @param ctx - ExtensionFactoryCtx (rill 0.19); `ctx.signal` triggers
+ *   full disposal because the Qdrant SDK does not accept per-call signals.
  */
-export function createQdrantExtension(config: QdrantConfig): ExtensionFactoryResult {
-  // Validate required fields (AC-10)
+export function createQdrantExtension(
+  config: QdrantConfig,
+  ctx?: ExtensionFactoryCtx
+): ExtensionFactoryResult {
+  // Factory-time validation (RILL-R001 via assertRequired)
   assertRequired(config.url, 'url');
   assertRequired(config.collection, 'collection');
 
-  // Instantiate SDK client at factory time
-  const clientConfig: {
-    url: string;
-    apiKey?: string;
-    timeout?: number;
-  } = { url: config.url };
-
-  if (config.apiKey !== undefined) {
-    clientConfig.apiKey = config.apiKey;
-  }
-  if (config.timeout !== undefined) {
-    clientConfig.timeout = config.timeout;
-  }
+  const clientConfig: { url: string; apiKey?: string; timeout?: number } = {
+    url: config.url,
+  };
+  if (config.apiKey !== undefined) clientConfig.apiKey = config.apiKey;
+  if (config.timeout !== undefined) clientConfig.timeout = config.timeout;
 
   const client = new QdrantClient(clientConfig);
-
-  // Store config values for use in functions
   const factoryCollection = config.collection;
+  const disposalState = createDisposalState(PROVIDER);
 
-  // Create disposal state for tracking lifecycle
-  const disposalState = createDisposalState('qdrant');
-
-  // Dispose function for cleanup (AC-31, AC-32)
   const disposeExtension = async (): Promise<void> => {
     await dispose(disposalState, async () => {
-      // Cleanup SDK HTTP connections
-      // Note: Qdrant SDK doesn't expose a close() method, but we include
-      // this structure for consistency with extension pattern
+      // Qdrant SDK does not expose a close() method.
     });
   };
 
-  // Build function dict — satisfies verifies contract shape at compile time (IR-8)
-  const fnDict: { upsert: RillFunction; upsert_batch: RillFunction; search: RillFunction; get: RillFunction; delete: RillFunction; delete_batch: RillFunction; count: RillFunction; create_collection: RillFunction; delete_collection: RillFunction; list_collections: RillFunction; describe: RillFunction } = ({
-    // IR-1: qdrant::upsert
+  if (ctx?.signal !== undefined) {
+    ctx.signal.addEventListener(
+      'abort',
+      () => {
+        void disposeExtension();
+      },
+      { once: true }
+    );
+  }
+
+  const fnDict: {
+    upsert: RillFunction;
+    upsert_batch: RillFunction;
+    search: RillFunction;
+    get: RillFunction;
+    delete: RillFunction;
+    delete_batch: RillFunction;
+    count: RillFunction;
+    create_collection: RillFunction;
+    delete_collection: RillFunction;
+    list_collections: RillFunction;
+    describe: RillFunction;
+  } = {
     upsert: {
       params: [
         p.str('id'),
         vectorParam('vector'),
         p.dict('metadata', undefined, {}),
       ],
-      fn: async (args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        // Extract arguments
         const id = args['id'] as string;
         const vector = args['vector'] as RillVector;
         const metadata = (args['metadata'] ?? {}) as Record<string, unknown>;
 
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'upsert',
-          { id },
-          async () => {
-            // Call Qdrant API
-            await client.upsert(factoryCollection, {
-              wait: true,
-              points: [
-                {
-                  id,
-                  vector: Array.from(vector.data),
-                  payload: metadata,
-                },
-              ],
-            });
-
-            // Build result
-            return {
-              id,
-              success: true,
-            } as RillValue;
-          }
-        );
+        return withEventEmission(ctx, PROVIDER, 'upsert', { id }, async () => {
+          await client.upsert(factoryCollection, {
+            wait: true,
+            points: [{ id, vector: Array.from(vector.data), payload: metadata }],
+          });
+          return { id, success: true } as RillValue;
+        });
       },
       annotations: { description: 'Insert or update single vector with metadata' },
-      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, success: { type: { kind: 'bool' } } } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: { id: { type: { kind: 'string' } }, success: { type: { kind: 'bool' } } },
+      }),
     },
 
-    // IR-2: qdrant::upsert_batch
     upsert_batch: {
       params: [p.list('items')],
-      fn: async (args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        // Extract arguments
         const items = args['items'] as Array<Record<string, RillValue>>;
 
         return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
+          ctx,
+          PROVIDER,
           'upsert_batch',
           { count: items.length, succeeded: 0 },
           async () => {
             let succeeded = 0;
 
-            // Process sequentially; halt on first failure
             for (let i = 0; i < items.length; i++) {
               const item = items[i];
-
-              // Validate item structure
               if (!item || typeof item !== 'object') {
                 return {
                   succeeded,
@@ -165,46 +144,39 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionFactoryRes
 
               const id = item['id'] as string;
               const vector = item['vector'] as RillVector;
-              const metadata = (item['metadata'] ?? {}) as Record<
-                string,
-                unknown
-              >;
+              const metadata = (item['metadata'] ?? {}) as Record<string, unknown>;
 
               try {
-                // Call Qdrant API
                 await client.upsert(factoryCollection, {
                   wait: true,
-                  points: [
-                    {
-                      id,
-                      vector: Array.from(vector.data),
-                      payload: metadata,
-                    },
-                  ],
+                  points: [{ id, vector: Array.from(vector.data), payload: metadata }],
                 });
-
                 succeeded++;
               } catch (error: unknown) {
-                // Halt on first failure
-                const rillError = mapVectorError('qdrant', error);
+                const invalid = mapVectorError(ctx, PROVIDER, error);
                 return {
                   succeeded,
                   failed: id,
-                  error: rillError.message,
+                  error: getStatus(invalid).message,
                 } as RillValue;
               }
             }
 
-            // All succeeded
             return { succeeded } as RillValue;
           }
         );
       },
       annotations: { description: 'Batch insert/update vectors' },
-      returnType: structureToTypeValue({ kind: 'dict', fields: { succeeded: { type: { kind: 'number' } }, failed: { type: { kind: 'string' } }, error: { type: { kind: 'string' } } } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: {
+          succeeded: { type: { kind: 'number' } },
+          failed: { type: { kind: 'string' } },
+          error: { type: { kind: 'string' } },
+        },
+      }),
     },
 
-    // IR-3: qdrant::search
     search: {
       params: [
         vectorParam('vector'),
@@ -214,14 +186,13 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionFactoryRes
           score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
-      fn: async (args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        // Extract arguments
         const vector = args['vector'] as RillVector;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
-
-        // Extract options with defaults
         const k = typeof options['k'] === 'number' ? options['k'] : 10;
         const filter = (options['filter'] ?? {}) as Record<string, unknown>;
         const scoreThreshold =
@@ -229,231 +200,192 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionFactoryRes
             ? options['score_threshold']
             : undefined;
 
-        // Metadata object for event emission (will be updated with result_count)
         const eventMetadata = { k, result_count: 0 };
 
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'search',
-          eventMetadata,
-          async () => {
-            // Build search request
-            const searchRequest: {
-              vector: number[];
-              limit: number;
-              with_payload: boolean;
-              filter?: Record<string, unknown>;
-              score_threshold?: number;
-            } = {
-              vector: Array.from(vector.data),
-              limit: k,
-              with_payload: true,
-            };
+        return withEventEmission(ctx, PROVIDER, 'search', eventMetadata, async () => {
+          const searchRequest: {
+            vector: number[];
+            limit: number;
+            with_payload: boolean;
+            filter?: Record<string, unknown>;
+            score_threshold?: number;
+          } = {
+            vector: Array.from(vector.data),
+            limit: k,
+            with_payload: true,
+          };
 
-            if (Object.keys(filter).length > 0) {
-              searchRequest.filter = filter;
-            }
-            if (scoreThreshold !== undefined) {
-              searchRequest.score_threshold = scoreThreshold;
-            }
-
-            // Call Qdrant API
-            const response = await client.search(
-              factoryCollection,
-              searchRequest
-            );
-
-            // Build result list
-            const results = response.map((hit) => ({
-              id: String(hit.id),
-              score: hit.score,
-              metadata: hit.payload ?? {},
-            }));
-
-            // Update metadata with actual result count before event emission
-            eventMetadata.result_count = results.length;
-
-            return results as RillValue;
+          if (Object.keys(filter).length > 0) searchRequest.filter = filter;
+          if (scoreThreshold !== undefined) {
+            searchRequest.score_threshold = scoreThreshold;
           }
-        );
+
+          const response = await client.search(factoryCollection, searchRequest);
+          const results = response.map((hit) => ({
+            id: String(hit.id),
+            score: hit.score,
+            metadata: hit.payload ?? {},
+          }));
+          eventMetadata.result_count = results.length;
+          return results as RillValue;
+        });
       },
       annotations: { description: 'Search k nearest neighbors' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { id: { type: { kind: 'string' } }, score: { type: { kind: 'number' } }, metadata: { type: { kind: 'dict' } } } } }),
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: {
+          kind: 'dict',
+          fields: {
+            id: { type: { kind: 'string' } },
+            score: { type: { kind: 'number' } },
+            metadata: { type: { kind: 'dict' } },
+          },
+        },
+      }),
     },
 
-    // IR-4: qdrant::get
     get: {
       params: [p.str('id')],
-      fn: async (args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        // Extract arguments
         const id = args['id'] as string;
 
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'get',
-          { id },
-          async () => {
-            // Call Qdrant API
-            const response = await client.retrieve(factoryCollection, {
-              ids: [id],
-              with_payload: true,
-              with_vector: true,
-            });
+        return withEventEmission(ctx, PROVIDER, 'get', { id }, async () => {
+          const response = await client.retrieve(factoryCollection, {
+            ids: [id],
+            with_payload: true,
+            with_vector: true,
+          });
 
-            // EC-7: ID not found
-            if (response.length === 0) {
-              throw new RuntimeError('RILL-R004', 'qdrant: id not found');
-            }
-
-            const point = response[0]!;
-            const vectorData = point.vector;
-
-            // Convert vector to Float32Array
-            // vectorData can be number[] or number[][] (for named vectors) or Record (named vectors)
-            let vectorArray: number[];
-            if (
-              Array.isArray(vectorData) &&
-              vectorData.length > 0 &&
-              typeof vectorData[0] === 'number'
-            ) {
-              // Simple vector case: number[]
-              vectorArray = vectorData as number[];
-            } else {
-              throw new RuntimeError(
-                'RILL-R004',
-                'qdrant: invalid vector format'
-              );
-            }
-
-            const float32Data = new Float32Array(vectorArray);
-            const vector = createVector(float32Data, factoryCollection);
-
-            // Build result
-            return {
-              id: String(point.id),
-              vector,
-              metadata: point.payload ?? {},
-            } as RillValue;
+          if (response.length === 0) {
+            // Throw so withEventEmission catches and maps via mapVectorError
+            // ("id not found" → NOT_FOUND via collection/index keyword path).
+            throw new Error('qdrant: id not found');
           }
-        );
+
+          const point = response[0]!;
+          const vectorData = point.vector;
+
+          let vectorArray: number[];
+          if (
+            Array.isArray(vectorData) &&
+            vectorData.length > 0 &&
+            typeof vectorData[0] === 'number'
+          ) {
+            vectorArray = vectorData as number[];
+          } else {
+            throw new Error('qdrant: invalid vector format');
+          }
+
+          const vector = createVector(new Float32Array(vectorArray), factoryCollection);
+          return {
+            id: String(point.id),
+            vector,
+            metadata: point.payload ?? {},
+          } as RillValue;
+        });
       },
       annotations: { description: 'Fetch vector by ID' },
-      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, vector: { type: { kind: 'vector' } }, metadata: { type: { kind: 'dict' } } } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: {
+          id: { type: { kind: 'string' } },
+          vector: { type: { kind: 'vector' } },
+          metadata: { type: { kind: 'dict' } },
+        },
+      }),
     },
 
-    // IR-5: qdrant::delete
     delete: {
       params: [p.str('id')],
-      fn: async (args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        // Extract arguments
         const id = args['id'] as string;
-
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'delete',
-          { id },
-          async () => {
-            // Call Qdrant API (Qdrant accepts string or number IDs)
-            await client.delete(factoryCollection, {
-              wait: true,
-              points: [id as string | number],
-            });
-
-            // Build result
-            return {
-              id,
-              deleted: true,
-            } as RillValue;
-          }
-        );
+        return withEventEmission(ctx, PROVIDER, 'delete', { id }, async () => {
+          await client.delete(factoryCollection, {
+            wait: true,
+            points: [id as string | number],
+          });
+          return { id, deleted: true } as RillValue;
+        });
       },
       annotations: { description: 'Delete vector by ID' },
-      returnType: structureToTypeValue({ kind: 'dict', fields: { id: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: { id: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } },
+      }),
     },
 
-    // IR-6: qdrant::delete_batch
     delete_batch: {
       params: [p.list('ids')],
-      fn: async (args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        // Extract arguments
         const ids = args['ids'] as Array<string>;
 
         return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
+          ctx,
+          PROVIDER,
           'delete_batch',
           { count: ids.length, succeeded: 0 },
           async () => {
             let succeeded = 0;
-
-            // Process sequentially; halt on first failure
             for (let i = 0; i < ids.length; i++) {
               const id = ids[i];
-
               try {
-                // Call Qdrant API (Qdrant accepts string or number IDs)
                 await client.delete(factoryCollection, {
                   wait: true,
                   points: [id as string | number],
                 });
-
                 succeeded++;
               } catch (error: unknown) {
-                // Halt on first failure
-                const rillError = mapVectorError('qdrant', error);
+                const invalid = mapVectorError(ctx, PROVIDER, error);
                 return {
                   succeeded,
                   failed: id,
-                  error: rillError.message,
+                  error: getStatus(invalid).message,
                 } as RillValue;
               }
             }
-
-            // All succeeded
             return { succeeded } as RillValue;
           }
         );
       },
       annotations: { description: 'Batch delete vectors' },
-      returnType: structureToTypeValue({ kind: 'dict', fields: { succeeded: { type: { kind: 'number' } }, failed: { type: { kind: 'string' } }, error: { type: { kind: 'string' } } } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: {
+          succeeded: { type: { kind: 'number' } },
+          failed: { type: { kind: 'string' } },
+          error: { type: { kind: 'string' } },
+        },
+      }),
     },
 
-    // IR-7: qdrant::count
     count: {
       params: [],
-      fn: async (_args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (_args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'count',
-          {},
-          async () => {
-            // Call Qdrant API
-            const response = await client.getCollection(factoryCollection);
-
-            // Extract count
-            const count = response.points_count ?? 0;
-
-            return count as RillValue;
-          }
-        );
+        return withEventEmission(ctx, PROVIDER, 'count', {}, async () => {
+          const response = await client.getCollection(factoryCollection);
+          return (response.points_count ?? 0) as RillValue;
+        });
       },
       annotations: { description: 'Return total vector count in collection' },
       returnType: structureToTypeValue({ kind: 'number' }),
     },
 
-    // IR-8: qdrant::create_collection
     create_collection: {
       params: [
         p.str('name'),
@@ -462,156 +394,117 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionFactoryRes
           distance: { type: { kind: 'string' }, defaultValue: 'cosine' },
         }),
       ],
-      fn: async (args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        // Extract arguments
         const name = args['name'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
-
-        // Extract options
         const dimensions = options['dimensions'] as number;
         const distance =
           (options['distance'] as 'cosine' | 'euclidean' | 'dot') ?? 'cosine';
 
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'create_collection',
-          { name },
-          async () => {
-            // Map distance metric to Qdrant format
-            let qdrantDistance: 'Cosine' | 'Euclid' | 'Dot';
-            if (distance === 'cosine') {
-              qdrantDistance = 'Cosine';
-            } else if (distance === 'euclidean') {
-              qdrantDistance = 'Euclid';
-            } else {
-              qdrantDistance = 'Dot';
-            }
+        return withEventEmission(ctx, PROVIDER, 'create_collection', { name }, async () => {
+          let qdrantDistance: 'Cosine' | 'Euclid' | 'Dot';
+          if (distance === 'cosine') qdrantDistance = 'Cosine';
+          else if (distance === 'euclidean') qdrantDistance = 'Euclid';
+          else qdrantDistance = 'Dot';
 
-            // Call Qdrant API
-            await client.createCollection(name, {
-              vectors: {
-                size: dimensions,
-                distance: qdrantDistance,
-              },
-            });
-
-            // Build result
-            return {
-              name,
-              created: true,
-            } as RillValue;
-          }
-        );
+          await client.createCollection(name, {
+            vectors: { size: dimensions, distance: qdrantDistance },
+          });
+          return { name, created: true } as RillValue;
+        });
       },
       annotations: { description: 'Create new vector collection' },
-      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, created: { type: { kind: 'bool' } } } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: { name: { type: { kind: 'string' } }, created: { type: { kind: 'bool' } } },
+      }),
     },
 
-    // IR-9: qdrant::delete_collection
     delete_collection: {
       params: [p.str('name')],
-      fn: async (args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        // Extract arguments
         const name = args['name'] as string;
-
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'delete_collection',
-          { name },
-          async () => {
-            // Call Qdrant API
-            await client.deleteCollection(name);
-
-            // Build result
-            return {
-              name,
-              deleted: true,
-            } as RillValue;
-          }
-        );
+        return withEventEmission(ctx, PROVIDER, 'delete_collection', { name }, async () => {
+          await client.deleteCollection(name);
+          return { name, deleted: true } as RillValue;
+        });
       },
       annotations: { description: 'Delete vector collection' },
-      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: { name: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } },
+      }),
     },
 
-    // IR-10: qdrant::list_collections
     list_collections: {
       params: [],
-      fn: async (_args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (_args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'list_collections',
-          {},
-          async () => {
-            // Call Qdrant API
-            const response = await client.getCollections();
-
-            // Extract collection names
-            const names = response.collections.map((col) => col.name);
-
-            return names as RillValue;
-          }
-        );
+        return withEventEmission(ctx, PROVIDER, 'list_collections', {}, async () => {
+          const response = await client.getCollections();
+          return response.collections.map((col) => col.name) as RillValue;
+        });
       },
       annotations: { description: 'List all collection names' },
       returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
     },
 
-    // IR-11: qdrant::describe
     describe: {
       params: [],
-      fn: async (_args, ctx): Promise<RillValue> => {
-        checkDisposed(disposalState, 'qdrant');
+      fn: async (_args, ctxLike): Promise<RillValue> => {
+        const ctx = ctxLike as RuntimeContext;
+        const disposed = checkDisposed(ctx, disposalState, PROVIDER);
+        if (disposed !== null) return disposed;
 
-        return withEventEmission(
-          ctx as RuntimeContext,
-          'qdrant',
-          'describe',
-          { name: factoryCollection },
-          async () => {
-            // Call Qdrant API
-            const response = await client.getCollection(factoryCollection);
+        return withEventEmission(ctx, PROVIDER, 'describe', { name: factoryCollection }, async () => {
+          const response = await client.getCollection(factoryCollection);
+          const vectorConfig = response.config?.params?.vectors;
+          let dimensions = 0;
+          let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
 
-            // Extract collection info
-            const vectorConfig = response.config?.params?.vectors;
-            let dimensions = 0;
-            let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
-
-            if (
-              vectorConfig &&
-              typeof vectorConfig === 'object' &&
-              'size' in vectorConfig
-            ) {
-              dimensions = (vectorConfig as { size: number }).size;
-              const dist = (vectorConfig as { distance: string }).distance;
-              if (dist === 'Cosine') distance = 'cosine';
-              else if (dist === 'Euclid') distance = 'euclidean';
-              else if (dist === 'Dot') distance = 'dot';
-            }
-
-            // Build result
-            return {
-              name: factoryCollection,
-              count: response.points_count ?? 0,
-              dimensions,
-              distance,
-            } as RillValue;
+          if (
+            vectorConfig &&
+            typeof vectorConfig === 'object' &&
+            'size' in vectorConfig
+          ) {
+            dimensions = (vectorConfig as { size: number }).size;
+            const dist = (vectorConfig as { distance: string }).distance;
+            if (dist === 'Cosine') distance = 'cosine';
+            else if (dist === 'Euclid') distance = 'euclidean';
+            else if (dist === 'Dot') distance = 'dot';
           }
-        );
+
+          return {
+            name: factoryCollection,
+            count: response.points_count ?? 0,
+            dimensions,
+            distance,
+          } as RillValue;
+        });
       },
       annotations: { description: 'Describe configured collection' },
-      returnType: structureToTypeValue({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, count: { type: { kind: 'number' } }, dimensions: { type: { kind: 'number' } }, distance: { type: { kind: 'string' } } } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: {
+          name: { type: { kind: 'string' } },
+          count: { type: { kind: 'number' } },
+          dimensions: { type: { kind: 'number' } },
+          distance: { type: { kind: 'string' } },
+        },
+      }),
     },
-  });
+  };
 
   const callableDict = {
     upsert: toCallable(fnDict.upsert),
@@ -627,5 +520,8 @@ export function createQdrantExtension(config: QdrantConfig): ExtensionFactoryRes
     describe: toCallable(fnDict.describe),
   } satisfies VectorExtensionContract;
 
-  return { value: callableDict as unknown as RillValue, dispose: disposeExtension } satisfies ExtensionFactoryResult;
+  return {
+    value: callableDict as unknown as RillValue,
+    dispose: disposeExtension,
+  } satisfies ExtensionFactoryResult;
 }

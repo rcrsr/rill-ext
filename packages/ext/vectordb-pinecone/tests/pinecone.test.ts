@@ -4,13 +4,34 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, createVector, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  createVector,
+  getStatus,
+  isInvalid,
+  type ApplicationCallable,
+  type RillValue,
+} from '@rcrsr/rill';
 
 /**
  * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
  */
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
+
+async function expectInvalidWithMessage(
+  promise: Promise<RillValue>,
+  needle: string,
+  codeName?: string
+): Promise<RillValue> {
+  const result = await promise;
+  expect(isInvalid(result)).toBe(true);
+  expect(getStatus(result).message).toContain(needle);
+  if (codeName !== undefined) {
+    expect(getStatus(result).code.name).toBe(codeName);
+  }
+  return result;
 }
 import { createPineconeExtension } from '../src/factory.js';
 import type { PineconeConfig } from '../src/types.js';
@@ -776,8 +797,10 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
-      'pinecone: authentication failed (401)'
+    await expectInvalidWithMessage(
+      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      'pinecone: authentication failed (401)',
+      'AUTH'
     );
   });
 
@@ -789,8 +812,10 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
-      'pinecone: collection not found'
+    await expectInvalidWithMessage(
+      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      'pinecone: collection not found',
+      'NOT_FOUND'
     );
   });
 
@@ -802,8 +827,10 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
-      'pinecone: rate limit exceeded'
+    await expectInvalidWithMessage(
+      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      'pinecone: rate limit exceeded',
+      'RATE_LIMIT'
     );
   });
 
@@ -817,8 +844,10 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
-      'pinecone: request timeout'
+    await expectInvalidWithMessage(
+      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      'pinecone: request timeout',
+      'TIMEOUT'
     );
   });
 
@@ -829,9 +858,11 @@ describe('Error handling contracts', () => {
 
     const wrongVector = createVector(new Float32Array(128).fill(0.1), 'test');
 
-    await expect(
-      getCallable(ext, 'upsert').fn({ id: 'doc-1', vector: wrongVector, metadata: {} }, ctx)
-    ).rejects.toThrow('pinecone: dimension mismatch (expected 384, got 128)');
+    await expectInvalidWithMessage(
+      getCallable(ext, 'upsert').fn({ id: 'doc-1', vector: wrongVector, metadata: {} }, ctx) as Promise<RillValue>,
+      'pinecone: dimension mismatch (expected 384, got 128)',
+      'TYPE_MISMATCH'
+    );
   });
 
   it('duplicate create_collection produces "collection already exists" (EC-6, AC-17)', async () => {
@@ -839,15 +870,18 @@ describe('Error handling contracts', () => {
       new Error('Index "test_index" already exists')
     );
 
-    await expect(
-      getCallable(ext, 'create_collection').fn({ name: 'test_index', options: { dimensions: 384 } }, ctx)
-    ).rejects.toThrow('pinecone: collection already exists');
+    await expectInvalidWithMessage(
+      getCallable(ext, 'create_collection').fn({ name: 'test_index', options: { dimensions: 384 } }, ctx) as Promise<RillValue>,
+      'pinecone: collection already exists',
+      'CONFLICT'
+    );
   });
 
   it('get non-existent ID produces "id not found" (EC-7, AC-15)', async () => {
     mockFetch.mockResolvedValue({ records: {} });
 
-    await expect(getCallable(ext, 'get').fn({ id: 'nonexistent' }, ctx)).rejects.toThrow(
+    await expectInvalidWithMessage(
+      getCallable(ext, 'get').fn({ id: 'nonexistent' }, ctx) as Promise<RillValue>,
       'pinecone: id not found'
     );
   });
@@ -860,8 +894,10 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
-      'pinecone: operation cancelled'
+    await expectInvalidWithMessage(
+      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      'pinecone: operation cancelled',
+      'DISPOSED'
     );
   });
 
@@ -873,8 +909,10 @@ describe('Error handling contracts', () => {
       'test'
     );
 
-    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
-      'pinecone: Something unexpected happened'
+    await expectInvalidWithMessage(
+      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      'pinecone: Something unexpected happened',
+      'UNAVAILABLE'
     );
   });
 });
@@ -994,8 +1032,10 @@ describe('Request cancellation', () => {
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
       'test'
     );
-    await expect(getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)).rejects.toThrow(
-      'pinecone: operation cancelled'
+    await expectInvalidWithMessage(
+      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      'pinecone: operation cancelled',
+      'DISPOSED'
     );
   });
 });

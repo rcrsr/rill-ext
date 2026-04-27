@@ -2,7 +2,8 @@
  * Event emission wrapper for vector database extensions.
  * Wraps async operations with start-time recording, success event
  * emission, and error event emission. On failure, returns an invalid
- * RillValue mapped via {@link mapVectorError}.
+ * RillValue mapped via {@link mapVectorError} using rill core's
+ * pre-registered generic atoms.
  */
 
 import {
@@ -21,7 +22,6 @@ import { mapVectorError } from './errors.js';
  * @param operation - Operation name (e.g., "upsert", "query", "delete")
  * @param metadata - Additional metadata to include in success event
  * @param fn - Async operation to execute
- * @param errorCode - Atom name registered by the consuming extension for API errors
  * @returns Promise resolving to operation result, or an invalid RillValue on error
  */
 export async function withEventEmission<T extends RillValue>(
@@ -29,8 +29,7 @@ export async function withEventEmission<T extends RillValue>(
   provider: string,
   operation: string,
   metadata: Record<string, unknown>,
-  fn: () => Promise<T>,
-  errorCode: string
+  fn: () => Promise<T>
 ): Promise<T | RillValue> {
   const startTime = Date.now();
   try {
@@ -45,7 +44,7 @@ export async function withEventEmission<T extends RillValue>(
     return result;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const invalid = mapVectorError(ctx, provider, error, errorCode);
+    const invalid = mapVectorError(ctx, provider, error);
     const status = getStatus(invalid);
     emitExtensionEvent(ctx, {
       event: `${provider}:error`,

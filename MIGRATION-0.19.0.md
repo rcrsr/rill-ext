@@ -184,7 +184,7 @@ No `errors.ts` files. No `ctx.registerErrorCode` calls.
 
 ---
 
-## Phase 5 — Vector DB extensions
+## Phase 5 — Vector DB extensions [DONE]
 
 **Packages (3):** `vectordb-chroma`, `vectordb-pinecone`, `vectordb-qdrant`
 
@@ -373,7 +373,7 @@ async function expectInvalidWithMessage(
 | 2 | Built-in-only | 6 | done | ~40 |
 | 3 | Search | 5 | done | ~25 |
 | 4 | LLM | 4 | pending | ~30 |
-| 5 | Vector | 3 | pending | ~20 |
+| 5 | Vector | 3 | done | ~20 |
 | 6 | Persistent KV/FS | 3 | pending | ~25 |
 | 7 | HTTP integration | 2 | pending | ~50 |
 | 8 | Process/protocol | 3 | pending | ~25 |

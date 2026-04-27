@@ -11,8 +11,6 @@ import {
 } from '@rcrsr/rill';
 import { createDisposalState, checkDisposed, dispose } from '../src/disposal.js';
 
-const DISPOSED_CODE = 'DISPOSED';
-
 describe('createDisposalState', () => {
   it('returns initial state with isDisposed false', () => {
     expect(createDisposalState('test-provider')).toEqual({ isDisposed: false });
@@ -34,20 +32,26 @@ describe('checkDisposed', () => {
 
   it('returns null when not disposed', () => {
     const state = { isDisposed: false };
-    expect(checkDisposed(ctx, state, provider, DISPOSED_CODE)).toBeNull();
+    expect(checkDisposed(ctx, state, provider)).toBeNull();
   });
 
   it('returns invalid RillValue with disposed message when disposed', () => {
     const state = { isDisposed: true };
-    const result = checkDisposed(ctx, state, provider, DISPOSED_CODE);
+    const result = checkDisposed(ctx, state, provider);
     expect(result).not.toBeNull();
     expect(getStatus(result!).message).toBe(`${provider}: operation cancelled`);
   });
 
   it('includes provider name in disposed message', () => {
     const state = { isDisposed: true };
-    const result = checkDisposed(ctx, state, 'my-custom-provider', DISPOSED_CODE);
+    const result = checkDisposed(ctx, state, 'my-custom-provider');
     expect(getStatus(result!).message).toBe('my-custom-provider: operation cancelled');
+  });
+
+  it('emits #DISPOSED atom code', () => {
+    const state = { isDisposed: true };
+    const result = checkDisposed(ctx, state, provider);
+    expect(getStatus(result!).code.name).toBe('DISPOSED');
   });
 });
 
@@ -104,7 +108,7 @@ describe('dispose', () => {
     const provider = 'test-provider';
     const state = createDisposalState(provider);
     await dispose(state);
-    const result = checkDisposed(ctx, state, provider, DISPOSED_CODE);
+    const result = checkDisposed(ctx, state, provider);
     expect(result).not.toBeNull();
     expect(getStatus(result!).message).toBe(`${provider}: operation cancelled`);
   });

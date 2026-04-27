@@ -14,25 +14,15 @@ import type { DisposalState } from './types.js';
 import { checkDisposed } from './disposal.js';
 import { mapVectorError } from './errors.js';
 
-/** Atom names supplied by the consuming extension at factory init. */
-export interface VectorWrapperAtoms {
-  /** Atom registered for the disposed/cancelled state. */
-  readonly disposedCode: string;
-  /** Atom registered for SDK / API failures. */
-  readonly errorCode: string;
-}
-
 /**
  * Create a function wrapper that adds disposal check, timing, events,
- * and error mapping. Composes `ctx.signal` lifecycle into per-call
- * cancellation via `signal` argument. Vector SDKs that cannot accept a
- * per-call signal must dispose themselves on `ctx.signal.abort` from
- * the consuming extension's factory.
+ * and error mapping. Vector SDKs that cannot accept a per-call signal
+ * dispose themselves on `ctx.signal.abort` from the consuming
+ * extension's factory.
  */
 export function createFunctionWrapper(
   provider: string,
-  state: DisposalState,
-  atoms: VectorWrapperAtoms
+  state: DisposalState
 ): (
   operation: string,
   fn: (
@@ -47,7 +37,7 @@ export function createFunctionWrapper(
       ctx: RuntimeContext
     ): Promise<RillValue> => {
       // EC-20: Check disposal state first
-      const disposed = checkDisposed(ctx, state, provider, atoms.disposedCode);
+      const disposed = checkDisposed(ctx, state, provider);
       if (disposed !== null) return disposed;
 
       const startTime = Date.now();
@@ -63,7 +53,7 @@ export function createFunctionWrapper(
         return result;
       } catch (error: unknown) {
         const duration = Date.now() - startTime;
-        const invalid = mapVectorError(ctx, provider, error, atoms.errorCode);
+        const invalid = mapVectorError(ctx, provider, error);
         const status = getStatus(invalid);
         emitExtensionEvent(ctx, {
           event: `${provider}:error`,

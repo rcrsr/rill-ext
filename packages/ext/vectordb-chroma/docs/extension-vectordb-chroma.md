@@ -165,20 +165,28 @@ $info.count -> log
 
 ## Error Behavior
 
-**Validation errors** (before API call):
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #NOT_FOUND`) or finely
+(`guard #NOT_FOUND && raw.kind == 'id_not_found'`).
 
-- Missing collection → `RuntimeError RILL-R004: chroma: collection is required`
-- Vector dimension mismatch → `RuntimeError RILL-R004: chroma: dimension mismatch (expected X, got Y)`
-- Collection already exists → `RuntimeError RILL-R004: chroma: collection already exists`
-- ID not found → `RuntimeError RILL-R004: chroma: id not found`
+**Factory-time validation** (before any host fn runs):
 
-**API errors** (from ChromaDB):
+- Missing collection → `RuntimeError RILL-R001: chroma: collection is required`
 
-- Authentication failure → `RuntimeError RILL-R004: chroma: authentication failed (401)`
-- Collection not found → `RuntimeError RILL-R004: chroma: collection not found`
-- Rate limit exceeded → `RuntimeError RILL-R004: chroma: rate limit exceeded`
-- Network timeout → `RuntimeError RILL-R004: chroma: request timeout`
-- Other API errors → `RuntimeError RILL-R004: chroma: {API error message}`
+**Host-fn errors** (during operations):
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Authentication failure (401, "unauthorized") | `#AUTH` | `authentication_failed` |
+| Collection not found | `#NOT_FOUND` | `collection_not_found` |
+| ID not found (`get`) | `#NOT_FOUND` | `id_not_found` |
+| Rate limit exceeded (429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Network timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| Vector dimension mismatch | `#TYPE_MISMATCH` | `dimension_mismatch` |
+| Collection already exists | `#CONFLICT` | `collection_exists` |
+| Invalid vector format from response | `#PROTOCOL` | `invalid_vector_format` |
+| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `disposed` |
+| Other SDK errors | `#UNAVAILABLE` | `sdk_error` |
 
 ## Local ChromaDB Setup
 
