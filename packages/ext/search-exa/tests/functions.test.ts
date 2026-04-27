@@ -202,7 +202,7 @@ describe('Exa extension host functions', () => {
       expect(url).toBe('https://custom.exa.ai/search');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
@@ -706,7 +706,7 @@ describe('Exa extension host functions', () => {
       expect(body['query']).toBe('What is TypeScript?');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 

@@ -147,8 +147,8 @@ describe('reply() host function', () => {
     );
   });
 
-  // EC-6: empty messageId throws RILL-R004
-  it('throws RILL-R004 for empty messageId [EC-6]', async () => {
+  // EC-6: empty messageId throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty messageId [EC-6]', async () => {
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -158,8 +158,8 @@ describe('reply() host function', () => {
   expect(getStatus(caught).message).toContain('messageId is required');
   });
 
-  // EC-6: empty body throws RILL-R004
-  it('throws RILL-R004 for empty body [EC-6]', async () => {
+  // EC-6: empty body throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty body [EC-6]', async () => {
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -228,8 +228,8 @@ describe('flag() host function', () => {
     );
   });
 
-  // EC-6: empty messageId throws RILL-R004
-  it('throws RILL-R004 for empty messageId [EC-6]', async () => {
+  // EC-6: empty messageId throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty messageId [EC-6]', async () => {
     const ext = createOutlookExtension(FLAG_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -298,8 +298,8 @@ describe('events() host function', () => {
     expect(result['events']).toEqual([]);
   });
 
-  // EC-8: start > end throws RILL-R004
-  it('throws RILL-R004 when start is after end [EC-8]', async () => {
+  // EC-8: start > end throws #INVALID_INPUT
+  it('throws #INVALID_INPUT when start is after end [EC-8]', async () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -396,8 +396,8 @@ describe('free_busy() host function', () => {
     expect(schedules).toHaveLength(1);
   });
 
-  // EC-9: empty attendees throws RILL-R004
-  it('throws RILL-R004 for empty attendees [EC-9]', async () => {
+  // EC-9: empty attendees throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty attendees [EC-9]', async () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -410,8 +410,8 @@ describe('free_busy() host function', () => {
   expect(getStatus(caught).message).toContain('attendees is required');
   });
 
-  // EC-8: start > end throws RILL-R004
-  it('throws RILL-R004 when start is after end [EC-8]', async () => {
+  // EC-8: start > end throws #INVALID_INPUT
+  it('throws #INVALID_INPUT when start is after end [EC-8]', async () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -488,8 +488,8 @@ describe('create_event() host function', () => {
     expect(typeof result['end']).toBe('number');
   });
 
-  // EC-10: empty title throws RILL-R004
-  it('throws RILL-R004 for empty title [EC-10]', async () => {
+  // EC-10: empty title throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty title [EC-10]', async () => {
     const ext = createOutlookExtension(CALENDAR_CREATE_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -502,8 +502,8 @@ describe('create_event() host function', () => {
   expect(getStatus(caught).message).toContain('title is required');
   });
 
-  // EC-10: start > end throws RILL-R004
-  it('throws RILL-R004 when start is after end [EC-10]', async () => {
+  // EC-10: start > end throws #INVALID_INPUT
+  it('throws #INVALID_INPUT when start is after end [EC-10]', async () => {
     const ext = createOutlookExtension(CALENDAR_CREATE_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -516,8 +516,8 @@ describe('create_event() host function', () => {
   expect(getStatus(caught).message).toContain('start must be before end');
   });
 
-  // EC-10: calendar.create disabled throws RILL-R004
-  it('throws RILL-R004 when calendar.create is disabled [EC-10]', async () => {
+  // EC-10: calendar.create disabled emits #FORBIDDEN
+  it('emits #FORBIDDEN when calendar.create is disabled [EC-10]', async () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
       const caught = (await getCallable(ext, 'create_event').fn(

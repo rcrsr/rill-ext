@@ -169,7 +169,7 @@ describe('createClaudeCodeExtension', () => {
   });
 
   describe('binaryPath validation (EC-1)', () => {
-    it('throws RuntimeError RILL-R004 for invalid binaryPath', () => {
+    it('throws RuntimeError RILL-R001 for invalid binaryPath', () => {
       expect(() =>
         createClaudeCodeExtension({ binaryPath: '/nonexistent/claude' }, makeFactoryCtx())
       ).toThrow('claude binary not found');

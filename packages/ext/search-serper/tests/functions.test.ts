@@ -229,7 +229,7 @@ describe('Serper extension host functions', () => {
       expect(url).toBe('https://custom.serper.dev/search');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
@@ -407,7 +407,7 @@ describe('Serper extension host functions', () => {
       expect(body['q']).toBe('latest TypeScript news');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
@@ -579,7 +579,7 @@ describe('Serper extension host functions', () => {
       expect(body['q']).toBe('TypeScript logo');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 

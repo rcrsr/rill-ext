@@ -92,7 +92,7 @@ afterEach(() => {
 // ============================================================
 
 describe('AC-4: capability gating', () => {
-  it('drive_list with list:false → RILL-R004 "google: drive.list not enabled"; no fetch', async () => {
+  it('drive_list with list:false → #FORBIDDEN "google: drive.list not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_list', {})) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -101,7 +101,7 @@ describe('AC-4: capability gating', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('drive_upload with upload:false → RILL-R004 "google: drive.upload not enabled"; no fetch', async () => {
+  it('drive_upload with upload:false → #FORBIDDEN "google: drive.upload not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_upload', { content: BASE64_100, filename: 'file.txt' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -110,7 +110,7 @@ describe('AC-4: capability gating', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('drive_download with download:false → RILL-R004 "google: drive.download not enabled"; no fetch', async () => {
+  it('drive_download with download:false → #FORBIDDEN "google: drive.download not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_download', { fileId: 'f1' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -119,7 +119,7 @@ describe('AC-4: capability gating', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('drive_share with share:false → RILL-R004 "google: drive.share not enabled"; no fetch', async () => {
+  it('drive_share with share:false → #FORBIDDEN "google: drive.share not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_share', { fileId: 'f1', email: 'a@b.com', role: 'reader' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -128,7 +128,7 @@ describe('AC-4: capability gating', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('drive_delete with delete:false → RILL-R004 "google: drive.delete not enabled"; no fetch', async () => {
+  it('drive_delete with delete:false → #FORBIDDEN "google: drive.delete not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_delete', { fileId: 'f1' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -137,7 +137,7 @@ describe('AC-4: capability gating', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('drive_get_metadata with read:false → RILL-R004 "google: drive.read not enabled"; no fetch', async () => {
+  it('drive_get_metadata with read:false → #FORBIDDEN "google: drive.read not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_get_metadata', { fileId: 'f1' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -492,7 +492,7 @@ describe('EC-7: allowedFolderIds restriction', () => {
     drive: { allowedFolderIds: ['F1'] },
   };
 
-  it('drive_list with folderId not in allowedFolderIds → RILL-R004; no fetch', async () => {
+  it('drive_list with folderId not in allowedFolderIds → #FORBIDDEN; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(config, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_list', { folderId: 'F2' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -529,7 +529,7 @@ describe('EC-7: allowedFolderIds restriction', () => {
     expect(globalThis.fetch).toHaveBeenCalledOnce();
   });
 
-  it('drive_upload with folderId not in allowedFolderIds → RILL-R004; no fetch', async () => {
+  it('drive_upload with folderId not in allowedFolderIds → #FORBIDDEN; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(config, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_upload', {
         content: BASE64_100,
@@ -556,7 +556,7 @@ describe('EC-8: deniedMimeTypes restriction', () => {
     drive: { deniedMimeTypes: ['application/x-evil'] },
   };
 
-  it('drive_upload with denied MIME type → RILL-R004; no fetch', async () => {
+  it('drive_upload with denied MIME type → #INVALID_INPUT; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(config, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_upload', {
         content: BASE64_100,
@@ -583,7 +583,7 @@ describe('EC-9 / BC-8: maxUploadBytes enforcement', () => {
     drive: { maxUploadBytes: 100 },
   };
 
-  it('drive_upload with 101-byte content → RILL-R004 "file exceeds maximum"; no fetch', async () => {
+  it('drive_upload with 101-byte content → #INVALID_INPUT "file exceeds maximum"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(config, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_upload', {
         content: BASE64_101,
@@ -622,7 +622,7 @@ expect(getStatus(caught as RillValue).message).toBe(
 // ============================================================
 
 describe('EC-10: invalid role for drive_share', () => {
-  it('drive_share with role="invalid-role" → RILL-R004 with role message; no fetch', async () => {
+  it('drive_share with role="invalid-role" → #INVALID_INPUT with role message; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(DRIVE_ALL_CONFIG, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_share', {
         fileId: 'f1',
@@ -755,7 +755,7 @@ describe('AC-11: drive callables pass AbortSignal to fetch', () => {
 // ============================================================
 
 describe('HTTP error mapping for drive_list', () => {
-  it('EC-14: 401 → RILL-R004 "google: invalid Drive token"', async () => {
+  it('EC-14: 401 → #AUTH "google: invalid Drive token"', async () => {
     const ext = createGoogleWorkspaceExtension(DRIVE_ALL_CONFIG, makeFactoryCtx());
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -769,7 +769,7 @@ describe('HTTP error mapping for drive_list', () => {
   expect(getStatus(caught).message).toBe('google: invalid Drive token');
   });
 
-  it('EC-15: 403 → RILL-R004 "google: insufficient Drive scopes for list"', async () => {
+  it('EC-15: 403 → #FORBIDDEN "google: insufficient Drive scopes for list"', async () => {
     const ext = createGoogleWorkspaceExtension(DRIVE_ALL_CONFIG, makeFactoryCtx());
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -783,7 +783,7 @@ describe('HTTP error mapping for drive_list', () => {
   expect(getStatus(caught).message).toBe('google: insufficient Drive scopes for list');
   });
 
-  it('EC-17: 429 → RILL-R004 "google: rate limit exceeded; retry after delay"', async () => {
+  it('EC-17: 429 → #RATE_LIMIT "google: rate limit exceeded; retry after delay"', async () => {
     const ext = createGoogleWorkspaceExtension(DRIVE_ALL_CONFIG, makeFactoryCtx());
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -797,7 +797,7 @@ describe('HTTP error mapping for drive_list', () => {
   expect(getStatus(caught).message).toBe('google: rate limit exceeded; retry after delay');
   });
 
-  it('EC-18: 503 → RILL-R004 "google: Drive server error (503); temporarily unavailable"', async () => {
+  it('EC-18: 503 → #UNAVAILABLE "google: Drive server error (503); temporarily unavailable"', async () => {
     const ext = createGoogleWorkspaceExtension(DRIVE_ALL_CONFIG, makeFactoryCtx());
 
     globalThis.fetch = vi.fn().mockResolvedValue({

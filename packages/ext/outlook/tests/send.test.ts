@@ -147,10 +147,10 @@ describe('send() host function', () => {
   });
 
   // ============================================================
-  // EC-6: empty to/subject/body throws RILL-R004
+  // EC-6: empty to/subject/body throws #INVALID_INPUT
   // ============================================================
 
-  it('throws RILL-R004 for empty to [EC-6]', async () => {
+  it('throws #INVALID_INPUT for empty to [EC-6]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -160,7 +160,7 @@ describe('send() host function', () => {
   expect(getStatus(caught).message).toContain('to is required');
   });
 
-  it('throws RILL-R004 for empty subject [EC-6]', async () => {
+  it('throws #INVALID_INPUT for empty subject [EC-6]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -170,7 +170,7 @@ describe('send() host function', () => {
   expect(getStatus(caught).message).toContain('subject is required');
   });
 
-  it('throws RILL-R004 for empty body [EC-6]', async () => {
+  it('throws #INVALID_INPUT for empty body [EC-6]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 

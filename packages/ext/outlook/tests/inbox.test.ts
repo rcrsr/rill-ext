@@ -307,7 +307,7 @@ describe('inbox() host function', () => {
       expect(url).toContain('mailFolders/sent/messages');
     });
 
-    it('throws RILL-R004 when folder is not in allowlist [EC-4]', async () => {
+    it('emits #FORBIDDEN when folder is not in allowlist [EC-4]', async () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
@@ -395,7 +395,7 @@ describe('read() host function', () => {
     expect(url).toContain('messages/msg-001');
   });
 
-  it('throws RILL-R004 for empty messageId [EC-3]', async () => {
+  it('throws #INVALID_INPUT for empty messageId [EC-3]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 

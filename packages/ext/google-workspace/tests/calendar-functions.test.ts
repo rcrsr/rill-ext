@@ -138,7 +138,7 @@ afterEach(() => {
 // ============================================================
 
 describe('AC-4: capability gating', () => {
-  it('calendar_events with calendar.read:false → RILL-R004 before fetch', async () => {
+  it('calendar_events with calendar.read:false → #FORBIDDEN before fetch', async () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -156,7 +156,7 @@ describe('AC-4: capability gating', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('calendar_today with calendar.read:false → RILL-R004 before fetch', async () => {
+  it('calendar_today with calendar.read:false → #FORBIDDEN before fetch', async () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -171,7 +171,7 @@ describe('AC-4: capability gating', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('calendar_create_event with calendar.create:false → RILL-R004 before fetch', async () => {
+  it('calendar_create_event with calendar.create:false → #FORBIDDEN before fetch', async () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -189,7 +189,7 @@ describe('AC-4: capability gating', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('calendar_free_busy with calendar.freeBusy:false → RILL-R004 before fetch', async () => {
+  it('calendar_free_busy with calendar.freeBusy:false → #FORBIDDEN before fetch', async () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -247,11 +247,11 @@ describe('BC-3: start equals end returns empty without fetch', () => {
 });
 
 // ============================================================
-// BC-4: calendar_free_busy empty emails → RILL-R004 before fetch
+// BC-4: calendar_free_busy empty emails → #INVALID_INPUT before fetch
 // ============================================================
 
 describe('BC-4: empty emails list rejected before fetch', () => {
-  it('empty array → RILL-R004 before fetch', async () => {
+  it('empty array → #INVALID_INPUT before fetch', async () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -267,7 +267,7 @@ describe('BC-4: empty emails list rejected before fetch', () => {
 expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('non-array emails → RILL-R004 before fetch', async () => {
+  it('non-array emails → #INVALID_INPUT before fetch', async () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -289,7 +289,7 @@ expect(mockFetch).not.toHaveBeenCalled();
 // ============================================================
 
 describe('EC-11: allowedCalendarIds restriction', () => {
-  it('calendar_events with disallowed calendarId → RILL-R004 before fetch', async () => {
+  it('calendar_events with disallowed calendarId → #FORBIDDEN before fetch', async () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -339,7 +339,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     expect(mockFetch).toHaveBeenCalledOnce();
   });
 
-  it('calendar_today with disallowed calendarId → RILL-R004 before fetch', async () => {
+  it('calendar_today with disallowed calendarId → #FORBIDDEN before fetch', async () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -356,7 +356,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('calendar_create_event with disallowed calendarId → RILL-R004 before fetch', async () => {
+  it('calendar_create_event with disallowed calendarId → #FORBIDDEN before fetch', async () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -384,7 +384,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
 // ============================================================
 
 describe('EC-12/EC-13: denyAllDay blocks all-day events', () => {
-  it('allDay:true with denyAllDay config → RILL-R004 before fetch', async () => {
+  it('allDay:true with denyAllDay config → #FORBIDDEN before fetch', async () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -407,7 +407,7 @@ describe('EC-12/EC-13: denyAllDay blocks all-day events', () => {
 // ============================================================
 
 describe('EC-13: naive ISO timestamp rejection', () => {
-  it('calendar_create_event with naive startTime → RILL-R004 before fetch', async () => {
+  it('calendar_create_event with naive startTime → #INVALID_INPUT before fetch', async () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -424,7 +424,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('calendar_create_event with naive endTime → RILL-R004 before fetch', async () => {
+  it('calendar_create_event with naive endTime → #INVALID_INPUT before fetch', async () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -473,7 +473,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     expect(mockFetch).toHaveBeenCalledOnce();
   });
 
-  it('calendar_free_busy with naive startTime → RILL-R004 before fetch', async () => {
+  it('calendar_free_busy with naive startTime → #INVALID_INPUT before fetch', async () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -490,7 +490,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('calendar_free_busy with naive endTime → RILL-R004 before fetch', async () => {
+  it('calendar_free_busy with naive endTime → #INVALID_INPUT before fetch', async () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 

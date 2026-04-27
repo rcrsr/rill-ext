@@ -43,7 +43,7 @@ describe('createOutlookExtension', () => {
   // ============================================================
 
   describe('configuration validation [EC-1, AC-30]', () => {
-    it('throws RILL-R004 when auth is missing', () => {
+    it('throws RILL-R001 when auth is missing', () => {
       let caught: unknown;
       try {
         createOutlookExtension({ auth: undefined as unknown as OutlookConfig['auth'] }, makeFactoryCtx());
@@ -55,7 +55,7 @@ describe('createOutlookExtension', () => {
       expect((caught as RuntimeError).message).toBe('outlook: auth is required');
     });
 
-    it('throws RILL-R004 for invalid auth.type', () => {
+    it('throws RILL-R001 for invalid auth.type', () => {
       let caught: unknown;
       try {
         createOutlookExtension({
@@ -71,7 +71,7 @@ describe('createOutlookExtension', () => {
       );
     });
 
-    it('throws RILL-R004 for empty bearer token', () => {
+    it('throws RILL-R001 for empty bearer token', () => {
       let caught: unknown;
       try {
         createOutlookExtension({ auth: { type: 'bearer', token: '' } }, makeFactoryCtx());
@@ -92,7 +92,7 @@ describe('createOutlookExtension', () => {
       ).not.toThrow();
     });
 
-    it('throws RILL-R004 for empty session tokenVar', () => {
+    it('throws RILL-R001 for empty session tokenVar', () => {
       let caught: unknown;
       try {
         createOutlookExtension({ auth: { type: 'session', tokenVar: '' } }, makeFactoryCtx());
@@ -104,7 +104,7 @@ describe('createOutlookExtension', () => {
       expect((caught as RuntimeError).message).toBe('outlook: auth.tokenVar is required');
     });
 
-    it('throws RILL-R004 when session tokenVar is missing', () => {
+    it('throws RILL-R001 when session tokenVar is missing', () => {
       let caught: unknown;
       try {
         createOutlookExtension({
@@ -118,7 +118,7 @@ describe('createOutlookExtension', () => {
   expect((caught as RuntimeError).message).toBe('outlook: auth.tokenVar is required');
     });
 
-    it('throws RILL-R004 when maxResults is 0', () => {
+    it('throws RILL-R001 when maxResults is 0', () => {
       let caught: unknown;
       try {
         createOutlookExtension({
@@ -133,7 +133,7 @@ describe('createOutlookExtension', () => {
   expect((caught as RuntimeError).message).toBe('outlook: maxResults must be 1-1000');
     });
 
-    it('throws RILL-R004 when maxResults is 1001', () => {
+    it('throws RILL-R001 when maxResults is 1001', () => {
       let caught: unknown;
       try {
         createOutlookExtension({
@@ -148,7 +148,7 @@ describe('createOutlookExtension', () => {
   expect((caught as RuntimeError).message).toBe('outlook: maxResults must be 1-1000');
     });
 
-    it('throws RILL-R004 when maxResults is negative', () => {
+    it('throws RILL-R001 when maxResults is negative', () => {
       let caught: unknown;
       try {
         createOutlookExtension({
@@ -163,7 +163,7 @@ describe('createOutlookExtension', () => {
   expect((caught as RuntimeError).message).toBe('outlook: maxResults must be 1-1000');
     });
 
-    it('throws RILL-R004 when folders array is empty', () => {
+    it('throws RILL-R001 when folders array is empty', () => {
       let caught: unknown;
       try {
         createOutlookExtension({

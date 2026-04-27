@@ -208,7 +208,7 @@ describe('SearXNG extension host functions', () => {
       expect(Array.isArray(result['suggestions'])).toBe(true);
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = await createTestExtension();
       const ctx = createRuntimeContext();
 

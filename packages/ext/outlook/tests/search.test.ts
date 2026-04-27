@@ -149,10 +149,10 @@ describe('search() host function', () => {
   });
 
   // ============================================================
-  // EC-3: empty query throws RILL-R004
+  // EC-3: empty query throws #INVALID_INPUT
   // ============================================================
 
-  it('throws RILL-R004 for empty query [EC-3]', async () => {
+  it('throws #INVALID_INPUT for empty query [EC-3]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -162,7 +162,7 @@ describe('search() host function', () => {
   expect(getStatus(caught).message).toContain('query is required');
   });
 
-  it('throws RILL-R004 for whitespace-only query [EC-3]', async () => {
+  it('throws #INVALID_INPUT for whitespace-only query [EC-3]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 

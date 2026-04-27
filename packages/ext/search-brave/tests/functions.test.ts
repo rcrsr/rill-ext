@@ -203,7 +203,7 @@ describe('Brave extension host functions', () => {
       expect(url).toContain('https://custom.search.brave.com/res/v1/web/search');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
@@ -393,7 +393,7 @@ describe('Brave extension host functions', () => {
       expect(init.method).toBe('GET');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
@@ -614,7 +614,7 @@ describe('Brave extension host functions', () => {
       expect(secondUrl).toContain('key=test-summarizer-key');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 

@@ -24,7 +24,7 @@ describe('validateConfig', () => {
       expect((caught as RuntimeError).message).toBe('google: auth is required');
     });
 
-    it('throws RILL-R004 when bearer token is empty', () => {
+    it('throws RILL-R001 when bearer token is empty', () => {
         let caught: unknown;
         try {
           validateConfig({ auth: { type: 'bearer', token: '' } });
@@ -34,7 +34,7 @@ describe('validateConfig', () => {
         expect((caught as RuntimeError).message).toBe('google: auth.token is required');
     });
 
-    it('throws RILL-R004 when session tokenVar is empty', () => {
+    it('throws RILL-R001 when session tokenVar is empty', () => {
         let caught: unknown;
         try {
           validateConfig({ auth: { type: 'session', tokenVar: '' } });
@@ -50,7 +50,7 @@ describe('validateConfig', () => {
   // ============================================================
 
   describe('EC-2: invalid auth.type', () => {
-    it('throws RILL-R004 for unsupported auth type', () => {
+    it('throws RILL-R001 for unsupported auth type', () => {
         let caught: unknown;
         try {
           validateConfig({
@@ -70,7 +70,7 @@ expect((caught as RuntimeError).message).toBe(
   // ============================================================
 
   describe('EC-3: malformed auth.keyJson', () => {
-    it('throws RILL-R004 when keyJson is not valid JSON', () => {
+    it('throws RILL-R001 when keyJson is not valid JSON', () => {
         let caught: unknown;
         try {
           validateConfig({ auth: { type: 'service-account', keyJson: 'not-json' } });
@@ -82,7 +82,7 @@ expect((caught as RuntimeError).message).toBe(
       );
     });
 
-    it('throws RILL-R004 when keyJson is missing client_email', () => {
+    it('throws RILL-R001 when keyJson is missing client_email', () => {
         let caught: unknown;
         try {
           validateConfig({
@@ -102,7 +102,7 @@ expect((caught as RuntimeError).message).toBe(
       );
     });
 
-    it('throws RILL-R004 when keyJson is missing private_key', () => {
+    it('throws RILL-R001 when keyJson is missing private_key', () => {
         let caught: unknown;
         try {
           validateConfig({
@@ -122,7 +122,7 @@ expect((caught as RuntimeError).message).toBe(
       );
     });
 
-    it('throws RILL-R004 when keyJson is missing token_uri', () => {
+    it('throws RILL-R001 when keyJson is missing token_uri', () => {
         let caught: unknown;
         try {
           validateConfig({
@@ -148,7 +148,7 @@ expect((caught as RuntimeError).message).toBe(
   // ============================================================
 
   describe('EC-4: service config boundaries', () => {
-    it('throws RILL-R004 when gmail.maxResults is 0 (below minimum)', () => {
+    it('throws RILL-R001 when gmail.maxResults is 0 (below minimum)', () => {
         let caught: unknown;
         try {
           validateConfig({
@@ -161,7 +161,7 @@ expect((caught as RuntimeError).message).toBe(
         expect((caught as RuntimeError).message).toBe('google: gmail.maxResults must be 1-500');
     });
 
-    it('throws RILL-R004 when gmail.maxResults is 501 (above maximum)', () => {
+    it('throws RILL-R001 when gmail.maxResults is 501 (above maximum)', () => {
         let caught: unknown;
         try {
           validateConfig({
@@ -187,7 +187,7 @@ expect((caught as RuntimeError).message).toBe(
       expect((caught as RuntimeError).message).toBe('google: drive.maxUploadBytes must be positive');
     });
 
-    it('throws RILL-R004 when drive.maxUploadBytes is negative', () => {
+    it('throws RILL-R001 when drive.maxUploadBytes is negative', () => {
         let caught: unknown;
         try {
           validateConfig({
@@ -202,7 +202,7 @@ expect((caught as RuntimeError).message).toBe(
       );
     });
 
-    it('throws RILL-R004 when drive.allowedFolderIds is empty array', () => {
+    it('throws RILL-R001 when drive.allowedFolderIds is empty array', () => {
         let caught: unknown;
         try {
           validateConfig({

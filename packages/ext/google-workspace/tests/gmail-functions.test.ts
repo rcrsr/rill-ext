@@ -121,7 +121,7 @@ afterEach(() => {
 // ============================================================
 
 describe('capability gating [AC-4, EC-3]', () => {
-  it('gmail_send with gmail.send=false → RILL-R004 before fetch', async () => {
+  it('gmail_send with gmail.send=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -137,7 +137,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_draft with gmail.draft=false → RILL-R004 before fetch', async () => {
+  it('gmail_draft with gmail.draft=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -153,7 +153,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_reply with gmail.reply=false → RILL-R004 before fetch', async () => {
+  it('gmail_reply with gmail.reply=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -169,7 +169,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_flag with gmail.modify=false → RILL-R004 before fetch', async () => {
+  it('gmail_flag with gmail.modify=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -185,7 +185,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_label with gmail.label=false → RILL-R004 before fetch', async () => {
+  it('gmail_label with gmail.label=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -201,7 +201,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_search with gmail.search=false → RILL-R004 before fetch', async () => {
+  it('gmail_search with gmail.search=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -214,7 +214,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_read with gmail.read=false → RILL-R004 before fetch', async () => {
+  it('gmail_read with gmail.read=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -677,7 +677,7 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     expect(mockFetchImpl.mock.calls).toHaveLength(2);
   });
 
-  it('BC-10: allowedLabels set + label not in list → RILL-R004 before fetch', async () => {
+  it('BC-10: allowedLabels set + label not in list → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
     const ext = createGoogleWorkspaceExtension({
@@ -696,7 +696,7 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('EC-12: deniedLabels includes label → RILL-R004 before fetch', async () => {
+  it('EC-12: deniedLabels includes label → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
     const ext = createGoogleWorkspaceExtension({
@@ -740,7 +740,7 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     expect(mockFetchImpl.mock.calls).toHaveLength(2);
   });
 
-  it('EC-6: gmail.label=false + valid label → RILL-R004 before fetch (cap gate fires first)', async () => {
+  it('EC-6: gmail.label=false + valid label → #FORBIDDEN before fetch (cap gate fires first)', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig({ label: false }), makeFactoryCtx());
@@ -901,7 +901,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
     expect(Array.isArray(result['attachments'])).toBe(true);
   });
 
-  it('raises RILL-R004 when session tokenVar not found in context (IR-21 error path)', async () => {
+  it('emits #AUTH when session tokenVar not found in context (IR-21 error path)', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
     const sessionConfig = {

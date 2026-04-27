@@ -29,7 +29,7 @@ function getCallable(ext: { value: unknown }, name: string): ApplicationCallable
 
 describe('createBraveExtension', () => {
   describe('configuration validation', () => {
-    it('throws RILL-R004 for missing apiKey [EC-13, AC-14]', () => {
+    it('throws RILL-R001 for missing apiKey [EC-13, AC-14]', () => {
       let caught: unknown;
       try {
         createBraveExtension({ apiKey: undefined as unknown as string }, makeFactoryCtx());
@@ -41,7 +41,7 @@ describe('createBraveExtension', () => {
       expect((caught as RuntimeError).message).toContain('apiKey is required');
     });
 
-    it('throws RILL-R004 for empty apiKey [EC-13, AC-14]', () => {
+    it('throws RILL-R001 for empty apiKey [EC-13, AC-14]', () => {
       let caught: unknown;
       try {
         createBraveExtension({ apiKey: '' }, makeFactoryCtx());
@@ -53,7 +53,7 @@ describe('createBraveExtension', () => {
       expect((caught as RuntimeError).message).toContain('apiKey is required');
     });
 
-    it('throws RILL-R004 for invalid baseUrl (non-http)', () => {
+    it('throws RILL-R001 for invalid baseUrl (non-http)', () => {
       let caught: unknown;
       try {
         createBraveExtension({ apiKey: 'test-key', baseUrl: 'ftp://bad.example.com' }, makeFactoryCtx());

@@ -29,7 +29,7 @@ function getCallable(ext: { value: unknown }, name: string): ApplicationCallable
 
 describe('createSerperExtension', () => {
   describe('configuration validation', () => {
-    it('throws RILL-R004 for missing apiKey [EC-13, AC-14]', () => {
+    it('throws RILL-R001 for missing apiKey [EC-13, AC-14]', () => {
       let caught: unknown;
       try {
         createSerperExtension({ apiKey: undefined as unknown as string }, makeFactoryCtx());
@@ -41,7 +41,7 @@ describe('createSerperExtension', () => {
       expect((caught as RuntimeError).message).toContain('apiKey is required');
     });
 
-    it('throws RILL-R004 for empty apiKey [EC-13, AC-14]', () => {
+    it('throws RILL-R001 for empty apiKey [EC-13, AC-14]', () => {
       let caught: unknown;
       try {
         createSerperExtension({ apiKey: '' }, makeFactoryCtx());
@@ -53,7 +53,7 @@ describe('createSerperExtension', () => {
       expect((caught as RuntimeError).message).toContain('apiKey is required');
     });
 
-    it('throws RILL-R004 for invalid baseUrl (non-http)', () => {
+    it('throws RILL-R001 for invalid baseUrl (non-http)', () => {
       let caught: unknown;
       try {
         createSerperExtension({ apiKey: 'test-key', baseUrl: 'ftp://bad.example.com' }, makeFactoryCtx());

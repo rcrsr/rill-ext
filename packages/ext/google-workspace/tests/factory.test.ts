@@ -201,7 +201,7 @@ describe('createGoogleWorkspaceExtension', () => {
   // ============================================================
 
   describe('AC-4: capability gate throws before fetch', () => {
-    it('throws RILL-R004 when gmail.send is disabled', async () => {
+    it('emits #FORBIDDEN when gmail.send is disabled', async () => {
       const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
         const caught = (await getCallable(ext, 'gmail_send').fn(
@@ -214,7 +214,7 @@ describe('createGoogleWorkspaceExtension', () => {
       expect(getStatus(caught).message).toContain('not enabled');
     });
 
-    it('throws RILL-R004 when drive.list is disabled', async () => {
+    it('emits #FORBIDDEN when drive.list is disabled', async () => {
       const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
         const caught = (await getCallable(ext, 'drive_list').fn({}, ctx)) as RillValue;
@@ -223,7 +223,7 @@ describe('createGoogleWorkspaceExtension', () => {
   expect(getStatus(caught).message).toContain('drive.list');
     });
 
-    it('throws RILL-R004 when calendar.create is disabled', async () => {
+    it('emits #FORBIDDEN when calendar.create is disabled', async () => {
       const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
         const caught = (await getCallable(ext, 'calendar_create_event').fn(
@@ -241,7 +241,7 @@ describe('createGoogleWorkspaceExtension', () => {
   // ============================================================
 
   describe('AC-6: call after dispose throws "operation cancelled"', () => {
-    it('throws RILL-R004 "google: operation cancelled" when disposed', async () => {
+    it('emits #DISPOSED "google: operation cancelled" when disposed', async () => {
       const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose();
@@ -439,7 +439,7 @@ describe('createGoogleWorkspaceExtension', () => {
       globalThis.fetch = originalFetch;
     });
 
-    it('in-flight call is rejected with RILL-R004 when dispose fires mid-flight (BC-5)', async () => {
+    it('in-flight call resolves to #DISPOSED when dispose fires mid-flight (BC-5)', async () => {
       // Arrange: mock fetch to hang until its AbortSignal fires.
       globalThis.fetch = vi.fn((_url: unknown, init?: RequestInit) => {
         return new Promise<Response>((_, reject) => {
@@ -476,7 +476,7 @@ describe('createGoogleWorkspaceExtension', () => {
       expect(getStatus(result).message).toBe('google: operation cancelled');
     });
 
-    it('multiple concurrent in-flight calls all reject with RILL-R004 on dispose (BC-5)', async () => {
+    it('multiple concurrent in-flight calls all resolve to #DISPOSED on dispose (BC-5)', async () => {
       // Arrange: same hanging fetch mock
       globalThis.fetch = vi.fn((_url: unknown, init?: RequestInit) => {
         return new Promise<Response>((_, reject) => {

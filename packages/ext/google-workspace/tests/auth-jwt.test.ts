@@ -284,7 +284,7 @@ describe('signServiceAccountJwt — VAL-1: RS256 fixture verification', () => {
 });
 
 // ============================================================
-// EC-3: Invalid private key → RILL-R004, no key material in message
+// EC-3: Invalid private key → #AUTH, no key material in message
 // ============================================================
 
 describe('signServiceAccountJwt — EC-3: invalid private_key', () => {

@@ -126,10 +126,10 @@ describe('from() host function', () => {
   });
 
   // ============================================================
-  // EC-3: empty address throws RILL-R004
+  // EC-3: empty address throws #INVALID_INPUT
   // ============================================================
 
-  it('throws RILL-R004 for empty address [EC-3]', async () => {
+  it('throws #INVALID_INPUT for empty address [EC-3]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -139,7 +139,7 @@ describe('from() host function', () => {
   expect(getStatus(caught).message).toContain('address is required');
   });
 
-  it('throws RILL-R004 for whitespace-only address [EC-3]', async () => {
+  it('throws #INVALID_INPUT for whitespace-only address [EC-3]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 

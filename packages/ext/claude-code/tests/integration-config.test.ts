@@ -485,7 +485,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
 // ============================================================
 
 describe('EC-1: Invalid binaryPath at factory creation', () => {
-  it('throws RuntimeError RILL-R004 "claude binary not found" when binary does not exist', async () => {
+  it('throws RuntimeError RILL-R001 "claude binary not found" when binary does not exist', async () => {
     const which = await import('which');
 
     // Mock which.sync to throw (binary not in PATH)

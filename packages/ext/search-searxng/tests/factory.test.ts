@@ -58,7 +58,7 @@ describe('createSearxngExtension', () => {
   // ============================================================
 
   describe('configuration validation', () => {
-    it('throws RILL-R004 for missing baseUrl [EC-13, AC-15]', async () => {
+    it('throws RILL-R001 for missing baseUrl [EC-13, AC-15]', async () => {
       let caught: unknown;
       try {
         await createSearxngExtension({ baseUrl: undefined as unknown as string }, makeFactoryCtx());
@@ -70,7 +70,7 @@ describe('createSearxngExtension', () => {
       expect((caught as RuntimeError).message).toContain('baseUrl is required');
     });
 
-    it('throws RILL-R004 for empty baseUrl [EC-13, AC-15]', async () => {
+    it('throws RILL-R001 for empty baseUrl [EC-13, AC-15]', async () => {
       let caught: unknown;
       try {
         await createSearxngExtension({ baseUrl: '' }, makeFactoryCtx());
@@ -82,7 +82,7 @@ describe('createSearxngExtension', () => {
       expect((caught as RuntimeError).message).toContain('baseUrl is required');
     });
 
-    it('throws RILL-R004 for invalid baseUrl format [EC-14]', async () => {
+    it('throws RILL-R001 for invalid baseUrl format [EC-14]', async () => {
       let caught: unknown;
       try {
         await createSearxngExtension({ baseUrl: 'ftp://bad.example.com' }, makeFactoryCtx());
@@ -94,7 +94,7 @@ describe('createSearxngExtension', () => {
       expect((caught as RuntimeError).message).toContain('baseUrl must start with http');
     });
 
-    it('throws RILL-R004 for non-URL baseUrl [EC-14]', async () => {
+    it('throws RILL-R001 for non-URL baseUrl [EC-14]', async () => {
       let caught: unknown;
       try {
         await createSearxngExtension({ baseUrl: 'not-a-url' }, makeFactoryCtx());
@@ -111,7 +111,7 @@ describe('createSearxngExtension', () => {
   // ============================================================
 
   describe('factory probe failures', () => {
-    it('throws RILL-R004 when JSON not in formats array [EC-15, AC-29]', async () => {
+    it('throws RILL-R001 when JSON not in formats array [EC-15, AC-29]', async () => {
       globalThis.fetch = mockFetchJson(200, { formats: ['html', 'csv'] });
 
       let caught: unknown;
@@ -125,7 +125,7 @@ describe('createSearxngExtension', () => {
       expect((caught as RuntimeError).message).toContain('JSON format is not enabled on http://localhost:8888');
     });
 
-    it('throws RILL-R004 when formats array is absent [EC-15, AC-29]', async () => {
+    it('throws RILL-R001 when formats array is absent [EC-15, AC-29]', async () => {
       globalThis.fetch = mockFetchJson(200, { engines: [] });
 
       let caught: unknown;
@@ -139,7 +139,7 @@ describe('createSearxngExtension', () => {
       expect((caught as RuntimeError).message).toContain('JSON format is not enabled on http://localhost:8888');
     });
 
-    it('throws RILL-R004 when probe returns non-JSON [EC-15, AC-29]', async () => {
+    it('throws RILL-R001 when probe returns non-JSON [EC-15, AC-29]', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
@@ -157,7 +157,7 @@ describe('createSearxngExtension', () => {
       expect((caught as RuntimeError).message).toContain('JSON format is not enabled on http://localhost:8888');
     });
 
-    it('throws RILL-R004 when instance is unreachable (TypeError) [EC-16, AC-30]', async () => {
+    it('throws RILL-R001 when instance is unreachable (TypeError) [EC-16, AC-30]', async () => {
       globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
 
       let caught: unknown;
@@ -171,7 +171,7 @@ describe('createSearxngExtension', () => {
       expect((caught as RuntimeError).message).toContain('instance unreachable at http://localhost:8888');
     });
 
-    it('throws RILL-R004 when probe returns non-OK status [EC-16, AC-30]', async () => {
+    it('throws RILL-R001 when probe returns non-OK status [EC-16, AC-30]', async () => {
       globalThis.fetch = mockFetchJson(503, {});
 
       let caught: unknown;

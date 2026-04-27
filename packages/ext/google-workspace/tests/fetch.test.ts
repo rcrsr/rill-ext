@@ -297,7 +297,7 @@ describe('HTTP error mapping', () => {
     vi.unstubAllGlobals();
   });
 
-  it('maps 403 to RILL-R004 insufficient scopes [EC-15]', async () => {
+  it('maps 403 to #FORBIDDEN insufficient scopes [EC-15]', async () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
