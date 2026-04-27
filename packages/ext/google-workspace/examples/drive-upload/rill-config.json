@@ -1,0 +1,38 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@rcrsr/rill@latest/schema/rill-config.schema.json",
+  "name": "drive-upload-example",
+  "version": "0.1.0",
+  "description": "Upload a small text file to Google Drive with a maxUploadBytes guard",
+  "main": "script.rill",
+  "extensions": {
+    "mounts": {
+      "gw": "@rcrsr/rill-ext-google-workspace"
+    },
+    "config": {
+      "gw": {
+        "auth": {
+          "type": "bearer",
+          "token": "${GOOGLE_TOKEN}"
+        },
+        "capabilities": {
+          "drive": { "upload": true }
+        },
+        "drive": {
+          "maxUploadBytes": 1048576
+        }
+      }
+    }
+  },
+  "context": {
+    "schema": {
+      "folderId": { "type": "string" },
+      "filename": { "type": "string" },
+      "contentBase64": { "type": "string" }
+    },
+    "values": {
+      "folderId": "${DRIVE_FOLDER_ID}",
+      "filename": "rill-example.txt",
+      "contentBase64": "SGVsbG8gZnJvbSByaWxsIGRyaXZlLXVwbG9hZCBleGFtcGxlIQo="
+    }
+  }
+}

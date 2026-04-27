@@ -1,0 +1,54 @@
+{
+  "name": "@rcrsr/rill-ext-google-workspace",
+  "version": "0.18.6",
+  "description": "rill extension for Google Workspace (Gmail, Drive, Calendar) integration",
+  "license": "MIT",
+  "author": "Andre Bremer",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "rill",
+    "google",
+    "workspace",
+    "gmail",
+    "drive",
+    "calendar",
+    "extension",
+    "ai",
+    "scripting"
+  ],
+  "scripts": {
+    "build": "tsup && dts-bundle-generator --config dts-bundle-generator.config.cjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config ../../../eslint.config.js src/",
+    "check": "pnpm run build && pnpm run test && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@rcrsr/rill": "~0.18.4"
+  },
+  "devDependencies": {
+    "@rcrsr/rill": "~0.18.4",
+    "@rcrsr/rill-ext-param-shared": "workspace:^",
+    "@types/node": "^25.5.2",
+    "dts-bundle-generator": "^9.5.1",
+    "tsup": "^8.5.1",
+    "undici-types": "^8.0.2"
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git",
+    "directory": "packages/ext/google-workspace"
+  },
+  "homepage": "https://github.com/rcrsr/rill-ext/tree/main/packages/ext/google-workspace#readme",
+  "bugs": {
+    "url": "https://github.com/rcrsr/rill-ext/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

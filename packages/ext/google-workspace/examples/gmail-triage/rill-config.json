@@ -1,0 +1,30 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@rcrsr/rill@latest/schema/rill-config.schema.json",
+  "name": "gmail-triage-example",
+  "version": "0.1.0",
+  "description": "Search the inbox, read the first result, and apply a label",
+  "main": "script.rill",
+  "extensions": {
+    "mounts": {
+      "gw": "@rcrsr/rill-ext-google-workspace"
+    },
+    "config": {
+      "gw": {
+        "auth": {
+          "type": "bearer",
+          "token": "${GOOGLE_TOKEN}"
+        }
+      }
+    }
+  },
+  "context": {
+    "schema": {
+      "query": { "type": "string" },
+      "label": { "type": "string" }
+    },
+    "values": {
+      "query": "in:inbox is:unread",
+      "label": "Processed"
+    }
+  }
+}

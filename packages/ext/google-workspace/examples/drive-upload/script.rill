@@ -1,0 +1,14 @@
+# Drive upload demo. Uploads a small base64-encoded payload.
+# drive.upload is default-false; rill-config.json opts in via capabilities.
+# Token, folder ID, and file content all come from rill-config.json context.
+
+gw.drive_upload(
+  $context.contentBase64,
+  $context.filename,
+  $context.folderId,
+  dict[mimeType: "text/plain"]
+) => $file
+
+"Uploaded: {$file.name}" -> log
+"File ID: {$file.id}" -> log
+"Size: {$file.size} bytes" -> log

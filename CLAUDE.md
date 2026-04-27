@@ -30,6 +30,7 @@ rill-ext is a pnpm workspace containing official extensions for the rill languag
 | `packages/ext/fs-local` | `@rcrsr/rill-ext-fs-local` | node:fs (built-in) |
 | `packages/ext/kv-file` | `@rcrsr/rill-ext-kv-file` | node:fs (built-in) |
 | `packages/ext/outlook` | `@rcrsr/rill-ext-outlook` | fetch (native) |
+| `packages/ext/google-workspace` | `@rcrsr/rill-ext-google-workspace` | fetch (native), node:crypto (built-in) |
 | `packages/ext/foundry` | `@rcrsr/rill-ext-foundry` | openai, @azure/identity (optional) |
 | `packages/ext/prompt-md` | `@rcrsr/rill-ext-prompt-md` | yaml |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
