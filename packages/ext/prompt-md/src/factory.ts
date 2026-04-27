@@ -77,7 +77,7 @@ export async function createPromptMdExtension(
   // ── Collect *.prompt.md files ─────────────────────────────────────────────
   const entries = await traversePromptFiles(basePath);
 
-  // ── Parse all files (EC-8 through EC-14 propagate as RILL-R004) ──────────
+  // ── Parse all files (EC-8 through EC-14 propagate as RILL-R001) ──────────
   const parsed = await Promise.all(
     entries.map((entry) => parseFile(entry.absolutePath, entry.relativePath)),
   );

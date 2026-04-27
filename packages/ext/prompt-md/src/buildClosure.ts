@@ -37,7 +37,8 @@ import type { ParsedPrompt } from './parseFile.js';
  *
  * The closure fn:
  *   - Coerces values via `formatValue` from `@rcrsr/rill` (rill's canonical stringifier).
- *   - Wraps uncaught errors in RILL-R004 (EC-17); re-throws existing RuntimeErrors.
+ *   - Re-throws existing RuntimeErrors as-is (factory-time RILL-R001 paths).
+ *   - Wraps any other uncaught error (EC-17) via `ctx.invalidate(err, { code: 'PROTOCOL', provider: 'prompt-md', raw: { kind: 'closure_failure', ... } })`.
  *
  * @param parsed - Fully validated ParsedPrompt from parseFile.
  * @returns An ApplicationCallable wrapping the prompt logic.

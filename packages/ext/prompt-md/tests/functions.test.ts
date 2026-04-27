@@ -550,20 +550,17 @@ Articles: {articles}
 
 // ── EC-17: uncaught internal failure ─────────────────────────────────────────
 
-describe('EC-17: uncaught internal failure wrapped in RILL-R004', () => {
+describe('EC-17: uncaught internal failure invalidated via ctx with #PROTOCOL', () => {
   // [ASSUMPTION] EC-17 is the default catch-all in buildClosure.ts that wraps
-  // unexpected (non-RuntimeError) exceptions in RILL-R004. It cannot be triggered
-  // deterministically via the public API since all known error paths are already
-  // RILL-R004. The implementation is verified by code inspection:
-  // buildClosure.ts lines 106-115 wrap any non-RuntimeError in RILL-R004.
-  // We trigger it by calling splitRoleMessages indirectly with a body that has
-  // a list output but no @@ markers — however parseFile already blocks this at
-  // boot time, so EC-17 is a defensive branch for future edge cases.
-  //
-  // We verify the branch exists by ensuring a callable's fn wraps raw Error:
-  // This is done by directly constructing a minimal ParsedPrompt and calling
-  // buildClosure with it, then monkey-patching the interpolate import — which
-  // is not possible without vi.mock. Instead we document this as a best-effort
-  // coverage gap and note it is covered by code inspection.
+  // unexpected (non-RuntimeError) exceptions via ctx.invalidate with code
+  // 'PROTOCOL' and raw.kind 'closure_failure'. It cannot be triggered
+  // deterministically via the public API since all known error paths are
+  // already covered by RILL-R001 (factory-time) or never throw at runtime.
+  // The implementation is verified by code inspection:
+  // buildClosure.ts lines 93-108 catch any non-RuntimeError and call
+  // ctx.invalidate(err, { code: 'PROTOCOL', provider: 'prompt-md',
+  //   raw: { kind: 'closure_failure', name, detail } }).
+  // parseFile already blocks list-output-without-markers at boot time, so
+  // EC-17 is a defensive branch for future edge cases.
   it.skip('EC-17 defensive catch-all — untestable via public API (see buildClosure.ts catch branch)', () => {});
 });

@@ -116,7 +116,7 @@ export async function parseFile(
   // ── Read source ─────────────────────────────────────────────────────────
   const source = await readFile(absolutePath, 'utf-8');
 
-  // ── Split frontmatter fence (EC-8 path: RILL-R001 → RILL-R004) ─────────
+  // ── Split frontmatter fence (EC-8 path: RILL-R001) ─────────────────────
   let frontmatter: string;
   let body: string;
   let bodyLineOffset: number;

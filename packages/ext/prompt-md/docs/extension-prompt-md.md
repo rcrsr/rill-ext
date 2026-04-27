@@ -46,7 +46,7 @@ name: type
 name: type = default
 ```
 
-Each entry MUST be a quoted YAML string. Unquoted form (`- name: type`) is parsed by YAML as a map and rejected at load time with `RILL-R004` (`params entries must be strings`).
+Each entry MUST be a quoted YAML string. Unquoted form (`- name: type`) is parsed by YAML as a map and rejected at load time with `RuntimeError RILL-R001` (`params entries must be strings`).
 
 **Type expression** is any static rill type accepted by rill's type-ref grammar. The grammar supports all of rill's built-in type names and parameterized forms.
 
@@ -83,7 +83,7 @@ params:
   - "articles: list(dict(title: string, body: string))"
 ```
 
-A param without a default is required. A param with a default is optional at call time. The extension raises `RILL-R004` when a required param is missing at invocation.
+A param without a default is required. A param with a default is optional at call time. Missing required params at invocation are rejected by the rill runtime before the closure runs (this extension does not synthesize defaults at call time).
 
 ### Output Values
 
@@ -91,7 +91,7 @@ A param without a default is required. A param with a default is optional at cal
 |-------|-----------------|
 | `string` | Interpolated body as a single string |
 | `list` | List of `{ role, content }` dicts, one per `@@ role` section |
-| `dict` | Reserved. Rejected at load time with `RILL-R004`. |
+| `dict` | Reserved. Rejected at load time with `RuntimeError RILL-R001`. |
 
 Use `output: string` for single-turn completions. Use `output: list` for multi-turn or structured conversation prompts.
 
@@ -279,15 +279,35 @@ $result.content -> log
 
 The `$messages` value is a list of `{ role, content }` dicts. `messages()` on `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-openai`, and `@rcrsr/rill-ext-gemini` all accept this shape without modification. Swap the `llm` mount to a different provider and the script works unchanged.
 
-## Errors
+## Error Behavior
 
-| Condition | Code | Description |
-|-----------|------|-------------|
-| `output: dict` in frontmatter | RILL-R004 | `dict` output is reserved in v0 |
-| Missing required param at invocation | RILL-R004 | Param has no default and was not passed |
-| File fails YAML parse | RILL-R004 | Frontmatter is not valid YAML |
-| Missing `description` or `params` or `output` | RILL-R004 | Required frontmatter field absent |
-| File not found at `basePath` | RILL-R004 | `basePath` does not exist or is not a directory |
+The extension surfaces failures in two places: factory-time validation throws
+`RuntimeError RILL-R001` before any host fn runs; closure-runtime failures
+emit invalid `RillValue`s carrying rill core's generic atoms. Host scripts
+match coarsely (`guard #PROTOCOL`) or finely
+(`guard #PROTOCOL && raw.kind == 'closure_failure'`).
+
+**Factory-time validation** (during `createPromptMdExtension`, before any closure runs):
+
+| Condition | Code |
+|---|---|
+| `basePath` empty / not a string (EC-6) | `RILL-R001` |
+| `basePath` does not exist or is not a directory (EC-7) | `RILL-R001` |
+| Frontmatter fence missing or malformed (EC-8) | `RILL-R001` |
+| Frontmatter is not a YAML mapping or fails YAML parse (EC-9) | `RILL-R001` |
+| Missing / invalid `description`, `params`, or `output` (EC-10) | `RILL-R001` |
+| `output: dict` reserved, or unrecognized `output` value (EC-11) | `RILL-R001` |
+| Param entry not a string, or grammar parse failure (EC-12) | `RILL-R001` |
+| Template `{name}` references a param not declared in `params` (EC-13) | `RILL-R001` |
+| `output: list` body has no `@@ role` marker (EC-14) | `RILL-R001` |
+| Multiple files resolve to the same prompt name (EC-15) | `RILL-R001` |
+
+**Host-fn errors** (during closure invocation):
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Extension disposed before invocation | `#DISPOSED` | `disposed` |
+| Uncaught internal failure during interpolation / role split (EC-17) | `#PROTOCOL` | `closure_failure` |
 
 ## See Also
 
