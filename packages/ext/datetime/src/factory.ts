@@ -5,16 +5,19 @@
  */
 
 import {
-  RuntimeError,
   structureToTypeValue,
   toCallable,
+  type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillFunction,
   type RillParam,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { DatetimeExtensionConfig } from './types.js';
+import { EXT_DATETIME_CONFIG } from './errors.js';
 
 // ============================================================
 // RETURN TYPE CONSTANTS
@@ -28,6 +31,8 @@ const stringListReturn = structureToTypeValue({
 });
 const datetimeReturn = structureToTypeValue({ kind: 'datetime' } as { kind: string });
 
+const PROVIDER = 'datetime';
+
 // ============================================================
 // ZONE VALIDATION
 // ============================================================
@@ -35,17 +40,6 @@ const datetimeReturn = structureToTypeValue({ kind: 'datetime' } as { kind: stri
 const validZones = new Set<string>(Intl.supportedValuesOf('timeZone'));
 // Intl.supportedValuesOf may omit UTC on some runtimes
 validZones.add('UTC');
-
-function validateZone(zone: string): void {
-  if (!validZones.has(zone)) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `unknown timezone: "${zone}"`,
-      undefined,
-      { zone },
-    );
-  }
-}
 
 // ============================================================
 // FORMAT TOKEN REGISTRY
@@ -77,45 +71,6 @@ function escapeRegex(s: string): string {
 }
 
 /**
- * Scan a pattern for unrecognized tokens.
- * Walks the pattern left-to-right. At each position, attempts to match a
- * registered token. If an alphabetic character is found with no matching
- * token, throws EC-2.
- */
-function validatePattern(pattern: string): void {
-  let pos = 0;
-  while (pos < pattern.length) {
-    let tokenMatched = false;
-    for (const entry of TOKEN_REGISTRY) {
-      if (pattern.startsWith(entry.token, pos)) {
-        pos += entry.token.length;
-        tokenMatched = true;
-        break;
-      }
-    }
-    if (!tokenMatched) {
-      const ch = pattern[pos] ?? '';
-      if (/[A-Za-z]/.test(ch)) {
-        // Collect the full alphabetic sequence as the unknown token
-        let tokenEnd = pos + 1;
-        while (tokenEnd < pattern.length && /[A-Za-z]/.test(pattern[tokenEnd] ?? '')) {
-          tokenEnd++;
-        }
-        const unknownToken = pattern.slice(pos, tokenEnd);
-        throw new RuntimeError(
-          'RILL-R004',
-          `unknown format token: "${unknownToken}"`,
-          undefined,
-          { token: unknownToken },
-        );
-      }
-      // Non-alphabetic character: treat as literal, advance
-      pos++;
-    }
-  }
-}
-
-/**
  * Apply format tokens to a UTC Date, producing formatted output.
  */
 function applyFormat(date: Date, pattern: string): string {
@@ -143,42 +98,6 @@ function applyFormat(date: Date, pattern: string): string {
     result = result.split(entry.token).join(replacements[entry.token] ?? entry.token);
   }
   return result;
-}
-
-// ============================================================
-// ARGUMENT VALIDATION HELPERS
-// ============================================================
-
-/**
- * Validate and extract a datetime argument (represented as epoch ms number).
- * Throws EC-5 if not a number.
- */
-function extractDatetime(value: RillValue, _paramName: string): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `expected datetime, got ${typeof value === 'number' ? String(value) : typeof value}`,
-      undefined,
-      { expected: 'datetime', got: typeof value },
-    );
-  }
-  return value;
-}
-
-/**
- * Validate and extract a string argument.
- * Throws EC-6 if not a string.
- */
-function extractString(value: RillValue, _paramName: string): string {
-  if (typeof value !== 'string') {
-    throw new RuntimeError(
-      'RILL-R004',
-      `expected string, got ${typeof value}`,
-      undefined,
-      { expected: 'string', got: typeof value },
-    );
-  }
-  return value;
 }
 
 // ============================================================
@@ -267,76 +186,6 @@ function getLocalComponents(
 }
 
 // ============================================================
-// PARSE HELPER
-// ============================================================
-
-/**
- * Build a regex from a format pattern and parse the input string.
- * Returns epoch milliseconds (UTC) or throws EC-3 on mismatch.
- */
-function parseWithPattern(str: string, pattern: string): number {
-  // Build regex from pattern by replacing tokens with named capture groups.
-  // Escape literal characters between tokens.
-  let regexSource = '';
-  let remaining = pattern;
-
-  while (remaining.length > 0) {
-    let tokenMatched = false;
-    for (const entry of TOKEN_REGISTRY) {
-      if (remaining.startsWith(entry.token)) {
-        regexSource += `(?<${entry.group}>${entry.regex})`;
-        remaining = remaining.slice(entry.token.length);
-        tokenMatched = true;
-        break;
-      }
-    }
-    if (!tokenMatched) {
-      // Literal character
-      regexSource += escapeRegex(remaining[0] ?? '');
-      remaining = remaining.slice(1);
-    }
-  }
-
-  const regex = new RegExp(`^${regexSource}$`);
-  const match = regex.exec(str);
-
-  if (!match || !match.groups) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `cannot parse "${str}" with pattern "${pattern}"`,
-      undefined,
-      { str, pattern },
-    );
-  }
-
-  const g = match.groups;
-  const year = parseInt(g['YYYY'] ?? '1970', 10);
-  const month = parseInt(g['MM'] ?? '01', 10);
-  const day = parseInt(g['DD'] ?? '01', 10);
-  const hours = parseInt(g['HH'] ?? '00', 10);
-  const minutes = parseInt(g['mm'] ?? '00', 10);
-  const seconds = parseInt(g['ss'] ?? '00', 10);
-  const ms = parseInt(g['SSS'] ?? '0', 10);
-
-  // Validate ranges to prevent silent Date.UTC normalization
-  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  if (
-    month < 1 || month > 12 ||
-    day < 1 || day > daysInMonth ||
-    hours > 23 || minutes > 59 || seconds > 59 || ms > 999
-  ) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `date component out of range in "${str}"`,
-      undefined,
-      { str, pattern },
-    );
-  }
-
-  return Date.UTC(year, month - 1, day, hours, minutes, seconds, ms);
-}
-
-// ============================================================
 // FACTORY
 // ============================================================
 
@@ -347,36 +196,218 @@ function parseWithPattern(str: string, pattern: string): number {
  */
 export function createDatetimeExtension(
   _config: DatetimeExtensionConfig = {},
+  ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
+  ctx.registerErrorCode(EXT_DATETIME_CONFIG, 'runtime');
+
   let disposed = false;
 
   // ----------------------------------------------------------
-  // Disposal check
+  // Validation helpers (return invalid RillValue or null on success)
   // ----------------------------------------------------------
 
-  function checkDisposed(): void {
+  function checkDisposed(runCtx: RuntimeContext): RillValue | null {
     if (disposed) {
-      throw new RuntimeError(
-        'RILL-R004',
-        'datetime: operation cancelled',
-        undefined,
-        {},
+      return runCtx.invalidate(
+        new Error('datetime: operation cancelled'),
+        {
+          code: EXT_DATETIME_CONFIG,
+          provider: PROVIDER,
+          raw: { kind: 'disposed' },
+        },
       );
     }
+    return null;
+  }
+
+  function validateZone(zone: string, runCtx: RuntimeContext): RillValue | null {
+    if (!validZones.has(zone)) {
+      return runCtx.invalidate(
+        new Error(`unknown timezone: "${zone}"`),
+        {
+          code: EXT_DATETIME_CONFIG,
+          provider: PROVIDER,
+          raw: { kind: 'invalid_timezone', zone },
+        },
+      );
+    }
+    return null;
+  }
+
+  /**
+   * Scan a pattern for unrecognized tokens.
+   */
+  function validatePattern(pattern: string, runCtx: RuntimeContext): RillValue | null {
+    let pos = 0;
+    while (pos < pattern.length) {
+      let tokenMatched = false;
+      for (const entry of TOKEN_REGISTRY) {
+        if (pattern.startsWith(entry.token, pos)) {
+          pos += entry.token.length;
+          tokenMatched = true;
+          break;
+        }
+      }
+      if (!tokenMatched) {
+        const ch = pattern[pos] ?? '';
+        if (/[A-Za-z]/.test(ch)) {
+          let tokenEnd = pos + 1;
+          while (tokenEnd < pattern.length && /[A-Za-z]/.test(pattern[tokenEnd] ?? '')) {
+            tokenEnd++;
+          }
+          const unknownToken = pattern.slice(pos, tokenEnd);
+          return runCtx.invalidate(
+            new Error(`unknown format token: "${unknownToken}"`),
+            {
+              code: EXT_DATETIME_CONFIG,
+              provider: PROVIDER,
+              raw: { kind: 'unknown_format_token', token: unknownToken },
+            },
+          );
+        }
+        pos++;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Validate and extract a datetime argument (epoch ms number).
+   */
+  function extractDatetime(
+    value: RillValue,
+    runCtx: RuntimeContext,
+  ): { ok: true; value: number } | { ok: false; invalid: RillValue } {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      const got = typeof value === 'number' ? String(value) : typeof value;
+      return {
+        ok: false,
+        invalid: runCtx.invalidate(
+          new Error(`expected datetime, got ${got}`),
+          {
+            code: EXT_DATETIME_CONFIG,
+            provider: PROVIDER,
+            raw: { kind: 'invalid_argument', expected: 'datetime', got: typeof value },
+          },
+        ),
+      };
+    }
+    return { ok: true, value };
+  }
+
+  /**
+   * Validate and extract a string argument.
+   */
+  function extractString(
+    value: RillValue,
+    runCtx: RuntimeContext,
+  ): { ok: true; value: string } | { ok: false; invalid: RillValue } {
+    if (typeof value !== 'string') {
+      return {
+        ok: false,
+        invalid: runCtx.invalidate(
+          new Error(`expected string, got ${typeof value}`),
+          {
+            code: EXT_DATETIME_CONFIG,
+            provider: PROVIDER,
+            raw: { kind: 'invalid_argument', expected: 'string', got: typeof value },
+          },
+        ),
+      };
+    }
+    return { ok: true, value };
+  }
+
+  /**
+   * Build a regex from a format pattern and parse the input string.
+   */
+  function parseWithPattern(
+    str: string,
+    pattern: string,
+    runCtx: RuntimeContext,
+  ): { ok: true; value: number } | { ok: false; invalid: RillValue } {
+    let regexSource = '';
+    let remaining = pattern;
+
+    while (remaining.length > 0) {
+      let tokenMatched = false;
+      for (const entry of TOKEN_REGISTRY) {
+        if (remaining.startsWith(entry.token)) {
+          regexSource += `(?<${entry.group}>${entry.regex})`;
+          remaining = remaining.slice(entry.token.length);
+          tokenMatched = true;
+          break;
+        }
+      }
+      if (!tokenMatched) {
+        regexSource += escapeRegex(remaining[0] ?? '');
+        remaining = remaining.slice(1);
+      }
+    }
+
+    const regex = new RegExp(`^${regexSource}$`);
+    const match = regex.exec(str);
+
+    if (!match || !match.groups) {
+      return {
+        ok: false,
+        invalid: runCtx.invalidate(
+          new Error(`cannot parse "${str}" with pattern "${pattern}"`),
+          {
+            code: EXT_DATETIME_CONFIG,
+            provider: PROVIDER,
+            raw: { kind: 'parse_mismatch', str, pattern },
+          },
+        ),
+      };
+    }
+
+    const g = match.groups;
+    const year = parseInt(g['YYYY'] ?? '1970', 10);
+    const month = parseInt(g['MM'] ?? '01', 10);
+    const day = parseInt(g['DD'] ?? '01', 10);
+    const hours = parseInt(g['HH'] ?? '00', 10);
+    const minutes = parseInt(g['mm'] ?? '00', 10);
+    const seconds = parseInt(g['ss'] ?? '00', 10);
+    const ms = parseInt(g['SSS'] ?? '0', 10);
+
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    if (
+      month < 1 || month > 12 ||
+      day < 1 || day > daysInMonth ||
+      hours > 23 || minutes > 59 || seconds > 59 || ms > 999
+    ) {
+      return {
+        ok: false,
+        invalid: runCtx.invalidate(
+          new Error(`date component out of range in "${str}"`),
+          {
+            code: EXT_DATETIME_CONFIG,
+            provider: PROVIDER,
+            raw: { kind: 'date_out_of_range', str, pattern },
+          },
+        ),
+      };
+    }
+
+    return { ok: true, value: Date.UTC(year, month - 1, day, hours, minutes, seconds, ms) };
   }
 
   // ----------------------------------------------------------
   // tz::iso
   // ----------------------------------------------------------
 
-  const iso = async (args: Record<string, RillValue>): Promise<string> => {
-    checkDisposed();
-    const epochMs = extractDatetime(args['dt'] as RillValue, 'dt');
-    const zone = extractString(args['zone'] as RillValue, 'zone');
-    validateZone(zone);
+  const iso: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
+    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dt = extractDatetime(args['dt'] as RillValue, runCtx);
+    if (!dt.ok) return dt.invalid;
+    const zoneArg = extractString(args['zone'] as RillValue, runCtx);
+    if (!zoneArg.ok) return zoneArg.invalid;
+    const zInv = validateZone(zoneArg.value, runCtx); if (zInv) return zInv;
 
-    const { year, month, day, hours, minutes, seconds } = getLocalComponents(epochMs, zone);
-    const offsetMin = getOffsetMinutes(epochMs, zone);
+    const { year, month, day, hours, minutes, seconds } = getLocalComponents(dt.value, zoneArg.value);
+    const offsetMin = getOffsetMinutes(dt.value, zoneArg.value);
 
     const pad2 = (n: number): string => String(n).padStart(2, '0');
     const datePart = `${String(year).padStart(4, '0')}-${pad2(month)}-${pad2(day)}`;
@@ -388,13 +419,16 @@ export function createDatetimeExtension(
   // tz::date
   // ----------------------------------------------------------
 
-  const date = async (args: Record<string, RillValue>): Promise<string> => {
-    checkDisposed();
-    const epochMs = extractDatetime(args['dt'] as RillValue, 'dt');
-    const zone = extractString(args['zone'] as RillValue, 'zone');
-    validateZone(zone);
+  const date: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
+    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dt = extractDatetime(args['dt'] as RillValue, runCtx);
+    if (!dt.ok) return dt.invalid;
+    const zoneArg = extractString(args['zone'] as RillValue, runCtx);
+    if (!zoneArg.ok) return zoneArg.invalid;
+    const zInv = validateZone(zoneArg.value, runCtx); if (zInv) return zInv;
 
-    const { year, month, day } = getLocalComponents(epochMs, zone);
+    const { year, month, day } = getLocalComponents(dt.value, zoneArg.value);
     const pad2 = (n: number): string => String(n).padStart(2, '0');
     return `${String(year).padStart(4, '0')}-${pad2(month)}-${pad2(day)}`;
   };
@@ -403,13 +437,16 @@ export function createDatetimeExtension(
   // tz::time
   // ----------------------------------------------------------
 
-  const time = async (args: Record<string, RillValue>): Promise<string> => {
-    checkDisposed();
-    const epochMs = extractDatetime(args['dt'] as RillValue, 'dt');
-    const zone = extractString(args['zone'] as RillValue, 'zone');
-    validateZone(zone);
+  const time: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
+    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dt = extractDatetime(args['dt'] as RillValue, runCtx);
+    if (!dt.ok) return dt.invalid;
+    const zoneArg = extractString(args['zone'] as RillValue, runCtx);
+    if (!zoneArg.ok) return zoneArg.invalid;
+    const zInv = validateZone(zoneArg.value, runCtx); if (zInv) return zInv;
 
-    const { hours, minutes, seconds } = getLocalComponents(epochMs, zone);
+    const { hours, minutes, seconds } = getLocalComponents(dt.value, zoneArg.value);
     const pad2 = (n: number): string => String(n).padStart(2, '0');
     return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
   };
@@ -418,18 +455,24 @@ export function createDatetimeExtension(
   // tz::offset
   // ----------------------------------------------------------
 
-  const offset = async (args: Record<string, RillValue>): Promise<number> => {
-    checkDisposed();
-    const zone = extractString(args['zone'] as RillValue, 'zone');
-    validateZone(zone);
+  const offset: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
+    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const zoneArg = extractString(args['zone'] as RillValue, runCtx);
+    if (!zoneArg.ok) return zoneArg.invalid;
+    const zInv = validateZone(zoneArg.value, runCtx); if (zInv) return zInv;
 
     const dtArg = args['dt'];
-    const epochMs =
-      dtArg === undefined || dtArg === null
-        ? Date.now()
-        : extractDatetime(dtArg, 'dt');
+    let epochMs: number;
+    if (dtArg === undefined || dtArg === null) {
+      epochMs = Date.now();
+    } else {
+      const dt = extractDatetime(dtArg, runCtx);
+      if (!dt.ok) return dt.invalid;
+      epochMs = dt.value;
+    }
 
-    const offsetMin = getOffsetMinutes(epochMs, zone);
+    const offsetMin = getOffsetMinutes(epochMs, zoneArg.value);
     return offsetMin / 60;
   };
 
@@ -437,36 +480,45 @@ export function createDatetimeExtension(
   // tz::zones
   // ----------------------------------------------------------
 
-  const zones = async (): Promise<RillValue[]> => {
-    checkDisposed();
-    return Array.from(validZones) as RillValue[];
+  const zones: CallableFn = async (_args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
+    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    return Array.from(validZones) as unknown as RillValue;
   };
 
   // ----------------------------------------------------------
   // time::format
   // ----------------------------------------------------------
 
-  const format = async (args: Record<string, RillValue>): Promise<string> => {
-    checkDisposed();
-    const epochMs = extractDatetime(args['dt'] as RillValue, 'dt');
-    const pattern = extractString(args['pattern'] as RillValue, 'pattern');
-    validatePattern(pattern);
+  const format: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
+    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dt = extractDatetime(args['dt'] as RillValue, runCtx);
+    if (!dt.ok) return dt.invalid;
+    const patternArg = extractString(args['pattern'] as RillValue, runCtx);
+    if (!patternArg.ok) return patternArg.invalid;
+    const pInv = validatePattern(patternArg.value, runCtx); if (pInv) return pInv;
 
-    const d = new Date(epochMs);
-    return applyFormat(d, pattern);
+    const d = new Date(dt.value);
+    return applyFormat(d, patternArg.value);
   };
 
   // ----------------------------------------------------------
   // time::parse
   // ----------------------------------------------------------
 
-  const parse = async (args: Record<string, RillValue>): Promise<number> => {
-    checkDisposed();
-    const str = extractString(args['str'] as RillValue, 'str');
-    const pattern = extractString(args['pattern'] as RillValue, 'pattern');
-    validatePattern(pattern);
+  const parse: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
+    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const strArg = extractString(args['str'] as RillValue, runCtx);
+    if (!strArg.ok) return strArg.invalid;
+    const patternArg = extractString(args['pattern'] as RillValue, runCtx);
+    if (!patternArg.ok) return patternArg.invalid;
+    const pInv = validatePattern(patternArg.value, runCtx); if (pInv) return pInv;
 
-    return parseWithPattern(str, pattern);
+    const result = parseWithPattern(strArg.value, patternArg.value, runCtx);
+    if (!result.ok) return result.invalid;
+    return result.value;
   };
 
   // ----------------------------------------------------------

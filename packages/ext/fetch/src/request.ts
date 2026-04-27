@@ -6,7 +6,13 @@
  * @module
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  RuntimeHaltSignal,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+import { EXT_FETCH_HTTP, EXT_FETCH_TIMEOUT } from './errors.js';
 
 // ============================================================
 // TYPE DEFINITIONS
@@ -63,6 +69,8 @@ export interface FetchOptions {
   signal?: AbortSignal | undefined;
 }
 
+const PROVIDER = 'fetch';
+
 // ============================================================
 // CONCURRENCY SEMAPHORE
 // ============================================================
@@ -103,14 +111,6 @@ export class Semaphore {
 // URL BUILDING
 // ============================================================
 
-/**
- * Interpolate path parameters in URL pattern.
- * Replaces `:param` placeholders with values from pathArgs.
- *
- * @param pattern - URL pattern with :param placeholders
- * @param pathArgs - Map of parameter names to values
- * @returns Interpolated URL path
- */
 function interpolatePathParams(
   pattern: string,
   pathArgs: Map<string, string>
@@ -124,12 +124,6 @@ function interpolatePathParams(
   });
 }
 
-/**
- * Build query string from query arguments.
- *
- * @param queryArgs - Map of query parameter names to values
- * @returns Query string (without leading ?)
- */
 function buildQueryString(queryArgs: Map<string, string>): string {
   const params = new URLSearchParams();
   for (const [key, value] of queryArgs) {
@@ -138,15 +132,6 @@ function buildQueryString(queryArgs: Map<string, string>): string {
   return params.toString();
 }
 
-/**
- * Build full URL from base, path pattern, and arguments.
- *
- * @param baseUrl - Base URL
- * @param pathPattern - URL path pattern with :param placeholders
- * @param pathArgs - Path parameter values
- * @param queryArgs - Query parameter values
- * @returns Complete URL
- */
 function buildUrl(
   baseUrl: string,
   pathPattern: string,
@@ -168,12 +153,6 @@ function buildUrl(
 // HEADER HANDLING
 // ============================================================
 
-/**
- * Flatten multi-value headers to string-to-string dict.
- *
- * @param headers - Headers object from fetch Response
- * @returns Flattened headers dict
- */
 function flattenHeaders(headers: Headers): Record<string, string> {
   const result: Record<string, string> = {};
   headers.forEach((value, key) => {
@@ -182,12 +161,6 @@ function flattenHeaders(headers: Headers): Record<string, string> {
   return result;
 }
 
-/**
- * Resolve dynamic headers (call function if provided).
- *
- * @param headers - Static headers or function returning headers
- * @returns Resolved headers dict
- */
 function resolveHeaders(
   headers: Record<string, string> | (() => Record<string, string>) | undefined
 ): Record<string, string> {
@@ -196,13 +169,6 @@ function resolveHeaders(
   return headers;
 }
 
-/**
- * Merge headers with endpoint headers taking precedence.
- *
- * @param globalHeaders - Global extension headers
- * @param endpointHeaders - Endpoint-specific headers
- * @returns Merged headers dict
- */
 function mergeHeaders(
   globalHeaders: Record<string, string>,
   endpointHeaders: Record<string, string> | undefined
@@ -216,36 +182,26 @@ function mergeHeaders(
 
 /**
  * Parse response body as JSON.
- * Throws RuntimeError on invalid JSON.
- *
- * @param response - Fetch Response object
- * @param namespace - Extension namespace for error messages
- * @returns Parsed JSON body
+ * Returns a sentinel symbol on parse failure so caller can route to ctx.invalidate.
  */
+const PARSE_FAILED = Symbol('parse_failed');
+
 async function parseJsonResponse(
-  response: Response,
-  namespace: string
-): Promise<unknown> {
+  response: Response
+): Promise<unknown | typeof PARSE_FAILED> {
   const text = await response.text();
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new RuntimeError('RILL-R004', `${namespace}: invalid JSON response`);
+    return PARSE_FAILED;
   }
 }
 
-/**
- * Build full response object with status, headers, and body.
- *
- * @param response - Fetch Response object
- * @param namespace - Extension namespace for error messages
- * @returns Full response object
- */
 async function buildFullResponse(
-  response: Response,
-  namespace: string
-): Promise<FullResponse> {
-  const body = await parseJsonResponse(response, namespace);
+  response: Response
+): Promise<FullResponse | typeof PARSE_FAILED> {
+  const body = await parseJsonResponse(response);
+  if (body === PARSE_FAILED) return PARSE_FAILED;
   return {
     status: response.status,
     headers: flattenHeaders(response.headers),
@@ -257,24 +213,10 @@ async function buildFullResponse(
 // RETRY LOGIC
 // ============================================================
 
-/**
- * Check if status code should be retried.
- * Retry on: 429, 502, 503, 504.
- *
- * @param status - HTTP status code
- * @returns true if status should be retried
- */
 function shouldRetryStatus(status: number): boolean {
   return status === 429 || status === 502 || status === 503 || status === 504;
 }
 
-/**
- * Extract Retry-After header value in milliseconds.
- * Supports both delay-seconds and HTTP-date formats.
- *
- * @param response - Fetch Response object
- * @returns Retry delay in milliseconds, or null if not present
- */
 function getRetryAfterMs(response: Response): number | null {
   const retryAfter = response.headers.get('Retry-After');
   if (!retryAfter) return null;
@@ -292,22 +234,10 @@ function getRetryAfterMs(response: Response): number | null {
   return null;
 }
 
-/**
- * Calculate exponential backoff delay.
- *
- * @param baseDelay - Base delay in milliseconds
- * @param attempt - Attempt number (0-indexed)
- * @returns Delay in milliseconds
- */
 function calculateBackoff(baseDelay: number, attempt: number): number {
   return baseDelay * Math.pow(2, attempt);
 }
 
-/**
- * Sleep for specified duration.
- *
- * @param ms - Milliseconds to sleep
- */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -320,13 +250,7 @@ function sleep(ms: number): Promise<void> {
  * Execute HTTP request with retry logic.
  * Handles timeouts, network errors, and retries.
  *
- * @param url - Request URL
- * @param options - Fetch options
- * @param config - Extension configuration
- * @param namespace - Extension namespace for error messages
- * @param responseShape - Whether to return full response or just body
- * @param semaphore - Concurrency semaphore (optional)
- * @returns Response body or full response
+ * On failure, returns an invalid `RillValue` via `ctx.invalidate`.
  */
 export async function executeRequest(
   url: string,
@@ -334,8 +258,9 @@ export async function executeRequest(
   config: InternalFetchConfig,
   namespace: string,
   responseShape: ResponseShape,
+  ctx: RuntimeContext,
   semaphore?: Semaphore | undefined
-): Promise<unknown> {
+): Promise<RillValue> {
   const retryLimit = config.retryLimit ?? 3;
   const retryDelay = config.retryDelay ?? 100;
   const timeoutMs = config.timeout ?? 30000;
@@ -353,9 +278,9 @@ export async function executeRequest(
         const timeoutController = new AbortController();
         const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
 
-        const signals = options.signal
-          ? [options.signal, timeoutController.signal]
-          : [timeoutController.signal];
+        const signals: AbortSignal[] = [timeoutController.signal];
+        if (options.signal) signals.push(options.signal);
+        if (ctx.signal) signals.push(ctx.signal);
         const combinedSignal = AbortSignal.any(signals);
 
         try {
@@ -373,9 +298,18 @@ export async function executeRequest(
             // 4xx errors (except 429) - no retry
             if (status >= 400 && status < 500 && status !== 429) {
               const body = await response.text();
-              throw new RuntimeError(
-                'RILL-R004',
-                `${namespace}: HTTP ${status} — ${body}`
+              return ctx.invalidate(
+                new Error(`${namespace}: HTTP ${status} — ${body}`),
+                {
+                  code: EXT_FETCH_HTTP,
+                  provider: PROVIDER,
+                  raw: {
+                    kind: 'http_error',
+                    status,
+                    body,
+                    namespace,
+                  },
+                },
               );
             }
 
@@ -395,9 +329,20 @@ export async function executeRequest(
                 attempt++;
                 continue;
               } else {
-                throw new RuntimeError(
-                  'RILL-R004',
-                  `${namespace}: HTTP ${status} after ${retryLimit} retries`
+                return ctx.invalidate(
+                  new Error(
+                    `${namespace}: HTTP ${status} after ${retryLimit} retries`,
+                  ),
+                  {
+                    code: EXT_FETCH_HTTP,
+                    provider: PROVIDER,
+                    raw: {
+                      kind: 'http_error_retries_exhausted',
+                      status,
+                      retries: retryLimit,
+                      namespace,
+                    },
+                  },
                 );
               }
             }
@@ -405,9 +350,31 @@ export async function executeRequest(
 
           // Success - parse response
           if (responseShape === 'full') {
-            return await buildFullResponse(response, namespace);
+            const full = await buildFullResponse(response);
+            if (full === PARSE_FAILED) {
+              return ctx.invalidate(
+                new Error(`${namespace}: invalid JSON response`),
+                {
+                  code: EXT_FETCH_HTTP,
+                  provider: PROVIDER,
+                  raw: { kind: 'invalid_json', namespace },
+                },
+              );
+            }
+            return full as unknown as RillValue;
           } else {
-            return await parseJsonResponse(response, namespace);
+            const body = await parseJsonResponse(response);
+            if (body === PARSE_FAILED) {
+              return ctx.invalidate(
+                new Error(`${namespace}: invalid JSON response`),
+                {
+                  code: EXT_FETCH_HTTP,
+                  provider: PROVIDER,
+                  raw: { kind: 'invalid_json', namespace },
+                },
+              );
+            }
+            return body as RillValue;
           }
         } finally {
           clearTimeout(timeoutId);
@@ -418,12 +385,21 @@ export async function executeRequest(
         }
       }
     } catch (error) {
+      // Halt signal — propagate cooperative cancellation
+      if (error instanceof RuntimeHaltSignal) throw error;
+
       // Timeout - no retry
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new RuntimeError(
-          'RILL-R004',
-          `${namespace}: request timeout (${timeoutMs}ms)`
-        );
+        return ctx.invalidate(error, {
+          code: EXT_FETCH_TIMEOUT,
+          provider: PROVIDER,
+          raw: {
+            kind: 'request_timeout',
+            message: `${namespace}: request timeout (${timeoutMs}ms)`,
+            timeoutMs,
+            namespace,
+          },
+        });
       }
 
       // Already formatted error - rethrow immediately
@@ -440,10 +416,15 @@ export async function executeRequest(
           lastError = error;
           continue;
         } else {
-          throw new RuntimeError(
-            'RILL-R004',
-            `${namespace}: network error — ${error.message}`
-          );
+          return ctx.invalidate(error, {
+            code: EXT_FETCH_HTTP,
+            provider: PROVIDER,
+            raw: {
+              kind: 'network_error',
+              message: `${namespace}: network error — ${error.message}`,
+              namespace,
+            },
+          });
         }
       }
 
@@ -453,10 +434,15 @@ export async function executeRequest(
     }
   }
 
-  throw new RuntimeError(
-    'RILL-R004',
-    `${namespace}: network error — ${lastError?.message ?? 'unknown error'}`
-  );
+  return ctx.invalidate(lastError ?? new Error('unknown error'), {
+    code: EXT_FETCH_HTTP,
+    provider: PROVIDER,
+    raw: {
+      kind: 'network_error',
+      message: `${namespace}: network error — ${lastError?.message ?? 'unknown error'}`,
+      namespace,
+    },
+  });
 }
 
 // ============================================================
@@ -465,9 +451,6 @@ export async function executeRequest(
 
 /**
  * Create semaphore for concurrency control.
- *
- * @param maxConcurrent - Maximum concurrent requests
- * @returns Semaphore instance or undefined if no limit
  */
 export function createSemaphore(
   maxConcurrent: number | undefined
@@ -480,11 +463,6 @@ export function createSemaphore(
 
 /**
  * Build request from endpoint config and arguments.
- *
- * @param config - Internal fetch configuration
- * @param endpointName - Endpoint name
- * @param args - Request arguments
- * @returns Request URL and options
  */
 export function buildRequest(
   config: InternalFetchConfig,

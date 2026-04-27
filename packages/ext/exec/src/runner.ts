@@ -9,10 +9,16 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { RuntimeError } from '@rcrsr/rill';
+import {
+  RuntimeHaltSignal,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import type { CommandConfig, CommandResult } from './types.js';
+import { EXT_EXEC_CONFIG, EXT_EXEC_TIMEOUT } from './errors.js';
 
 const execFileAsync = promisify(execFile);
+const PROVIDER = 'exec';
 
 // ----------------------------------------------------------
 // Validation
@@ -22,17 +28,25 @@ function validateArgs(
   args: readonly string[],
   config: CommandConfig,
   commandName: string,
-): void {
+  ctx: RuntimeContext,
+): RillValue | null {
   const { allowedArgs, blockedArgs } = config;
 
   if (allowedArgs !== undefined) {
     for (const arg of args) {
       if (!allowedArgs.includes(arg)) {
-        throw new RuntimeError(
-          'RILL-R004',
-          `arg "${arg}" not permitted for command "${commandName}"`,
-          undefined,
-          { commandName, arg, allowedArgs },
+        return ctx.invalidate(
+          new Error(`arg "${arg}" not permitted for command "${commandName}"`),
+          {
+            code: EXT_EXEC_CONFIG,
+            provider: PROVIDER,
+            raw: {
+              kind: 'arg_not_permitted',
+              commandName,
+              arg,
+              allowedArgs: [...allowedArgs],
+            },
+          },
         );
       }
     }
@@ -41,30 +55,43 @@ function validateArgs(
   if (blockedArgs !== undefined) {
     for (const arg of args) {
       if (blockedArgs.includes(arg)) {
-        throw new RuntimeError(
-          'RILL-R004',
-          `arg "${arg}" is blocked for command "${commandName}"`,
-          undefined,
-          { commandName, arg, blockedArgs },
+        return ctx.invalidate(
+          new Error(`arg "${arg}" is blocked for command "${commandName}"`),
+          {
+            code: EXT_EXEC_CONFIG,
+            provider: PROVIDER,
+            raw: {
+              kind: 'arg_blocked',
+              commandName,
+              arg,
+              blockedArgs: [...blockedArgs],
+            },
+          },
         );
       }
     }
   }
+
+  return null;
 }
 
 function validateStdin(
   config: CommandConfig,
   commandName: string,
   hasStdin: boolean,
-): void {
+  ctx: RuntimeContext,
+): RillValue | null {
   if (hasStdin && !config.stdin) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `command "${commandName}" does not support stdin`,
-      undefined,
-      { commandName },
+    return ctx.invalidate(
+      new Error(`command "${commandName}" does not support stdin`),
+      {
+        code: EXT_EXEC_CONFIG,
+        provider: PROVIDER,
+        raw: { kind: 'stdin_not_supported', commandName },
+      },
     );
   }
+  return null;
 }
 
 // ----------------------------------------------------------
@@ -76,16 +103,28 @@ function validateStdin(
  *
  * Uses execFile() to prevent shell injection attacks.
  * Non-zero exit code is returned as part of the result, not thrown.
+ *
+ * Returns either a CommandResult (success path) or an invalid RillValue
+ * (validation/exec failure). Callers must check via `isInvalid()`.
  */
 export async function runCommand(
   commandName: string,
   config: CommandConfig,
   args: readonly string[],
-  stdinData?: string | undefined,
-  signal?: AbortSignal | undefined,
-): Promise<CommandResult> {
-  validateArgs(args, config, commandName);
-  validateStdin(config, commandName, stdinData !== undefined);
+  stdinData: string | undefined,
+  signal: AbortSignal | undefined,
+  ctx: RuntimeContext,
+): Promise<CommandResult | RillValue> {
+  const argInvalid = validateArgs(args, config, commandName, ctx);
+  if (argInvalid !== null) return argInvalid;
+
+  const stdinInvalid = validateStdin(
+    config,
+    commandName,
+    stdinData !== undefined,
+    ctx,
+  );
+  if (stdinInvalid !== null) return stdinInvalid;
 
   const options: {
     timeout?: number;
@@ -131,6 +170,10 @@ export async function runCommand(
       exitCode: 0,
     };
   } catch (err: unknown) {
+    if (err instanceof RuntimeHaltSignal) {
+      throw err;
+    }
+
     if (err && typeof err === 'object') {
       const execError = err as {
         code?: string;
@@ -139,14 +182,21 @@ export async function runCommand(
         stdout?: string;
         stderr?: string;
         message?: string;
+        name?: string;
       };
 
       if (execError.code === 'ENOENT') {
-        throw new RuntimeError(
-          'RILL-R004',
-          `binary not found: ${config.binary}`,
-          undefined,
-          { commandName, binary: config.binary },
+        return ctx.invalidate(
+          new Error(`binary not found: ${config.binary}`),
+          {
+            code: EXT_EXEC_CONFIG,
+            provider: PROVIDER,
+            raw: {
+              kind: 'binary_not_found',
+              commandName,
+              binary: config.binary,
+            },
+          },
         );
       }
 
@@ -160,21 +210,44 @@ export async function runCommand(
           config.maxBuffer !== undefined);
 
       if (isMaxBufferError) {
-        throw new RuntimeError(
-          'RILL-R004',
-          `command output exceeds size limit`,
-          undefined,
-          { commandName, maxBuffer: config.maxBuffer },
+        return ctx.invalidate(
+          new Error('command output exceeds size limit'),
+          {
+            code: EXT_EXEC_CONFIG,
+            provider: PROVIDER,
+            raw: {
+              kind: 'maxbuffer_exceeded',
+              commandName,
+              maxBuffer: config.maxBuffer,
+            },
+          },
         );
       }
 
       if (execError.killed === true && execError.signal === 'SIGTERM') {
         const timeoutMs = config.timeout || 0;
-        throw new RuntimeError(
-          'RILL-R012',
-          `command "${commandName}" timed out (${timeoutMs}ms)`,
-          undefined,
-          { commandName, timeoutMs },
+        return ctx.invalidate(
+          new Error(`command "${commandName}" timed out (${timeoutMs}ms)`),
+          {
+            code: EXT_EXEC_TIMEOUT,
+            provider: PROVIDER,
+            raw: { kind: 'timeout', commandName, timeoutMs },
+          },
+        );
+      }
+
+      // AbortError (signal-based abort) — surface as timeout-equivalent
+      if (
+        execError.name === 'AbortError' ||
+        execError.code === 'ABORT_ERR'
+      ) {
+        return ctx.invalidate(
+          new Error(`command "${commandName}" aborted`),
+          {
+            code: EXT_EXEC_TIMEOUT,
+            provider: PROVIDER,
+            raw: { kind: 'aborted', commandName },
+          },
         );
       }
 

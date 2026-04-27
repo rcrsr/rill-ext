@@ -8,9 +8,12 @@ import {
   RuntimeError,
   structureToTypeValue,
   toCallable,
+  type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillFunction,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import type { FetchExtensionConfig, EndpointConfig, EndpointParam } from './types.js';
 import {
@@ -22,6 +25,11 @@ import {
   type EndpointArg,
   type Semaphore,
 } from './request.js';
+import {
+  EXT_FETCH_CONFIG,
+  EXT_FETCH_HTTP,
+  EXT_FETCH_TIMEOUT,
+} from './errors.js';
 
 // ============================================================
 // PARAMETER MAPPING
@@ -89,7 +97,7 @@ function processArguments(
         result[param.name] = param.defaultValue;
       } else if (param.required !== false) {
         throw new RuntimeError(
-          'RILL-R004',
+          'RILL-R005',
           `parameter "${param.name}" is required`,
           undefined,
           { functionName, paramName: param.name }
@@ -132,8 +140,13 @@ function processArguments(
  * ```
  */
 export function createFetchExtension(
-  config: FetchExtensionConfig
+  config: FetchExtensionConfig,
+  ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
+  ctx.registerErrorCode(EXT_FETCH_CONFIG, 'runtime');
+  ctx.registerErrorCode(EXT_FETCH_HTTP, 'runtime');
+  ctx.registerErrorCode(EXT_FETCH_TIMEOUT, 'runtime');
+
   const timeout = config.timeout ?? 30000;
   const retries = config.retries ?? 0;
   const retryDelay = config.retryDelay ?? 1000;
@@ -166,10 +179,13 @@ export function createFetchExtension(
   for (const [endpointName, endpointConfig] of Object.entries(config.endpoints)) {
     const params = endpointConfig.params ?? [];
 
-    const endpointFn = async (
-      args: Record<string, RillValue>
-    ): Promise<RillValue> => {
-      const processedArgs = processArguments(args, params, endpointName);
+    const endpointFn: CallableFn = async (args, runCtxLike) => {
+      const runCtx = runCtxLike as RuntimeContext;
+      const processedArgs = processArguments(
+        args as Record<string, RillValue>,
+        params,
+        endpointName,
+      );
 
       const { url, options, responseShape } = buildRequest(
         internalConfig,
@@ -187,10 +203,11 @@ export function createFetchExtension(
           internalConfig,
           endpointName,
           responseShape,
-          semaphore
+          runCtx,
+          semaphore,
         );
 
-        return result as RillValue;
+        return result;
       } finally {
         activeControllers.delete(controller);
       }

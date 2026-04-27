@@ -7,11 +7,15 @@
 import { describe, it, expect } from 'vitest';
 import { createCryptoExtension } from '../src/factory.js';
 import type { CryptoExtensionConfig } from '../src/types.js';
+import { makeFactoryCtx } from './_setup.js';
+
+const createCryptoExtensionT = (config?: CryptoExtensionConfig) =>
+  createCryptoExtension(config ?? {}, makeFactoryCtx());
 
 describe('crypto extension factory', () => {
   describe('factory creation', () => {
     it('creates ExtensionFactoryResult with 4 functions', () => {
-      const ext = createCryptoExtension();
+      const ext = createCryptoExtensionT();
 
       expect(ext).toHaveProperty('value');
 
@@ -22,7 +26,7 @@ describe('crypto extension factory', () => {
     });
 
     it('wraps functions as callables with params and returnType', () => {
-      const ext = createCryptoExtension();
+      const ext = createCryptoExtensionT();
 
       expect(ext.value.hash).toMatchObject({
         params: expect.any(Array),
@@ -38,7 +42,7 @@ describe('crypto extension factory', () => {
     });
 
     it('applies config defaults', () => {
-      const ext = createCryptoExtension();
+      const ext = createCryptoExtensionT();
       expect(ext).toBeDefined();
     });
 
@@ -46,7 +50,7 @@ describe('crypto extension factory', () => {
       const config: CryptoExtensionConfig = {
         defaultAlgorithm: 'sha512',
       };
-      const ext = createCryptoExtension(config);
+      const ext = createCryptoExtensionT(config);
       expect(ext).toBeDefined();
     });
 
@@ -54,7 +58,7 @@ describe('crypto extension factory', () => {
       const config: CryptoExtensionConfig = {
         hmacKey: 'secret-key-123',
       };
-      const ext = createCryptoExtension(config);
+      const ext = createCryptoExtensionT(config);
       expect(ext).toBeDefined();
     });
   });

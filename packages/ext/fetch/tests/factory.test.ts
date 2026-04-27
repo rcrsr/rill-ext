@@ -6,11 +6,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, getStatus, type ApplicationCallable } from '@rcrsr/rill';
 import {
   createFetchExtension,
   type FetchExtensionConfig,
 } from '../src/index.js';
+import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 // ============================================================
 // MOCK FETCH
@@ -112,7 +113,7 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       expect(ext).toHaveProperty('value');
       expect(ext).toHaveProperty('dispose');
@@ -142,7 +143,7 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       expect(getCallable(ext, 'getUser')).toBeDefined();
       expect(getCallable(ext, 'createPost')).toBeDefined();
@@ -161,7 +162,7 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
       expect(ext).toBeDefined();
     });
 
@@ -177,7 +178,7 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
       expect(typeof getCallable(ext, 'getUser').fn).toBe('function');
     });
 
@@ -193,7 +194,7 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
       expect(Array.isArray(getCallable(ext, 'getUser').params)).toBe(true);
     });
   });
@@ -218,8 +219,8 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
-      const result = (await getCallable(ext, 'endpoints').fn({}, {} as never)) as Array<{
+      const ext = createFetchExtension(config, makeFactoryCtx());
+      const result = (await getCallable(ext, 'endpoints').fn({}, makeRuntimeCtx())) as Array<{
         name: string;
         method: string;
         path: string;
@@ -253,8 +254,8 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
-      const result = (await getCallable(ext, 'endpoints').fn({}, {} as never)) as Array<{
+      const ext = createFetchExtension(config, makeFactoryCtx());
+      const result = (await getCallable(ext, 'endpoints').fn({}, makeRuntimeCtx())) as Array<{
         description: string;
       }>;
 
@@ -275,13 +276,13 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       await expect(
-        getCallable(ext, 'getUser').fn({}, {} as never)
+        getCallable(ext, 'getUser').fn({}, makeRuntimeCtx())
       ).rejects.toThrow(RuntimeError);
       await expect(
-        getCallable(ext, 'getUser').fn({}, {} as never)
+        getCallable(ext, 'getUser').fn({}, makeRuntimeCtx())
       ).rejects.toThrow('parameter "id" is required');
     });
 
@@ -300,13 +301,13 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       await expect(
-        getCallable(ext, 'createUser').fn({ name: 'John' }, {} as never)
+        getCallable(ext, 'createUser').fn({ name: 'John' }, makeRuntimeCtx())
       ).rejects.toThrow(RuntimeError);
       await expect(
-        getCallable(ext, 'createUser').fn({ name: 'John' }, {} as never)
+        getCallable(ext, 'createUser').fn({ name: 'John' }, makeRuntimeCtx())
       ).rejects.toThrow('parameter "email" is required');
     });
 
@@ -331,10 +332,10 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       await expect(
-        getCallable(ext, 'listUsers').fn({}, {} as never)
+        getCallable(ext, 'listUsers').fn({}, makeRuntimeCtx())
       ).resolves.toBeDefined();
     });
 
@@ -359,10 +360,10 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       await expect(
-        getCallable(ext, 'listUsers').fn({}, {} as never)
+        getCallable(ext, 'listUsers').fn({}, makeRuntimeCtx())
       ).resolves.toBeDefined();
     });
   });
@@ -382,11 +383,11 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       const result = await getCallable(ext, 'getUser').fn(
         { id: '123' },
-        {} as never
+        makeRuntimeCtx()
       );
 
       expect(result).toEqual({ id: 123, name: 'John' });
@@ -413,11 +414,11 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       const result = await getCallable(ext, 'createPost').fn(
         { title: 'Test Post', body: 'Post content' },
-        {} as never
+        makeRuntimeCtx()
       );
 
       expect(result).toEqual({ id: 1, title: 'Test Post' });
@@ -442,11 +443,11 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       const result = await getCallable(ext, 'getUser').fn(
         { id: '123' },
-        {} as never
+        makeRuntimeCtx()
       );
 
       expect(result).toEqual({ id: 123, name: 'Test' });
@@ -471,11 +472,11 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       const result = await getCallable(ext, 'getUser').fn(
         { id: '123' },
-        {} as never
+        makeRuntimeCtx()
       );
 
       expect(result).toHaveProperty('status', 200);
@@ -503,11 +504,11 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       const result = await getCallable(ext, 'getUser').fn(
         { id: '123' },
-        {} as never
+        makeRuntimeCtx()
       );
 
       expect(result).toHaveProperty('status', 200);
@@ -534,11 +535,11 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       const result = await getCallable(ext, 'getUser').fn(
         { id: '123' },
-        {} as never
+        makeRuntimeCtx()
       );
 
       expect(result).toEqual({ id: 123 });
@@ -558,7 +559,7 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       expect(ext).toHaveProperty('dispose');
       expect(typeof ext.dispose).toBe('function');
@@ -576,7 +577,7 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       expect(() => ext.dispose()).not.toThrow();
       expect(() => ext.dispose()).not.toThrow();
@@ -597,17 +598,51 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
 
       const requestPromise = getCallable(ext, 'getUser').fn(
         { id: '123' },
-        {} as never
+        makeRuntimeCtx()
       );
 
       // Abort all in-flight requests via dispose
       ext.dispose();
 
-      await expect(requestPromise).rejects.toThrow(RuntimeError);
+      const result = await requestPromise;
+      const status = getStatus(result);
+      expect(status.code.name).toBe('R001');
+    });
+
+    it('aborts when ctx.signal fires', async () => {
+      mockResponses.push({ status: 200, body: '{"id":123}', delay: 500 });
+
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+          },
+        },
+      };
+
+      const ext = createFetchExtension(config, makeFactoryCtx());
+
+      const ctrl = new AbortController();
+      const runCtx = makeRuntimeCtx();
+      // Override signal field
+      Object.defineProperty(runCtx, 'signal', { value: ctrl.signal, configurable: true });
+
+      const requestPromise = getCallable(ext, 'getUser').fn(
+        { id: '123' },
+        runCtx,
+      );
+      ctrl.abort();
+
+      const result = await requestPromise;
+      const status = getStatus(result);
+      expect(status.code.name).toBe('R001');
     });
   });
 
@@ -624,7 +659,7 @@ describe('createFetchExtension', () => {
         },
       };
 
-      const ext = createFetchExtension(config);
+      const ext = createFetchExtension(config, makeFactoryCtx());
       const value = ext.value as Record<string, unknown>;
 
       expect(value['getUser']).toBeDefined();

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError } from '@rcrsr/rill';
+import { getStatus } from '@rcrsr/rill';
 import {
   executeRequest,
   buildRequest,
@@ -14,6 +14,7 @@ import {
   type InternalFetchConfig,
   type FetchOptions,
 } from '../src/request.js';
+import { makeRuntimeCtx } from './_setup.js';
 
 // ============================================================
 // MOCK FETCH
@@ -235,7 +236,8 @@ describe('executeRequest - response parsing', () => {
       { method: 'GET', headers: {} },
       testConfig,
       'api',
-      'body'
+      'body',
+      makeRuntimeCtx()
     );
 
     expect(result).toEqual({ id: 123, name: 'John' });
@@ -255,7 +257,8 @@ describe('executeRequest - response parsing', () => {
       { method: 'POST', headers: {} },
       testConfig,
       'api',
-      'full'
+      'full',
+      makeRuntimeCtx()
     );
 
     expect(result).toMatchObject({
@@ -265,37 +268,20 @@ describe('executeRequest - response parsing', () => {
     });
   });
 
-  it('throws RuntimeError for invalid JSON', async () => {
-    mockResponses = [
-      { status: 200, body: 'not json' },
-      { status: 200, body: 'not json' },
-    ];
+  it('returns invalid value for invalid JSON', async () => {
+    mockResponses = [{ status: 200, body: 'not json' }];
 
-    await expect(
-      executeRequest(
-        'https://api.example.com/users/123',
-        { method: 'GET', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      )
-    ).rejects.toThrow(RuntimeError);
-
-    try {
-      await executeRequest(
-        'https://api.example.com/users/123',
-        { method: 'GET', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      );
-    } catch (error) {
-      expect(error).toBeInstanceOf(RuntimeError);
-      if (error instanceof RuntimeError) {
-        expect(error.errorId).toBe('RILL-R004');
-        expect(error.message).toContain('invalid JSON response');
-      }
-    }
+    const result = await executeRequest(
+      'https://api.example.com/users/123',
+      { method: 'GET', headers: {} },
+      testConfig,
+      'api',
+      'body',
+      makeRuntimeCtx()
+    );
+    const status = getStatus(result);
+    expect(status.code.name).toBe('R001');
+    expect(status.message).toMatch(/invalid JSON response/);
   });
 });
 
@@ -304,109 +290,59 @@ describe('executeRequest - response parsing', () => {
 // ============================================================
 
 describe('executeRequest - HTTP errors', () => {
-  it('throws RuntimeError for HTTP 4xx', async () => {
-    mockResponses = [
-      { status: 404, body: 'Not Found' },
-      { status: 404, body: 'Not Found' },
-    ];
+  it('returns invalid value for HTTP 4xx', async () => {
+    mockResponses = [{ status: 404, body: 'Not Found' }];
 
-    await expect(
-      executeRequest(
-        'https://api.example.com/users/999',
-        { method: 'GET', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      )
-    ).rejects.toThrow(RuntimeError);
-
-    try {
-      await executeRequest(
-        'https://api.example.com/users/999',
-        { method: 'GET', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      );
-    } catch (error) {
-      expect(error).toBeInstanceOf(RuntimeError);
-      if (error instanceof RuntimeError) {
-        expect(error.errorId).toBe('RILL-R004');
-        expect(error.message).toContain('HTTP 404');
-        expect(error.message).toContain('Not Found');
-      }
-    }
+    const result = await executeRequest(
+      'https://api.example.com/users/999',
+      { method: 'GET', headers: {} },
+      testConfig,
+      'api',
+      'body',
+      makeRuntimeCtx()
+    );
+    const status = getStatus(result);
+    expect(status.code.name).toBe('R001');
+    expect(status.message).toMatch(/HTTP 404/);
+    expect(status.message).toMatch(/Not Found/);
   });
 
-  it('throws RuntimeError for HTTP 5xx after retries', async () => {
+  it('returns invalid value for HTTP 5xx after retries', async () => {
     mockResponses = [
-      { status: 503, body: 'Service Unavailable' },
-      { status: 503, body: 'Service Unavailable' },
-      { status: 503, body: 'Service Unavailable' },
       { status: 503, body: 'Service Unavailable' },
       { status: 503, body: 'Service Unavailable' },
       { status: 503, body: 'Service Unavailable' },
     ];
 
-    await expect(
-      executeRequest(
-        'https://api.example.com/users',
-        { method: 'GET', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      )
-    ).rejects.toThrow(RuntimeError);
-
-    try {
-      await executeRequest(
-        'https://api.example.com/users',
-        { method: 'GET', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      );
-    } catch (error) {
-      expect(error).toBeInstanceOf(RuntimeError);
-      if (error instanceof RuntimeError) {
-        expect(error.errorId).toBe('RILL-R004');
-        expect(error.message).toContain('HTTP 503');
-        expect(error.message).toContain('after 2 retries');
-      }
-    }
-
-    expect(fetchCallCount).toBe(6); // (initial + 2 retries) x 2 test runs
+    const result = await executeRequest(
+      'https://api.example.com/users',
+      { method: 'GET', headers: {} },
+      testConfig,
+      'api',
+      'body',
+      makeRuntimeCtx()
+    );
+    const status = getStatus(result);
+    expect(status.code.name).toBe('R001');
+    expect(status.message).toMatch(/HTTP 503/);
+    expect(status.message).toMatch(/after 2 retries/);
+    expect(fetchCallCount).toBe(3); // initial + 2 retries
   });
 
-  it('throws RuntimeError for network error', async () => {
+  it('returns invalid value for network error', async () => {
     // No mock responses - triggers TypeError
-    await expect(
-      executeRequest(
-        'https://api.example.com/users',
-        { method: 'GET', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      )
-    ).rejects.toThrow(RuntimeError);
-
-    try {
-      await executeRequest(
-        'https://api.example.com/users',
-        { method: 'GET', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      );
-    } catch (error) {
-      expect(error).toBeInstanceOf(RuntimeError);
-      if (error instanceof RuntimeError) {
-        expect(error.errorId).toBe('RILL-R004');
-        expect(error.message).toContain('network error');
-      }
-    }
-
-    expect(fetchCallCount).toBe(6); // (initial + 2 retries) x 2 test runs
+    const result = await executeRequest(
+      'https://api.example.com/users',
+      { method: 'GET', headers: {} },
+      testConfig,
+      'api',
+      'body',
+      makeRuntimeCtx()
+    );
+    const status = getStatus(result);
+    expect(status.code.name).toBe('R001');
+    expect(status.message).toMatch(/network error/);
+    expect(fetchCallCount).toBe(3); // initial + 2 retries
   });
 });
 
@@ -426,7 +362,8 @@ describe('executeRequest - retry logic', () => {
       { method: 'GET', headers: {} },
       testConfig,
       'api',
-      'body'
+      'body',
+      makeRuntimeCtx()
     );
 
     expect(result).toEqual({ success: true });
@@ -449,7 +386,8 @@ describe('executeRequest - retry logic', () => {
       { method: 'GET', headers: {} },
       testConfig,
       'api',
-      'body'
+      'body',
+      makeRuntimeCtx()
     );
     await vi.advanceTimersByTimeAsync(1001);
     const result = await promise;
@@ -483,7 +421,8 @@ describe('executeRequest - retry logic', () => {
       { method: 'GET', headers: {} },
       testConfig,
       'api',
-      'body'
+      'body',
+      makeRuntimeCtx()
     );
     await vi.advanceTimersByTimeAsync(150);
     await promise;
@@ -496,16 +435,15 @@ describe('executeRequest - retry logic', () => {
   it('does not retry HTTP 4xx errors (except 429)', async () => {
     mockResponses = [{ status: 400, body: 'Bad Request' }];
 
-    await expect(
-      executeRequest(
-        'https://api.example.com/users',
-        { method: 'POST', headers: {} },
-        testConfig,
-        'api',
-        'body'
-      )
-    ).rejects.toThrow(RuntimeError);
-
+    const result = await executeRequest(
+      'https://api.example.com/users',
+      { method: 'POST', headers: {} },
+      testConfig,
+      'api',
+      'body',
+      makeRuntimeCtx()
+    );
+    expect(getStatus(result).code.name).toBe('R001');
     expect(fetchCallCount).toBe(1);
   });
 });
@@ -515,40 +453,21 @@ describe('executeRequest - retry logic', () => {
 // ============================================================
 
 describe('executeRequest - timeout', () => {
-  it('throws RuntimeError on timeout', async () => {
-    mockResponses = [
-      { status: 200, body: '{"success": true}', delay: 2000 },
-      { status: 200, body: '{"success": true}', delay: 2000 },
-    ];
+  it('returns invalid value on timeout', async () => {
+    mockResponses = [{ status: 200, body: '{"success": true}', delay: 2000 }];
 
     const shortTimeoutConfig = { ...testConfig, timeout: 100 };
 
-    await expect(
-      executeRequest(
-        'https://api.example.com/users',
-        { method: 'GET', headers: {} },
-        shortTimeoutConfig,
-        'api',
-        'body'
-      )
-    ).rejects.toThrow(RuntimeError);
-
-    try {
-      await executeRequest(
-        'https://api.example.com/users',
-        { method: 'GET', headers: {} },
-        shortTimeoutConfig,
-        'api',
-        'body'
-      );
-    } catch (error) {
-      expect(error).toBeInstanceOf(RuntimeError);
-      if (error instanceof RuntimeError) {
-        expect(error.errorId).toBe('RILL-R004');
-        expect(error.message).toContain('request timeout');
-        expect(error.message).toContain('100ms');
-      }
-    }
+    const result = await executeRequest(
+      'https://api.example.com/users',
+      { method: 'GET', headers: {} },
+      shortTimeoutConfig,
+      'api',
+      'body',
+      makeRuntimeCtx()
+    );
+    const status = getStatus(result);
+    expect(status.code.name).toBe('R001');
   });
 });
 
@@ -601,6 +520,7 @@ describe('executeRequest - concurrency control', () => {
           testConfig,
           'api',
           'body',
+          makeRuntimeCtx(),
           semaphore
         )
       )

@@ -6,18 +6,22 @@
 
 import crypto from 'node:crypto';
 import {
-  RuntimeError,
   structureToTypeValue,
   toCallable,
+  type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillFunction,
   type RillParam,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { CryptoExtensionConfig } from './types.js';
+import { EXT_CRYPTO_CONFIG } from './errors.js';
 
 const stringReturn = structureToTypeValue({ kind: 'string' });
+const PROVIDER = 'crypto';
 
 /**
  * Creates a crypto extension with hashing and random generation.
@@ -26,7 +30,10 @@ const stringReturn = structureToTypeValue({ kind: 'string' });
  */
 export function createCryptoExtension(
   config: CryptoExtensionConfig = {},
+  ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
+  ctx.registerErrorCode(EXT_CRYPTO_CONFIG, 'runtime');
+
   const defaultAlgorithm = config.defaultAlgorithm ?? 'sha256';
   const hmacKey = config.hmacKey;
 
@@ -36,71 +43,92 @@ export function createCryptoExtension(
   // Helpers
   // ----------------------------------------------------------
 
-  function validateAlgorithm(algorithm: string): void {
+  function checkAlgorithm(
+    algorithm: string,
+    runCtx: RuntimeContext,
+  ): RillValue | null {
     if (!supportedAlgorithms.has(algorithm)) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `unsupported algorithm: ${algorithm}`,
-        undefined,
-        { algorithm, supported: Array.from(supportedAlgorithms) },
+      return runCtx.invalidate(
+        new Error(`unsupported algorithm: ${algorithm}`),
+        {
+          code: EXT_CRYPTO_CONFIG,
+          provider: PROVIDER,
+          raw: {
+            kind: 'unsupported_algorithm',
+            algorithm,
+            supported: Array.from(supportedAlgorithms),
+          },
+        },
       );
     }
+    return null;
   }
 
   // ----------------------------------------------------------
   // Functions
   // ----------------------------------------------------------
 
-  const hash = async (args: Record<string, RillValue>): Promise<string> => {
+  const hash: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
     const input = args['input'] as string;
     const algorithm =
       (args['algorithm'] as string | undefined) ?? defaultAlgorithm;
-    validateAlgorithm(algorithm);
+    const invalid = checkAlgorithm(algorithm, runCtx);
+    if (invalid !== null) return invalid;
     const h = crypto.createHash(algorithm);
     h.update(input);
     return h.digest('hex');
   };
 
-  const hmac = async (args: Record<string, RillValue>): Promise<string> => {
+  const hmac: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
     if (!hmacKey) {
-      throw new RuntimeError(
-        'RILL-R004',
-        'hmacKey required for hmac() — set in config',
-        undefined,
-        {},
+      return runCtx.invalidate(
+        new Error('hmacKey required for hmac() — set in config'),
+        {
+          code: EXT_CRYPTO_CONFIG,
+          provider: PROVIDER,
+          raw: { kind: 'missing_hmac_key' },
+        },
       );
     }
     const input = args['input'] as string;
     const algorithm =
       (args['algorithm'] as string | undefined) ?? defaultAlgorithm;
-    validateAlgorithm(algorithm);
+    const invalid = checkAlgorithm(algorithm, runCtx);
+    if (invalid !== null) return invalid;
     const h = crypto.createHmac(algorithm, hmacKey);
     h.update(input);
     return h.digest('hex');
   };
 
-  const uuid = async (): Promise<string> => {
+  const uuid: CallableFn = async () => {
     return crypto.randomUUID();
   };
 
   const MAX_RANDOM_BYTES = 1_048_576;
 
-  const random = async (args: Record<string, RillValue>): Promise<string> => {
+  const random: CallableFn = async (args, ctx) => {
+    const runCtx = ctx as RuntimeContext;
     const bytes = args['bytes'] as number;
     if (!Number.isInteger(bytes) || bytes < 0) {
-      throw new RuntimeError(
-        'RILL-R004',
-        'bytes must be a non-negative integer',
-        undefined,
-        { bytes },
+      return runCtx.invalidate(
+        new Error('bytes must be a non-negative integer'),
+        {
+          code: EXT_CRYPTO_CONFIG,
+          provider: PROVIDER,
+          raw: { kind: 'invalid_bytes', bytes },
+        },
       );
     }
     if (bytes > MAX_RANDOM_BYTES) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `bytes must not exceed ${MAX_RANDOM_BYTES} (1MB)`,
-        undefined,
-        { bytes, max: MAX_RANDOM_BYTES },
+      return runCtx.invalidate(
+        new Error(`bytes must not exceed ${MAX_RANDOM_BYTES} (1MB)`),
+        {
+          code: EXT_CRYPTO_CONFIG,
+          provider: PROVIDER,
+          raw: { kind: 'bytes_too_large', bytes, max: MAX_RANDOM_BYTES },
+        },
       );
     }
     return crypto.randomBytes(bytes).toString('hex');

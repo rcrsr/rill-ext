@@ -5,14 +5,19 @@
  */
 
 import {
+  isInvalid,
   structureToTypeValue,
   toCallable,
+  type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillFunction,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import type { CommandConfig, CommandResult, ExecExtensionConfig } from './types.js';
 import { runCommand } from './runner.js';
+import { EXT_EXEC_CONFIG, EXT_EXEC_TIMEOUT } from './errors.js';
 
 /**
  * Creates an exec extension with sandboxed command execution.
@@ -21,7 +26,11 @@ import { runCommand } from './runner.js';
  */
 export function createExecExtension(
   config: ExecExtensionConfig,
+  ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
+  ctx.registerErrorCode(EXT_EXEC_CONFIG, 'runtime');
+  ctx.registerErrorCode(EXT_EXEC_TIMEOUT, 'runtime');
+
   const globalTimeout = config.timeout ?? 30000;
   const globalMaxOutputSize = config.maxOutputSize ?? 1048576;
   const inheritEnv = config.inheritEnv ?? false;
@@ -51,15 +60,18 @@ export function createExecExtension(
   const functions: Record<string, RillFunction> = {};
 
   for (const [commandName, commandConfig] of Object.entries(config.commands)) {
-    const commandFn = async (
-      args: Record<string, RillValue>,
-    ): Promise<RillValue> => {
+    const commandFn: CallableFn = async (args, runCtxLike) => {
+      const runCtx = runCtxLike as RuntimeContext;
       const argsParam = (args['args'] as RillValue[] | undefined) ?? [];
       const stdinParam = args['stdin'] as string | undefined;
       const stringArgs = argsParam.map((arg) => String(arg));
 
       const controller = new AbortController();
       abortControllers.push(controller);
+
+      // Compose factory-scope cancellation with per-call abort so script-level
+      // cancel kills children spawned by this call.
+      const composedSignal = AbortSignal.any([ctx.signal, controller.signal]);
 
       try {
         const effectiveConfig: CommandConfig = {
@@ -69,18 +81,24 @@ export function createExecExtension(
           env: getEnv(commandConfig),
         };
 
-        const result: CommandResult = await runCommand(
+        const result = await runCommand(
           commandName,
           effectiveConfig,
           stringArgs,
           stdinParam,
-          controller.signal,
+          composedSignal,
+          runCtx,
         );
 
+        if (isInvalid(result as RillValue)) {
+          return result as RillValue;
+        }
+
+        const cmdResult = result as CommandResult;
         return {
-          stdout: result.stdout,
-          stderr: result.stderr,
-          exitCode: result.exitCode,
+          stdout: cmdResult.stdout,
+          stderr: cmdResult.stderr,
+          exitCode: cmdResult.exitCode,
         };
       } finally {
         const index = abortControllers.indexOf(controller);
@@ -116,12 +134,12 @@ export function createExecExtension(
   // Introspection
   // ----------------------------------------------------------
 
-  const commands = async (): Promise<RillValue[]> => {
+  const commands: CallableFn = async () => {
     const result: RillValue[] = [];
     for (const [name, cmd] of Object.entries(config.commands)) {
       result.push({ name, description: cmd.description ?? '' });
     }
-    return result;
+    return result as unknown as RillValue;
   };
 
   functions['commands'] = {
