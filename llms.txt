@@ -160,3 +160,13 @@ Microsoft Outlook mail and calendar via the Graph API. Supports bearer token and
 | `@rcrsr/rill-ext-outlook` | [extension-outlook.md](packages/ext/outlook/docs/extension-outlook.md) |
 
 Functions: `inbox`, `from`, `search`, `read`, `send`, `draft`, `reply`, `flag`, `events`, `today`, `free_busy`, `create_event`
+
+## Google Workspace (1 package, 17 functions)
+
+Gmail, Google Drive, and Google Calendar via Google REST APIs. Supports bearer token, session, and service account (RS256 JWT) auth. Per-service capability gating.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-google-workspace` | [docs/README.md](packages/ext/google-workspace/docs/README.md) |
+
+Functions: `gmail_search`, `gmail_read`, `gmail_send`, `gmail_draft`, `gmail_reply`, `gmail_flag`, `gmail_label`, `drive_list`, `drive_get_metadata`, `drive_download`, `drive_upload`, `drive_share`, `drive_delete`, `calendar_events`, `calendar_today`, `calendar_free_busy`, `calendar_create_event`
