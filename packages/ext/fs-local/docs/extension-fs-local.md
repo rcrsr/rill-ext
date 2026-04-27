@@ -46,21 +46,21 @@ Reads file contents as a string.
 
 - `path` - Mount-prefixed file path, e.g. `/workspace/file.txt`
 - Returns file content as string
-- Throws `RuntimeError(RILL-R004)` if file not found or exceeds size limit
+- Returns invalid `#NOT_FOUND` if file is missing; invalid `#FORBIDDEN` if path escapes the mount sandbox; invalid `#INVALID_INPUT` (`raw.kind == 'size_limit_exceeded'`) if size exceeds limit
 
 ### write(path, content)
 
 Writes content to a file, replacing if it exists.
 
 - Returns bytes written as string
-- Throws `RuntimeError(RILL-R004)` if content exceeds size limit
+- Returns invalid `#FORBIDDEN` if path escapes the sandbox or mount is read-only; invalid `#INVALID_INPUT` (`raw.kind == 'size_limit_exceeded'`) if content exceeds limit
 
 ### append(path, content)
 
 Appends content to a file, creating it if it does not exist.
 
 - Returns bytes appended as string
-- Throws `RuntimeError(RILL-R004)` if total size would exceed limit
+- Returns invalid `#FORBIDDEN` if path escapes the sandbox or mount is read-only; invalid `#INVALID_INPUT` (`raw.kind == 'size_limit_exceeded'`) if total size would exceed limit
 
 ### list(path)
 
@@ -94,7 +94,7 @@ Deletes a file.
 Gets file metadata.
 
 - Returns `{ name, type, size, created, modified }` dict
-- Throws `RuntimeError(RILL-R004)` if file not found
+- Returns invalid `#NOT_FOUND` if file does not exist
 
 ### mkdir(path)
 
@@ -106,13 +106,13 @@ Creates a directory (recursive).
 
 Copies a file within the same mount.
 
-- Throws `RuntimeError(RILL-R004)` if src and dest are different mounts
+- Returns invalid `#INVALID_INPUT` (`raw.kind == 'cross_mount'`) if src and dest are different mounts
 
 ### move(src, dest)
 
 Moves a file within the same mount.
 
-- Throws `RuntimeError(RILL-R004)` if src and dest are different mounts
+- Returns invalid `#INVALID_INPUT` (`raw.kind == 'cross_mount'`) if src and dest are different mounts
 
 ### mounts()
 
@@ -131,8 +131,21 @@ The sandbox enforces the following:
 5. Optional glob patterns restrict file types per mount
 6. File size limits prevent large file reads/writes
 
-## Error Codes
+## Error Behavior
 
-| Code | Description |
-|------|-------------|
-| `RILL-R004` | All extension errors: unknown mount, path escapes boundary, glob violation, mode violation, permission denied, file not found, size limit exceeded |
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #FORBIDDEN`) or finely
+(`guard #FORBIDDEN && raw.kind == 'path_escape'`).
+
+**Host-fn errors:**
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| File or directory not found | `#NOT_FOUND` | `not_found` |
+| Path escapes the mount sandbox (symlink or `..`) | `#FORBIDDEN` | `path_escape` |
+| Mount mode forbids the operation (e.g. write on read-only) | `#FORBIDDEN` | `mode_violation` |
+| Path does not match the mount glob | `#FORBIDDEN` | `glob_violation` |
+| Unknown mount referenced | `#INVALID_INPUT` | `unknown_mount` |
+| `copy()` / `move()` across different mounts | `#INVALID_INPUT` | `cross_mount` |
+| Value or file exceeds configured size limit | `#INVALID_INPUT` | `size_limit_exceeded` |
+| Filesystem read or write failure | `#UNAVAILABLE` | `io_error` |

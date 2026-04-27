@@ -130,7 +130,7 @@ export function createOutlookExtension(
    * Wrap a host function with: disposal check, capability gate,
    * AbortController lifecycle, timing, event emission, and error mapping.
    *
-   * @param capabilityCheck - Throws RILL-R004 when capability disabled; null = no gate
+   * @param capabilityCheck - Halts with invalid `#FORBIDDEN` when capability disabled; null = no gate
    * @param eventFactory - Builds success event fields from the result
    * @param fn - Inner function (args, ctx, controller, config) => RillValue
    */

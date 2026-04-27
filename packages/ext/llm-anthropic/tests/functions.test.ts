@@ -978,7 +978,7 @@ describe('messages() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream));
+      await expectRejectedHalt(resolveStream(stream));
     });
   });
 });

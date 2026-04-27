@@ -348,20 +348,29 @@ Filters use exact name matching against the MCP server's declared names. Empty a
 
 ## Error Behavior
 
-**Connection errors** during `createMcpExtension()`:
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #UNAVAILABLE`) or finely
+(`guard #UNAVAILABLE && raw.kind == 'connection_lost'`).
 
-- Config validation: `transport.command is required for stdio`
-- Process exit: `mcp: failed to connect -- server process exited with code 1`
-- Connection refused: `mcp: failed to connect -- connection refused at https://...`
-- Auth required: `mcp: server requires authentication -- complete OAuth flow`
+**Factory-time validation** (before any host fn runs) throws `RuntimeError RILL-R001`:
 
-**Runtime errors** during script execution (halts with `RuntimeError RILL-R004`):
+- Missing or invalid transport config (e.g. `transport.command is required for stdio`)
+- Server process exited (stdio): `mcp: server process exited with code <n>`
+- Connection refused (HTTP): `mcp: connection refused at <url>`
+- Server requires authentication (HTTP): `mcp: server requires authentication -- complete OAuth flow before connecting`
 
-- Tool execution: `mcp tool "read_file": file not found`
-- Protocol error: `mcp: protocol error -- invalid tool name`
-- Timeout: `mcp: timeout calling tool "slow_query"`
-- Connection lost: `mcp: connection lost to server`
-- Auth failed: `mcp: authentication failed`
+**Host-fn errors** (during tool / resource / prompt invocation):
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Tool execution returned an error response | `#UNAVAILABLE` | `tool_error` |
+| Tool / resource / prompt not found on server | `#NOT_FOUND` | `not_found` |
+| Malformed protocol response or schema mismatch | `#PROTOCOL` | `protocol_error` |
+| Operation exceeded configured timeout | `#TIMEOUT` | `tool_timeout` |
+| Transport disconnected mid-operation | `#UNAVAILABLE` | `connection_lost` |
+| Authentication failed / token expired | `#AUTH` | `auth_failed` |
+| Bad input from host script | `#INVALID_INPUT` | `invalid_input` |
+| Other transport / SDK failure | `#UNAVAILABLE` | `unknown_error` |
 
 ```rill
 use<ext:fs> => $fs

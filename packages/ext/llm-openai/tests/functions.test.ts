@@ -977,7 +977,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
 
-      await expect(resolveStream(stream));
+      await expectRejectedHalt(resolveStream(stream));
     });
   });
 });
@@ -1884,7 +1884,7 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools, options: {} }, ctx);
 
-      await expect(resolveStream(stream), { message: expect.stringContaining('Provider API error:') });
+      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('Provider API error:') });
     });
 
     // AC-17: Tool execution error mid-loop yields tool_call chunk; stream resolves with final content

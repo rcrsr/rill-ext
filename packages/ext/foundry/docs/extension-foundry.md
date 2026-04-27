@@ -443,11 +443,9 @@ Set `contentSafety.autoShield: true` to run a shield check before every call to 
 }
 ```
 
-When a shield check blocks a call:
-
-```text
-RuntimeError RILL-R004: foundry: prompt attack detected
-```
+When a shield check blocks a call, the call returns an invalid value carrying
+`#FORBIDDEN` (with `raw.kind == 'prompt_attack_detected'`). Use
+`guard #FORBIDDEN` in host scripts to react.
 
 Use `shield()` directly for explicit checks. Use `autoShield` to protect all LLM calls without modifying scripts.
 
@@ -528,7 +526,7 @@ Counts accumulate across all `message`, `messages`, `tool_loop`, `generate`, and
 
 ### dispose()
 
-Release all resources held by the extension. Safe to call multiple times. Calling any host function after `dispose()` throws `RILL-R004: foundry: extension disposed`.
+Release all resources held by the extension. Safe to call multiple times. Calling any host function after `dispose()` returns an invalid value carrying `#DISPOSED` (with `raw.kind == 'extension_disposed'`).
 
 ```rill
 $foundry.dispose()
@@ -622,35 +620,41 @@ $result.content -> log
 
 ## Error Reference
 
-### Validation errors (before API call)
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
+(`guard #AUTH && raw.kind == 'rest_error' && raw.status == 401`).
 
-| Error | Cause |
-|-------|-------|
-| `foundry: endpoint is required` | `endpoint` is empty or missing |
-| `foundry: auth is required` | `auth` is missing |
-| `foundry: auth.type must be 'api-key' or 'entra'` | Invalid `auth.type` |
-| `foundry: inference not configured` | Called LLM function without `inference` config |
-| `foundry: model is required` | `inference.model` is empty |
-| `foundry: inference.apiVersion is required` | `inference.apiVersion` is empty |
-| `foundry: content safety not configured` | Called `shield()` without `contentSafety` config |
-| `foundry: prompt attack detected` | `autoShield` blocked a call |
-| `foundry: grounding connection not configured` | Called `ground()` without `grounding` config |
-| `foundry: grounding requires a model` | No model in `grounding` or `inference` |
-| `foundry: search not configured` | Called `search()` without `search` config |
-| `foundry: search index '{name}' not found` | Index does not exist (HTTP 404) |
-| `foundry: extension disposed` | Called a function after `dispose()` |
-| `prompt text cannot be empty` | Empty string passed to `message` or `tool_loop` |
-| `messages list cannot be empty` | Empty list passed to `messages` |
-| `embed_model not configured` | Called `embed` or `embed_batch` without `embedModel` |
+### Factory-time validation (throws `RuntimeError RILL-R001`)
 
-### API errors (from Azure)
+- `foundry: endpoint is required` — `endpoint` empty or missing
+- `foundry: auth is required` — `auth` missing
+- `foundry: auth.type must be 'api-key' or 'entra'` — invalid `auth.type`
+- `foundry: inference not configured` — LLM function called without `inference` config
+- `foundry: model is required` — `inference.model` empty
+- `foundry: inference.apiVersion is required` — `inference.apiVersion` empty
+- `foundry: content safety not configured` — `shield()` called without `contentSafety` config
+- `foundry: grounding connection not configured` — `ground()` called without `grounding` config
+- `foundry: grounding requires a model` — no model in `grounding` or `inference`
+- `foundry: search not configured` — `search()` called without `search` config
 
-| Error | Cause |
-|-------|-------|
-| `foundry: authentication failed (401)` | Invalid API key or expired token |
-| `foundry: rate limit exceeded` | Azure rate limit hit (HTTP 429) |
-| `foundry: request timeout` | Request exceeded timeout |
-| `foundry: model '{name}' not deployed` | Deployment name does not exist |
+### Host-fn errors
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Authentication failed (HTTP 401, missing key, token acquisition) | `#AUTH` | `rest_error` (status=401) |
+| Quota / token-budget exceeded (HTTP 402) | `#QUOTA_EXCEEDED` | `rest_error` (status=402) |
+| Forbidden (HTTP 403) | `#FORBIDDEN` | `rest_error` (status=403) |
+| Prompt-attack detected by content safety | `#FORBIDDEN` | `attack_detected` |
+| Search index `'{name}'` not found (HTTP 404) | `#NOT_FOUND` | `index_not_found` |
+| Model `'{name}'` not deployed | `#NOT_FOUND` | `model_not_deployed` |
+| Other resource not found (HTTP 404) | `#NOT_FOUND` | `rest_error` (status=404) |
+| Request timeout (HTTP 408 / `AbortError`) | `#TIMEOUT` | `request_timeout` |
+| Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rest_error` (status=429) |
+| Service unavailable (HTTP 5xx) | `#UNAVAILABLE` | `rest_error` (status=5xx) |
+| Network failure / SDK error | `#UNAVAILABLE` | `unknown_error` |
+| Empty prompt / messages list / unresolved `@{VAR}` reference | `#INVALID_INPUT` | `unresolved_variable` (and others) |
+| Malformed JSON / SSE response | `#PROTOCOL` | `rest_error` (other status) |
+| Called a function after `dispose()` | `#DISPOSED` | `extension_disposed` |
 
 ---
 

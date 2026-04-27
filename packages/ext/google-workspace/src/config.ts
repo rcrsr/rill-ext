@@ -48,11 +48,11 @@ const DEFAULT_CAPABILITIES: GoogleCapabilities = {
 
 /**
  * Parse and validate a GCP service account key JSON string.
- * Throws RuntimeError RILL-R004 with EC-3 messages on failure.
+ * Throws RuntimeError RILL-R001 with EC-3 messages on failure.
  *
  * @param keyJson - Service account key JSON string
  * @returns Parsed ServiceAccountKey with required fields
- * @throws RuntimeError (RILL-R004) on parse failure or missing fields
+ * @throws RuntimeError (RILL-R001) on parse failure or missing fields
  */
 export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
   let parsed: unknown;
@@ -109,10 +109,10 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
 
 /**
  * Validate GoogleWorkspaceConfig fields.
- * Throws RuntimeError RILL-R004 on any invalid field.
+ * Throws RuntimeError RILL-R001 on any invalid field.
  *
  * @param config - Configuration to validate
- * @throws RuntimeError (RILL-R004) on validation failure
+ * @throws RuntimeError (RILL-R001) on validation failure
  */
 export function validateConfig(config: GoogleWorkspaceConfig): void {
   // EC-1: Missing auth

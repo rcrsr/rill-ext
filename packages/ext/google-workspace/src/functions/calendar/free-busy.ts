@@ -17,7 +17,7 @@ export interface CalendarFreeBusyDeps {
 }
 /**
  * Factory returning the calendar_free_busy inner function.
- * BC-4: Empty emails list → throws RILL-R004 before fetch.
+ * BC-4: Empty emails list → halts with invalid `#INVALID_INPUT` before fetch.
  * EC-13: Rejects naive ISO timestamps (no timezone).
  * AC-12: Returns rill primitive dict keyed by email.
  */

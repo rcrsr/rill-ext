@@ -31,9 +31,9 @@ interface GmailLabel {
 }
 /**
  * Validate labelName against allowed/denied label config.
- * EC-6/EC-12: Throws RuntimeError (RILL-R004) before fetch on violation.
+ * EC-6/EC-12: Halts with invalid `#FORBIDDEN` before fetch on violation.
  * BC-9: allowedLabels undefined → all labels accepted.
- * BC-10: allowedLabels non-empty + label not in list → RILL-R004.
+ * BC-10: allowedLabels non-empty + label not in list → invalid `#FORBIDDEN`.
  */
 function validateLabelAccess(
   ctx: RuntimeContext,

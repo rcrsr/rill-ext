@@ -613,7 +613,7 @@ Requires capability: `calendar.freeBusy` (default `true`).
 
 ## Error Behavior
 
-See [errors.md](./errors.md) for the complete RILL-R004 error catalog and retry guidance.
+See [errors.md](./errors.md) for the complete generic-atom error catalog and retry guidance.
 
 ## Events
 
@@ -656,7 +656,7 @@ Every successful callable emits one event in the form `google:<service>:<operati
 
 - [auth.md](./auth.md) — Auth variant comparison, GCP service account setup, domain-wide delegation
 - [capabilities.md](./capabilities.md) — Capability matrix, default-deny rationale, allowlist semantics
-- [errors.md](./errors.md) — RILL-R004 error catalog, retry guidance
+- [errors.md](./errors.md) — Generic-atom error catalog, retry guidance
 - [rill](https://github.com/rcrsr/rill) — Core language runtime
 - [Extensions Guide](https://github.com/rcrsr/rill/blob/main/docs/integration-extensions.md) — Extension contract and patterns
 - [Google APIs](https://developers.google.com/apis-explorer) — Underlying API reference

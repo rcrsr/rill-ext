@@ -160,22 +160,31 @@ $cfg.locales    -> log
 
 ## Error Behavior
 
-**Validation errors** (before request):
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #UNAVAILABLE`) or finely
+(`guard #UNAVAILABLE && raw.kind == 'connection_failed'`).
 
-- Empty query → `RuntimeError RILL-R004: searxng: query is required`
-- Invalid `time_range` value → `RuntimeError RILL-R004: searxng: time_range must be one of: day, month, year`
-- After dispose → `RuntimeError RILL-R004: searxng: operation cancelled`
+**Factory-time validation** (throws `RuntimeError RILL-R001`):
 
-**Factory errors** (at creation time):
+- `searxng: instance unreachable at {url}` — probe failed during factory init
+- `searxng: JSON format is not enabled on {url}` — instance does not return JSON
+- `searxng: invalid configuration` — generic config validation failure
 
-- Instance unreachable → `RuntimeError RILL-R004: searxng: instance unreachable at {url}`
-- JSON format not enabled → `RuntimeError RILL-R004: searxng: JSON format is not enabled on {url}`
+**Host-fn errors:**
 
-**Request errors** (during call):
-
-- Network failure → `RuntimeError RILL-R004: searxng: connection failed`
-- Non-2xx response → `RuntimeError RILL-R004: searxng: server error ({status})`
-- Malformed JSON body → `RuntimeError RILL-R004: searxng: unexpected response format`
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Empty / missing query | `#INVALID_INPUT` | `invalid_input` |
+| Invalid `time_range` value | `#INVALID_INPUT` | `invalid_input` |
+| Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
+| Forbidden (HTTP 403) | `#FORBIDDEN` | `forbidden` |
+| Resource not found (HTTP 404) | `#NOT_FOUND` | `not_found` |
+| Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
+| Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
+| Unexpected JSON / response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
+| Called after `dispose()` | `#DISPOSED` | `disposed` |
 
 ## Events
 

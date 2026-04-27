@@ -71,8 +71,8 @@ export function clearTokenCache(cache: TokenCache): void {
  * @param scopes - OAuth2 scopes for service-account JWT; ignored for other modes
  * @param signal - AbortSignal for token exchange HTTP request cancellation
  * @returns Resolved Bearer token string
- * @throws RuntimeError (RILL-R004) if session token variable not found (EC-21)
- * @throws RuntimeError (RILL-R004) on JWT signing or token exchange failure
+ * @throws halt carrying invalid `#AUTH` (`raw.kind == 'session_token_missing'`) if session token variable not found (EC-21)
+ * @throws halt carrying invalid `#AUTH` on JWT signing or token exchange failure
  */
 export async function resolveToken(
   auth: GoogleAuth,

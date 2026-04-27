@@ -124,7 +124,7 @@ export function createGoogleWorkspaceExtension(
    * @param _fnName - Host function name (reserved for diagnostics)
    * @param service - Google service identifier for event name
    * @param operation - Operation name for event name (e.g. 'search', 'send')
-   * @param capabilityCheck - Throws RILL-R004 when capability disabled; null = no gate
+   * @param capabilityCheck - Returns invalid `#FORBIDDEN` when capability disabled; null = no gate
    * @param fn - Inner function (args, ctx, controller) => RillValue
    */
   function wrap(

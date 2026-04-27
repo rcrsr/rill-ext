@@ -254,7 +254,7 @@ describe('generate() function', () => {
         },
       });
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx));
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');

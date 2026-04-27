@@ -173,16 +173,27 @@ brave::summarize("how does RLHF work", [country: "US", search_lang: "en"]) => $r
 
 ## Error Behavior
 
-| Condition | Error Code | Message |
-|-----------|------------|---------|
-| Empty query string | `RILL-R004` | `brave: query is required` |
-| Summarizer key not in response | `RILL-R004` | `brave: summarizer key not found` |
-| Summarizer second request fails | `RILL-R004` | `brave: summarizer request failed` |
-| HTTP 429 from Brave API | `RILL-R004` | `brave: rate limit exceeded` |
-| HTTP 401 or 403 from Brave API | `RILL-R004` | `brave: authentication failed` |
-| HTTP 403 with error code in body | `RILL-R004` | `brave: access denied ({code})` |
-| Request timeout | `RILL-R004` | `brave: request timeout` |
-| Called after `dispose()` | `RILL-R004` | `brave: operation cancelled` |
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #FORBIDDEN`) or finely
+(`guard #FORBIDDEN && raw.kind == 'access_denied'`).
+
+**Host-fn errors:**
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Empty / missing query | `#INVALID_INPUT` | `empty_query` |
+| Summarizer key not in initial response | `#UNAVAILABLE` | `summarizer_key_missing` |
+| Summarizer second request failed | `#UNAVAILABLE` | `summarizer_request_failed` |
+| Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
+| Access denied — body carries provider code (HTTP 403) | `#FORBIDDEN` | `access_denied` |
+| Forbidden — no body code (HTTP 403) | `#FORBIDDEN` | `forbidden` |
+| Resource not found (HTTP 404) | `#NOT_FOUND` | `not_found` |
+| Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
+| Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
+| Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
+| Called after `dispose()` | `#DISPOSED` | `disposed` |
 
 ## Events
 

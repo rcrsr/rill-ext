@@ -36,7 +36,7 @@ function toBase64Url(value: string | Buffer): string {
  * @param scopes - OAuth2 scopes to request
  * @param subject - Optional email to impersonate via domain-wide delegation
  * @returns Base64url-encoded JWT assertion: <header>.<payload>.<signature>
- * @throws RuntimeError (RILL-R004) on signing failure
+ * @throws halt carrying invalid `#AUTH` (`raw.kind == 'jwt_sign_failed'`) on signing failure
  */
 export function signServiceAccountJwt(
   ctx: RuntimeContext,
