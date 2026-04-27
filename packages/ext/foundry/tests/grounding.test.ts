@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RuntimeError, createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
+import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
 
 // ============================================================
 // MODULE MOCK
@@ -356,7 +357,7 @@ describe('ground() host function', () => {
   // --------------------------------------------------------
 
   describe('grounding not configured [AC-20, EC-9]', () => {
-    it('throws RILL-R004 when grounding config absent [AC-20, EC-9]', async () => {
+    it('throws RILL-R005 when grounding config absent [AC-20, EC-9]', async () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithoutGrounding());
       const ctx = createRuntimeContext();
@@ -371,9 +372,9 @@ describe('ground() host function', () => {
       const ext = await createFoundryExtension(configWithoutGrounding());
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('foundry: grounding connection not configured');
+      , { message: 'foundry: grounding connection not configured' });
     });
 
     it('responses.create is not called when grounding not configured [AC-20]', async () => {
@@ -403,9 +404,9 @@ describe('ground() host function', () => {
       const ext = await createFoundryExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('grounding requires a model');
+      , { message: 'grounding requires a model' });
     });
   });
 
@@ -462,7 +463,7 @@ describe('ground() host function', () => {
   // --------------------------------------------------------
 
   describe('error mapping', () => {
-    it('wraps unexpected error as RuntimeError with RILL-R004', async () => {
+    it('wraps unexpected error as RuntimeError with RILL-R005', async () => {
       mockResponsesCreate.mockRejectedValue(new Error('Network failure'));
 
       const { createFoundryExtension } = await import('../src/factory.js');
@@ -481,9 +482,9 @@ describe('ground() host function', () => {
       const ext = await createFoundryExtension(configWithGrounding());
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('Connection refused');
+      , { message: 'Connection refused' });
     });
   });
 });

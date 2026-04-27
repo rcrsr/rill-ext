@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import type { FoundryConfig } from '../src/types.js';
+import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
 
 // ============================================================
 // MODULE MOCK
@@ -86,9 +87,7 @@ describe('createFoundryExtension', () => {
         auth: { type: 'api-key', key: 'test-key' },
       } as FoundryConfig;
 
-      await expect(createFoundryExtension(config)).rejects.toThrow(
-        'foundry: endpoint is required'
-      );
+      await expectRejectedHalt(createFoundryExtension(config), { message: 'foundry: endpoint is required' });
     });
 
     it('throws when endpoint is whitespace only (EC-1)', async () => {
@@ -98,9 +97,7 @@ describe('createFoundryExtension', () => {
         auth: { type: 'api-key', key: 'test-key' },
       } as FoundryConfig;
 
-      await expect(createFoundryExtension(config)).rejects.toThrow(
-        'foundry: endpoint is required'
-      );
+      await expectRejectedHalt(createFoundryExtension(config), { message: 'foundry: endpoint is required' });
     });
 
     // EC-2 / AC-17: Missing auth
@@ -111,9 +108,7 @@ describe('createFoundryExtension', () => {
         auth: undefined,
       } as unknown as FoundryConfig;
 
-      await expect(createFoundryExtension(config)).rejects.toThrow(
-        'foundry: auth is required'
-      );
+      await expectRejectedHalt(createFoundryExtension(config), { message: 'foundry: auth is required' });
     });
 
     // EC-3: Invalid auth.type
@@ -373,9 +368,7 @@ describe('createFoundryExtension', () => {
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const embedFn = value['embed']!;
 
-      await expect(embedFn.fn({ text: 'hello' }, {})).rejects.toThrow(
-        'foundry: extension disposed'
-      );
+      await expectRejectedHalt(embedFn.fn({ text: 'hello' }, {}), { message: 'foundry: extension disposed' });
     });
 
     it('usage() halts after dispose (EC-16)', async () => {
@@ -399,9 +392,7 @@ describe('createFoundryExtension', () => {
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const shieldFn = value['shield']!;
 
-      await expect(shieldFn.fn({ text: 'hello', documents: [] }, {})).rejects.toThrow(
-        'foundry: extension disposed'
-      );
+      await expectRejectedHalt(shieldFn.fn({ text: 'hello', documents: [] }, {}), { message: 'foundry: extension disposed' });
     });
 
     it('ground() halts after dispose (AC-27, EC-16)', async () => {
@@ -412,9 +403,7 @@ describe('createFoundryExtension', () => {
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const groundFn = value['ground']!;
 
-      await expect(groundFn.fn({ query: 'test query' }, {})).rejects.toThrow(
-        'foundry: extension disposed'
-      );
+      await expectRejectedHalt(groundFn.fn({ query: 'test query' }, {}), { message: 'foundry: extension disposed' });
     });
 
     it('search() halts after dispose (AC-27, EC-16)', async () => {
@@ -425,9 +414,7 @@ describe('createFoundryExtension', () => {
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const searchFn = value['search']!;
 
-      await expect(searchFn.fn({ query: 'test query', options: {} }, {})).rejects.toThrow(
-        'foundry: extension disposed'
-      );
+      await expectRejectedHalt(searchFn.fn({ query: 'test query', options: {} }, {}), { message: 'foundry: extension disposed' });
     });
 
     it('embed_batch() halts after dispose (AC-27, EC-16)', async () => {
@@ -438,9 +425,7 @@ describe('createFoundryExtension', () => {
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const embedBatchFn = value['embed_batch']!;
 
-      await expect(embedBatchFn.fn({ texts: ['hello', 'world'] }, {})).rejects.toThrow(
-        'foundry: extension disposed'
-      );
+      await expectRejectedHalt(embedBatchFn.fn({ texts: ['hello', 'world'] }, {}), { message: 'foundry: extension disposed' });
     });
 
     it('tool_loop() halts after dispose (AC-27, EC-16)', async () => {
@@ -464,9 +449,7 @@ describe('createFoundryExtension', () => {
       const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }>;
       const generateFn = value['generate']!;
 
-      await expect(generateFn.fn({ prompt: 'hello', schema: undefined, options: {} }, {})).rejects.toThrow(
-        'foundry: extension disposed'
-      );
+      await expectRejectedHalt(generateFn.fn({ prompt: 'hello', schema: undefined, options: {} }, {}), { message: 'foundry: extension disposed' });
     });
   });
 });

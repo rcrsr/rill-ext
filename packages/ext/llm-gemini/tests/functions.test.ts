@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { expectHalt, expectRejectedHalt } from './_halt-helpers.js';
 import { createRuntimeContext, callable, isRillStream, type ApplicationCallable, type RillStream, type RillValue } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
@@ -353,9 +354,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'message').fn({ text: '' }, ctx)).rejects.toThrow(
-        'prompt text cannot be empty'
-      );
+      await expectRejectedHalt(getCallable(ext, "message").fn({ text: "" }, ctx), { message: "prompt text cannot be empty" });
     });
 
     it('throws RuntimeError for whitespace-only prompt text', async () => {
@@ -367,9 +366,7 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'message').fn({ text: '   ' }, ctx)).rejects.toThrow(
-        'prompt text cannot be empty'
-      );
+      await expectRejectedHalt(getCallable(ext, 'message').fn({ text: '   ' }, ctx), { message: 'prompt text cannot be empty' });
     });
 
     // EC-2: Provider API error during stream
@@ -387,9 +384,7 @@ describe('message() function', () => {
       const ctx = createRuntimeContext();
 
       const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
-      await expect(collectStream(stream, ctx)).rejects.toThrow(
-        'Gemini API error (HTTP 401): authentication failed (401)'
-      );
+      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error (HTTP 401): authentication failed (401)' });
     });
 
     // EC-2: Provider API error during stream
@@ -405,9 +400,7 @@ describe('message() function', () => {
       const ctx = createRuntimeContext();
 
       const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
-      await expect(collectStream(stream, ctx)).rejects.toThrow(
-        'Gemini API error: rate limit exceeded'
-      );
+      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error: rate limit exceeded' });
     });
 
     // EC-2: Network timeout error during stream
@@ -423,9 +416,7 @@ describe('message() function', () => {
       const ctx = createRuntimeContext();
 
       const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
-      await expect(collectStream(stream, ctx)).rejects.toThrow(
-        'Gemini API error: Request timeout'
-      );
+      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error: Request timeout' });
     });
 
     // EC-2: Generic API error with status during stream
@@ -443,13 +434,11 @@ describe('message() function', () => {
       const ctx = createRuntimeContext();
 
       const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
-      await expect(collectStream(stream, ctx)).rejects.toThrow(
-        'Gemini API error (HTTP 500): Internal server error (500)'
-      );
+      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error (HTTP 500): Internal server error (500)' });
     });
 
-    // EC-3/AC-16: Provider disconnect mid-stream — error thrown during iteration with RILL-R004
-    it('throws RuntimeError RILL-R004 during iteration on mid-stream disconnect [EC-3]', async () => {
+    // EC-3/AC-16: Provider disconnect mid-stream — error thrown during iteration with RILL-R005
+    it('throws RuntimeError RILL-R005 during iteration on mid-stream disconnect [EC-3]', async () => {
       const disconnectError = new Error('Connection reset (503)');
       mockGenerateContentStream.mockResolvedValue(
         makePartialDisconnectIterable(['Partial text'], disconnectError)
@@ -466,10 +455,7 @@ describe('message() function', () => {
       const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
       const { error } = await collectStreamUntilError(stream, ctx);
-      expect(error).toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('Gemini API error'),
-      });
+      expectHalt(error, { message: 'Gemini API error' });
     });
 
     it('yields partial chunks before mid-stream disconnect [EC-3]', async () => {
@@ -492,8 +478,8 @@ describe('message() function', () => {
       expect(chunks).toEqual(['Hello', ' world']);
     });
 
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R004
-    it('resolve() propagates error as RuntimeError RILL-R004 after stream error [EC-12]', async () => {
+    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
+    it('resolve() propagates error as RuntimeError RILL-R005 after stream error [EC-12]', async () => {
       const disconnectError = new Error('Service unavailable (503)');
       mockGenerateContentStream.mockResolvedValue(
         makePartialDisconnectIterable([], disconnectError)
@@ -515,9 +501,7 @@ describe('message() function', () => {
       // Resolve also throws because streamError is set
       await expect(
         (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-      });
+      );
     });
   });
 });
@@ -771,9 +755,7 @@ describe('messages() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'messages').fn({ messages: [] }, ctx)).rejects.toThrow(
-        'messages list cannot be empty'
-      );
+      await expectRejectedHalt(getCallable(ext, 'messages').fn({ messages: [] }, ctx), { message: 'messages list cannot be empty' });
     });
 
     // EC-10: Missing role field
@@ -919,9 +901,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
 
-      await expect(collectStream(stream, ctx)).rejects.toThrow(
-        'Gemini API error (HTTP 401): authentication failed (401)'
-      );
+      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error (HTTP 401): authentication failed (401)' });
     });
 
     it('throws RuntimeError for 429 rate limit error when iterating stream', async () => {
@@ -938,9 +918,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
 
-      await expect(collectStream(stream, ctx)).rejects.toThrow(
-        'Gemini API error: rate limit exceeded'
-      );
+      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error: rate limit exceeded' });
     });
 
     it('throws RuntimeError for timeout error when iterating stream', async () => {
@@ -957,9 +935,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
 
-      await expect(collectStream(stream, ctx)).rejects.toThrow(
-        'Gemini API error: Request timeout'
-      );
+      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error: Request timeout' });
     });
 
     it('throws RuntimeError for generic API error when iterating stream', async () => {
@@ -978,13 +954,11 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
 
-      await expect(collectStream(stream, ctx)).rejects.toThrow(
-        'Gemini API error (HTTP 500): Internal server error (500)'
-      );
+      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error (HTTP 500): Internal server error (500)' });
     });
 
     // EC-3/AC-16: Provider disconnect mid-stream for messages()
-    it('throws RuntimeError RILL-R004 during iteration on mid-stream disconnect [EC-3]', async () => {
+    it('throws RuntimeError RILL-R005 during iteration on mid-stream disconnect [EC-3]', async () => {
       const disconnectError = new Error('Connection reset (503)');
       mockGenerateContentStream.mockResolvedValue(
         makePartialDisconnectIterable(['Partial response'], disconnectError)
@@ -1002,14 +976,11 @@ describe('messages() function', () => {
       const stream = await getCallable(ext, 'messages').fn({ messages }, ctx);
 
       const { error } = await collectStreamUntilError(stream, ctx);
-      expect(error).toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('Gemini API error'),
-      });
+      expectHalt(error, { message: 'Gemini API error' });
     });
 
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R004
-    it('resolve() propagates error as RuntimeError RILL-R004 after stream error [EC-12]', async () => {
+    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
+    it('resolve() propagates error as RuntimeError RILL-R005 after stream error [EC-12]', async () => {
       const disconnectError = new Error('Service unavailable (503)');
       mockGenerateContentStream.mockResolvedValue(
         makePartialDisconnectIterable([], disconnectError)
@@ -1030,9 +1001,7 @@ describe('messages() function', () => {
 
       await expect(
         (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-      });
+      );
     });
   });
 });
@@ -1113,9 +1082,7 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: '' }, ctx)).rejects.toThrow(
-        'embed text cannot be empty'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: '' }, ctx), { message: 'embed text cannot be empty' });
     });
 
     // EC-16: No embed_model configured
@@ -1128,9 +1095,7 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx)).rejects.toThrow(
-        'embed_model not configured'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx), { message: 'embed_model not configured' });
     });
 
     // EC-17: API errors
@@ -1148,9 +1113,7 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx)).rejects.toThrow(
-        'Gemini API error: 401: authentication failed'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx), { message: 'Gemini API error: 401: authentication failed' });
     });
   });
 });
@@ -1231,9 +1194,9 @@ describe('embed_batch() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['Hello', 123, 'World'] }, ctx)
-      ).rejects.toThrow('embed_batch requires list of strings');
+      , { message: 'embed_batch requires list of strings' });
     });
 
     // EC-19: Empty string in list
@@ -1247,9 +1210,9 @@ describe('embed_batch() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['Hello', '', 'World'] }, ctx)
-      ).rejects.toThrow('embed text cannot be empty at index 1');
+      , { message: 'embed text cannot be empty at index 1' });
     });
 
     // EC-20: No embed_model configured
@@ -1262,9 +1225,9 @@ describe('embed_batch() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['Hello', 'World'] }, ctx)
-      ).rejects.toThrow('embed_model not configured');
+      , { message: 'embed_model not configured' });
     });
   });
 });
@@ -1588,9 +1551,10 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello' }, ctx);
 
-      await expect(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
-      ).rejects.toThrow('tools parameter is required');
+      await expectRejectedHalt(
+        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
+        { message: 'tools parameter is required' }
+      );
     });
 
     // EC-24: Unknown tool called by LLM — error surfaces via stream resolve
@@ -1616,9 +1580,10 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: { max_errors: 3 } }, ctx);
 
-      await expect(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
-      ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
+      await expectRejectedHalt(
+        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
+        { message: 'Tool execution failed: 3 consecutive errors' }
+      );
     });
 
     // EC-25: max_errors exceeded — error surfaces via stream resolve
@@ -1646,13 +1611,14 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: { max_errors: 2 } }, ctx);
 
-      await expect(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
-      ).rejects.toThrow('Tool execution failed: 2 consecutive errors');
+      await expectRejectedHalt(
+        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
+        { message: 'Tool execution failed: 2 consecutive errors' }
+      );
     });
 
-    // EC-4/EC-12: Provider streaming API failure surfaces via stream resolve with RILL-R004
-    it('stream resolve rejects with RILL-R004 on provider streaming API failure [EC-4]', async () => {
+    // EC-4/EC-12: Provider streaming API failure surfaces via stream resolve with RILL-R005
+    it('stream resolve rejects with RILL-R005 on provider streaming API failure [EC-4]', async () => {
       mockGenerateContentStream.mockRejectedValue(new Error('API rate limit exceeded'));
 
       const config: GeminiExtensionConfig = {
@@ -1669,7 +1635,7 @@ describe('tool_loop() function', () => {
 
       await expect(
         (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
-      ).rejects.toMatchObject({ errorId: 'RILL-R004', message: expect.stringContaining('Provider API error:') });
+      , { message: expect.stringContaining('Provider API error:') });
     });
 
     // AC-17: Tool execution error mid-loop yields tool_call chunk; stream resolves with final content

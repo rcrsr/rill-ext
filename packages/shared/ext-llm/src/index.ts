@@ -40,7 +40,7 @@ export {
 // ============================================================
 // ERROR MAPPING
 // ============================================================
-export { mapProviderError } from './errors.js';
+export { mapProviderError, throwProviderHalt } from './errors.js';
 
 // ============================================================
 // TOOL ORCHESTRATION

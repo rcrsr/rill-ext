@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RuntimeError, createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
+import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
 
 // ============================================================
 // MODULE MOCK
@@ -358,7 +359,7 @@ describe('search() host function', () => {
   // --------------------------------------------------------
 
   describe('search not configured [AC-21, EC-10]', () => {
-    it('throws RILL-R004 when search config absent [AC-21, EC-10]', async () => {
+    it('throws RILL-R005 when search config absent [AC-21, EC-10]', async () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithoutSearch());
       const ctx = createRuntimeContext();
@@ -373,9 +374,9 @@ describe('search() host function', () => {
       const ext = await createFoundryExtension(configWithoutSearch());
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      ).rejects.toThrow('foundry: search not configured');
+      , { message: 'foundry: search not configured' });
     });
 
     it('fetch is not called when search not configured [AC-21]', async () => {
@@ -399,7 +400,7 @@ describe('search() host function', () => {
   // --------------------------------------------------------
 
   describe('non-existent index [AC-22, EC-11]', () => {
-    it('throws RILL-R004 when index returns HTTP 404 [AC-22, EC-11]', async () => {
+    it('throws RILL-R005 when index returns HTTP 404 [AC-22, EC-11]', async () => {
       globalThis.fetch = mockFetchJson(404, {});
 
       const { createFoundryExtension } = await import('../src/factory.js');
@@ -598,9 +599,9 @@ describe('search() host function', () => {
       const ext = await createFoundryExtension(configWithSearch());
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      ).rejects.toThrow('foundry: authentication failed');
+      , { message: 'foundry: authentication failed' });
     });
 
     it('maps HTTP 429 to rate limit exceeded', async () => {
@@ -610,9 +611,9 @@ describe('search() host function', () => {
       const ext = await createFoundryExtension(configWithSearch());
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      ).rejects.toThrow('foundry: rate limit exceeded');
+      , { message: 'foundry: rate limit exceeded' });
     });
   });
 });

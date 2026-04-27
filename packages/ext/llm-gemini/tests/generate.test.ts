@@ -19,6 +19,7 @@ import {
 } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
+import { expectRejectedHalt } from './_halt-helpers.js';
 
 // ============================================================
 // TEST HELPERS
@@ -309,14 +310,12 @@ describe('generate() function', () => {
   });
 
   describe('error cases', () => {
-    // AC-18/EC-3: Missing schema throws RILL-R004
-    it('throws RILL-R004 with "generate requires a type expression as schema" when schema is absent', async () => {
+    // AC-18/EC-3: Missing schema throws RILL-R005
+    it('throws RILL-R005 with "generate requires a type expression as schema" when schema is absent', async () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow(
-        'generate requires a type expression as schema'
-      );
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx), { message: 'generate requires a type expression as schema' });
     });
 
     // AC-18/EC-3: Missing schema throws RuntimeError
@@ -332,7 +331,7 @@ describe('generate() function', () => {
       }
 
       expect(thrown).toBeInstanceOf(RuntimeError);
-      expect((thrown as RuntimeError).errorId).toBe('RILL-R004');
+      expect((thrown as RuntimeError).errorId).toBe('RILL-R005');
     });
 
     // AC-25/EC-3: No HTTP call when schema is missing
@@ -345,12 +344,12 @@ describe('generate() function', () => {
       expect(mockGenerateContent).not.toHaveBeenCalled();
     });
 
-    // AC-19/EC-4: Unsupported type throws RILL-R004 before HTTP
-    it('throws RILL-R004 for unsupported schema type before making any API call', async () => {
+    // AC-19/EC-4: Unsupported type throws RILL-R005 before HTTP
+    it('throws RILL-R005 for unsupported schema type before making any API call', async () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn(
           {
             prompt: 'prompt',
@@ -359,13 +358,13 @@ describe('generate() function', () => {
           },
           ctx
         )
-      ).rejects.toThrow('unsupported type: unsupported_type');
+      , { message: 'unsupported type: unsupported_type' });
 
       expect(mockGenerateContent).not.toHaveBeenCalled();
     });
 
-    // AC-21/EC-5: "not json" response throws RILL-R004
-    it('throws RILL-R004 when response text is not valid JSON', async () => {
+    // AC-21/EC-5: "not json" response throws RILL-R005
+    it('throws RILL-R005 when response text is not valid JSON', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('not json')
       );
@@ -373,12 +372,12 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn(
           { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
           ctx
         )
-      ).rejects.toThrow('generate: failed to parse response JSON:');
+      , { message: 'generate: failed to parse response JSON:' });
     });
 
     // AC-22/EC-5: "{broken" response throws with original parse error detail
@@ -408,8 +407,8 @@ describe('generate() function', () => {
       );
     });
 
-    // AC-23/EC-5: Parse error is RuntimeError with RILL-R004
-    it('throws a RuntimeError with RILL-R004 code when response parse fails', async () => {
+    // AC-23/EC-5: Parse error is RuntimeError with RILL-R005
+    it('throws a RuntimeError with RILL-R005 code when response parse fails', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('{broken')
       );
@@ -428,7 +427,7 @@ describe('generate() function', () => {
       }
 
       expect(thrown).toBeInstanceOf(RuntimeError);
-      expect((thrown as RuntimeError).errorId).toBe('RILL-R004');
+      expect((thrown as RuntimeError).errorId).toBe('RILL-R005');
     });
 
     // AC-24/EC-5: Parse failure returns no partial dict

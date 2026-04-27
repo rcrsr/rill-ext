@@ -68,12 +68,12 @@ export async function callGround(
   disposed: { value: boolean }
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw new RuntimeError('RILL-R004', `${PROVIDER}: extension disposed`);
+    throw new RuntimeError('RILL-R005', `${PROVIDER}: extension disposed`);
   }
 
   // EC-9: Grounding must be configured
   if (!config.grounding) {
-    throw new RuntimeError('RILL-R004', 'foundry: grounding connection not configured');
+    throw new RuntimeError('RILL-R005', 'foundry: grounding connection not configured');
   }
 
   const groundingConfig: FoundryGroundingConfig = config.grounding;
@@ -82,7 +82,7 @@ export async function callGround(
   const model = groundingConfig.model ?? config.inference?.model;
   if (!model) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `${PROVIDER}: grounding requires a model — set grounding.model or inference.model`
     );
   }
@@ -140,7 +140,7 @@ export async function callGround(
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    const rillError = new RuntimeError('RILL-R004', `${PROVIDER}: ${message}`);
+    const rillError = new RuntimeError('RILL-R005', `${PROVIDER}: ${message}`);
 
     emitExtensionEvent(ctx, {
       event: 'foundry:ground:error',

@@ -96,7 +96,7 @@ describe('mapRestError', () => {
     const error = mapRestError(401);
 
     expect(error).toBeInstanceOf(RuntimeError);
-    expect(error.errorId).toBe('RILL-R004');
+    expect(error.errorId).toBe('RILL-R005');
     expect(error.message).toBe('foundry: authentication failed (401)');
   });
 
@@ -107,7 +107,7 @@ describe('mapRestError', () => {
     const error = mapRestError(429);
 
     expect(error).toBeInstanceOf(RuntimeError);
-    expect(error.errorId).toBe('RILL-R004');
+    expect(error.errorId).toBe('RILL-R005');
     expect(error.message).toBe('foundry: rate limit exceeded');
   });
 
@@ -117,7 +117,7 @@ describe('mapRestError', () => {
     const error = mapRestError(500);
 
     expect(error).toBeInstanceOf(RuntimeError);
-    expect(error.errorId).toBe('RILL-R004');
+    expect(error.errorId).toBe('RILL-R005');
     expect(error.message).toContain('HTTP 500');
   });
 
@@ -143,7 +143,7 @@ describe('createTimeoutError', () => {
     const error = createTimeoutError();
 
     expect(error).toBeInstanceOf(RuntimeError);
-    expect(error.errorId).toBe('RILL-R004');
+    expect(error.errorId).toBe('RILL-R005');
     expect(error.message).toBe('foundry: request timeout');
   });
 });
@@ -160,7 +160,7 @@ describe('createModelNotDeployedError', () => {
     const error = createModelNotDeployedError('gpt-4-turbo');
 
     expect(error).toBeInstanceOf(RuntimeError);
-    expect(error.errorId).toBe('RILL-R004');
+    expect(error.errorId).toBe('RILL-R005');
     expect(error.message).toBe("foundry: model 'gpt-4-turbo' not deployed");
   });
 
@@ -189,7 +189,7 @@ describe('resolveVariables', () => {
     );
   });
 
-  it('thrown error has RILL-R004 code (EC-17)', async () => {
+  it('thrown error has RILL-R005 code (EC-17)', async () => {
     const { resolveVariables } = await import('../src/errors.js');
 
     const lookup = (_name: string) => undefined;
@@ -202,7 +202,7 @@ describe('resolveVariables', () => {
     }
 
     expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    expect((caught as RuntimeError).errorId).toBe('RILL-R005');
   });
 
   it('includes the variable name in the error message (EC-17)', async () => {
@@ -240,58 +240,47 @@ describe('resolveVariables', () => {
 // ============================================================
 
 describe('mapProviderError + detectFoundryError integration', () => {
-  // EC-12 / AC-23: 401 via SDK path
-  it('produces authentication failed message for 401 APIError (EC-12)', async () => {
-    const OpenAI = await import('openai');
+  async function runMap(error: unknown): Promise<{ code: string; message: string }> {
     const { detectFoundryError } = await import('../src/errors.js');
     const { mapProviderError } = await import('@rcrsr/rill-ext-llm-shared');
+    const { createRuntimeContext, getStatus } = await import('@rcrsr/rill');
+    const ctx = createRuntimeContext();
+    const result = mapProviderError(ctx, 'Foundry', error, detectFoundryError);
+    const status = getStatus(result);
+    return { code: status.code.name, message: status.message };
+  }
 
+  // EC-12 / AC-23: 401 → #AUTH
+  it('produces #AUTH for 401 APIError (EC-12)', async () => {
+    const OpenAI = await import('openai');
     const error = new OpenAI.APIError(401, {}, 'Unauthorized', {});
-    const rillError = mapProviderError('Foundry', error, detectFoundryError);
-
-    expect(rillError).toBeInstanceOf(RuntimeError);
-    expect(rillError.errorId).toBe('RILL-R004');
-    expect(rillError.message).toBe('Foundry API error (HTTP 401): Unauthorized');
+    const { code, message } = await runMap(error);
+    expect(code).toBe('AUTH');
+    expect(message).toBe('Foundry API error (HTTP 401): Unauthorized');
   });
 
-  // EC-13 / AC-24: 429 via SDK path
-  it('produces rate limit message for 429 APIError (EC-13)', async () => {
+  // EC-13 / AC-24: 429 → #RATE_LIMIT
+  it('produces #RATE_LIMIT for 429 APIError (EC-13)', async () => {
     const OpenAI = await import('openai');
-    const { detectFoundryError } = await import('../src/errors.js');
-    const { mapProviderError } = await import('@rcrsr/rill-ext-llm-shared');
-
     const error = new OpenAI.APIError(429, {}, 'Too Many Requests', {});
-    const rillError = mapProviderError('Foundry', error, detectFoundryError);
-
-    expect(rillError).toBeInstanceOf(RuntimeError);
-    expect(rillError.errorId).toBe('RILL-R004');
-    expect(rillError.message).toBe('Foundry API error (HTTP 429): Too Many Requests');
+    const { code, message } = await runMap(error);
+    expect(code).toBe('RATE_LIMIT');
+    expect(message).toBe('Foundry API error (HTTP 429): Too Many Requests');
   });
 
-  // EC-14 / AC-25: Timeout via generic Error path
+  // EC-14 / AC-25: Timeout via generic Error path → #UNAVAILABLE
   it('wraps timeout error via generic Error fallback (EC-14)', async () => {
-    const { detectFoundryError } = await import('../src/errors.js');
-    const { mapProviderError } = await import('@rcrsr/rill-ext-llm-shared');
-
     const error = new Error('Request aborted due to timeout');
-    const rillError = mapProviderError('Foundry', error, detectFoundryError);
-
-    expect(rillError).toBeInstanceOf(RuntimeError);
-    expect(rillError.errorId).toBe('RILL-R004');
-    expect(rillError.message).toContain('Request aborted due to timeout');
+    const { message } = await runMap(error);
+    expect(message).toContain('Request aborted due to timeout');
   });
 
-  // EC-15 / AC-26: Model not deployed via 404
-  it('wraps model not deployed 404 APIError (EC-15)', async () => {
+  // EC-15 / AC-26: 404 → #NOT_FOUND
+  it('produces #NOT_FOUND for 404 APIError (EC-15)', async () => {
     const OpenAI = await import('openai');
-    const { detectFoundryError } = await import('../src/errors.js');
-    const { mapProviderError } = await import('@rcrsr/rill-ext-llm-shared');
-
     const error = new OpenAI.APIError(404, {}, 'Deployment not found', {});
-    const rillError = mapProviderError('Foundry', error, detectFoundryError);
-
-    expect(rillError).toBeInstanceOf(RuntimeError);
-    expect(rillError.errorId).toBe('RILL-R004');
-    expect(rillError.message).toBe('Foundry API error (HTTP 404): Deployment not found');
+    const { code, message } = await runMap(error);
+    expect(code).toBe('NOT_FOUND');
+    expect(message).toBe('Foundry API error (HTTP 404): Deployment not found');
   });
 });

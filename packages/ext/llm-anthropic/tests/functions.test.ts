@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createRuntimeContext, isRillStream, type ApplicationCallable } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
+import { expectRejectedHalt } from './_halt-helpers.js';
 
 // ============================================================
 // TEST HELPERS
@@ -366,7 +367,7 @@ describe('message() function', () => {
       expect(mockStream).not.toHaveBeenCalled();
     });
 
-    it('throws RuntimeError with RILL-R004 for empty prompt text', () => {
+    it('throws RuntimeError with RILL-R005 for empty prompt text', () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -377,7 +378,7 @@ describe('message() function', () => {
 
       expect(() => getCallable(ext, 'message').fn({ text: '' }, ctx)).toThrowError(
         expect.objectContaining({
-          errorId: 'RILL-R004',
+          errorId: 'RILL-R005',
           message: expect.stringContaining('prompt text cannot be empty'),
         })
       );
@@ -394,13 +395,13 @@ describe('message() function', () => {
 
       expect(() => getCallable(ext, 'message').fn({ text: '   \n\t  ' }, ctx)).toThrowError(
         expect.objectContaining({
-          errorId: 'RILL-R004',
+          errorId: 'RILL-R005',
           message: expect.stringContaining('prompt text cannot be empty'),
         })
       );
     });
 
-    // EC-2: Provider API error during stream resolution → RuntimeError RILL-R004
+    // EC-2: Provider API error during stream resolution → RuntimeError RILL-R005
     it('maps 429 rate limit error from resolve() correctly', async () => {
       const mockError = await createMockAPIError(429, 'Rate limit exceeded');
       mockStream.mockReturnValue(createErrorStream(mockError));
@@ -415,10 +416,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic API error (HTTP 429): Rate limit exceeded',
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 429): Rate limit exceeded' });
     });
 
     it('maps 401 auth error from resolve() correctly', async () => {
@@ -435,10 +433,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic API error (HTTP 401): Invalid API key',
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 401): Invalid API key' });
     });
 
     it('maps timeout error from resolve() correctly', async () => {
@@ -456,10 +451,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic error: Request timeout',
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic error: Request timeout' });
     });
 
     it('maps 500 error from resolve() correctly', async () => {
@@ -476,10 +468,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic API error (HTTP 500): Internal server error',
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 500): Internal server error' });
     });
 
     it('maps unknown error from resolve() correctly', async () => {
@@ -496,10 +485,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic error: Unknown error',
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic error: Unknown error' });
     });
 
     // EC-3/AC-16: Provider disconnect mid-stream yields error during iteration; stream resolves with partial data
@@ -518,10 +504,7 @@ describe('message() function', () => {
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
       // Iteration throws after yielding partial chunks
-      await expect(collectChunks(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('503'),
-      });
+      await expectRejectedHalt(collectChunks(stream), { message: '503' });
     });
 
     it('resolves with partial data after mid-stream disconnect [AC-16]', async () => {
@@ -544,8 +527,8 @@ describe('message() function', () => {
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
     });
 
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R004
-    it('resolve() propagates provider error as RuntimeError RILL-R004 [EC-12]', async () => {
+    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
+    it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
       const mockError = await createMockAPIError(500, 'Internal server error');
       mockStream.mockReturnValue(createErrorStream(mockError));
 
@@ -559,9 +542,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-      });
+      await expectRejectedHalt(resolveStream(stream));
     });
   });
 });
@@ -780,7 +761,7 @@ describe('messages() function', () => {
 
       expect(() => getCallable(ext, 'messages').fn({ messages: [] }, ctx)).toThrowError(
         expect.objectContaining({
-          errorId: 'RILL-R004',
+          errorId: 'RILL-R005',
           message: expect.stringContaining('messages list cannot be empty'),
         })
       );
@@ -803,7 +784,7 @@ describe('messages() function', () => {
         getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).toThrowError(
         expect.objectContaining({
-          errorId: 'RILL-R004',
+          errorId: 'RILL-R005',
           message: expect.stringContaining("message missing required 'role' field"),
         })
       );
@@ -825,7 +806,7 @@ describe('messages() function', () => {
         getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).toThrowError(
         expect.objectContaining({
-          errorId: 'RILL-R004',
+          errorId: 'RILL-R005',
           message: expect.stringContaining("invalid role 'system'"),
         })
       );
@@ -847,7 +828,7 @@ describe('messages() function', () => {
         getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).toThrowError(
         expect.objectContaining({
-          errorId: 'RILL-R004',
+          errorId: 'RILL-R005',
           message: expect.stringContaining("user message requires 'content'"),
         })
       );
@@ -868,7 +849,7 @@ describe('messages() function', () => {
         getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).toThrowError(
         expect.objectContaining({
-          errorId: 'RILL-R004',
+          errorId: 'RILL-R005',
           message: expect.stringContaining("user message requires 'content'"),
         })
       );
@@ -893,7 +874,7 @@ describe('messages() function', () => {
         getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
       ).toThrowError(
         expect.objectContaining({
-          errorId: 'RILL-R004',
+          errorId: 'RILL-R005',
           message: expect.stringContaining("assistant message requires 'content' or 'tool_calls'"),
         })
       );
@@ -939,10 +920,7 @@ describe('messages() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic API error (HTTP 429): Rate limit exceeded',
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 429): Rate limit exceeded' });
     });
 
     it('maps 401 auth error from resolve() correctly', async () => {
@@ -962,10 +940,7 @@ describe('messages() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic API error (HTTP 401): Invalid API key',
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 401): Invalid API key' });
     });
 
     it('maps timeout error from resolve() correctly', async () => {
@@ -986,10 +961,7 @@ describe('messages() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic error: Request timeout',
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic error: Request timeout' });
     });
 
     // EC-3/AC-16: Provider disconnect mid-stream for messages()
@@ -1010,10 +982,7 @@ describe('messages() function', () => {
         ctx
       );
 
-      await expect(collectChunks(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('503'),
-      });
+      await expectRejectedHalt(collectChunks(stream), { message: expect.stringContaining('503') });
     });
 
     it('resolves with partial data after mid-stream disconnect [AC-16]', async () => {
@@ -1038,8 +1007,8 @@ describe('messages() function', () => {
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
     });
 
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R004
-    it('resolve() propagates provider error as RuntimeError RILL-R004 [EC-12]', async () => {
+    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
+    it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
       const mockError = await createMockAPIError(500, 'Internal server error');
       mockStream.mockReturnValue(createErrorStream(mockError));
 
@@ -1056,9 +1025,7 @@ describe('messages() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-      });
+      await expect(resolveStream(stream));
     });
   });
 });
@@ -1080,10 +1047,7 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: '' }, ctx)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'embed text cannot be empty',
-      });
+      await expect(getCallable(ext, 'embed').fn({ text: '' }, ctx), { message: 'embed text cannot be empty' });
     });
 
     // EC-16: No embed_model configured raises error
@@ -1097,10 +1061,7 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'embed_model not configured',
-      });
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx), { message: 'embed_model not configured' });
     });
 
     // EC-17: API errors mapped correctly (currently raises "not available")
@@ -1114,10 +1075,7 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic: embeddings API not available',
-      });
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx), { message: 'Anthropic: embeddings API not available' });
     });
   });
 
@@ -1475,10 +1433,7 @@ describe('embed_batch() function', () => {
 
       await expect(
         getCallable(ext, 'embed_batch').fn({ texts: ['text1', 123, 'text3'] }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'embed_batch requires list of strings',
-      });
+      , { message: 'embed_batch requires list of strings' });
     });
 
     // EC-19: Empty string at index raises error
@@ -1492,12 +1447,9 @@ describe('embed_batch() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['text1', '', 'text3'] }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'embed text cannot be empty at index 1',
-      });
+      , { message: 'embed text cannot be empty at index 1' });
     });
 
     // EC-20: No embed_model configured raises error
@@ -1511,12 +1463,9 @@ describe('embed_batch() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'embed_model not configured',
-      });
+      , { message: 'embed_model not configured' });
     });
 
     // EC-21: API errors mapped correctly (currently raises "not available")
@@ -1530,12 +1479,9 @@ describe('embed_batch() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'Anthropic: embeddings API not available',
-      });
+      , { message: 'Anthropic: embeddings API not available' });
     });
   });
 

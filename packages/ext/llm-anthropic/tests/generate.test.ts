@@ -367,15 +367,15 @@ describe('generate() function', () => {
   // --------------------------------------------------------
 
   describe('error cases', () => {
-    // AC-18 / EC-3: Missing schema throws RILL-R004
-    it('throws RILL-R004 when schema option is missing', async () => {
+    // AC-18 / EC-3: Missing schema throws RILL-R005
+    it('throws RILL-R005 when schema option is missing', async () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
       await expect(
         getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx)
       ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
+        errorId: 'RILL-R005',
         message: 'generate requires a type expression as schema',
       });
     });
@@ -392,8 +392,8 @@ describe('generate() function', () => {
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
-    // AC-21 / EC-5: "not json" response throws RILL-R004
-    it('throws RILL-R004 when model returns non-JSON text', async () => {
+    // AC-21 / EC-5: "not json" response throws RILL-R005
+    it('throws RILL-R005 when model returns non-JSON text', async () => {
       mockCreate.mockResolvedValue(createMockGenerateResponse('not json'));
 
       const ext = createAnthropicExtension(BASE_CONFIG);
@@ -402,12 +402,12 @@ describe('generate() function', () => {
       await expect(
         getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
       ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
+        errorId: 'RILL-R005',
       });
     });
 
     // AC-22 / EC-5: "{broken" response includes original parse error detail
-    it('throws RILL-R004 with original parse error detail for malformed JSON', async () => {
+    it('throws RILL-R005 with original parse error detail for malformed JSON', async () => {
       mockCreate.mockResolvedValue(createMockGenerateResponse('{broken'));
 
       const ext = createAnthropicExtension(BASE_CONFIG);
@@ -416,13 +416,13 @@ describe('generate() function', () => {
       await expect(
         getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
       ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
+        errorId: 'RILL-R005',
         message: expect.stringContaining('failed to parse response JSON'),
       });
     });
 
-    // AC-23 / EC-5: Parse failure error is instance of RuntimeError with RILL-R004
-    it('parse failure throws RuntimeError instance with RILL-R004', async () => {
+    // AC-23 / EC-5: Parse failure error is instance of RuntimeError with RILL-R005
+    it('parse failure throws RuntimeError instance with RILL-R005', async () => {
       mockCreate.mockResolvedValue(createMockGenerateResponse('not json'));
 
       const ext = createAnthropicExtension(BASE_CONFIG);
@@ -439,7 +439,7 @@ describe('generate() function', () => {
       }
 
       expect(thrown).toBeInstanceOf(RuntimeError);
-      expect((thrown as RuntimeError).errorId).toBe('RILL-R004');
+      expect((thrown as RuntimeError).errorId).toBe('RILL-R005');
     });
 
     // AC-24 / EC-5: Parse failure never returns a partial dict

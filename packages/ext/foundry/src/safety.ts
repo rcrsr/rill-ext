@@ -78,12 +78,12 @@ export async function callShield(
   disposed: { value: boolean }
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw new RuntimeError('RILL-R004', `${PROVIDER}: extension disposed`);
+    throw new RuntimeError('RILL-R005', `${PROVIDER}: extension disposed`);
   }
 
   // EC-7: Content Safety must be configured
   if (!config.contentSafety) {
-    throw new RuntimeError('RILL-R004', 'foundry: content safety not configured');
+    throw new RuntimeError('RILL-R005', 'foundry: content safety not configured');
   }
 
   const safetyConfig: FoundryContentSafetyConfig = config.contentSafety;
@@ -115,7 +115,7 @@ export async function callShield(
     }
     // Rethrow unexpected errors as RuntimeError
     const message = error instanceof Error ? error.message : String(error);
-    throw new RuntimeError('RILL-R004', `${PROVIDER}: ${message}`);
+    throw new RuntimeError('RILL-R005', `${PROVIDER}: ${message}`);
   }
 }
 
@@ -168,7 +168,7 @@ export function createAutoShieldMiddleware(
 
     // EC-8: Prompt attack detected
     if (!result.safe) {
-      throw new RuntimeError('RILL-R004', 'foundry: prompt attack detected');
+      throw new RuntimeError('RILL-R005', 'foundry: prompt attack detected');
     }
 
     return inner(args, ctx);

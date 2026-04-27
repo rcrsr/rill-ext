@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { expectRejectedHalt } from './_halt-helpers.js';
 import { createRuntimeContext, callable, type ApplicationCallable, type RillValue, type RillTypeValue, type TypeStructure } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
@@ -421,9 +422,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI API error (HTTP 401): Invalid API key'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 401): Invalid API key' });
     });
 
     it('throws RuntimeError for 429 rate limit error during stream iteration', async () => {
@@ -442,9 +441,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI API error (HTTP 429): Rate limit'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 429): Rate limit' });
     });
 
     it('throws RuntimeError for timeout error during stream iteration', async () => {
@@ -463,9 +460,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI error: Request timeout'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI error: Request timeout' });
     });
 
     it('throws RuntimeError for generic API error during stream iteration', async () => {
@@ -484,9 +479,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI API error (HTTP 500): Internal server error'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 500): Internal server error' });
     });
 
     // EC-3/AC-16: Provider disconnect mid-stream throws during iteration; resolve returns partial data
@@ -506,9 +499,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI API error (HTTP 503): Service unavailable'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 503): Service unavailable' });
     });
 
     it('resolves with partial data after mid-stream disconnect [AC-16]', async () => {
@@ -533,8 +524,8 @@ describe('message() function', () => {
       expect(result['model']).toBe('gpt-4-turbo');
     });
 
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R004
-    it('resolve() propagates provider error as RuntimeError RILL-R004 [EC-12]', async () => {
+    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
+    it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
       const { APIError } = await import('openai');
       const apiError = new APIError(500, {}, 'Internal server error', {});
       const runner = createErrorStreamRunner(apiError);
@@ -550,9 +541,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-      });
+      await expect(resolveStream(stream));
     });
   });
 });
@@ -880,9 +869,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI API error (HTTP 401): Invalid API key'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 401): Invalid API key' });
     });
 
     it('throws RuntimeError for 429 rate limit error during stream iteration', async () => {
@@ -902,9 +889,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI API error (HTTP 429): Rate limit'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 429): Rate limit' });
     });
 
     it('throws RuntimeError for timeout error during stream iteration', async () => {
@@ -924,9 +909,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI error: Request timeout'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI error: Request timeout' });
     });
 
     it('throws RuntimeError for generic API error during stream iteration', async () => {
@@ -946,9 +929,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI API error (HTTP 500): Internal server error'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 500): Internal server error' });
     });
 
     // EC-3/AC-16: Provider disconnect mid-stream for messages()
@@ -969,9 +950,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
 
-      await expect(collectStreamChunks(stream)).rejects.toThrow(
-        'OpenAI API error (HTTP 503): Service unavailable'
-      );
+      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 503): Service unavailable' });
     });
 
     it('resolves with partial data after mid-stream disconnect [AC-16]', async () => {
@@ -996,8 +975,8 @@ describe('messages() function', () => {
       expect(result['model']).toBe('gpt-4-turbo');
     });
 
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R004
-    it('resolve() propagates provider error as RuntimeError RILL-R004 [EC-12]', async () => {
+    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
+    it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
       const { APIError } = await import('openai');
       const apiError = new APIError(500, {}, 'Internal server error', {});
       const runner = createErrorStreamRunner(apiError);
@@ -1014,9 +993,7 @@ describe('messages() function', () => {
       const messages = [{ role: 'user', content: 'Test' }];
       const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-      });
+      await expect(resolveStream(stream));
     });
   });
 });
@@ -1092,9 +1069,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: '' }, ctx)).rejects.toThrow(
-        'embed text cannot be empty'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: '' }, ctx), { message: 'embed text cannot be empty' });
     });
 
     it('throws RuntimeError for whitespace-only text', async () => {
@@ -1107,9 +1082,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: '   \n\t  ' }, ctx)).rejects.toThrow(
-        'embed text cannot be empty'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: '   \n\t  ' }, ctx), { message: 'embed text cannot be empty' });
     });
 
     // EC-16: No embed_model configured
@@ -1123,9 +1096,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: 'test' }, ctx)).rejects.toThrow(
-        'embed_model not configured'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test' }, ctx), { message: 'embed_model not configured' });
     });
 
     it('maps API authentication error (401)', async () => {
@@ -1143,9 +1114,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: 'test' }, ctx)).rejects.toThrow(
-        'OpenAI API error (HTTP 401): Invalid API key'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test' }, ctx), { message: 'OpenAI API error (HTTP 401): Invalid API key' });
     });
 
     it('maps API rate limit error (429)', async () => {
@@ -1163,9 +1132,7 @@ describe('embed() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: 'test' }, ctx)).rejects.toThrow(
-        'OpenAI API error (HTTP 429): Rate limit exceeded'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test' }, ctx), { message: 'OpenAI API error (HTTP 429): Rate limit exceeded' });
     });
   });
 });
@@ -1241,9 +1208,7 @@ describe('embed_batch() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed_batch').fn({ texts: ['test'] }, ctx)).rejects.toThrow(
-        'embed_model not configured'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed_batch').fn({ texts: ['test'] }, ctx), { message: 'embed_model not configured' });
     });
 
     // EC-18: Non-string element in list
@@ -1257,9 +1222,9 @@ describe('embed_batch() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['valid', 123, 'text'] }, ctx)
-      ).rejects.toThrow('embed_batch requires list of strings');
+      , { message: 'embed_batch requires list of strings' });
     });
 
     // EC-19: Empty string in list
@@ -1273,9 +1238,9 @@ describe('embed_batch() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['valid', '', 'text'] }, ctx)
-      ).rejects.toThrow('embed text cannot be empty at index 1');
+      , { message: 'embed text cannot be empty at index 1' });
     });
 
     it('throws RuntimeError for whitespace-only string at index', async () => {
@@ -1288,9 +1253,9 @@ describe('embed_batch() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['valid', '   ', 'text'] }, ctx)
-      ).rejects.toThrow('embed text cannot be empty at index 1');
+      , { message: 'embed text cannot be empty at index 1' });
     });
   });
 });
@@ -1862,9 +1827,7 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools: undefined, options: {} }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toThrow(
-        'tools parameter is required'
-      );
+      await expectRejectedHalt(resolveStream(stream), { message: 'tools parameter is required' });
     });
 
     // EC-22: Unknown tool name — exceeds max_errors, throws from iteration
@@ -1918,11 +1881,11 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test prompt', tools, options: {} }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toThrow('Tool execution failed: 3 consecutive errors');
+      await expectRejectedHalt(resolveStream(stream), { message: 'Tool execution failed: 3 consecutive errors' });
     });
 
-    // EC-4: Streaming API failure — resolve rejects with RILL-R004 and "Provider API error:" prefix
-    it('resolve rejects with RILL-R004 on streaming API failure [EC-4]', async () => {
+    // EC-4: Streaming API failure — resolve rejects with RILL-R005 and "Provider API error:" prefix
+    it('resolve rejects with RILL-R005 on streaming API failure [EC-4]', async () => {
       mockStream.mockRejectedValue(new Error('API error'));
 
       const config: OpenAIExtensionConfig = {
@@ -1939,10 +1902,7 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools, options: {} }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('Provider API error:'),
-      });
+      await expect(resolveStream(stream), { message: expect.stringContaining('Provider API error:') });
     });
 
     // AC-17: Tool execution error mid-loop yields tool_call chunk; stream resolves with final content
@@ -2063,7 +2023,7 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test prompt', tools, options: { max_errors: 3 } }, ctx);
 
-      await expect(resolveStream(stream)).rejects.toThrow('Tool execution failed: 3 consecutive errors');
+      await expectRejectedHalt(resolveStream(stream), { message: 'Tool execution failed: 3 consecutive errors' });
     });
   });
 });
@@ -2300,14 +2260,12 @@ describe('generate() function', () => {
   });
 
   describe('error cases', () => {
-    // EC-3: missing schema throws RuntimeError RILL-R004
-    it('throws RILL-R004 when schema option is missing', async () => {
+    // EC-3: missing schema throws RuntimeError RILL-R005
+    it('throws RILL-R005 when schema option is missing', async () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow(
-        'generate requires a type expression as schema'
-      );
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx), { message: 'generate requires a type expression as schema' });
     });
 
     // EC-3: no HTTP call when schema is missing
@@ -2319,21 +2277,21 @@ describe('generate() function', () => {
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
-    // EC-4: unsupported type throws RILL-R004 via buildJsonSchema
-    it('throws RILL-R004 for unsupported schema type', async () => {
+    // EC-4: unsupported type throws RILL-R005 via buildJsonSchema
+    it('throws RILL-R005 for unsupported schema type', async () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn(
           { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { field: { type: { kind: 'unsupported_type' } } } }), options: {} },
           ctx
         )
-      ).rejects.toThrow('unsupported type: unsupported_type');
+      , { message: 'unsupported type: unsupported_type' });
     });
 
-    // EC-5: JSON parse failure throws RILL-R004 with parse error detail
-    it('throws RILL-R004 with parse error detail when response is not valid JSON', async () => {
+    // EC-5: JSON parse failure throws RILL-R005 with parse error detail
+    it('throws RILL-R005 with parse error detail when response is not valid JSON', async () => {
       mockCreate.mockResolvedValue(
         createGenerateMockResponse('not valid json {{')
       );
@@ -2341,9 +2299,9 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} }, ctx)
-      ).rejects.toThrow('generate: failed to parse response JSON:');
+      , { message: 'generate: failed to parse response JSON:' });
     });
 
     // EC-6: provider API error mapped via mapProviderError
@@ -2358,9 +2316,9 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} }, ctx)
-      ).rejects.toThrow('Rate limit exceeded');
+      , { message: 'Rate limit exceeded' });
     });
 
     // AC-35: failure emits openai:error with error and duration

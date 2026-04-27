@@ -6,8 +6,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import {
   RuntimeError,
+  RuntimeHaltSignal,
   createRillStream,
   emitExtensionEvent,
+  getStatus,
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryResult,
@@ -25,6 +27,7 @@ import {
   validateEmbedBatch,
   validateEmbedModel,
   mapProviderError,
+  throwProviderHalt,
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
   buildResponseMessages,
@@ -77,11 +80,11 @@ const detectAnthropicError: ProviderErrorDetector = (error: unknown) => {
 };
 
 /**
- * Wrap shared validation to convert RILL-R001 errors to RILL-R004.
- * Extension errors use RILL-R004 code for consistency with existing behavior.
+ * Wrap shared validation to convert RILL-R001 errors to RILL-R005.
+ * Extension errors use RILL-R005 code for consistency with existing behavior.
  *
  * @param fn - Validation function to wrap
- * @returns Wrapped function that throws RILL-R004 errors
+ * @returns Wrapped function that throws RILL-R005 errors
  */
 function wrapValidation<T extends unknown[]>(
   fn: (...args: T) => void | string[]
@@ -91,7 +94,7 @@ function wrapValidation<T extends unknown[]>(
       return fn(...args);
     } catch (error) {
       if (error instanceof RuntimeError && error.errorId === 'RILL-R001') {
-        throw new RuntimeError('RILL-R004', error.message);
+        throw new RuntimeError('RILL-R005', error.message);
       }
       throw error;
     }
@@ -175,7 +178,7 @@ export function createAnthropicExtension(
 
         // EC-1: Validate text is non-empty before stream creation
         if (text.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
+          throw new RuntimeError('RILL-R005', 'prompt text cannot be empty');
         }
 
         // Extract options
@@ -223,12 +226,12 @@ export function createAnthropicExtension(
               }
             }
           } catch (error: unknown) {
-            const rillError = mapProviderError(
+            throwProviderHalt(
+              ctx as RuntimeContext,
               'Anthropic',
               error,
               detectAnthropicError
             );
-            throw rillError;
           }
         }
 
@@ -273,7 +276,8 @@ export function createAnthropicExtension(
             return result as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
-            const rillError = mapProviderError(
+            const invalid = mapProviderError(
+              ctx as RuntimeContext,
               'Anthropic',
               error,
               detectAnthropicError
@@ -282,11 +286,11 @@ export function createAnthropicExtension(
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
-              error: rillError.message,
+              error: getStatus(invalid).message,
               duration,
             });
 
-            throw rillError;
+            throw new RuntimeHaltSignal(invalid, true);
           }
         };
 
@@ -345,7 +349,7 @@ export function createAnthropicExtension(
         // AC-23: Empty messages list raises error — before stream creation
         if (msgList.length === 0) {
           throw new RuntimeError(
-            'RILL-R004',
+            'RILL-R005',
             'messages list cannot be empty'
           );
         }
@@ -359,7 +363,7 @@ export function createAnthropicExtension(
           // EC-10: Missing role raises error
           if (!msg || typeof msg !== 'object' || !('role' in msg)) {
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               "message missing required 'role' field"
             );
           }
@@ -368,14 +372,14 @@ export function createAnthropicExtension(
 
           // EC-11: Unknown role value raises error
           if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw new RuntimeError('RILL-R004', `invalid role '${role}'`);
+            throw new RuntimeError('RILL-R005', `invalid role '${role}'`);
           }
 
           // EC-12: User message missing content
           if (role === 'user' || role === 'tool') {
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
               throw new RuntimeError(
-                'RILL-R004',
+                'RILL-R005',
                 `${role} message requires 'content'`
               );
             }
@@ -391,7 +395,7 @@ export function createAnthropicExtension(
 
             if (!hasContent && !hasToolCalls) {
               throw new RuntimeError(
-                'RILL-R004',
+                'RILL-R005',
                 "assistant message requires 'content' or 'tool_calls'"
               );
             }
@@ -446,12 +450,12 @@ export function createAnthropicExtension(
               }
             }
           } catch (error: unknown) {
-            const rillError = mapProviderError(
+            throwProviderHalt(
+              ctx as RuntimeContext,
               'Anthropic',
               error,
               detectAnthropicError
             );
-            throw rillError;
           }
         }
 
@@ -498,7 +502,8 @@ export function createAnthropicExtension(
             return result as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
-            const rillError = mapProviderError(
+            const invalid = mapProviderError(
+              ctx as RuntimeContext,
               'Anthropic',
               error,
               detectAnthropicError
@@ -507,11 +512,11 @@ export function createAnthropicExtension(
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
-              error: rillError.message,
+              error: getStatus(invalid).message,
               duration,
             });
 
-            throw rillError;
+            throw new RuntimeHaltSignal(invalid, true);
           }
         };
 
@@ -563,7 +568,7 @@ export function createAnthropicExtension(
           // Extract argument
           const text = args['text'] as string;
 
-          // Validate using shared validation functions (wrapped to use RILL-R004)
+          // Validate using shared validation functions (wrapped to use RILL-R005)
           wrapValidation(validateEmbedText)(text);
           wrapValidation(validateEmbedModel)(factoryEmbedModel);
 
@@ -572,7 +577,7 @@ export function createAnthropicExtension(
           // The spec requires these functions, so we implement the interface.
           // For now, this will raise an error indicating unsupported operation.
           throw new RuntimeError(
-            'RILL-R004',
+            'RILL-R005',
             'Anthropic: embeddings API not available'
           );
 
@@ -601,20 +606,29 @@ export function createAnthropicExtension(
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
 
-          // If already a RuntimeError, use it directly (validation errors)
-          const rillError =
-            error instanceof RuntimeError
-              ? error
-              : mapProviderError('Anthropic', error, detectAnthropicError);
+          if (error instanceof RuntimeError) {
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: 'anthropic:error',
+              subsystem: 'extension:anthropic',
+              error: error.message,
+              duration,
+            });
+            throw error;
+          }
 
+          const invalid = mapProviderError(
+            ctx as RuntimeContext,
+            'Anthropic',
+            error,
+            detectAnthropicError
+          );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'anthropic:error',
             subsystem: 'extension:anthropic',
-            error: rillError.message,
+            error: getStatus(invalid).message,
             duration,
           });
-
-          throw rillError;
+          throw new RuntimeHaltSignal(invalid, true);
         }
       },
       annotations: { description: 'Generate embedding vector for text' },
@@ -636,14 +650,14 @@ export function createAnthropicExtension(
             return [] as RillValue;
           }
 
-          // Validate using shared validation functions (wrapped to use RILL-R004)
+          // Validate using shared validation functions (wrapped to use RILL-R005)
           wrapValidation(validateEmbedBatch)(texts);
           wrapValidation(validateEmbedModel)(factoryEmbedModel);
 
           // NOTE: Anthropic does not currently provide a public embeddings API.
           // This implementation is prepared for when/if the API becomes available.
           throw new RuntimeError(
-            'RILL-R004',
+            'RILL-R005',
             'Anthropic: embeddings API not available'
           );
 
@@ -672,20 +686,29 @@ export function createAnthropicExtension(
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
 
-          // If already a RuntimeError, use it directly (validation errors)
-          const rillError =
-            error instanceof RuntimeError
-              ? error
-              : mapProviderError('Anthropic', error, detectAnthropicError);
+          if (error instanceof RuntimeError) {
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: 'anthropic:error',
+              subsystem: 'extension:anthropic',
+              error: error.message,
+              duration,
+            });
+            throw error;
+          }
 
+          const invalid = mapProviderError(
+            ctx as RuntimeContext,
+            'Anthropic',
+            error,
+            detectAnthropicError
+          );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'anthropic:error',
             subsystem: 'extension:anthropic',
-            error: rillError.message,
+            error: getStatus(invalid).message,
             duration,
           });
-
-          throw rillError;
+          throw new RuntimeHaltSignal(invalid, true);
         }
       },
       annotations: { description: 'Generate embedding vectors for multiple texts' },
@@ -718,7 +741,7 @@ export function createAnthropicExtension(
 
         // EC-22: Empty prompt raises error before stream creation
         if (prompt.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
+          throw new RuntimeError('RILL-R005', 'prompt text cannot be empty');
         }
 
         // Extract options
@@ -750,19 +773,19 @@ export function createAnthropicExtension(
           for (const msg of prependedMessages) {
             if (!msg || typeof msg !== 'object' || !('role' in msg)) {
               throw new RuntimeError(
-                'RILL-R004',
+                'RILL-R005',
                 "message missing required 'role' field"
               );
             }
 
             const role = msg['role'];
             if (role !== 'user' && role !== 'assistant') {
-              throw new RuntimeError('RILL-R004', `invalid role '${role}'`);
+              throw new RuntimeError('RILL-R005', `invalid role '${role}'`);
             }
 
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
               throw new RuntimeError(
-                'RILL-R004',
+                'RILL-R005',
                 `${role} message requires 'content'`
               );
             }
@@ -1038,19 +1061,37 @@ export function createAnthropicExtension(
             return result as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
-            const rillError =
-              error instanceof RuntimeError
-                ? error
-                : mapProviderError('Anthropic', error, detectAnthropicError);
-
+            if (error instanceof RuntimeError) {
+              emitExtensionEvent(ctx as RuntimeContext, {
+                event: 'anthropic:error',
+                subsystem: 'extension:anthropic',
+                error: error.message,
+                duration,
+              });
+              throw error;
+            }
+            if (error instanceof RuntimeHaltSignal) {
+              emitExtensionEvent(ctx as RuntimeContext, {
+                event: 'anthropic:error',
+                subsystem: 'extension:anthropic',
+                error: getStatus(error.value).message,
+                duration,
+              });
+              throw error;
+            }
+            const invalid = mapProviderError(
+              ctx as RuntimeContext,
+              'Anthropic',
+              error,
+              detectAnthropicError
+            );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
-              error: rillError.message,
+              error: getStatus(invalid).message,
               duration,
             });
-
-            throw rillError;
+            throw new RuntimeHaltSignal(invalid, true);
           }
         };
 
@@ -1115,13 +1156,13 @@ export function createAnthropicExtension(
           // EC-3: Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               'generate requires a type expression as schema'
             );
           }
           if (schemaArg.structure.kind !== 'dict') {
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
             );
           }
@@ -1150,19 +1191,19 @@ export function createAnthropicExtension(
             for (const msg of prependedMessages) {
               if (!msg || typeof msg !== 'object' || !('role' in msg)) {
                 throw new RuntimeError(
-                  'RILL-R004',
+                  'RILL-R005',
                   "message missing required 'role' field"
                 );
               }
 
               const role = msg['role'];
               if (role !== 'user' && role !== 'assistant') {
-                throw new RuntimeError('RILL-R004', `invalid role '${role}'`);
+                throw new RuntimeError('RILL-R005', `invalid role '${role}'`);
               }
 
               if (!('content' in msg) || typeof msg['content'] !== 'string') {
                 throw new RuntimeError(
-                  'RILL-R004',
+                  'RILL-R005',
                   `${role} message requires 'content'`
                 );
               }
@@ -1215,7 +1256,7 @@ export function createAnthropicExtension(
                 ? parseError.message
                 : String(parseError);
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               `generate: failed to parse response JSON: ${detail}`
             );
           }
@@ -1247,21 +1288,38 @@ export function createAnthropicExtension(
 
           return result as RillValue;
         } catch (error: unknown) {
-          // Map error and emit failure event
           const duration = Date.now() - startTime;
-          const rillError =
-            error instanceof RuntimeError
-              ? error
-              : mapProviderError('Anthropic', error, detectAnthropicError);
-
+          if (error instanceof RuntimeError) {
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: 'anthropic:error',
+              subsystem: 'extension:anthropic',
+              error: error.message,
+              duration,
+            });
+            throw error;
+          }
+          if (error instanceof RuntimeHaltSignal) {
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: 'anthropic:error',
+              subsystem: 'extension:anthropic',
+              error: getStatus(error.value).message,
+              duration,
+            });
+            throw error;
+          }
+          const invalid = mapProviderError(
+            ctx as RuntimeContext,
+            'Anthropic',
+            error,
+            detectAnthropicError
+          );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'anthropic:error',
             subsystem: 'extension:anthropic',
-            error: rillError.message,
+            error: getStatus(invalid).message,
             duration,
           });
-
-          throw rillError;
+          throw new RuntimeHaltSignal(invalid, true);
         }
       },
       annotations: { description: 'Generate structured output from Anthropic API' },

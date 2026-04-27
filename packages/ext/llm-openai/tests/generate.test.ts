@@ -10,12 +10,13 @@
  * This file adds:
  *   AC-1: data field contains schema-matching keys
  *   AC-19/EC-4: no HTTP call when unsupported type (mockCreate not called)
- *   AC-23/EC-5: parse error is RuntimeError instance with RILL-R004 code
+ *   AC-23/EC-5: parse error is RuntimeError instance with RILL-R005 code
  *   AC-24/EC-5: parse failure returns no partial dict (rejects, does not resolve)
  *   AC-27/EC-6: openai:error event emitted on provider API error
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { expectRejectedHalt } from './_halt-helpers.js';
 import {
   createRuntimeContext,
   RuntimeError,
@@ -169,8 +170,8 @@ describe('generate() function', () => {
       expect(thrown).toBeInstanceOf(RuntimeError);
     });
 
-    // AC-23/EC-5: parse error has RILL-R004 error code
-    it('parse error RuntimeError has RILL-R004 code', async () => {
+    // AC-23/EC-5: parse error has RILL-R005 error code
+    it('parse error RuntimeError has RILL-R005 code', async () => {
       mockCreate.mockResolvedValue(createGenerateMockResponse('{broken'));
 
       const ext = createOpenAIExtension(baseConfig);
@@ -184,7 +185,7 @@ describe('generate() function', () => {
       }
 
       expect(thrown).toBeInstanceOf(RuntimeError);
-      expect((thrown as RuntimeError).errorId).toBe('RILL-R004');
+      expect((thrown as RuntimeError).errorId).toBe('RILL-R005');
     });
 
     // AC-22/EC-5: "{broken" response throws with original parse error detail
@@ -194,9 +195,10 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow('generate: failed to parse response JSON:');
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx),
+        { message: 'generate: failed to parse response JSON:' }
+      );
 
       // Verify message contains the native JSON parse error detail
       let thrown: unknown;
@@ -226,17 +228,14 @@ describe('generate() function', () => {
       ).rejects.toThrow();
     });
 
-    // EC-4: missing schema arg throws RILL-R004
-    it('throws RILL-R004 when called without schema argument', async () => {
+    // EC-4: missing schema arg throws RILL-R005
+    it('throws RILL-R005 when called without schema argument', async () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
       await expect(
         getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('generate requires a type expression as schema'),
-      });
+      , { message: expect.stringContaining('generate requires a type expression as schema') });
     });
 
     // AC-27/EC-6: provider API error emits openai:error event

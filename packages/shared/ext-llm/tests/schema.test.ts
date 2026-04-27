@@ -5,8 +5,8 @@
  * and error contracts.
  *
  * AC-10: closure output matches expected JSON Schema
- * AC-18: unsupported type in param position → RILL-R004
- * EC-3: closure/tuple kind in param position → RILL-R004
+ * AC-18: unsupported type in param position → RILL-R005
+ * EC-3: closure/tuple kind in param position → RILL-R005
  */
 
 import { describe, it, expect } from 'vitest';
@@ -226,8 +226,8 @@ describe('buildJsonSchemaFromStructuralType', () => {
       expect(result.properties['matrix']?.items?.items?.type).toBe('number');
     });
 
-    // AC-18 / EC-3: unsupported type throws RILL-R004
-    it('AC-18/EC-3: closure type in param throws RuntimeError RILL-R004', () => {
+    // AC-18 / EC-3: unsupported type throws RILL-R005
+    it('AC-18/EC-3: closure type in param throws RuntimeError RILL-R005', () => {
       let thrown: RuntimeError | undefined;
       try {
         buildJsonSchemaFromStructuralType({
@@ -243,7 +243,7 @@ describe('buildJsonSchemaFromStructuralType', () => {
       expect(thrown?.errorId).toBe('RILL-R005');
     });
 
-    it('AC-18/EC-3: tuple type in param throws RuntimeError RILL-R004', () => {
+    it('AC-18/EC-3: tuple type in param throws RuntimeError RILL-R005', () => {
       let thrown: RuntimeError | undefined;
       try {
         buildJsonSchemaFromStructuralType({

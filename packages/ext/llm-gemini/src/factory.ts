@@ -13,10 +13,12 @@ import {
 } from '@google/genai';
 import {
   RuntimeError,
+  RuntimeHaltSignal,
   emitExtensionEvent,
   createRillStream,
   createVector,
   isVector,
+  getStatus,
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryResult,
@@ -53,6 +55,29 @@ const DEFAULT_MAX_TOKENS = 8192;
 // ============================================================
 // HELPER FUNCTIONS
 // ============================================================
+
+/**
+ * Map a non-RuntimeError into an invalid RillValue + halt signal pair so
+ * factory call sites can capture the halt for later re-throw while still
+ * emitting events with the human-readable message.
+ */
+function mapToHalt(
+  ctx: RuntimeContext,
+  error: unknown
+): RuntimeHaltSignal {
+  const invalid = mapProviderError(ctx, 'Gemini', error, detectGeminiError);
+  return new RuntimeHaltSignal(invalid, true);
+}
+
+function streamErrorMessage(
+  err: RuntimeError | RuntimeHaltSignal | undefined
+): string {
+  if (err === undefined) return '';
+  if (err instanceof RuntimeHaltSignal) {
+    return getStatus(err.value).message || err.message;
+  }
+  return err.message;
+}
 
 /**
  * Gemini-specific error detector for mapProviderError.
@@ -214,7 +239,7 @@ export function createGeminiExtension(
 
         // EC-1: Validate text is non-empty before stream creation
         if (text.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
+          throw new RuntimeError('RILL-R005', 'prompt text cannot be empty');
         }
 
         // Extract options
@@ -254,7 +279,7 @@ export function createGeminiExtension(
 
         // Accumulate streamed text deltas for resolve
         const collectedChunks: string[] = [];
-        let streamError: RuntimeError | undefined;
+        let streamError: RuntimeError | RuntimeHaltSignal | undefined;
 
         // Per-call AbortController to cancel the provider request on dispose
         const streamAbortController = new AbortController();
@@ -280,14 +305,14 @@ export function createGeminiExtension(
           } catch (error: unknown) {
             // EC-2: Provider API error during stream — map and emit error event
             streamError =
-              error instanceof RuntimeError
+              error instanceof RuntimeError || error instanceof RuntimeHaltSignal
                 ? error
-                : mapProviderError('Gemini', error, detectGeminiError);
+                : mapToHalt(ctx as RuntimeContext, error);
             const duration = Date.now() - messageStartTime;
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'gemini:error',
               subsystem: 'extension:gemini',
-              error: streamError.message,
+              error: streamErrorMessage(streamError),
               duration,
             });
             throw streamError;
@@ -388,7 +413,7 @@ export function createGeminiExtension(
         // AC-23: Empty messages list raises error before stream creation
         if (inputMessages.length === 0) {
           throw new RuntimeError(
-            'RILL-R004',
+            'RILL-R005',
             'messages list cannot be empty'
           );
         }
@@ -416,7 +441,7 @@ export function createGeminiExtension(
           // EC-10: Missing role raises error
           if (!msg || typeof msg !== 'object' || !('role' in msg)) {
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               "message missing required 'role' field"
             );
           }
@@ -425,14 +450,14 @@ export function createGeminiExtension(
 
           // EC-11: Unknown role value raises error
           if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw new RuntimeError('RILL-R004', `invalid role '${role}'`);
+            throw new RuntimeError('RILL-R005', `invalid role '${role}'`);
           }
 
           // EC-12: User message missing content
           if (role === 'user' || role === 'tool') {
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
               throw new RuntimeError(
-                'RILL-R004',
+                'RILL-R005',
                 `${role} message requires 'content'`
               );
             }
@@ -448,7 +473,7 @@ export function createGeminiExtension(
 
             if (!hasContent && !hasToolCalls) {
               throw new RuntimeError(
-                'RILL-R004',
+                'RILL-R005',
                 "assistant message requires 'content' or 'tool_calls'"
               );
             }
@@ -481,7 +506,7 @@ export function createGeminiExtension(
 
         // Accumulate streamed text deltas for resolve
         const collectedChunks: string[] = [];
-        let streamError: RuntimeError | undefined;
+        let streamError: RuntimeError | RuntimeHaltSignal | undefined;
 
         // Per-call AbortController to cancel the provider request on dispose
         const streamAbortController = new AbortController();
@@ -507,14 +532,14 @@ export function createGeminiExtension(
           } catch (error: unknown) {
             // EC-2: Provider API error during stream — map and emit error event
             streamError =
-              error instanceof RuntimeError
+              error instanceof RuntimeError || error instanceof RuntimeHaltSignal
                 ? error
-                : mapProviderError('Gemini', error, detectGeminiError);
+                : mapToHalt(ctx as RuntimeContext, error);
             const duration = Date.now() - messagesStartTime;
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'gemini:error',
               subsystem: 'extension:gemini',
-              error: streamError.message,
+              error: streamErrorMessage(streamError),
               duration,
             });
             throw streamError;
@@ -626,7 +651,7 @@ export function createGeminiExtension(
             embedding.values.length === 0
           ) {
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               'Gemini: empty embedding returned'
             );
           }
@@ -649,15 +674,15 @@ export function createGeminiExtension(
         } catch (error: unknown) {
           // Map error and emit failure event
           const duration = Date.now() - startTime;
-          const rillError =
+          const rillError: RuntimeError | RuntimeHaltSignal =
             error instanceof RuntimeError
               ? error
-              : mapProviderError('Gemini', error, detectGeminiError);
+              : mapToHalt(ctx as RuntimeContext, error);
 
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:error',
             subsystem: 'extension:gemini',
-            error: rillError.message,
+            error: streamErrorMessage(rillError),
             duration,
           });
 
@@ -697,7 +722,7 @@ export function createGeminiExtension(
           const vectors: RillValue[] = [];
           if (!response.embeddings || response.embeddings.length === 0) {
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               'Gemini: empty embeddings returned'
             );
           }
@@ -709,7 +734,7 @@ export function createGeminiExtension(
               embedding.values.length === 0
             ) {
               throw new RuntimeError(
-                'RILL-R004',
+                'RILL-R005',
                 'Gemini: empty embedding returned'
               );
             }
@@ -736,15 +761,15 @@ export function createGeminiExtension(
         } catch (error: unknown) {
           // Map error and emit failure event
           const duration = Date.now() - startTime;
-          const rillError =
+          const rillError: RuntimeError | RuntimeHaltSignal =
             error instanceof RuntimeError
               ? error
-              : mapProviderError('Gemini', error, detectGeminiError);
+              : mapToHalt(ctx as RuntimeContext, error);
 
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:error',
             subsystem: 'extension:gemini',
-            error: rillError.message,
+            error: streamErrorMessage(rillError),
             duration,
           });
 
@@ -781,7 +806,7 @@ export function createGeminiExtension(
 
         // EC-22: Validate prompt is non-empty before stream creation
         if (prompt.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
+          throw new RuntimeError('RILL-R005', 'prompt text cannot be empty');
         }
 
         // Extract options with defaults
@@ -901,7 +926,7 @@ export function createGeminiExtension(
         let resolveNext: (() => void) | undefined;
         const chunkQueue: RillValue[] = [];
         let streamDone = false;
-        let streamError: RuntimeError | undefined;
+        let streamError: RuntimeError | RuntimeHaltSignal | undefined;
         let loopResultHolder: { response: unknown; totalTokens: { input: number; output: number }; turns: number } | undefined;
         // AC-16: Accumulate text deltas so resolve() can return partial content on disconnect
         const accumulatedTextDeltas: string[] = [];
@@ -1092,9 +1117,9 @@ export function createGeminiExtension(
           }
         }).catch((error: unknown) => {
           streamError =
-            error instanceof RuntimeError
+            error instanceof RuntimeError || error instanceof RuntimeHaltSignal
               ? error
-              : mapProviderError('Gemini', error, detectGeminiError);
+              : mapToHalt(ctx as RuntimeContext, error);
           streamDone = true;
           if (resolveNext) {
             const r = resolveNext;
@@ -1153,13 +1178,13 @@ export function createGeminiExtension(
             // AC-16: When text was accumulated before the disconnect, return partial dict.
             // This brings Gemini in line with Anthropic and OpenAI AC-16 behavior.
             // When no text was accumulated (e.g. pure API failure at start), rethrow so
-            // callers receive the RILL-R004 error (EC-4/EC-12 behavior preserved).
+            // callers receive the RILL-R005 error (EC-4/EC-12 behavior preserved).
             if (accumulatedTextDeltas.length > 0) {
               const partialContent = accumulatedTextDeltas.join('');
               emitExtensionEvent(ctx as RuntimeContext, {
                 event: 'gemini:error',
                 subsystem: 'extension:gemini',
-                error: streamError.message,
+                error: streamErrorMessage(streamError),
                 duration: Date.now(),
               });
               return {
@@ -1176,7 +1201,7 @@ export function createGeminiExtension(
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'gemini:error',
               subsystem: 'extension:gemini',
-              error: streamError.message,
+              error: streamErrorMessage(streamError),
               duration,
             });
             throw streamError;
@@ -1264,13 +1289,13 @@ export function createGeminiExtension(
           // EC-3: Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               'generate requires a type expression as schema'
             );
           }
           if (schemaArg.structure.kind !== 'dict') {
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
             );
           }
@@ -1378,7 +1403,7 @@ export function createGeminiExtension(
                 ? parseError.message
                 : String(parseError);
             throw new RuntimeError(
-              'RILL-R004',
+              'RILL-R005',
               `generate: failed to parse response JSON: ${detail}`
             );
           }
@@ -1420,15 +1445,15 @@ export function createGeminiExtension(
           return generateResult as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError =
+          const rillError: RuntimeError | RuntimeHaltSignal =
             error instanceof RuntimeError
               ? error
-              : mapProviderError('Gemini', error, detectGeminiError);
+              : mapToHalt(ctx as RuntimeContext, error);
 
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:error',
             subsystem: 'extension:gemini',
-            error: rillError.message,
+            error: streamErrorMessage(rillError),
             duration,
           });
 

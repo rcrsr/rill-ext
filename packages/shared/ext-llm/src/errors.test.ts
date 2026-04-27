@@ -1,171 +1,138 @@
 /**
- * Unit tests for error mapping functions
+ * Unit tests for error mapping functions.
  *
- * Tests mapProviderError with detector returning status+message, null, and edge cases.
+ * Tests `mapProviderError` returns invalid RillValues with the correct
+ * generic atom code (`#AUTH`, `#RATE_LIMIT`, `#UNAVAILABLE`, etc.) so
+ * scripts can `guard #ATOM`.
  */
 
 import { describe, it, expect } from 'vitest';
-import { RuntimeError } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import { mapProviderError } from './errors.js';
 import type { ProviderErrorDetector } from './types.js';
 
-// ============================================================
-// MAP PROVIDER ERROR
-// ============================================================
+function makeCtx(): RuntimeContext {
+  return createRuntimeContext();
+}
 
 describe('mapProviderError', () => {
   describe('detector returns non-null', () => {
-    it('formats with HTTP status code and message', () => {
-      // EC-12: Detector returns non-null → RuntimeError with HTTP format
+    it('emits #AUTH on HTTP 401', () => {
+      const ctx = makeCtx();
       const detector: ProviderErrorDetector = () => ({
         status: 401,
         message: 'Invalid API key',
       });
-
-      const originalError = new Error('API Error');
-      const result = mapProviderError('Anthropic', originalError, detector);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R005');
-      expect(result.message).toBe(
-        'Anthropic API error (HTTP 401): Invalid API key'
-      );
+      const result = mapProviderError(ctx, 'anthropic', new Error('e'), detector);
+      expect(isInvalid(result)).toBe(true);
+      const status = getStatus(result);
+      expect(status.code.name).toBe('AUTH');
+      expect(status.provider).toBe('anthropic');
+      expect(status.message).toContain('HTTP 401');
+      expect(status.message).toContain('Invalid API key');
     });
 
-    it('formats with message only when status is undefined', () => {
-      // EC-12 edge case: Detector returns message without status
+    it('emits #RATE_LIMIT on HTTP 429', () => {
+      const ctx = makeCtx();
       const detector: ProviderErrorDetector = () => ({
+        status: 429,
         message: 'Rate limit exceeded',
       });
-
-      const originalError = new Error('Rate Limit');
-      const result = mapProviderError('OpenAI', originalError, detector);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R005');
-      expect(result.message).toBe('OpenAI API error: Rate limit exceeded');
+      const result = mapProviderError(ctx, 'openai', new Error('e'), detector);
+      expect(getStatus(result).code.name).toBe('RATE_LIMIT');
     });
 
-    it('handles different provider names', () => {
-      // EC-12: Provider name appears in formatted message
-      const detector: ProviderErrorDetector = () => ({
-        status: 500,
-        message: 'Internal server error',
-      });
-
-      const error = new Error('Server Error');
-      const result = mapProviderError('CustomProvider', error, detector);
-
-      expect(result.message).toContain('CustomProvider API error');
-      expect(result.message).toContain('HTTP 500');
-    });
-
-    it('handles different HTTP status codes', () => {
-      // EC-12: Different status codes format correctly
+    it('emits #FORBIDDEN on HTTP 403', () => {
+      const ctx = makeCtx();
       const detector: ProviderErrorDetector = () => ({
         status: 403,
         message: 'Forbidden',
       });
+      const result = mapProviderError(ctx, 'gemini', new Error('e'), detector);
+      expect(getStatus(result).code.name).toBe('FORBIDDEN');
+    });
 
-      const originalError = new Error('Original');
-      const result = mapProviderError('Provider', originalError, detector);
+    it('emits #UNAVAILABLE on HTTP 500', () => {
+      const ctx = makeCtx();
+      const detector: ProviderErrorDetector = () => ({
+        status: 500,
+        message: 'Internal server error',
+      });
+      const result = mapProviderError(ctx, 'foundry', new Error('e'), detector);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
+    });
 
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toContain('HTTP 403');
-      expect(result.message).toContain('Forbidden');
+    it('emits #UNAVAILABLE when status is undefined', () => {
+      const ctx = makeCtx();
+      const detector: ProviderErrorDetector = () => ({ message: 'no status' });
+      const result = mapProviderError(ctx, 'openai', new Error('e'), detector);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
+      expect(getStatus(result).raw['kind']).toBe('provider_error');
     });
   });
 
   describe('detector returns null', () => {
-    it('formats with generic error message for Error instance', () => {
-      // EC-13: Detector returns null → RuntimeError with generic format
+    it('maps TypeError to #UNAVAILABLE / connection_failed', () => {
+      const ctx = makeCtx();
       const detector: ProviderErrorDetector = () => null;
-
-      const originalError = new Error('Network timeout');
-      const result = mapProviderError('OpenAI', originalError, detector);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R005');
-      expect(result.message).toBe('OpenAI error: Network timeout');
+      const result = mapProviderError(
+        ctx,
+        'openai',
+        new TypeError('fetch failed'),
+        detector
+      );
+      const status = getStatus(result);
+      expect(status.code.name).toBe('UNAVAILABLE');
+      expect(status.raw['kind']).toBe('connection_failed');
     });
 
-    it('uses "Unknown error" for non-Error objects', () => {
-      // EC-13 edge case: Unknown error type
+    it('maps SyntaxError to #PROTOCOL', () => {
+      const ctx = makeCtx();
       const detector: ProviderErrorDetector = () => null;
-
-      const unknownError = { code: 'UNKNOWN' };
-      const result = mapProviderError('Provider', unknownError, detector);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R005');
-      expect(result.message).toBe('Provider error: Unknown error');
+      const result = mapProviderError(
+        ctx,
+        'openai',
+        new SyntaxError('bad json'),
+        detector
+      );
+      expect(getStatus(result).code.name).toBe('PROTOCOL');
     });
 
-    it('handles string error values', () => {
-      // EC-13 edge case: Error is a string
+    it('maps generic Error to #UNAVAILABLE / unknown_error', () => {
+      const ctx = makeCtx();
       const detector: ProviderErrorDetector = () => null;
-
-      const stringError = 'Connection failed';
-      const result = mapProviderError('Provider', stringError, detector);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe('Provider error: Unknown error');
+      const result = mapProviderError(
+        ctx,
+        'openai',
+        new Error('Network timeout'),
+        detector
+      );
+      const status = getStatus(result);
+      expect(status.code.name).toBe('UNAVAILABLE');
+      expect(status.message).toContain('Network timeout');
     });
 
-    it('handles null error values', () => {
-      // EC-13 edge case: Error is null
+    it('maps non-Error values to #UNAVAILABLE', () => {
+      const ctx = makeCtx();
       const detector: ProviderErrorDetector = () => null;
-
-      const result = mapProviderError('Provider', null, detector);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe('Provider error: Unknown error');
-    });
-
-    it('handles undefined error values', () => {
-      // EC-13 edge case: Error is undefined
-      const detector: ProviderErrorDetector = () => null;
-
-      const result = mapProviderError('Provider', undefined, detector);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe('Provider error: Unknown error');
+      const result = mapProviderError(ctx, 'openai', { code: 'X' }, detector);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
     });
   });
 
-  describe('edge cases', () => {
-    it('handles detector returning empty message', () => {
-      const detector: ProviderErrorDetector = () => ({
-        status: 404,
-        message: '',
-      });
-
-      const result = mapProviderError('Provider', new Error(), detector);
-
-      expect(result.message).toBe('Provider API error (HTTP 404): ');
-    });
-
-    it('handles detector returning status 0', () => {
-      const detector: ProviderErrorDetector = () => ({
-        status: 0,
-        message: 'Connection error',
-      });
-
-      const result = mapProviderError('Provider', new Error(), detector);
-
-      // Status 0 is still a defined number, so it formats with HTTP prefix
-      expect(result.message).toBe(
-        'Provider API error (HTTP 0): Connection error'
-      );
-    });
-
-    it('handles Error with empty message', () => {
+  describe('halt-style errors', () => {
+    it('maps DOMException AbortError to #TIMEOUT', () => {
+      const ctx = makeCtx();
       const detector: ProviderErrorDetector = () => null;
-
-      const emptyError = new Error('');
-      const result = mapProviderError('Provider', emptyError, detector);
-
-      expect(result.message).toBe('Provider error: ');
+      const abortError = new Error('aborted');
+      abortError.name = 'AbortError';
+      const result = mapProviderError(ctx, 'openai', abortError, detector);
+      expect(getStatus(result).code.name).toBe('TIMEOUT');
     });
   });
 });

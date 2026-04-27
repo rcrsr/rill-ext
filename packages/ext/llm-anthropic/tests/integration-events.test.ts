@@ -12,6 +12,7 @@ import {
   type ExtensionEvent,
 } from '@rcrsr/rill';
 import Anthropic from '@anthropic-ai/sdk';
+import { expectRejectedHalt } from './_halt-helpers.js';
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
@@ -246,9 +247,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // embed() throws "embeddings API not available"
-      await expect(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx)).rejects.toThrow(
-        'embeddings API not available'
-      );
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx), { message: 'embeddings API not available' });
 
       // Should emit error event
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -278,9 +277,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
-      ).rejects.toThrow('embeddings API not available');
+      , { message: 'embeddings API not available' });
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -755,7 +754,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         { prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} },
         ctx
       );
-      await expect(resolveStream(stream)).rejects.toThrow('tools parameter is required');
+      await expectRejectedHalt(resolveStream(stream), { message: 'tools parameter is required' });
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);

@@ -51,10 +51,10 @@ export const detectFoundryError: ProviderErrorDetector = (error: unknown) => {
  */
 export function mapRestError(status: number, body?: unknown): RuntimeError {
   if (status === 401) {
-    return new RuntimeError('RILL-R004', `${PROVIDER}: authentication failed (401)`);
+    return new RuntimeError('RILL-R005', `${PROVIDER}: authentication failed (401)`);
   }
   if (status === 429) {
-    return new RuntimeError('RILL-R004', `${PROVIDER}: rate limit exceeded`);
+    return new RuntimeError('RILL-R005', `${PROVIDER}: rate limit exceeded`);
   }
 
   const message =
@@ -67,7 +67,7 @@ export function mapRestError(status: number, body?: unknown): RuntimeError {
       ? (body as { error: { message: string } }).error.message
       : `HTTP ${status}`;
 
-  return new RuntimeError('RILL-R004', `${PROVIDER}: ${message}`);
+  return new RuntimeError('RILL-R005', `${PROVIDER}: ${message}`);
 }
 
 // ============================================================
@@ -80,7 +80,7 @@ export function mapRestError(status: number, body?: unknown): RuntimeError {
  * @returns RuntimeError with spec-defined timeout message
  */
 export function createTimeoutError(): RuntimeError {
-  return new RuntimeError('RILL-R004', `${PROVIDER}: request timeout`);
+  return new RuntimeError('RILL-R005', `${PROVIDER}: request timeout`);
 }
 
 // ============================================================
@@ -94,7 +94,7 @@ export function createTimeoutError(): RuntimeError {
  * @returns RuntimeError with spec-defined message
  */
 export function createModelNotDeployedError(name: string): RuntimeError {
-  return new RuntimeError('RILL-R004', `${PROVIDER}: model '${name}' not deployed`);
+  return new RuntimeError('RILL-R005', `${PROVIDER}: model '${name}' not deployed`);
 }
 
 // ============================================================
@@ -108,7 +108,7 @@ export function createModelNotDeployedError(name: string): RuntimeError {
  * @param input - String that may contain `@{VAR}` patterns
  * @param lookup - Function that returns the value for a variable name, or undefined if unknown
  * @returns String with all `@{VAR}` references replaced
- * @throws RuntimeError (RILL-R004) for each unresolved reference
+ * @throws RuntimeError (RILL-R005) for each unresolved reference
  */
 export function resolveVariables(
   input: string,
@@ -118,7 +118,7 @@ export function resolveVariables(
     const value = lookup(varName);
     if (value === undefined) {
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R005',
         `${PROVIDER}: unresolved variable '${varName}'`
       );
     }

@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createRuntimeContext, callable, isRillStream, type RillValue, type ApplicationCallable } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
+import { expectRejectedHalt } from './_halt-helpers.js';
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
@@ -500,8 +501,8 @@ describe('tool_loop() function', () => {
       ).toThrow('prompt text cannot be empty');
     });
 
-    // EC-4: Provider streaming API failure throws RuntimeError RILL-R004
-    it('throws RuntimeError RILL-R004 on streaming API failure [EC-4]', async () => {
+    // EC-4: Provider streaming API failure throws RuntimeError RILL-R005
+    it('throws RuntimeError RILL-R005 on streaming API failure [EC-4]', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -527,14 +528,11 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('Provider API error:'),
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('Provider API error:') });
     });
 
-    // EC-5: Consecutive tool errors exceed max — RuntimeError RILL-R004 with exact message
-    it('throws RuntimeError RILL-R004 for consecutive errors with errorId [EC-5]', async () => {
+    // EC-5: Consecutive tool errors exceed max — RuntimeError RILL-R005 with exact message
+    it('throws RuntimeError RILL-R005 for consecutive errors with errorId [EC-5]', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -563,10 +561,7 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('Tool execution failed: 2 consecutive errors'),
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('Tool execution failed: 2 consecutive errors') });
     });
 
     it('error message includes tool name and original message [EC-5]', async () => {
@@ -595,10 +590,7 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringMatching(/Tool execution failed: 1 consecutive errors \(last: my_tool: Specific failure\)/),
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: expect.stringMatching(/Tool execution failed: 1 consecutive errors \(last: my_tool: Specific failure\)/) });
     });
 
     // EC-6: Tool not found in tool map — error includes "Unknown tool: {name}"
@@ -625,10 +617,7 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      await expect(resolveStream(stream)).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('Unknown tool: nonexistent_tool'),
-      });
+      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('Unknown tool: nonexistent_tool') });
     });
 
     // AC-17: Tool execution error mid-loop yields tool_call chunk; stream resolves with final content
@@ -687,7 +676,7 @@ describe('tool_loop() function', () => {
         { prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} },
         ctx
       );
-      await expect(resolveStream(stream)).rejects.toThrow('tools parameter is required');
+      await expectRejectedHalt(resolveStream(stream), { message: 'tools parameter is required' });
     });
 
     // EC-15: Unknown tool name in tool loop
@@ -758,7 +747,7 @@ describe('tool_loop() function', () => {
         { prompt: 'Test', tools, options: { max_errors: 3 } },
         ctx
       );
-      await expect(resolveStream(stream)).rejects.toThrow('Tool execution failed: 3 consecutive errors');
+      await expectRejectedHalt(resolveStream(stream), { message: 'Tool execution failed: 3 consecutive errors' });
     });
 
     it('resets consecutive error count on success', async () => {

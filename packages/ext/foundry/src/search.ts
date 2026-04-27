@@ -63,12 +63,12 @@ export async function callSearch(
   disposed: { value: boolean }
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw new RuntimeError('RILL-R004', `${PROVIDER}: extension disposed`);
+    throw new RuntimeError('RILL-R005', `${PROVIDER}: extension disposed`);
   }
 
   // EC-10: Search must be configured
   if (!config.search) {
-    throw new RuntimeError('RILL-R004', 'foundry: search not configured');
+    throw new RuntimeError('RILL-R005', 'foundry: search not configured');
   }
 
   const searchConfig: FoundrySearchConfig = config.search;
@@ -127,7 +127,7 @@ export async function callSearch(
     }
 
     const message = error instanceof Error ? error.message : String(error);
-    const rillError = new RuntimeError('RILL-R004', `${PROVIDER}: ${message}`);
+    const rillError = new RuntimeError('RILL-R005', `${PROVIDER}: ${message}`);
 
     emitExtensionEvent(ctx, {
       event: 'foundry:search:error',
@@ -216,7 +216,7 @@ async function runSearchRequest(
   // EC-11: Search index not found
   if (response.status === 404) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `foundry: search index '${indexName}' not found`
     );
   }
