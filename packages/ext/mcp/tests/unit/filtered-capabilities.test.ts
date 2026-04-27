@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { McpExtensionConfig } from '../../src/types.js';
+import { makeFactoryCtx } from '../_helpers.js';
 
 // Mock the SDK transports to avoid actual process spawning
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
@@ -76,7 +77,7 @@ describe('Filtered Capabilities End-to-End', () => {
       };
 
       // Act
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
@@ -134,7 +135,7 @@ describe('Filtered Capabilities End-to-End', () => {
       };
 
       // Act
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
@@ -181,7 +182,7 @@ describe('Filtered Capabilities End-to-End', () => {
       };
 
       // Act
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
@@ -228,7 +229,7 @@ describe('Filtered Capabilities End-to-End', () => {
       };
 
       // Act
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
@@ -277,7 +278,7 @@ describe('Filtered Capabilities End-to-End', () => {
       };
 
       // Act
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
@@ -325,7 +326,7 @@ describe('Filtered Capabilities End-to-End', () => {
       };
 
       // Act
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
@@ -377,7 +378,7 @@ describe('Filtered Capabilities End-to-End', () => {
       };
 
       // Act
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
       const resources = fns.resources as Record<string, any>;
@@ -454,7 +455,7 @@ describe('Filtered Capabilities End-to-End', () => {
       };
 
       // Act
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
       const resources = fns.resources as Record<string, any>;

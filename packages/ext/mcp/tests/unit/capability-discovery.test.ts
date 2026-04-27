@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { McpExtensionConfig } from '../../src/types.js';
+import { makeFactoryCtx } from '../_helpers.js';
 
 // Mock the SDK transports to avoid actual process spawning
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
@@ -97,7 +98,7 @@ describe('Capability Discovery', () => {
         },
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // Verify all four list methods were called
@@ -140,7 +141,7 @@ describe('Capability Discovery', () => {
         },
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // With empty capabilities, only introspection + read_resource functions exist
@@ -184,7 +185,7 @@ describe('Capability Discovery', () => {
         toolFilter: ['tool1', 'tool3'], // Only include tool1 and tool3
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // Only filtered tools present in tools dict
@@ -219,7 +220,7 @@ describe('Capability Discovery', () => {
         resourceFilter: ['file://resource1', 'http://resource3'],
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // read_resource is always present in resources dict regardless of filter
@@ -257,7 +258,7 @@ describe('Capability Discovery', () => {
         promptFilter: ['prompt2', 'prompt4'],
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // Only filtered prompts present in prompts dict
@@ -296,7 +297,7 @@ describe('Capability Discovery', () => {
         promptFilter: [], // Empty = all
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // All capabilities included when filter is empty
@@ -332,7 +333,7 @@ describe('Capability Discovery', () => {
         // No filters = all included
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       const toolsDict2 = fns.tools as Record<string, unknown>;
@@ -367,7 +368,7 @@ describe('Capability Discovery', () => {
         toolFilter: ['nonexistent-tool'],
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // tool1 not generated because filter excluded it
@@ -406,7 +407,7 @@ describe('Capability Discovery', () => {
         toolFilter: ['tool1', 'tool2'], // Only 2 tools filtered
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // Only 2 tools dict entries generated
@@ -454,7 +455,7 @@ describe('Capability Discovery', () => {
         promptFilter: ['p1', 'p3'],
       };
 
-      const result = await createMcpExtension(config);
+      const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, any>;
 
       // Only filtered tool present in tools dict

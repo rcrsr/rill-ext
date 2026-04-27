@@ -6,22 +6,26 @@
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { anyTypeValue, emitExtensionEvent, structureToTypeValue } from '@rcrsr/rill';
-
-// RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
-type RuntimeContextLike = {
-  readonly variables: Map<string, RillValue>;
-  readonly callbacks?: RuntimeCallbacks | undefined;
-  pipeValue: RillValue;
-};
+import type { RillFunction, RillValue, RuntimeContext } from '@rcrsr/rill';
 import {
-  createToolError,
-  createProtocolError,
-  createTimeoutError,
-  createConnectionLostError,
-  createAuthFailedError,
+  anyTypeValue,
+  emitExtensionEvent,
+  getStatus,
+  isInvalid,
+  structureToTypeValue,
+} from '@rcrsr/rill';
+import {
+  failTool,
+  failTimeout,
+  mapMcpError,
 } from './errors.js';
+
+function describeError(error: unknown): string {
+  if (isInvalid(error as RillValue)) {
+    return getStatus(error as RillValue).message;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
 import { generateParametersFromSchema, jsonSchemaToTypeStructure, type JsonSchema, type OutputJsonSchema } from './parsing.js';
 import { sanitizeNames } from './naming.js';
 
@@ -179,8 +183,9 @@ function generateToolFunction(
   // Create async function wrapper
   const fn = async (
     args: Record<string, RillValue>,
-    ctx: RuntimeContextLike
+    ctxLike: unknown,
   ): Promise<RillValue> => {
+    const ctx = ctxLike as RuntimeContext;
     // Emit mcp:connect on first tool call [IR-1]
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
@@ -206,87 +211,38 @@ function generateToolFunction(
       params: toolArgs,
     });
 
-    // Set up timeout promise
+    // Set up timeout promise: reject with the invalid RillValue directly so
+    // the catch block recognises it via isInvalid and passes it through.
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => {
-        reject(createTimeoutError(tool.name, timeoutMs));
+        reject(failTimeout(ctx, tool.name, timeoutMs));
       }, timeoutMs);
-      // Ensure timer doesn't prevent process exit
       timer.unref();
     });
 
     try {
-      // Call tool with timeout race
       const result = (await Promise.race([
         client.callTool({ name: tool.name, arguments: toolArgs }),
         timeoutPromise,
       ])) as McpToolResult;
 
-      // Check for error response
       if (result.isError) {
-        // Extract error text from content
         const errorText = result.content
           .filter((block) => block.type === 'text')
           .map((block) => block.text ?? '')
           .join('\n');
-        throw createToolError(tool.name, errorText || 'unknown error');
+        throw failTool(ctx, tool.name, errorText || 'unknown error');
       }
 
-      // Parse and return result
       return parseToolResult(result);
     } catch (error) {
-      // Emit mcp:error event [IR-1]
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
-        error: error instanceof Error ? error.message : String(error),
+        error: describeError(error),
         tool: tool.name,
       });
-
-      // Handle error categories per spec
-      if (error instanceof Error) {
-        // Already wrapped runtime error: re-throw
-        if (error.name === 'RuntimeError') {
-          throw error;
-        }
-
-        const message = error.message.toLowerCase();
-
-        // EC-9: Connection lost
-        if (
-          message.includes('connection closed') ||
-          message.includes('connection lost') ||
-          message.includes('disconnected')
-        ) {
-          throw createConnectionLostError();
-        }
-
-        // EC-10: Authentication failed
-        if (
-          message.includes('unauthorized') ||
-          message.includes('authentication failed') ||
-          message.includes('token') ||
-          message.includes('auth')
-        ) {
-          throw createAuthFailedError();
-        }
-
-        // EC-7: Protocol error (malformed response, parsing failure)
-        if (
-          message.includes('protocol') ||
-          message.includes('invalid response') ||
-          message.includes('parse') ||
-          message.includes('malformed')
-        ) {
-          throw createProtocolError(error.message);
-        }
-
-        // EC-6: Generic tool error (fallback)
-        throw createToolError(tool.name, error.message);
-      }
-
-      // Non-Error exception: wrap as tool error
-      throw createToolError(tool.name, String(error));
+      throw mapMcpError(ctx, error, tool.name);
     }
   };
 

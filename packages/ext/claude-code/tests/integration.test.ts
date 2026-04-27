@@ -5,7 +5,9 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { createRuntimeContext, isRillStream, RuntimeError } from '@rcrsr/rill';
+import { SpawnError } from '../src/errors.js';
+import { makeFactoryCtx, expectInvalidThrow } from './_helpers.js';
+import { createRuntimeContext, getStatus, isInvalid, isRillStream, RuntimeError, type RillValue } from '@rcrsr/rill';
 import type { ClaudeCodeResult } from '../src/types.js';
 
 // Mock which module
@@ -76,7 +78,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx);
@@ -103,7 +105,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx);
@@ -130,7 +132,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx);
@@ -175,7 +177,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx);
@@ -211,7 +213,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx);
@@ -267,7 +269,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       });
 
       // Create extension and execute
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn(
@@ -326,7 +328,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).skill.fn(
@@ -389,7 +391,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 });
+      const ext = createClaudeCodeExtension({ defaultTimeout: 1800000 }, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn({ text: 'Test prompt', options: { timeout: 60000 } }, ctx);
@@ -437,7 +439,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension({ defaultTimeout: 45000 });
+      const ext = createClaudeCodeExtension({ defaultTimeout: 45000 }, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
@@ -488,7 +490,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn(
@@ -543,7 +545,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn(
@@ -594,7 +596,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn(
@@ -645,7 +647,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn(
@@ -669,114 +671,92 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
 // ============================================================
 
 describe('Claude Code Extension Integration Tests - Error Contracts', () => {
-  // EC-7: Empty prompt/name text throws RuntimeError RILL-R004 before stream creation
-  describe('EC-7: Empty text throws RuntimeError RILL-R004 before stream creation', () => {
-    it('prompt() throws RuntimeError RILL-R004 for empty prompt text', () => {
-      const ext = createClaudeCodeExtension();
+  // EC-7: Empty prompt/name text invalidates with #INVALID_INPUT before stream creation
+  describe('EC-7: Empty text invalidates with #INVALID_INPUT before stream creation', () => {
+    it('prompt() invalidates for empty prompt text', () => {
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
-
-      expect(() =>
-        (ext.value as any).prompt.fn({ text: '', options: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).prompt.fn({ text: '', options: {} }, ctx)
-      ).toThrow('prompt text cannot be empty');
+      expectInvalidThrow(
+        () => (ext.value as any).prompt.fn({ text: '', options: {} }, ctx),
+        'INVALID_INPUT',
+        'prompt text cannot be empty',
+      );
     });
 
-    it('prompt() throws RuntimeError RILL-R004 for whitespace-only prompt text', () => {
-      const ext = createClaudeCodeExtension();
+    it('prompt() invalidates for whitespace-only prompt text', () => {
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
-
-      expect(() =>
-        (ext.value as any).prompt.fn({ text: '   ', options: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).prompt.fn({ text: '   ', options: {} }, ctx)
-      ).toThrow('prompt text cannot be empty');
+      expectInvalidThrow(
+        () => (ext.value as any).prompt.fn({ text: '   ', options: {} }, ctx),
+        'INVALID_INPUT',
+        'prompt text cannot be empty',
+      );
     });
 
-    it('skill() throws RuntimeError RILL-R004 for empty skill name', () => {
-      const ext = createClaudeCodeExtension();
+    it('skill() invalidates for empty skill name', () => {
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
-
-      expect(() =>
-        (ext.value as any).skill.fn({ name: '', args: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).skill.fn({ name: '', args: {} }, ctx)
-      ).toThrow('skill name cannot be empty');
+      expectInvalidThrow(
+        () => (ext.value as any).skill.fn({ name: '', args: {} }, ctx),
+        'INVALID_INPUT',
+        'skill name cannot be empty',
+      );
     });
 
-    it('skill() throws RuntimeError RILL-R004 for whitespace-only skill name', () => {
-      const ext = createClaudeCodeExtension();
+    it('skill() invalidates for whitespace-only skill name', () => {
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
-
-      expect(() =>
-        (ext.value as any).skill.fn({ name: '  ', args: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).skill.fn({ name: '  ', args: {} }, ctx)
-      ).toThrow('skill name cannot be empty');
+      expectInvalidThrow(
+        () => (ext.value as any).skill.fn({ name: '  ', args: {} }, ctx),
+        'INVALID_INPUT',
+        'skill name cannot be empty',
+      );
     });
 
-    it('command() throws RuntimeError RILL-R004 for empty command name', () => {
-      const ext = createClaudeCodeExtension();
+    it('command() invalidates for empty command name', () => {
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
-
-      expect(() =>
-        (ext.value as any).command.fn({ name: '', args: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).command.fn({ name: '', args: {} }, ctx)
-      ).toThrow('command name cannot be empty');
+      expectInvalidThrow(
+        () => (ext.value as any).command.fn({ name: '', args: {} }, ctx),
+        'INVALID_INPUT',
+        'command name cannot be empty',
+      );
     });
 
-    it('command() throws RuntimeError RILL-R004 for whitespace-only command name', () => {
-      const ext = createClaudeCodeExtension();
+    it('command() invalidates for whitespace-only command name', () => {
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
-
-      expect(() =>
-        (ext.value as any).command.fn({ name: '\t', args: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).command.fn({ name: '\t', args: {} }, ctx)
-      ).toThrow('command name cannot be empty');
+      expectInvalidThrow(
+        () => (ext.value as any).command.fn({ name: '\t', args: {} }, ctx),
+        'INVALID_INPUT',
+        'command name cannot be empty',
+      );
     });
   });
 
-  // EC-8: Binary not found throws RuntimeError RILL-R004
-  describe('EC-8: Binary not found throws RuntimeError RILL-R004', () => {
-    it('prompt() throws RuntimeError RILL-R004 when spawnClaudeCli throws binary-not-found', async () => {
+  // EC-8: Binary not found invalidates with #UNAVAILABLE
+  describe('EC-8: Binary not found invalidates with #UNAVAILABLE', () => {
+    it('prompt() invalidates when spawnClaudeCli throws SpawnError(binary_missing)', async () => {
       const { spawnClaudeCli } = await import('../src/process.js');
 
       vi.mocked(spawnClaudeCli).mockImplementation(() => {
-        throw new RuntimeError('RILL-R004', 'claude binary not found', undefined, {
-          binaryPath: 'claude',
-        });
+        throw new SpawnError('binary_missing', 'claude binary not found', { binaryPath: 'claude' });
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      expect(() =>
-        (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx)
-      ).toThrow('claude binary not found');
+      expectInvalidThrow(
+        () => (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx),
+        'UNAVAILABLE',
+        'claude binary not found',
+      );
     });
   });
 
-  // EC-9: Process timeout throws RuntimeError RILL-R004
-  describe('EC-9: Process timeout throws RuntimeError RILL-R004', () => {
-    it('stream throws RuntimeError when process times out', async () => {
+  // EC-9: Process timeout maps to invalid RillValue with #TIMEOUT
+  describe('EC-9: Process timeout invalidates with #TIMEOUT', () => {
+    it('stream resolve() returns invalid #TIMEOUT when process times out', async () => {
       const { spawnClaudeCli } = await import('../src/process.js');
       const { createStreamParser } = await import('../src/stream-parser.js');
       const { extractResult } = await import('../src/result.js');
@@ -794,13 +774,6 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         duration: 0,
       });
 
-      const timeoutError = new RuntimeError(
-        'RILL-R004',
-        'Claude CLI timeout after 5000ms',
-        undefined,
-        { timeoutMs: 5000 }
-      );
-
       vi.mocked(spawnClaudeCli).mockReturnValue({
         ptyProcess: {
           onData: vi.fn(),
@@ -808,17 +781,20 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
           write: vi.fn(),
           kill: vi.fn(),
         } as any,
-        exitCode: Promise.reject(timeoutError),
+        exitCode: Promise.reject(
+          new SpawnError('cli_timeout', 'Claude CLI timeout after 5000ms', { timeoutMs: 5000 }),
+        ),
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn({ text: 'Hello Claude', options: { timeout: 5000 } }, ctx);
-
-      // EC-9: timeout re-throws RuntimeError through the generator; collectChunks propagates it
-      await expect(collectChunks(stream)).rejects.toThrow('Claude CLI timeout after 5000ms');
+      await collectChunks(stream);
+      const result = await resolveStream(stream) as RillValue;
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('TIMEOUT');
     });
   });
 
@@ -844,12 +820,9 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
 
       let onDataCallback: ((chunk: string) => void) | undefined;
 
-      const exitError = new RuntimeError(
-        'RILL-R004',
-        'Claude CLI exited with code 1',
-        undefined,
-        { exitCode: 1 }
-      );
+      const exitError = new SpawnError('exit_nonzero', 'Claude CLI exited with code 1', {
+        exitCode: 1,
+      });
 
       vi.mocked(spawnClaudeCli).mockReturnValue({
         ptyProcess: {
@@ -867,7 +840,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         dispose: vi.fn(),
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const stream = (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx);
@@ -878,85 +851,71 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       // EC-10: An error chunk is present in the stream
       expect(chunks.some((c) => c.includes('[error]'))).toBe(true);
 
-      // AC-18: Stream resolves (does not throw) with partial data
-      const result = await resolveStream(stream) as Record<string, unknown>;
-      expect(result).toBeDefined();
-      expect(result['result']).toBeDefined();
+      // AC-18: Stream resolves with an invalid RillValue carrying #UNAVAILABLE.
+      const result = await resolveStream(stream) as RillValue;
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
     });
   });
 
-  // EC-11: PTY spawn failure throws RuntimeError RILL-R004
-  describe('EC-11: PTY spawn failure throws RuntimeError RILL-R004', () => {
-    it('prompt() throws RuntimeError RILL-R004 with spawn failure message', async () => {
+  // EC-11: PTY spawn failure invalidates with #UNAVAILABLE
+  describe('EC-11: PTY spawn failure invalidates with #UNAVAILABLE', () => {
+    it('prompt() invalidates with spawn failure message', async () => {
       const { spawnClaudeCli } = await import('../src/process.js');
 
       vi.mocked(spawnClaudeCli).mockImplementation(() => {
-        throw new RuntimeError(
-          'RILL-R004',
-          'Failed to spawn claude binary: spawn error detail',
-          undefined,
-          { binaryPath: 'claude', originalError: 'spawn error detail' }
-        );
+        throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: spawn error detail', {
+          binaryPath: 'claude',
+          originalError: 'spawn error detail',
+        });
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      expect(() =>
-        (ext.value as any).prompt.fn({ text: 'Hello', options: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).prompt.fn({ text: 'Hello', options: {} }, ctx)
-      ).toThrow(/Failed to spawn claude binary:/);
+      expectInvalidThrow(
+        () => (ext.value as any).prompt.fn({ text: 'Hello', options: {} }, ctx),
+        'UNAVAILABLE',
+        'Failed to spawn claude binary',
+      );
     });
 
-    it('skill() throws RuntimeError RILL-R004 with spawn failure message', async () => {
+    it('skill() invalidates with spawn failure message', async () => {
       const { spawnClaudeCli } = await import('../src/process.js');
 
       vi.mocked(spawnClaudeCli).mockImplementation(() => {
-        throw new RuntimeError(
-          'RILL-R004',
-          'Failed to spawn claude binary: permission denied',
-          undefined,
-          { binaryPath: 'claude' }
-        );
+        throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: permission denied', {
+          binaryPath: 'claude',
+        });
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      expect(() =>
-        (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx)
-      ).toThrow(/Failed to spawn claude binary:/);
+      expectInvalidThrow(
+        () => (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx),
+        'UNAVAILABLE',
+        'Failed to spawn claude binary',
+      );
     });
 
-    it('command() throws RuntimeError RILL-R004 with spawn failure message', async () => {
+    it('command() invalidates with spawn failure message', async () => {
       const { spawnClaudeCli } = await import('../src/process.js');
 
       vi.mocked(spawnClaudeCli).mockImplementation(() => {
-        throw new RuntimeError(
-          'RILL-R004',
-          'Failed to spawn claude binary: resource unavailable',
-          undefined,
-          { binaryPath: 'claude' }
-        );
+        throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: resource unavailable', {
+          binaryPath: 'claude',
+        });
       });
 
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      expect(() =>
-        (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx)
-      ).toThrow(RuntimeError);
-
-      expect(() =>
-        (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx)
-      ).toThrow(/Failed to spawn claude binary:/);
+      expectInvalidThrow(
+        () => (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
+        'UNAVAILABLE',
+        'Failed to spawn claude binary',
+      );
     });
   });
 
@@ -986,7 +945,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
           dispose: vi.fn(),
         });
 
-        const ext = createClaudeCodeExtension();
+        const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
         const stream = (ext.value as any).prompt.fn({ text: 'Do something', options: {} }, ctx);
@@ -1040,7 +999,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
           dispose: vi.fn(),
         });
 
-        const ext = createClaudeCodeExtension();
+        const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
         const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
@@ -1093,7 +1052,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
           dispose: vi.fn(),
         });
 
-        const ext = createClaudeCodeExtension();
+        const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
         const stream = (ext.value as any).prompt.fn({ text: 'Empty task', options: {} }, ctx);
@@ -1136,7 +1095,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
           dispose: mockDispose,
         });
 
-        const ext = createClaudeCodeExtension();
+        const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
         const stream = (ext.value as any).prompt.fn({ text: 'Long task', options: {} }, ctx);
@@ -1178,7 +1137,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
           dispose: mockDispose,
         });
 
-        const ext = createClaudeCodeExtension();
+        const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
         const stream = (ext.value as any).prompt.fn({ text: 'Long task', options: {} }, ctx);

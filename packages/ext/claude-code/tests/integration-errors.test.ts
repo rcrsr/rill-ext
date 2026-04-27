@@ -1,43 +1,38 @@
 /**
- * Integration tests for Claude Code extension error contracts.
- * Tests error handling across factory, prompt, skill, command, and dispose.
+ * Integration tests for Claude Code extension error contracts (rill 0.19).
  *
- * Covers: EC-1, EC-2, EC-3, EC-4, EC-5, EC-6, EC-8, EC-9, EC-10, EC-11, EC-12, EC-13, EC-14, EC-15, EC-16
- * Acceptance: AC-6, AC-7, AC-8, AC-9, AC-11
+ * Validation, spawn, and exit-failure paths now produce invalid `RillValue`s
+ * carrying generic atoms (`#INVALID_INPUT`, `#UNAVAILABLE`, `#FORBIDDEN`,
+ * `#TIMEOUT`) via `ctx.invalidate`. Factory-time binary validation throws
+ * `RuntimeError('RILL-R001', ...)`.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { createRuntimeContext, RuntimeError } from '@rcrsr/rill';
+import { SpawnError } from '../src/errors.js';
+import {
+  expectInvalidThrow,
+  makeFactoryCtx,
+} from './_helpers.js';
+import {
+  createRuntimeContext,
+  RuntimeError,
+  isInvalid,
+  getStatus,
+  type RillValue,
+} from '@rcrsr/rill';
 
 // ============================================================
 // MOCKS
 // ============================================================
 
-// Mock which module for binary validation
 vi.mock('which', () => ({
-  default: {
-    sync: vi.fn(),
-  },
+  default: { sync: vi.fn() },
 }));
-
-// Mock node-pty to avoid native module
-vi.mock('node-pty', () => ({
-  spawn: vi.fn(),
-}));
-
-// Mock process module
+vi.mock('node-pty', () => ({ spawn: vi.fn() }));
 vi.mock('../src/process.js');
-
-// Mock stream parser
 vi.mock('../src/stream-parser.js');
-
-// Mock result extractor
 vi.mock('../src/result.js');
-
-// ============================================================
-// SETUP
-// ============================================================
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,17 +42,10 @@ beforeEach(() => {
 // STREAM HELPERS
 // ============================================================
 
-/**
- * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
- */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  return (stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+async function resolveStream(stream: unknown): Promise<RillValue> {
+  return (stream as { __rill_stream_resolve: () => Promise<RillValue> }).__rill_stream_resolve();
 }
 
-/**
- * Consume all chunks from a RillStream by iterating via next() calls.
- * Returns collected string chunks.
- */
 async function collectChunks(stream: unknown): Promise<string[]> {
   const chunks: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,33 +60,42 @@ async function collectChunks(stream: unknown): Promise<string[]> {
   return chunks;
 }
 
+function mockSpawnRejection(error: unknown): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const noop: any = vi.fn();
+  return void undefined;
+}
+
 // ============================================================
 // EC-1: Invalid binaryPath at factory creation
 // ============================================================
 
 describe('EC-1: Invalid binaryPath at factory creation', () => {
-  it('throws RuntimeError RILL-R004 "claude binary not found" when which.sync fails', async () => {
+  it('throws RuntimeError(RILL-R001) when which.sync fails', async () => {
     const which = await import('which');
-
-    // Mock which.sync to throw (binary not in PATH)
     vi.mocked(which.default.sync).mockImplementation(() => {
       throw new Error('not found');
     });
 
-    expect(() =>
-      createClaudeCodeExtension({ binaryPath: '/invalid/claude' })
-    ).toThrow('claude binary not found');
+    let caught: unknown;
+    try {
+      createClaudeCodeExtension({ binaryPath: '/invalid/claude' }, makeFactoryCtx());
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(RuntimeError);
+    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+    expect((caught as RuntimeError).message).toContain('claude binary not found');
   });
 
   it('throws for binary not in PATH', async () => {
     const which = await import('which');
-
     vi.mocked(which.default.sync).mockImplementation(() => {
       throw new Error('not found');
     });
 
     expect(() =>
-      createClaudeCodeExtension({ binaryPath: 'nonexistent-binary' })
+      createClaudeCodeExtension({ binaryPath: 'nonexistent-binary' }, makeFactoryCtx()),
     ).toThrow('claude binary not found');
   });
 });
@@ -108,39 +105,32 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
 // ============================================================
 
 describe('EC-2: Invalid defaultTimeout', () => {
-  it('throws Error for negative timeout', async () => {
+  beforeEach(async () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() => createClaudeCodeExtension({ defaultTimeout: -1000 })).toThrow(
-      'Invalid timeout: must be positive integer, max 3600000'
-    );
   });
 
-  it('throws Error for zero timeout', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() => createClaudeCodeExtension({ defaultTimeout: 0 })).toThrow(
-      'Invalid timeout: must be positive integer, max 3600000'
-    );
-  });
-
-  it('throws Error for non-integer timeout', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() => createClaudeCodeExtension({ defaultTimeout: 1500.5 })).toThrow(
-      'Invalid timeout: must be positive integer, max 3600000'
-    );
-  });
-
-  it('throws Error for timeout exceeding max (3600000)', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
+  it('throws Error for negative timeout', () => {
     expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 3600001 })
+      createClaudeCodeExtension({ defaultTimeout: -1000 }, makeFactoryCtx()),
+    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
+  });
+
+  it('throws Error for zero timeout', () => {
+    expect(() =>
+      createClaudeCodeExtension({ defaultTimeout: 0 }, makeFactoryCtx()),
+    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
+  });
+
+  it('throws Error for non-integer timeout', () => {
+    expect(() =>
+      createClaudeCodeExtension({ defaultTimeout: 1500.5 }, makeFactoryCtx()),
+    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
+  });
+
+  it('throws Error for timeout exceeding max (3600000)', () => {
+    expect(() =>
+      createClaudeCodeExtension({ defaultTimeout: 3600001 }, makeFactoryCtx()),
     ).toThrow('Invalid timeout: must be positive integer, max 3600000');
   });
 });
@@ -150,34 +140,35 @@ describe('EC-2: Invalid defaultTimeout', () => {
 // ============================================================
 
 describe('EC-3, AC-11: Empty text to prompt', () => {
-  it('throws RuntimeError RILL-R004 "prompt text cannot be empty"', async () => {
+  beforeEach(async () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
+  });
 
-    const ext = createClaudeCodeExtension();
+  it('invalidates with #INVALID_INPUT for empty prompt text', () => {
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    // Validation throws synchronously before stream creation (AC-10)
-    expect(() => (ext.value as any).prompt.fn({ text: '', options: {} }, ctx)).toThrow(RuntimeError);
-
-    expect(() => (ext.value as any).prompt.fn({ text: '', options: {} }, ctx)).toThrow(
-      'prompt text cannot be empty'
+    expectInvalidThrow(
+      () => (ext.value as any).prompt.fn({ text: '', options: {} }, ctx),
+      'INVALID_INPUT',
+      'prompt text cannot be empty',
     );
   });
 
-  it('throws RuntimeError for whitespace-only text', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const ext = createClaudeCodeExtension();
+  it('invalidates with #INVALID_INPUT for whitespace-only text', () => {
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    expect(() => (ext.value as any).prompt.fn({ text: '   ', options: {} }, ctx)).toThrow(
-      'prompt text cannot be empty'
+    expectInvalidThrow(
+      () => (ext.value as any).prompt.fn({ text: '   ', options: {} }, ctx),
+      'INVALID_INPUT',
+      'prompt text cannot be empty',
     );
-
-    expect(() => (ext.value as any).prompt.fn({ text: '\t\n  ', options: {} }, ctx)).toThrow(
-      'prompt text cannot be empty'
+    expectInvalidThrow(
+      () => (ext.value as any).prompt.fn({ text: '\t\n  ', options: {} }, ctx),
+      'INVALID_INPUT',
+      'prompt text cannot be empty',
     );
   });
 });
@@ -187,32 +178,22 @@ describe('EC-3, AC-11: Empty text to prompt', () => {
 // ============================================================
 
 describe('EC-4, AC-6: Binary not found at spawn (ENOENT)', () => {
-  it('throws RuntimeError RILL-R004 "claude binary not found"', async () => {
+  it('invalidates with #UNAVAILABLE when spawnClaudeCli throws SpawnError(binary_missing)', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Mock spawn to throw ENOENT error synchronously
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new RuntimeError(
-        'RILL-R004',
-        'claude binary not found',
-        undefined,
-        { binaryPath: 'claude' }
-      );
+      throw new SpawnError('binary_missing', 'claude binary not found', { binaryPath: 'claude' });
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    // spawnClaudeCli throws synchronously → fn() throws before creating stream
-    expect(() => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx)).toThrow(
-      RuntimeError
-    );
-
-    expect(() => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx)).toThrow(
-      /claude binary not found/
+    expectInvalidThrow(
+      () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
+      'UNAVAILABLE',
+      'claude binary not found',
     );
   });
 });
@@ -222,31 +203,24 @@ describe('EC-4, AC-6: Binary not found at spawn (ENOENT)', () => {
 // ============================================================
 
 describe('EC-5, AC-7: Permission denied (EACCES)', () => {
-  it('throws RuntimeError RILL-R004 "Permission denied: claude"', async () => {
+  it('invalidates with #FORBIDDEN when spawnClaudeCli throws SpawnError(binary_eacces)', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Mock spawn to throw EACCES error synchronously
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new RuntimeError(
-        'RILL-R004',
-        'Permission denied: claude',
-        undefined,
-        { binaryPath: '/usr/bin/claude' }
-      );
+      throw new SpawnError('binary_eacces', 'Permission denied: claude', {
+        binaryPath: '/usr/bin/claude',
+      });
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    expect(() => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx)).toThrow(
-      RuntimeError
-    );
-
-    expect(() => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx)).toThrow(
-      /Permission denied: claude/
+    expectInvalidThrow(
+      () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
+      'FORBIDDEN',
+      'Permission denied',
     );
   });
 });
@@ -256,42 +230,34 @@ describe('EC-5, AC-7: Permission denied (EACCES)', () => {
 // ============================================================
 
 describe('EC-6: Generic spawn failure', () => {
-  it('throws RuntimeError RILL-R004 "Failed to spawn claude binary: {error}"', async () => {
+  it('invalidates with #UNAVAILABLE when spawnClaudeCli throws SpawnError(spawn_failed)', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Mock spawn to throw generic error synchronously
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new RuntimeError(
-        'RILL-R004',
-        'Failed to spawn claude binary: Unknown spawn error',
-        undefined,
-        { binaryPath: 'claude', originalError: 'Unknown spawn error' }
-      );
+      throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: Unknown spawn error', {
+        binaryPath: 'claude',
+      });
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    expect(() => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx)).toThrow(
-      RuntimeError
-    );
-
-    expect(() => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx)).toThrow(
-      /Failed to spawn claude binary/
+    expectInvalidThrow(
+      () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
+      'UNAVAILABLE',
+      'Failed to spawn claude binary',
     );
   });
 });
 
 // ============================================================
-// EC-8: Timeout exceeded
-// EC-10 spec: non-zero exit yields error chunk; stream resolves with partial data
+// EC-8: Timeout exceeded (cli_timeout via exitCode rejection)
 // ============================================================
 
 describe('EC-8, AC-8: Timeout exceeded', () => {
-  it('throws RuntimeError containing timeout message through stream', async () => {
+  it('stream resolve() returns invalid value with #TIMEOUT', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -307,7 +273,6 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
       duration: 0,
     });
 
-    // Mock spawn to return process that times out (exitCode rejects)
     vi.mocked(spawnClaudeCli).mockReturnValue({
       ptyProcess: {
         onData: vi.fn(),
@@ -316,32 +281,28 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new RuntimeError(
-          'RILL-R004',
-          'Claude CLI timeout after 5000ms',
-          undefined,
-          { timeoutMs: 5000 }
-        )
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 5000ms', { timeoutMs: 5000 }),
       ),
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    // EC-9: timeout re-throws RuntimeError through the generator to the consumer
     const stream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
-    await expect(collectChunks(stream)).rejects.toThrow('Claude CLI timeout after 5000ms');
+    await collectChunks(stream);
+    const result = await resolveStream(stream);
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).code.name).toBe('TIMEOUT');
   });
 });
 
 // ============================================================
 // EC-9: Non-zero exit code
-// EC-10 spec: non-zero exit yields error chunk; stream resolves with partial data
 // ============================================================
 
 describe('EC-9, AC-9: Non-zero exit code', () => {
-  it('yields error chunk containing exit code in stream', async () => {
+  it('yields error chunk and resolve() returns invalid with #UNAVAILABLE', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -357,7 +318,6 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
       duration: 0,
     });
 
-    // Mock spawn to return process that exits with code 1 (exitCode rejects)
     vi.mocked(spawnClaudeCli).mockReturnValue({
       ptyProcess: {
         onData: vi.fn(),
@@ -366,29 +326,27 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new RuntimeError(
-          'RILL-R004',
-          'Claude CLI exited with code 1',
-          undefined,
-          { exitCode: 1 }
-        )
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 1', { exitCode: 1 }),
       ),
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
     const chunks = await collectChunks(stream);
 
-    // EC-10: error chunk is yielded containing the exit code message
     const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
     expect(errorChunks.length).toBeGreaterThan(0);
     expect(errorChunks[0]).toContain('Claude CLI exited with code 1');
+
+    const result = await resolveStream(stream);
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).code.name).toBe('UNAVAILABLE');
   });
 
-  it('stream resolves with partial data on exit code 127', async () => {
+  it('exit code 127 produces invalid #UNAVAILABLE result', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -412,27 +370,21 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new RuntimeError(
-          'RILL-R004',
-          'Claude CLI exited with code 127',
-          undefined,
-          { exitCode: 127 }
-        )
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 127', { exitCode: 127 }),
       ),
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
     const chunks = await collectChunks(stream);
-
     expect(chunks.some((c) => c.includes('127'))).toBe(true);
 
-    // Stream still resolves after error chunk (EC-10: resolves with partial data)
     const result = await resolveStream(stream);
-    expect(result).toBeDefined();
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).code.name).toBe('UNAVAILABLE');
   });
 });
 
@@ -441,40 +393,40 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
 // ============================================================
 
 describe('EC-10: Empty skill name', () => {
-  it('throws RuntimeError RILL-R004 "skill name cannot be empty"', async () => {
+  beforeEach(async () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
+  });
 
-    const ext = createClaudeCodeExtension();
+  it('invalidates with #INVALID_INPUT for empty skill name', () => {
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    // Validation throws synchronously before stream creation
-    expect(() => (ext.value as any).skill.fn({ name: '', args: {} }, ctx)).toThrow(RuntimeError);
-
-    expect(() => (ext.value as any).skill.fn({ name: '', args: {} }, ctx)).toThrow(
-      'skill name cannot be empty'
+    expectInvalidThrow(
+      () => (ext.value as any).skill.fn({ name: '', args: {} }, ctx),
+      'INVALID_INPUT',
+      'skill name cannot be empty',
     );
   });
 
-  it('throws RuntimeError for whitespace-only skill name', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const ext = createClaudeCodeExtension();
+  it('invalidates with #INVALID_INPUT for whitespace-only skill name', () => {
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    expect(() => (ext.value as any).skill.fn({ name: '   ', args: {} }, ctx)).toThrow(
-      'skill name cannot be empty'
+    expectInvalidThrow(
+      () => (ext.value as any).skill.fn({ name: '   ', args: {} }, ctx),
+      'INVALID_INPUT',
+      'skill name cannot be empty',
     );
   });
 });
 
 // ============================================================
-// EC-11: Invalid skill name (non-zero exit) — yields error chunk
+// EC-11: Invalid skill name (non-zero exit)
 // ============================================================
 
 describe('EC-11: Invalid skill name (non-zero exit)', () => {
-  it('yields error chunk containing exit code when skill exits non-zero', async () => {
+  it('yields error chunk and resolve() returns invalid #UNAVAILABLE', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -490,7 +442,6 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
       duration: 0,
     });
 
-    // Mock spawn to return process that exits with non-zero code (exitCode rejects)
     vi.mocked(spawnClaudeCli).mockReturnValue({
       ptyProcess: {
         onData: vi.fn(),
@@ -499,59 +450,54 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new RuntimeError(
-          'RILL-R004',
-          'Claude CLI exited with code 2',
-          undefined,
-          { exitCode: 2 }
-        )
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 2', { exitCode: 2 }),
       ),
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).skill.fn({ name: 'invalid-skill', args: {} }, ctx);
     const chunks = await collectChunks(stream);
 
-    // EC-10: error chunk is yielded
     const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
     expect(errorChunks.length).toBeGreaterThan(0);
     expect(errorChunks[0]).toContain('Claude CLI exited with code');
+
+    const result = await resolveStream(stream);
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).code.name).toBe('UNAVAILABLE');
   });
 });
 
 // ============================================================
-// EC-12: Skill spawn/parse/timeout
+// EC-12: Skill spawn / timeout
 // ============================================================
 
 describe('EC-12: Skill spawn/parse/timeout errors', () => {
-  it('throws RuntimeError for spawn error (same as prompt)', async () => {
+  it('invalidates with #UNAVAILABLE for spawn error', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // spawnClaudeCli throws synchronously → fn() throws before stream
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new RuntimeError(
-        'RILL-R004',
-        'Failed to spawn claude binary: test error',
-        undefined,
-        { binaryPath: 'claude' }
-      );
+      throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: test error', {
+        binaryPath: 'claude',
+      });
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    expect(() => (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx)).toThrow(
-      /Failed to spawn claude binary/
+    expectInvalidThrow(
+      () => (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx),
+      'UNAVAILABLE',
+      'Failed to spawn claude binary',
     );
   });
 
-  it('throws RuntimeError for timeout (same as prompt)', async () => {
+  it('resolve() returns #TIMEOUT on cli_timeout for skill', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -575,23 +521,19 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new RuntimeError(
-          'RILL-R004',
-          'Claude CLI timeout after 10000ms',
-          undefined,
-          { timeoutMs: 10000 }
-        )
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 10000ms', { timeoutMs: 10000 }),
       ),
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx);
-
-    // EC-9: timeout re-throws RuntimeError through the generator
-    await expect(collectChunks(stream)).rejects.toThrow('Claude CLI timeout after 10000ms');
+    await collectChunks(stream);
+    const result = await resolveStream(stream);
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).code.name).toBe('TIMEOUT');
   });
 });
 
@@ -600,40 +542,40 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
 // ============================================================
 
 describe('EC-13: Empty command name', () => {
-  it('throws RuntimeError RILL-R004 "command name cannot be empty"', async () => {
+  beforeEach(async () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
+  });
 
-    const ext = createClaudeCodeExtension();
+  it('invalidates with #INVALID_INPUT for empty command name', () => {
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    // Validation throws synchronously before stream creation
-    expect(() => (ext.value as any).command.fn({ name: '', args: {} }, ctx)).toThrow(RuntimeError);
-
-    expect(() => (ext.value as any).command.fn({ name: '', args: {} }, ctx)).toThrow(
-      'command name cannot be empty'
+    expectInvalidThrow(
+      () => (ext.value as any).command.fn({ name: '', args: {} }, ctx),
+      'INVALID_INPUT',
+      'command name cannot be empty',
     );
   });
 
-  it('throws RuntimeError for whitespace-only command name', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const ext = createClaudeCodeExtension();
+  it('invalidates with #INVALID_INPUT for whitespace-only command name', () => {
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    expect(() => (ext.value as any).command.fn({ name: '\t\n', args: {} }, ctx)).toThrow(
-      'command name cannot be empty'
+    expectInvalidThrow(
+      () => (ext.value as any).command.fn({ name: '\t\n', args: {} }, ctx),
+      'INVALID_INPUT',
+      'command name cannot be empty',
     );
   });
 });
 
 // ============================================================
-// EC-14: Invalid command (non-zero exit) — yields error chunk
+// EC-14: Invalid command (non-zero exit)
 // ============================================================
 
 describe('EC-14: Invalid command (non-zero exit)', () => {
-  it('yields error chunk containing exit code when command exits non-zero', async () => {
+  it('yields error chunk and resolve() returns invalid #UNAVAILABLE', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -657,58 +599,51 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new RuntimeError(
-          'RILL-R004',
-          'Claude CLI exited with code 3',
-          undefined,
-          { exitCode: 3 }
-        )
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 3', { exitCode: 3 }),
       ),
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).command.fn({ name: 'invalid-command', args: {} }, ctx);
     const chunks = await collectChunks(stream);
-
     const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
     expect(errorChunks.length).toBeGreaterThan(0);
     expect(errorChunks[0]).toContain('Claude CLI exited with code');
+
+    const result = await resolveStream(stream);
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).code.name).toBe('UNAVAILABLE');
   });
 });
 
 // ============================================================
-// EC-15: Command spawn/parse/timeout
+// EC-15: Command spawn / timeout / EACCES
 // ============================================================
 
 describe('EC-15: Command spawn/parse/timeout errors', () => {
-  it('throws RuntimeError for spawn error (same as prompt)', async () => {
+  it('invalidates with #UNAVAILABLE for spawn error', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // spawnClaudeCli throws synchronously → fn() throws before stream
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new RuntimeError(
-        'RILL-R004',
-        'claude binary not found',
-        undefined,
-        { binaryPath: 'claude' }
-      );
+      throw new SpawnError('binary_missing', 'claude binary not found', { binaryPath: 'claude' });
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    expect(() => (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx)).toThrow(
-      /claude binary not found/
+    expectInvalidThrow(
+      () => (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
+      'UNAVAILABLE',
+      'claude binary not found',
     );
   });
 
-  it('throws RuntimeError for timeout (same as prompt)', async () => {
+  it('resolve() returns #TIMEOUT on cli_timeout for command', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -732,214 +667,39 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new RuntimeError(
-          'RILL-R004',
-          'Claude CLI timeout after 15000ms',
-          undefined,
-          { timeoutMs: 15000 }
-        )
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 15000ms', { timeoutMs: 15000 }),
       ),
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx);
-
-    // EC-9: timeout re-throws RuntimeError through the generator
-    await expect(collectChunks(stream)).rejects.toThrow('Claude CLI timeout after 15000ms');
+    await collectChunks(stream);
+    const result = await resolveStream(stream);
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).code.name).toBe('TIMEOUT');
   });
 
-  it('throws RuntimeError for permission denied (same as prompt)', async () => {
+  it('invalidates with #FORBIDDEN for permission denied (binary_eacces)', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // spawnClaudeCli throws synchronously → fn() throws before stream
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new RuntimeError(
-        'RILL-R004',
-        'Permission denied: claude',
-        undefined,
-        { binaryPath: '/usr/bin/claude' }
-      );
+      throw new SpawnError('binary_eacces', 'Permission denied: claude', {
+        binaryPath: '/usr/bin/claude',
+      });
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    expect(() => (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx)).toThrow(
-      /Permission denied: claude/
+    expectInvalidThrow(
+      () => (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
+      'FORBIDDEN',
+      'Permission denied',
     );
-  });
-});
-
-// ============================================================
-// EC-16: Cleanup failure on dispose
-// ============================================================
-
-describe('EC-16: Cleanup failure on dispose', () => {
-  it('logs warning and does not throw when dispose cleanup fails', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Create a dispose function that throws
-    const failingDispose = vi.fn(() => {
-      throw new Error('Cleanup failure');
-    });
-
-    // Return a pending promise so dispose is called while process is still running
-    vi.mocked(spawnClaudeCli).mockReturnValue({
-      ptyProcess: {
-        onData: vi.fn(),
-        onExit: vi.fn(),
-        write: vi.fn(),
-        kill: vi.fn(),
-      } as any,
-      exitCode: new Promise(() => {}), // Never resolves
-      dispose: failingDispose,
-    });
-
-    vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
-    });
-
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
-
-    const ext = createClaudeCodeExtension();
-    const ctx = createRuntimeContext();
-
-    // Start prompt (don't await - it will never complete)
-    const promptStream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
-
-    // Dispose while process is still running - should log warning, not throw
-    expect(() => ext.dispose?.()).not.toThrow();
-
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to cleanup process')
-    );
-
-    consoleWarnSpy.mockRestore();
-
-    // Catch any unresolved stream to avoid warnings
-    resolveStream(promptStream).catch(() => {});
-  });
-
-  it('continues cleanup for all disposers even if one fails', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Create multiple disposers - first fails, second succeeds
-    const failingDispose = vi.fn(() => {
-      throw new Error('Cleanup failure');
-    });
-    const successDispose = vi.fn();
-
-    let callCount = 0;
-    vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      callCount++;
-      return {
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as any,
-        exitCode: new Promise(() => {}), // Never resolves
-        dispose: callCount === 1 ? failingDispose : successDispose,
-      };
-    });
-
-    vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
-    });
-
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
-
-    const ext = createClaudeCodeExtension();
-    const ctx = createRuntimeContext();
-
-    // Start two prompts (don't await - they will never complete)
-    const stream1 = (ext.value as any).prompt.fn({ text: 'test1', options: {} }, ctx);
-    const stream2 = (ext.value as any).prompt.fn({ text: 'test2', options: {} }, ctx);
-
-    // Dispose should call both, log warning for first, not throw
-    expect(() => ext.dispose?.()).not.toThrow();
-
-    expect(failingDispose).toHaveBeenCalled();
-    expect(successDispose).toHaveBeenCalled();
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to cleanup process')
-    );
-
-    consoleWarnSpy.mockRestore();
-
-    // Catch the unresolved streams to avoid warnings
-    resolveStream(stream1).catch(() => {});
-    resolveStream(stream2).catch(() => {});
-  });
-
-  it('handles non-Error cleanup failures', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Disposer throws non-Error object
-    const failingDispose = vi.fn(() => {
-      throw 'string error';
-    });
-
-    vi.mocked(spawnClaudeCli).mockReturnValue({
-      ptyProcess: {
-        onData: vi.fn(),
-        onExit: vi.fn(),
-        write: vi.fn(),
-        kill: vi.fn(),
-      } as any,
-      exitCode: new Promise(() => {}), // Never resolves
-      dispose: failingDispose,
-    });
-
-    vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
-    });
-
-    const consoleWarnSpy = vi
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
-
-    const ext = createClaudeCodeExtension();
-    const ctx = createRuntimeContext();
-
-    // Start prompt (don't await - it will never complete)
-    const promptStream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
-
-    expect(() => ext.dispose?.()).not.toThrow();
-
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to cleanup process: Unknown error')
-    );
-
-    consoleWarnSpy.mockRestore();
-
-    // Catch the unresolved stream to avoid warnings
-    resolveStream(promptStream).catch(() => {});
   });
 });

@@ -9,7 +9,7 @@
  * Covers IR-9, AC-4, AC-14, EC-17.
  */
 
-import { anyTypeValue, formatValue, RuntimeError, toCallable, type ApplicationCallable, type RillValue } from '@rcrsr/rill';
+import { anyTypeValue, formatValue, RuntimeError, toCallable, type ApplicationCallable, type CallableFn, type RillValue, type RuntimeContext } from '@rcrsr/rill';
 import {
   interpolate,
   splitRoleMessages,
@@ -59,7 +59,8 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
   };
 
   // ── Closure fn ────────────────────────────────────────────────────────────
-  const fn = async (args: Record<string, RillValue>): Promise<RillValue> => {
+  const fn: CallableFn = async (args, ctxLike): Promise<RillValue> => {
+    const ctx = ctxLike as RuntimeContext;
     try {
       // Build interpolation values via rill's canonical formatValue; null/undefined → empty string.
       const values: Record<string, string> = {};
@@ -94,11 +95,16 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
       if (err instanceof RuntimeError) {
         throw err;
       }
-      // Wrap unexpected errors in RILL-R004 (EC-17).
-      throw new RuntimeError(
-        'RILL-R004',
-        `unexpected error in prompt closure "${parsed.name}": ${String(err)}`,
-      );
+      // Closure-runtime failure (EC-17): invalidate via ctx with #PROTOCOL.
+      throw ctx.invalidate(err, {
+        code: 'PROTOCOL',
+        provider: 'prompt-md',
+        raw: {
+          kind: 'closure_failure',
+          name: parsed.name,
+          detail: err instanceof Error ? err.message : String(err),
+        },
+      }) as unknown as RillValue;
     }
   };
 

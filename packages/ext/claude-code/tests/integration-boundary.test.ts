@@ -7,7 +7,9 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { createRuntimeContext, RuntimeError } from '@rcrsr/rill';
+import { SpawnError } from '../src/errors.js';
+import { makeFactoryCtx } from './_helpers.js';
+import { createRuntimeContext } from '@rcrsr/rill';
 
 // ============================================================
 // MOCKS
@@ -170,7 +172,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Execute prompt — fn() returns RillStream synchronously
@@ -280,7 +282,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).prompt.fn(
@@ -387,7 +389,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       };
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Execute 10 concurrent prompts — each fn() call returns a RillStream synchronously
@@ -498,7 +500,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       duration: 100,
     }));
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Execute mixed concurrent calls — all fn() calls return RillStream synchronously
@@ -559,12 +561,9 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
           setTimeout(() => {
             if (shouldFail) {
               reject(
-                new RuntimeError(
-                  'RILL-R004',
-                  `Claude CLI exited with code 1`,
-                  undefined,
-                  { exitCode: 1 }
-                )
+                new SpawnError('exit_nonzero', `Claude CLI exited with code 1`, {
+                  exitCode: 1,
+                }),
               );
             } else {
               if (onDataCallback) {
@@ -610,7 +609,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       duration: 100,
     }));
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // All fn() calls return RillStream synchronously
@@ -715,7 +714,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       duration: 50,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Execute 1000 sequential prompts
@@ -823,7 +822,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       duration: Math.floor(Math.random() * 200),
     }));
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Execute 1000 sequential prompts with varying sizes
@@ -922,7 +921,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       duration: 50,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Execute 1000 sequential prompts

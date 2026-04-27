@@ -6,8 +6,8 @@
  * type, checks template references against declared params, verifies role
  * markers for list output, and computes the content hash.
  *
- * All RILL-R001 errors from shared helpers are wrapped into RILL-R004 with
- * path context (wrapValidation convention). EC-8 through EC-14.
+ * All errors thrown are `RuntimeError('RILL-R001', ...)` with path context
+ * attached. EC-8 through EC-14.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -95,7 +95,7 @@ const ROLE_MARKER_RE = /^@@\s+\w+\s*$/m;
  * Reads and fully parses a single `*.prompt.md` file.
  *
  * Implements EC-8 through EC-14 error paths. All errors thrown are
- * `RuntimeError('RILL-R004', ...)`.
+ * factory-time `RuntimeError('RILL-R001', ...)` with path context attached.
  *
  * @param absolutePath - Absolute filesystem path of the file.
  * @param relativePath - Path relative to the loader basePath.
@@ -108,7 +108,7 @@ export async function parseFile(
   // ── Derive resolution name ──────────────────────────────────────────────
   const name = deriveResolutionName(relativePath);
   if (name === null) {
-    throw new RuntimeError('RILL-R004', `resolution name derived from "${relativePath}" contains ".." segments`, undefined, {
+    throw new RuntimeError('RILL-R001', `resolution name derived from "${relativePath}" contains ".." segments`, undefined, {
       path: absolutePath,
     });
   }
@@ -127,7 +127,7 @@ export async function parseFile(
     bodyLineOffset = split.bodyLineOffset;
   } catch (err) {
     if (err instanceof RuntimeError && err.errorId === 'RILL-R001') {
-      throw new RuntimeError('RILL-R004', err.message, undefined, { path: absolutePath, cause: err });
+      throw new RuntimeError('RILL-R001', err.message, undefined, { path: absolutePath, cause: err });
     }
     throw err;
   }
@@ -138,7 +138,7 @@ export async function parseFile(
     // yaml.parse throws YAMLParseError on malformed input.
     const parsed = yamlParse(frontmatter) as unknown;
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new RuntimeError('RILL-R004', 'frontmatter must be a YAML mapping', undefined, {
+      throw new RuntimeError('RILL-R001', 'frontmatter must be a YAML mapping', undefined, {
         path: absolutePath,
         line: 2,
       });
@@ -156,7 +156,7 @@ export async function parseFile(
       const yamlLine: number | undefined = err.linePos?.[0]?.line;
       const sourceLine = yamlLine !== undefined ? fenceLine + yamlLine : undefined;
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R001',
         `YAML parse error: ${err.message}`,
         undefined,
         { path: absolutePath, ...(sourceLine !== undefined ? { line: sourceLine } : {}), cause: err },
@@ -167,19 +167,19 @@ export async function parseFile(
 
   // ── Validate required fields (EC-9) ────────────────────────────────────
   if (typeof raw['description'] !== 'string' || raw['description'].length === 0) {
-    throw new RuntimeError('RILL-R004', `missing or empty required field "description"`, undefined, {
+    throw new RuntimeError('RILL-R001', `missing or empty required field "description"`, undefined, {
       path: absolutePath,
       field: 'description',
     });
   }
   if (!Array.isArray(raw['params'])) {
-    throw new RuntimeError('RILL-R004', `missing or invalid required field "params" (must be a list)`, undefined, {
+    throw new RuntimeError('RILL-R001', `missing or invalid required field "params" (must be a list)`, undefined, {
       path: absolutePath,
       field: 'params',
     });
   }
   if (raw['output'] === undefined || raw['output'] === null) {
-    throw new RuntimeError('RILL-R004', `missing required field "output"`, undefined, {
+    throw new RuntimeError('RILL-R001', `missing required field "output"`, undefined, {
       path: absolutePath,
       field: 'output',
     });
@@ -192,7 +192,7 @@ export async function parseFile(
   // ── Validate output value (EC-10, EC-11) ───────────────────────────────
   if (rawOutput === 'dict') {
     // EC-10: dict is reserved in v0
-    throw new RuntimeError('RILL-R004', `output type "dict" is reserved and not implemented in v0`, undefined, {
+    throw new RuntimeError('RILL-R001', `output type "dict" is reserved and not implemented in v0`, undefined, {
       path: absolutePath,
       field: 'output',
       value: 'dict',
@@ -201,7 +201,7 @@ export async function parseFile(
   if (rawOutput !== 'string' && rawOutput !== 'list') {
     // EC-11: unrecognized output value
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R001',
       `unrecognized output value "${String(rawOutput)}" — accepted values: string, list`,
       undefined,
       { path: absolutePath, field: 'output', value: String(rawOutput) },
@@ -213,7 +213,7 @@ export async function parseFile(
   const params: RillParam[] = [];
   for (const entry of rawParamEntries) {
     if (typeof entry !== 'string') {
-      throw new RuntimeError('RILL-R004', `params entries must be strings, got: ${JSON.stringify(entry)}`, undefined, {
+      throw new RuntimeError('RILL-R001', `params entries must be strings, got: ${JSON.stringify(entry)}`, undefined, {
         path: absolutePath,
         entry: JSON.stringify(entry),
       });
@@ -223,7 +223,7 @@ export async function parseFile(
     } catch (err) {
       if (err instanceof RuntimeError && err.errorId === 'RILL-R001') {
         // EC-12
-        throw new RuntimeError('RILL-R004', err.message, undefined, {
+        throw new RuntimeError('RILL-R001', err.message, undefined, {
           path: absolutePath,
           entry,
           cause: err,
@@ -243,7 +243,7 @@ export async function parseFile(
       // ref.line is 1-based within body; adjust to source file line.
       const sourceLine = bodyLineOffset + ref.line - 1;
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R001',
         `template references "{${ref.name}}" which is not declared in params`,
         undefined,
         { path: absolutePath, line: sourceLine, name: ref.name },
@@ -253,7 +253,7 @@ export async function parseFile(
 
   // ── Validate role markers for list output (EC-14) ──────────────────────
   if (output === 'list' && !ROLE_MARKER_RE.test(body)) {
-    throw new RuntimeError('RILL-R004', `output type "list" requires at least one @@ role marker in the body`, undefined, {
+    throw new RuntimeError('RILL-R001', `output type "list" requires at least one @@ role marker in the body`, undefined, {
       path: absolutePath,
     });
   }

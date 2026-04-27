@@ -42,17 +42,19 @@ export const configSchema: ExtensionConfigSchema = {
 // ERROR UTILITIES
 // ============================================================
 export {
-  createFactoryError,
-  createConnectionError,
-  createProcessExitError,
-  createConnectionRefusedError,
-  createAuthRequiredError,
-  createRuntimeError,
-  createToolError,
-  createProtocolError,
-  createTimeoutError,
-  createConnectionLostError,
-  createAuthFailedError,
+  factoryError,
+  processExitError,
+  connectionRefusedError,
+  authRequiredError,
+  failTool,
+  failNotFound,
+  failProtocol,
+  failTimeout,
+  failConnectionLost,
+  failAuth,
+  failInput,
+  failUnavailable,
+  mapMcpError,
 } from './errors.js';
 
 // ============================================================

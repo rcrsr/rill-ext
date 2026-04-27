@@ -7,25 +7,28 @@
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { emitExtensionEvent, structureToTypeValue } from '@rcrsr/rill';
-import { p } from '@rcrsr/rill-ext-param-shared';
-
-// RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
-type RuntimeContextLike = {
-  readonly variables: Map<string, RillValue>;
-  readonly callbacks?: RuntimeCallbacks | undefined;
-  pipeValue: RillValue;
-};
+import type { RillFunction, RillValue, RuntimeContext } from '@rcrsr/rill';
 import {
-  createToolError,
-  createProtocolError,
-  createTimeoutError,
-  createConnectionLostError,
-  createAuthFailedError,
+  emitExtensionEvent,
+  getStatus,
+  isInvalid,
+  structureToTypeValue,
+} from '@rcrsr/rill';
+import { p } from '@rcrsr/rill-ext-param-shared';
+import {
+  failInput,
+  failTimeout,
+  mapMcpError,
 } from './errors.js';
 import { sanitizeNames } from './naming.js';
 import { parseResourceContent } from './parsing.js';
+
+function describeError(error: unknown): string {
+  if (isInvalid(error as RillValue)) {
+    return getStatus(error as RillValue).message;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
 
 // ============================================================
 // MCP TYPES (subset from SDK)
@@ -153,9 +156,10 @@ export function createReadResourceFunction(
 ): RillFunction {
   const fn = async (
     args: Record<string, RillValue>,
-    ctx: RuntimeContextLike
+    ctxLike: unknown,
   ): Promise<RillValue> => {
-    // Emit mcp:connect on first resource read [IR-1]
+    const ctx = ctxLike as RuntimeContext;
+
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
         event: 'mcp:connect',
@@ -166,91 +170,40 @@ export function createReadResourceFunction(
 
     const uri = args['uri'];
 
-    // Validate URI parameter
     if (typeof uri !== 'string') {
-      throw createToolError(
-        'read_resource',
-        `expected string uri, got ${typeof uri}`
-      );
+      throw failInput(ctx, `expected string uri, got ${typeof uri}`, {
+        name: 'read_resource',
+      });
     }
 
-    // Emit mcp:resource_read event [IR-1]
     emitExtensionEvent(ctx, {
       event: 'mcp:resource_read',
       subsystem: 'extension:mcp',
       uri,
     });
 
-    // Set up timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => {
-        reject(createTimeoutError('read_resource', timeoutMs));
+        reject(failTimeout(ctx, 'read_resource', timeoutMs));
       }, timeoutMs);
       timer.unref();
     });
 
     try {
-      // Call MCP readResource with timeout race
       const result = (await Promise.race([
         client.readResource({ uri }),
         timeoutPromise,
       ])) as McpResourceResult;
 
-      // Parse and return content
       return parseResourceContent(result);
     } catch (error) {
-      // Emit mcp:error event [IR-1]
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
-        error: error instanceof Error ? error.message : String(error),
+        error: describeError(error),
         uri,
       });
-
-      // Handle error categories per spec (similar to tools.ts)
-      if (error instanceof Error) {
-        // Already wrapped runtime error: re-throw
-        if (error.name === 'RuntimeError') {
-          throw error;
-        }
-
-        const message = error.message.toLowerCase();
-
-        // Connection lost
-        if (
-          message.includes('connection closed') ||
-          message.includes('connection lost') ||
-          message.includes('disconnected')
-        ) {
-          throw createConnectionLostError();
-        }
-
-        // Authentication failed
-        if (
-          message.includes('unauthorized') ||
-          message.includes('authentication failed') ||
-          message.includes('token') ||
-          message.includes('auth')
-        ) {
-          throw createAuthFailedError();
-        }
-
-        // Protocol error
-        if (
-          message.includes('protocol') ||
-          message.includes('invalid response') ||
-          message.includes('parse') ||
-          message.includes('malformed')
-        ) {
-          throw createProtocolError(error.message);
-        }
-
-        // Generic resource error (fallback)
-        throw createToolError('read_resource', error.message);
-      }
-
-      // Non-Error exception: wrap as resource error
-      throw createToolError('read_resource', String(error));
+      throw mapMcpError(ctx, error, 'read_resource');
     }
   };
 
@@ -301,9 +254,10 @@ function createStaticResourceFunction(
 
   const fn = async (
     _args: Record<string, RillValue>,
-    ctx: RuntimeContextLike
+    ctxLike: unknown,
   ): Promise<RillValue> => {
-    // Emit mcp:connect on first resource call [IR-1]
+    const ctx = ctxLike as RuntimeContext;
+
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
         event: 'mcp:connect',
@@ -312,77 +266,34 @@ function createStaticResourceFunction(
       lifecycleState.connectEmitted = true;
     }
 
-    // Emit mcp:resource_read event [IR-1]
     emitExtensionEvent(ctx, {
       event: 'mcp:resource_read',
       subsystem: 'extension:mcp',
       uri,
     });
 
-    // Set up timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => {
-        reject(createTimeoutError(callableName, timeoutMs));
+        reject(failTimeout(ctx, callableName, timeoutMs));
       }, timeoutMs);
       timer.unref();
     });
 
     try {
-      // Call MCP readResource with pre-bound URI
       const result = (await Promise.race([
         client.readResource({ uri }),
         timeoutPromise,
       ])) as McpResourceResult;
 
-      // Parse and return content
       return parseResourceContent(result);
     } catch (error) {
-      // Emit mcp:error event [IR-1]
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
-        error: error instanceof Error ? error.message : String(error),
+        error: describeError(error),
         uri,
       });
-
-      // Handle error categories (same as read_resource)
-      if (error instanceof Error) {
-        if (error.name === 'RuntimeError') {
-          throw error;
-        }
-
-        const message = error.message.toLowerCase();
-
-        if (
-          message.includes('connection closed') ||
-          message.includes('connection lost') ||
-          message.includes('disconnected')
-        ) {
-          throw createConnectionLostError();
-        }
-
-        if (
-          message.includes('unauthorized') ||
-          message.includes('authentication failed') ||
-          message.includes('token') ||
-          message.includes('auth')
-        ) {
-          throw createAuthFailedError();
-        }
-
-        if (
-          message.includes('protocol') ||
-          message.includes('invalid response') ||
-          message.includes('parse') ||
-          message.includes('malformed')
-        ) {
-          throw createProtocolError(error.message);
-        }
-
-        throw createToolError(callableName, error.message);
-      }
-
-      throw createToolError(callableName, String(error));
+      throw mapMcpError(ctx, error, callableName);
     }
   };
 
@@ -473,12 +384,12 @@ function createResourceTemplateFunction(
     p.str(varName, `URI template variable: ${varName}`)
   );
 
-  // Create async function wrapper
   const fn = async (
     args: Record<string, RillValue>,
-    ctx: RuntimeContextLike
+    ctxLike: unknown,
   ): Promise<RillValue> => {
-    // Emit mcp:connect on first resource template call [IR-1]
+    const ctx = ctxLike as RuntimeContext;
+
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
         event: 'mcp:connect',
@@ -486,96 +397,53 @@ function createResourceTemplateFunction(
       });
       lifecycleState.connectEmitted = true;
     }
-    // Validate all arguments are strings
+
     for (let i = 0; i < variables.length; i++) {
       const varName = variables[i]!;
       const arg = args[varName];
       if (typeof arg !== 'string') {
-        throw createToolError(
-          template.name,
-          `expected string for parameter ${varName}, got ${typeof arg}`
+        throw failInput(
+          ctx,
+          `expected string for parameter ${varName}, got ${typeof arg}`,
+          { name: template.name, parameter: varName },
         );
       }
     }
 
-    // Expand URI template with arguments
     const expandedUri = expandUriTemplate(
       template.uriTemplate,
       variables,
-      args
+      args,
     );
 
-    // Emit mcp:resource_read event [IR-1]
     emitExtensionEvent(ctx, {
       event: 'mcp:resource_read',
       subsystem: 'extension:mcp',
       uri: expandedUri,
     });
 
-    // Set up timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => {
-        reject(createTimeoutError(template.name, timeoutMs));
+        reject(failTimeout(ctx, template.name, timeoutMs));
       }, timeoutMs);
       timer.unref();
     });
 
     try {
-      // Call MCP readResource with expanded URI
       const result = (await Promise.race([
         client.readResource({ uri: expandedUri }),
         timeoutPromise,
       ])) as McpResourceResult;
 
-      // Parse and return content
       return parseResourceContent(result);
     } catch (error) {
-      // Emit mcp:error event [IR-1]
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
-        error: error instanceof Error ? error.message : String(error),
+        error: describeError(error),
         uri: expandedUri,
       });
-
-      // Handle error categories (same as read_resource)
-      if (error instanceof Error) {
-        if (error.name === 'RuntimeError') {
-          throw error;
-        }
-
-        const message = error.message.toLowerCase();
-
-        if (
-          message.includes('connection closed') ||
-          message.includes('connection lost') ||
-          message.includes('disconnected')
-        ) {
-          throw createConnectionLostError();
-        }
-
-        if (
-          message.includes('unauthorized') ||
-          message.includes('authentication failed') ||
-          message.includes('token') ||
-          message.includes('auth')
-        ) {
-          throw createAuthFailedError();
-        }
-
-        if (
-          message.includes('protocol') ||
-          message.includes('invalid response') ||
-          message.includes('parse') ||
-          message.includes('malformed')
-        ) {
-          throw createProtocolError(error.message);
-        }
-
-        throw createToolError(template.name, error.message);
-      }
-
-      throw createToolError(template.name, String(error));
+      throw mapMcpError(ctx, error, template.name);
     }
   };
 
