@@ -12,7 +12,7 @@ import {
   type ExtensionEvent,
 } from '@rcrsr/rill';
 import Anthropic from '@anthropic-ai/sdk';
-import { expectRejectedHalt } from './_halt-helpers.js';
+import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
@@ -698,7 +698,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx);
-      await expect(resolveStream(stream)).rejects.toThrow();
+      await expectRejectedHalt(resolveStream(stream));
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -726,9 +726,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Empty messages list triggers synchronous validation error before stream creation
-      expect(() =>
-        getCallable(ext, 'messages').fn({ messages: [], options: {} }, ctx)
-      ).toThrow('messages list cannot be empty');
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: [], options: {} }, ctx), { message: 'messages list cannot be empty' });
 
       // No error event emitted for pre-stream validation errors
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');

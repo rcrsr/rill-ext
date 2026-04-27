@@ -63,6 +63,31 @@ export function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
 }
 
 /**
+ * Calls the given callable and asserts it threw a halt matching the
+ * expectation. Use for synchronous in-fn validation throws (which now
+ * surface as `RuntimeHaltSignal` carrying an invalid `RillValue` with a
+ * generic atom).
+ */
+export function expectThrowHalt(
+  fn: () => unknown,
+  opts: HaltExpectation = {}
+): unknown {
+  let thrown: unknown;
+  let threw = false;
+  try {
+    fn();
+  } catch (error: unknown) {
+    thrown = error;
+    threw = true;
+  }
+  if (!threw) {
+    throw new Error('expected function to throw');
+  }
+  expectHalt(thrown, opts);
+  return thrown;
+}
+
+/**
  * Awaits a rejected promise and asserts the rejection is a halt matching
  * the given expectation.
  */

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createRuntimeContext, isRillStream, type ApplicationCallable } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
-import { expectRejectedHalt } from './_halt-helpers.js';
+import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
 // ============================================================
 // TEST HELPERS
@@ -363,7 +363,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() => getCallable(ext, 'message').fn({ text: '' }, ctx)).toThrow();
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '' }, ctx));
       expect(mockStream).not.toHaveBeenCalled();
     });
 
@@ -376,12 +376,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() => getCallable(ext, 'message').fn({ text: '' }, ctx)).toThrowError(
-        expect.objectContaining({
-          errorId: 'RILL-R005',
-          message: expect.stringContaining('prompt text cannot be empty'),
-        })
-      );
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '' }, ctx), { message: 'prompt text cannot be empty' });
     });
 
     it('throws RuntimeError for whitespace-only prompt', () => {
@@ -393,12 +388,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() => getCallable(ext, 'message').fn({ text: '   \n\t  ' }, ctx)).toThrowError(
-        expect.objectContaining({
-          errorId: 'RILL-R005',
-          message: expect.stringContaining('prompt text cannot be empty'),
-        })
-      );
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '   \n\t  ' }, ctx), { message: 'prompt text cannot be empty' });
     });
 
     // EC-2: Provider API error during stream resolution → RuntimeError RILL-R005
@@ -759,12 +749,7 @@ describe('messages() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() => getCallable(ext, 'messages').fn({ messages: [] }, ctx)).toThrowError(
-        expect.objectContaining({
-          errorId: 'RILL-R005',
-          message: expect.stringContaining('messages list cannot be empty'),
-        })
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: [] }, ctx), { message: 'messages list cannot be empty' });
       expect(mockStream).not.toHaveBeenCalled();
     });
 
@@ -780,13 +765,9 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ content: 'Hello' }];
 
-      expect(() =>
-        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
-      ).toThrowError(
-        expect.objectContaining({
-          errorId: 'RILL-R005',
-          message: expect.stringContaining("message missing required 'role' field"),
-        })
+      expectThrowHalt(
+        () => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx),
+        { message: "message missing required 'role' field" },
       );
     });
 
@@ -802,14 +783,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'system', content: 'Hello' }];
 
-      expect(() =>
-        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
-      ).toThrowError(
-        expect.objectContaining({
-          errorId: 'RILL-R005',
-          message: expect.stringContaining("invalid role 'system'"),
-        })
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "invalid role 'system'" });
     });
 
     // EC-12: User message missing content
@@ -824,14 +798,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'user' }];
 
-      expect(() =>
-        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
-      ).toThrowError(
-        expect.objectContaining({
-          errorId: 'RILL-R005',
-          message: expect.stringContaining("user message requires 'content'"),
-        })
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "user message requires 'content'" });
     });
 
     it('throws RuntimeError when user content is not string', () => {
@@ -845,14 +812,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'user', content: 123 }];
 
-      expect(() =>
-        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
-      ).toThrowError(
-        expect.objectContaining({
-          errorId: 'RILL-R005',
-          message: expect.stringContaining("user message requires 'content'"),
-        })
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "user message requires 'content'" });
     });
 
     // EC-13: Assistant missing both content and tool_calls
@@ -870,14 +830,7 @@ describe('messages() function', () => {
         { role: 'assistant' },
       ];
 
-      expect(() =>
-        getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)
-      ).toThrowError(
-        expect.objectContaining({
-          errorId: 'RILL-R005',
-          message: expect.stringContaining("assistant message requires 'content' or 'tool_calls'"),
-        })
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "assistant message requires 'content' or 'tool_calls'" });
     });
 
     it('accepts assistant message with content', async () => {
@@ -1047,7 +1000,7 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'embed').fn({ text: '' }, ctx), { message: 'embed text cannot be empty' });
+      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: '' }, ctx), { message: 'embed text cannot be empty' });
     });
 
     // EC-16: No embed_model configured raises error
@@ -1431,9 +1384,10 @@ describe('embed_batch() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 123, 'text3'] }, ctx)
-      , { message: 'embed_batch requires list of strings' });
+      await expectRejectedHalt(
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 123, 'text3'] }, ctx),
+        { message: 'embed_batch requires list of strings' },
+      );
     });
 
     // EC-19: Empty string at index raises error

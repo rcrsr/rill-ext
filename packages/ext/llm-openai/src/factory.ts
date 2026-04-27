@@ -66,6 +66,26 @@ const detectOpenAIError: ProviderErrorDetector = (error: unknown) => {
   return null;
 };
 
+/**
+ * Build an invalid-RillValue halt signal carrying a generic atom.
+ * Host scripts recover via `guard #<ATOM>`.
+ */
+function haltInvalid(
+  ctx: RuntimeContext,
+  code: string,
+  rawKind: string,
+  message: string,
+): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code,
+      provider: 'openai',
+      raw: { kind: rawKind, message },
+    }),
+    true,
+  );
+}
+
 // ============================================================
 // FACTORY
 // ============================================================
@@ -161,7 +181,7 @@ export function createOpenAIExtension(
 
         // EC-1: Validate text is non-empty before stream creation
         if (text.trim().length === 0) {
-          throw new RuntimeError('RILL-R005', 'prompt text cannot be empty');
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
         }
 
         // Extract options
@@ -328,10 +348,7 @@ export function createOpenAIExtension(
 
         // AC-23: Empty messages list raises error before stream creation
         if (messages.length === 0) {
-          throw new RuntimeError(
-            'RILL-R005',
-            'messages list cannot be empty'
-          );
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_messages', 'messages list cannot be empty');
         }
 
         // Extract options
@@ -360,26 +377,20 @@ export function createOpenAIExtension(
 
           // EC-10: Missing role raises error
           if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-            throw new RuntimeError(
-              'RILL-R005',
-              "message missing required 'role' field"
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
           }
 
           const role = msg['role'];
 
           // EC-11: Unknown role value raises error
           if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw new RuntimeError('RILL-R005', `invalid role '${role}'`);
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
           }
 
           // EC-12: User message missing content
           if (role === 'user' || role === 'tool') {
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw new RuntimeError(
-                'RILL-R005',
-                `${role} message requires 'content'`
-              );
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
             }
             apiMessages.push({
               role: role as 'user',
@@ -392,10 +403,7 @@ export function createOpenAIExtension(
             const hasToolCalls = 'tool_calls' in msg && msg['tool_calls'];
 
             if (!hasContent && !hasToolCalls) {
-              throw new RuntimeError(
-                'RILL-R005',
-                "assistant message requires 'content' or 'tool_calls'"
-              );
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_assistant_message', "assistant message requires 'content' or 'tool_calls'");
             }
 
             // For now, we only support content
@@ -557,10 +565,7 @@ export function createOpenAIExtension(
           // Extract embedding data
           const embeddingData = response.data[0]?.embedding;
           if (!embeddingData || embeddingData.length === 0) {
-            throw new RuntimeError(
-              'RILL-R005',
-              'OpenAI: empty embedding returned'
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'OpenAI: empty embedding returned');
           }
 
           // Convert to Float32Array and create RillVector
@@ -581,6 +586,17 @@ export function createOpenAIExtension(
         } catch (error: unknown) {
           // Map error and emit failure event
           const duration = Date.now() - startTime;
+
+          if (error instanceof RuntimeHaltSignal) {
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: 'openai:error',
+              subsystem: 'extension:openai',
+              error: getStatus(error.value).message,
+              duration,
+            });
+            throw error;
+          }
+
           const invalid = mapProviderError(
             ctx as RuntimeContext,
             'OpenAI',
@@ -635,10 +651,7 @@ export function createOpenAIExtension(
           for (const embeddingItem of response.data) {
             const embeddingData = embeddingItem.embedding;
             if (!embeddingData || embeddingData.length === 0) {
-              throw new RuntimeError(
-                'RILL-R005',
-                'OpenAI: empty embedding returned'
-              );
+              throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'OpenAI: empty embedding returned');
             }
             const float32Data = new Float32Array(embeddingData);
             const vector = createVector(float32Data, factoryEmbedModel);
@@ -663,6 +676,17 @@ export function createOpenAIExtension(
         } catch (error: unknown) {
           // Map error and emit failure event
           const duration = Date.now() - startTime;
+
+          if (error instanceof RuntimeHaltSignal) {
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: 'openai:error',
+              subsystem: 'extension:openai',
+              error: getStatus(error.value).message,
+              duration,
+            });
+            throw error;
+          }
+
           const invalid = mapProviderError(
             ctx as RuntimeContext,
             'OpenAI',
@@ -710,7 +734,7 @@ export function createOpenAIExtension(
 
         // EC-20: Validate prompt is non-empty before stream creation
         if (prompt.trim().length === 0) {
-          throw new RuntimeError('RILL-R005', 'prompt text cannot be empty');
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
         }
 
         // Extract options
@@ -748,22 +772,16 @@ export function createOpenAIExtension(
 
           for (const msg of prependedMessages) {
             if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-              throw new RuntimeError(
-                'RILL-R005',
-                "message missing required 'role' field"
-              );
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
             }
 
             const role = msg['role'];
             if (role !== 'user' && role !== 'assistant') {
-              throw new RuntimeError('RILL-R005', `invalid role '${role}'`);
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
             }
 
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw new RuntimeError(
-                'RILL-R005',
-                `${role} message requires 'content'`
-              );
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
             }
 
             messages.push({
@@ -1191,16 +1209,10 @@ export function createOpenAIExtension(
 
           // EC-3: Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
-            throw new RuntimeError(
-              'RILL-R005',
-              'generate requires a type expression as schema'
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema', 'generate requires a type expression as schema');
           }
           if (schemaArg.structure.kind !== 'dict') {
-            throw new RuntimeError(
-              'RILL-R005',
-              `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema_type', `generate requires a dict type as schema, got ${schemaArg.structure.kind}`);
           }
 
           // EC-4: Build JSON Schema from TypeStructure
@@ -1233,22 +1245,16 @@ export function createOpenAIExtension(
 
             for (const msg of prependedMessages) {
               if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-                throw new RuntimeError(
-                  'RILL-R005',
-                  "message missing required 'role' field"
-                );
+                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
               }
 
               const role = msg['role'];
               if (role !== 'user' && role !== 'assistant') {
-                throw new RuntimeError('RILL-R005', `invalid role '${role}'`);
+                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
               }
 
               if (!('content' in msg) || typeof msg['content'] !== 'string') {
-                throw new RuntimeError(
-                  'RILL-R005',
-                  `${role} message requires 'content'`
-                );
+                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
               }
 
               apiMessages.push({
@@ -1295,10 +1301,7 @@ export function createOpenAIExtension(
               parseError instanceof Error
                 ? parseError.message
                 : String(parseError);
-            throw new RuntimeError(
-              'RILL-R005',
-              `generate: failed to parse response JSON: ${detail}`
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'json_parse_failed', `generate: failed to parse response JSON: ${detail}`);
           }
 
           // Build 6-key response dict (AC-6, AC-7, AC-8)

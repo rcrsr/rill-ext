@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { expectRejectedHalt } from './_halt-helpers.js';
+import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 import { createRuntimeContext, callable, type ApplicationCallable, type RillValue, type RillTypeValue, type TypeStructure } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
@@ -386,9 +386,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() => getCallable(ext, 'message').fn({ text: '' }, ctx)).toThrow(
-        'prompt text cannot be empty'
-      );
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '' }, ctx), { message: 'prompt text cannot be empty' });
     });
 
     it('throws RuntimeError for whitespace-only prompt text', () => {
@@ -400,9 +398,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() => getCallable(ext, 'message').fn({ text: '   ' }, ctx)).toThrow(
-        'prompt text cannot be empty'
-      );
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '   ' }, ctx), { message: 'prompt text cannot be empty' });
     });
 
     // EC-2: Provider API error during stream — thrown when iterating chunks
@@ -541,7 +537,7 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
 
-      await expect(resolveStream(stream));
+      await expectRejectedHalt(resolveStream(stream));
     });
   });
 });
@@ -718,9 +714,7 @@ describe('messages() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() => getCallable(ext, 'messages').fn({ messages: [] }, ctx)).toThrow(
-        'messages list cannot be empty'
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: [] }, ctx), { message: 'messages list cannot be empty' });
     });
 
     // EC-10: Missing role field
@@ -735,9 +729,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ content: 'Hello' }];
 
-      expect(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).toThrow(
-        "message missing required 'role' field"
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "message missing required 'role' field" });
     });
 
     // EC-11: Invalid role value — thrown synchronously before stream creation
@@ -752,9 +744,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'system', content: 'Hello' }];
 
-      expect(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).toThrow(
-        "invalid role 'system'"
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "invalid role 'system'" });
     });
 
     // EC-12: User message missing content — thrown synchronously
@@ -769,9 +759,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'user' }];
 
-      expect(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).toThrow(
-        "user message requires 'content'"
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "user message requires 'content'" });
     });
 
     // EC-13: Assistant missing both content and tool_calls — thrown synchronously
@@ -786,9 +774,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'assistant' }];
 
-      expect(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).toThrow(
-        "assistant message requires 'content' or 'tool_calls'"
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "assistant message requires 'content' or 'tool_calls'" });
     });
 
     it('accepts assistant message with content — returns stream', () => {
@@ -844,9 +830,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'tool' }];
 
-      expect(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).toThrow(
-        "tool message requires 'content'"
-      );
+      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "tool message requires 'content'" });
     });
   });
 
@@ -1810,9 +1794,7 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() => getCallable(ext, 'tool_loop').fn({ prompt: '', tools: {}, options: {} }, ctx)).toThrow(
-        'prompt text cannot be empty'
-      );
+      expectThrowHalt(() => getCallable(ext, 'tool_loop').fn({ prompt: '', tools: {}, options: {} }, ctx), { message: 'prompt text cannot be empty' });
     });
 
     // EC-21: Missing tools argument — thrown during stream iteration (executeToolLoop validates)
@@ -2273,7 +2255,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow();
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx));
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
@@ -2334,7 +2316,7 @@ describe('generate() function', () => {
         },
       });
 
-      await expect(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)).rejects.toThrow();
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx));
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');
       expect(errorEvent).toBeDefined();

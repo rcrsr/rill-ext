@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createRuntimeContext, callable, isRillStream, type RillValue, type ApplicationCallable } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
-import { expectRejectedHalt } from './_halt-helpers.js';
+import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
@@ -496,9 +496,7 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expect(() =>
-        getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools: {}, options: {} }, ctx)
-      ).toThrow('prompt text cannot be empty');
+      expectThrowHalt(() => getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools: {}, options: {} }, ctx), { message: 'prompt text cannot be empty' });
     });
 
     // EC-4: Provider streaming API failure throws RuntimeError RILL-R005

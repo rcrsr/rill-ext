@@ -69,6 +69,26 @@ function mapToHalt(
   return new RuntimeHaltSignal(invalid, true);
 }
 
+/**
+ * Build an invalid-RillValue halt signal carrying a generic atom.
+ * Host scripts recover via `guard #<ATOM>`.
+ */
+function haltInvalid(
+  ctx: RuntimeContext,
+  code: string,
+  rawKind: string,
+  message: string,
+): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code,
+      provider: 'gemini',
+      raw: { kind: rawKind, message },
+    }),
+    true,
+  );
+}
+
 function streamErrorMessage(
   err: RuntimeError | RuntimeHaltSignal | undefined
 ): string {
@@ -239,7 +259,7 @@ export function createGeminiExtension(
 
         // EC-1: Validate text is non-empty before stream creation
         if (text.trim().length === 0) {
-          throw new RuntimeError('RILL-R005', 'prompt text cannot be empty');
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
         }
 
         // Extract options
@@ -412,10 +432,7 @@ export function createGeminiExtension(
 
         // AC-23: Empty messages list raises error before stream creation
         if (inputMessages.length === 0) {
-          throw new RuntimeError(
-            'RILL-R005',
-            'messages list cannot be empty'
-          );
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_messages', 'messages list cannot be empty');
         }
 
         // Extract options
@@ -440,26 +457,20 @@ export function createGeminiExtension(
 
           // EC-10: Missing role raises error
           if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-            throw new RuntimeError(
-              'RILL-R005',
-              "message missing required 'role' field"
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
           }
 
           const role = msg['role'];
 
           // EC-11: Unknown role value raises error
           if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw new RuntimeError('RILL-R005', `invalid role '${role}'`);
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
           }
 
           // EC-12: User message missing content
           if (role === 'user' || role === 'tool') {
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw new RuntimeError(
-                'RILL-R005',
-                `${role} message requires 'content'`
-              );
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
             }
             contents.push({
               role: 'user',
@@ -472,10 +483,7 @@ export function createGeminiExtension(
             const hasToolCalls = 'tool_calls' in msg && msg['tool_calls'];
 
             if (!hasContent && !hasToolCalls) {
-              throw new RuntimeError(
-                'RILL-R005',
-                "assistant message requires 'content' or 'tool_calls'"
-              );
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_assistant_message', "assistant message requires 'content' or 'tool_calls'");
             }
 
             if (hasContent) {
@@ -650,10 +658,7 @@ export function createGeminiExtension(
             !embedding.values ||
             embedding.values.length === 0
           ) {
-            throw new RuntimeError(
-              'RILL-R005',
-              'Gemini: empty embedding returned'
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'Gemini: empty embedding returned');
           }
 
           // Convert to Float32Array and create RillVector
@@ -675,7 +680,7 @@ export function createGeminiExtension(
           // Map error and emit failure event
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeError
+            error instanceof RuntimeError || error instanceof RuntimeHaltSignal
               ? error
               : mapToHalt(ctx as RuntimeContext, error);
 
@@ -721,10 +726,7 @@ export function createGeminiExtension(
           // Convert embeddings to RillVector list
           const vectors: RillValue[] = [];
           if (!response.embeddings || response.embeddings.length === 0) {
-            throw new RuntimeError(
-              'RILL-R005',
-              'Gemini: empty embeddings returned'
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embeddings_response', 'Gemini: empty embeddings returned');
           }
 
           for (const embedding of response.embeddings) {
@@ -733,10 +735,7 @@ export function createGeminiExtension(
               !embedding.values ||
               embedding.values.length === 0
             ) {
-              throw new RuntimeError(
-                'RILL-R005',
-                'Gemini: empty embedding returned'
-              );
+              throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'Gemini: empty embedding returned');
             }
             const float32Data = new Float32Array(embedding.values);
             const vector = createVector(float32Data, factoryEmbedModel);
@@ -762,7 +761,7 @@ export function createGeminiExtension(
           // Map error and emit failure event
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeError
+            error instanceof RuntimeError || error instanceof RuntimeHaltSignal
               ? error
               : mapToHalt(ctx as RuntimeContext, error);
 
@@ -806,7 +805,7 @@ export function createGeminiExtension(
 
         // EC-22: Validate prompt is non-empty before stream creation
         if (prompt.trim().length === 0) {
-          throw new RuntimeError('RILL-R005', 'prompt text cannot be empty');
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
         }
 
         // Extract options with defaults
@@ -1288,16 +1287,10 @@ export function createGeminiExtension(
 
           // EC-3: Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
-            throw new RuntimeError(
-              'RILL-R005',
-              'generate requires a type expression as schema'
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema', 'generate requires a type expression as schema');
           }
           if (schemaArg.structure.kind !== 'dict') {
-            throw new RuntimeError(
-              'RILL-R005',
-              `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema_type', `generate requires a dict type as schema, got ${schemaArg.structure.kind}`);
           }
 
           // EC-4: Build JSON Schema from TypeStructure
@@ -1402,10 +1395,7 @@ export function createGeminiExtension(
               parseError instanceof Error
                 ? parseError.message
                 : String(parseError);
-            throw new RuntimeError(
-              'RILL-R005',
-              `generate: failed to parse response JSON: ${detail}`
-            );
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'json_parse_failed', `generate: failed to parse response JSON: ${detail}`);
           }
 
           // Extract usage metadata (IR-6)
@@ -1446,7 +1436,7 @@ export function createGeminiExtension(
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeError
+            error instanceof RuntimeError || error instanceof RuntimeHaltSignal
               ? error
               : mapToHalt(ctx as RuntimeContext, error);
 

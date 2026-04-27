@@ -19,7 +19,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { expectRejectedHalt } from './_halt-helpers.js';
 import {
   createRuntimeContext,
-  RuntimeError,
+  RuntimeHaltSignal,
+  getStatus,
   type ApplicationCallable,
   type RillTypeValue,
   type TypeStructure,
@@ -167,7 +168,7 @@ describe('generate() function', () => {
         thrown = err;
       }
 
-      expect(thrown).toBeInstanceOf(RuntimeError);
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
     });
 
     // AC-23/EC-5: parse error has RILL-R005 error code
@@ -184,8 +185,8 @@ describe('generate() function', () => {
         thrown = err;
       }
 
-      expect(thrown).toBeInstanceOf(RuntimeError);
-      expect((thrown as RuntimeError).errorId).toBe('RILL-R005');
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe('PROTOCOL');
     });
 
     // AC-22/EC-5: "{broken" response throws with original parse error detail
@@ -208,7 +209,7 @@ describe('generate() function', () => {
         thrown = err;
       }
 
-      const message = (thrown as RuntimeError).message;
+      const message = getStatus((thrown as RuntimeHaltSignal).value).message;
       // Message must contain detail beyond just the prefix
       expect(message.length).toBeGreaterThan(
         'generate: failed to parse response JSON:'.length
@@ -223,9 +224,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       // Must reject, never resolve to a value
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx));
     });
 
     // EC-4: missing schema arg throws RILL-R005
@@ -233,8 +232,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
       , { message: expect.stringContaining('generate requires a type expression as schema') });
     });
 
@@ -257,8 +255,7 @@ describe('generate() function', () => {
       });
 
       await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow();
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx));
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');
       expect(errorEvent).toBeDefined();

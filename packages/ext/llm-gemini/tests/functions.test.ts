@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { expectHalt, expectRejectedHalt } from './_halt-helpers.js';
+import { expectHalt, expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 import { createRuntimeContext, callable, isRillStream, type ApplicationCallable, type RillStream, type RillValue } from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
@@ -499,8 +499,7 @@ describe('message() function', () => {
       await collectStreamUntilError(stream, ctx);
 
       // Resolve also throws because streamError is set
-      await expect(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
+      await expectRejectedHalt((stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
       );
     });
   });
@@ -770,9 +769,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ content: 'Hello' }];
 
-      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
-        "message missing required 'role' field"
-      );
+      await expectRejectedHalt(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "message missing required 'role' field" });
     });
 
     // EC-11: Invalid role value
@@ -787,9 +784,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'system', content: 'Hello' }];
 
-      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
-        "invalid role 'system'"
-      );
+      await expectRejectedHalt(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "invalid role 'system'" });
     });
 
     // EC-12: User message missing content
@@ -804,9 +799,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'user' }];
 
-      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
-        "user message requires 'content'"
-      );
+      await expectRejectedHalt(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "user message requires 'content'" });
     });
 
     // EC-13: Assistant message missing both content and tool_calls
@@ -821,9 +814,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'assistant' }];
 
-      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
-        "assistant message requires 'content' or 'tool_calls'"
-      );
+      await expectRejectedHalt(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "assistant message requires 'content' or 'tool_calls'" });
     });
 
     it('accepts assistant message with content', async () => {
@@ -877,9 +868,7 @@ describe('messages() function', () => {
 
       const invalidMessages = [{ role: 'tool' }];
 
-      await expect(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx)).rejects.toThrow(
-        "tool message requires 'content'"
-      );
+      await expectRejectedHalt(getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "tool message requires 'content'" });
     });
   });
 
@@ -999,8 +988,8 @@ describe('messages() function', () => {
 
       await collectStreamUntilError(stream, ctx);
 
-      await expect(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
+      await expectRejectedHalt(
+        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
       );
     });
   });
@@ -1534,9 +1523,7 @@ describe('tool_loop() function', () => {
 
       const tools = { test: makeTool(vi.fn()) };
 
-      expect(() => getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools }, ctx)).toThrow(
-        'prompt text cannot be empty'
-      );
+      expectThrowHalt(() => getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools }, ctx), { message: 'prompt text cannot be empty' });
     });
 
     // EC-23: Missing tools argument — error surfaces via stream resolve
@@ -1633,9 +1620,10 @@ describe('tool_loop() function', () => {
 
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello', tools }, ctx);
 
-      await expect(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
-      , { message: expect.stringContaining('Provider API error:') });
+      await expectRejectedHalt(
+        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
+        { message: 'Provider API error:' },
+      );
     });
 
     // AC-17: Tool execution error mid-loop yields tool_call chunk; stream resolves with final content
