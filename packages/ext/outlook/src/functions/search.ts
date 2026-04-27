@@ -2,7 +2,7 @@
  * search host function — full-text search messages using Graph $search.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
 import { normalizeMessage } from '../normalize.js';
@@ -12,7 +12,7 @@ import type { ResolvedConfig } from '../factory.js';
  * Search messages using the Graph API $search parameter.
  * Caps `top` at config.maxResults.
  *
- * @throws RuntimeError (RILL-R004) when query is empty
+ * @throws an invalid RillValue (#INVALID_INPUT) when query is empty
  */
 export async function search(
   args: Record<string, RillValue>,
@@ -23,7 +23,7 @@ export async function search(
   const query = (args['query'] as string | undefined) ?? '';
 
   if (query.trim() === '') {
-    throw new RuntimeError('RILL-R004', 'outlook: query is required');
+    failInput(ctx, 'missing_query', 'outlook: query is required');
   }
 
   const rawTop = args['top'] as number | undefined;

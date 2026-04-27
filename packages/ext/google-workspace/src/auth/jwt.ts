@@ -4,8 +4,9 @@
  */
 
 import { createSign } from 'node:crypto';
-import { RuntimeError } from '@rcrsr/rill';
+import type { RuntimeContext } from '@rcrsr/rill';
 import type { ServiceAccountKey } from '../types.js';
+import { failAuth } from '../errors.js';
 
 /** JWT header — RS256 algorithm, JWT type (AC-9). */
 const JWT_HEADER = { alg: 'RS256', typ: 'JWT' } as const;
@@ -38,9 +39,10 @@ function toBase64Url(value: string | Buffer): string {
  * @throws RuntimeError (RILL-R004) on signing failure
  */
 export function signServiceAccountJwt(
+  ctx: RuntimeContext,
   key: ServiceAccountKey,
   scopes: string[],
-  subject?: string | undefined
+  subject?: string | undefined,
 ): string {
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + JWT_LIFETIME_SECONDS;
@@ -70,9 +72,9 @@ export function signServiceAccountJwt(
     return `${signingInput}.${signature}`;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    throw new RuntimeError(
-      'RILL-R004',
-      `google: JWT signing failed: ${reason}`
-    );
+    failAuth(ctx, 'jwt_sign_failed', `google: JWT signing failed: ${reason}`);
   }
+
+  // Unreachable: failAuth always throws
+  return '';
 }

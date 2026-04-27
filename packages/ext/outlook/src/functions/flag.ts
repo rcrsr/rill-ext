@@ -3,7 +3,7 @@
  * Graph returns HTTP 200 with the updated message body.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
 import { normalizeMessage } from '../normalize.js';
@@ -13,7 +13,7 @@ import type { ResolvedConfig } from '../factory.js';
  * Flag a message by setting flag.flagStatus to 'flagged'.
  * Uses PATCH /me/messages/{id}. Returns the updated MailMessageDict.
  *
- * @throws RuntimeError (RILL-R004) when messageId is empty
+ * @throws an invalid RillValue (#INVALID_INPUT) when messageId is empty
  */
 export async function flag(
   args: Record<string, RillValue>,
@@ -23,7 +23,7 @@ export async function flag(
 ): Promise<RillValue> {
   const messageId = (args['messageId'] as string | undefined) ?? '';
   if (messageId.trim() === '') {
-    throw new RuntimeError('RILL-R004', 'outlook: messageId is required');
+    failInput(ctx, 'missing_message_id', 'outlook: messageId is required');
   }
 
   const path = `messages/${encodeURIComponent(messageId)}`;

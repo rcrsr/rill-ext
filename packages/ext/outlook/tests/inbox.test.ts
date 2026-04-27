@@ -4,7 +4,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, createRuntimeContext, type ApplicationCallable, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
 
 // ============================================================
@@ -73,7 +74,7 @@ describe('inbox() host function', () => {
   describe('returns MailMessageDict list [AC-2]', () => {
     it('returns messages array with 9-field MailMessageDict objects', async () => {
       globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-      const ext = createOutlookExtension(BEARER_CONFIG);
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<string, unknown>;
@@ -96,7 +97,7 @@ describe('inbox() host function', () => {
 
     it('normalizes field values from Graph response', async () => {
       globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-      const ext = createOutlookExtension(BEARER_CONFIG);
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<string, unknown>;
@@ -120,7 +121,7 @@ describe('inbox() host function', () => {
 
   it('returns empty messages array when inbox is empty [AC-33]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<string, unknown>;
@@ -137,7 +138,7 @@ describe('inbox() host function', () => {
   it('uses maxResults when top=0 is passed [AC-31]', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'inbox').fn({ top: 0 }, ctx);
@@ -171,7 +172,7 @@ describe('inbox() host function', () => {
   it('adds $filter=isRead eq false when unread=true', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'inbox').fn({ unread: true }, ctx);
@@ -183,7 +184,7 @@ describe('inbox() host function', () => {
   it('uses $orderby=receivedDateTime desc when unread is not set', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'inbox').fn({}, ctx);
@@ -199,7 +200,7 @@ describe('inbox() host function', () => {
   it('sends Authorization: Bearer header with token [AC-16]', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'inbox').fn({}, ctx);
@@ -244,7 +245,7 @@ describe('inbox() host function', () => {
     const ext = createOutlookExtension({
       ...BEARER_CONFIG,
       mailbox: 'shared@example.com',
-    });
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'inbox').fn({}, ctx);
@@ -256,7 +257,7 @@ describe('inbox() host function', () => {
   it('uses /me/ path when no shared mailbox configured', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'inbox').fn({}, ctx);
@@ -271,7 +272,7 @@ describe('inbox() host function', () => {
 
   it('emits outlook:mail:read event on success [AC-19]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -307,25 +308,19 @@ describe('inbox() host function', () => {
     });
 
     it('throws RILL-R004 when folder is not in allowlist [EC-4]', async () => {
-      const ext = createOutlookExtension(BEARER_CONFIG);
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      let caught: unknown;
-      try {
-        await getCallable(ext, 'inbox').fn({ folder: 'drafts' }, ctx);
-      } catch (err) {
-        caught = err;
-      }
-
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toContain("folder 'drafts' not accessible");
+      const caught = (await getCallable(ext, 'inbox').fn({ folder: 'drafts' }, ctx)) as RillValue;
+      expect(isInvalid(caught)).toBe(true);
+      expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain("folder 'drafts' not accessible");
     });
 
     it('does not call fetch when folder is not in allowlist', async () => {
       const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
       globalThis.fetch = mockFetch;
-      const ext = createOutlookExtension(BEARER_CONFIG);
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       try {
@@ -340,7 +335,7 @@ describe('inbox() host function', () => {
     it('uses default /messages path when no folder arg is provided', async () => {
       const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
       globalThis.fetch = mockFetch;
-      const ext = createOutlookExtension(BEARER_CONFIG);
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'inbox').fn({}, ctx);
@@ -370,7 +365,7 @@ describe('read() host function', () => {
 
   it('returns single MailMessageDict by messageId [AC-5]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'read').fn(
@@ -391,7 +386,7 @@ describe('read() host function', () => {
   it('sends GET to messages/{messageId} path', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_MESSAGE);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'read').fn({ messageId: 'msg-001' }, ctx);
@@ -401,24 +396,18 @@ describe('read() host function', () => {
   });
 
   it('throws RILL-R004 for empty messageId [EC-3]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'read').fn({ messageId: '' }, ctx);
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('messageId is required');
+    const caught = (await getCallable(ext, 'read').fn({ messageId: '' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+  expect(getStatus(caught).message).toContain('messageId is required');
   });
 
   it('emits outlook:mail:read event on success [AC-19]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;

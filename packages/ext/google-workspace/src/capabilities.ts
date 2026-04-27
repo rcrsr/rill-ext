@@ -1,20 +1,21 @@
 /**
  * Capability guards for Google Workspace extension.
- * Throws RuntimeError before any API call when access is not permitted.
+ * Capability denials surface as invalid RillValues carrying `#FORBIDDEN`.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import type { RuntimeContext } from '@rcrsr/rill';
+import { failForbidden } from './errors.js';
 
 /**
  * Check that a named capability is enabled.
- * Throws RuntimeError RILL-R004 when the capability flag is false.
- *
- * @param enabled - Whether the capability is enabled
- * @param name - Human-readable capability name for the error message
- * @throws RuntimeError (RILL-R004) when enabled is false [IR-24]
+ * Throws an invalid RillValue (`#FORBIDDEN`) when disabled.
  */
-export function checkCapability(enabled: boolean, name: string): void {
+export function checkCapability(
+  ctx: RuntimeContext,
+  enabled: boolean,
+  name: string,
+): void {
   if (!enabled) {
-    throw new RuntimeError('RILL-R004', `google: ${name} not enabled`);
+    failForbidden(ctx, 'capability_disabled', `google: ${name} not enabled`);
   }
 }

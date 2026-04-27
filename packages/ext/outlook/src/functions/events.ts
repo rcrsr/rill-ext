@@ -2,7 +2,7 @@
  * events host function — list calendar events within a time range.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
 import { normalizeEvent } from '../normalize.js';
@@ -13,7 +13,7 @@ import type { ResolvedConfig } from '../factory.js';
  * Inputs are epoch milliseconds; converted to ISO 8601 for Graph API.
  * Returns dict with `events` list and `range` string.
  *
- * @throws RuntimeError (RILL-R004) when start > end
+ * @throws an invalid RillValue (#INVALID_INPUT) when start > end
  */
 export async function events(
   args: Record<string, RillValue>,
@@ -25,7 +25,7 @@ export async function events(
   const end = (args['end'] as number) ?? 0;
 
   if (start > end) {
-    throw new RuntimeError('RILL-R004', 'outlook: start must be before end');
+    failInput(ctx, 'invalid_range', 'outlook: start must be before end');
   }
 
   const startIso = new Date(start).toISOString();

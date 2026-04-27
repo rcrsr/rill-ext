@@ -4,23 +4,18 @@
  * Capability: drive.read
  * Scope: drive.readonly
  */
-
-import { RuntimeError } from '@rcrsr/rill';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import { failInput } from '../../errors.js';
 import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
-
 const DRIVE_BASE = 'https://www.googleapis.com/drive/v3';
 const DRIVE_READ_SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
-
 const METADATA_FIELDS = 'id,name,mimeType,size,owners,createdTime,modifiedTime';
-
 export interface DriveGetMetadataDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
 }
-
 /**
  * Factory returning the drive_get_metadata inner function.
  * AC-12: Returns rill primitive dict with file metadata.
@@ -37,11 +32,9 @@ export function makeDriveGetMetadata(deps: DriveGetMetadataDeps): (
   ): Promise<RillValue> => {
     const fileId = args['fileId'];
     if (typeof fileId !== 'string' || fileId.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: fileId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: fileId must be a non-empty string');
     }
-
     const path = `/files/${encodeURIComponent(fileId)}?fields=${encodeURIComponent(METADATA_FIELDS)}`;
-
     const response = await googleFetch(
       'GET',
       DRIVE_BASE,
@@ -57,7 +50,6 @@ export function makeDriveGetMetadata(deps: DriveGetMetadataDeps): (
       undefined,
       fileId
     );
-
     const data = response as {
       id?: string;
       name?: string;
@@ -67,7 +59,6 @@ export function makeDriveGetMetadata(deps: DriveGetMetadataDeps): (
       createdTime?: string;
       modifiedTime?: string;
     } | null;
-
     // AC-12: Return rill primitive dict
     return {
       id: data?.id ?? '',

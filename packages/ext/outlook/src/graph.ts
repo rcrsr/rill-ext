@@ -1,10 +1,13 @@
 /**
  * Microsoft Graph API fetch wrapper for Outlook extension.
  * Builds authenticated requests with mailbox-aware URL routing,
- * combined abort/timeout signals, and error mapping.
+ * combined abort/timeout/lifecycle signals, and error mapping.
+ *
+ * On failure throws an invalid RillValue (via mapGraphError /
+ * mapFetchError); the wrap()'s catch passes it through unchanged.
  */
 
-import type { RuntimeContext } from '@rcrsr/rill';
+import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { resolveToken } from './config.js';
 import { mapFetchError, mapGraphError } from './errors.js';
 import type { OutlookAuth } from './types.js';
@@ -20,24 +23,6 @@ const REQUEST_TIMEOUT_MS = 30000;
 // GRAPH FETCH
 // ============================================================
 
-/**
- * Perform an authenticated Microsoft Graph API request.
- *
- * Resolves the Bearer token via resolveToken, builds the full URL
- * with mailbox-aware path prefix (/me/ or /users/{mailbox}/),
- * combines the caller's abort controller signal with a 30s timeout,
- * and maps non-OK responses to RuntimeError via mapGraphError.
- *
- * @param method - HTTP method (GET, POST, PATCH, DELETE)
- * @param path - Graph API path relative to the mailbox root (e.g. 'messages', 'mailFolders/inbox/messages')
- * @param auth - Authentication config for token resolution
- * @param mailbox - Optional shared mailbox UPN/ID; uses /me/ when undefined
- * @param ctx - RuntimeContext for session token lookup
- * @param controller - AbortController for caller-side cancellation
- * @param body - Optional request body (POST/PATCH)
- * @returns Parsed JSON response body
- * @throws RuntimeError on non-OK response or network failure
- */
 export async function graphFetch(
   method: string,
   path: string,
@@ -46,27 +31,29 @@ export async function graphFetch(
   ctx: RuntimeContext,
   controller: AbortController,
   body?: unknown,
-  extraHeaders?: Record<string, string>
+  extraHeaders?: Record<string, string>,
 ): Promise<unknown> {
   const token = resolveToken(auth, ctx);
 
-  // Build mailbox-aware base: /me/ or /users/{mailbox}/
   const mailboxSegment =
     mailbox !== undefined ? `/users/${mailbox}` : '/me';
   const url = `${GRAPH_BASE_URL}${mailboxSegment}/${path}`;
 
-  // Combine caller signal with 30s hard timeout
-  const signal = AbortSignal.any([
+  // Compose lifecycle (ctx.signal), per-request controller, and 30s timeout.
+  const signals: AbortSignal[] = [
     controller.signal,
     AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  ]);
+  ];
+  if (ctx.signal !== undefined) {
+    signals.unshift(ctx.signal);
+  }
+  const signal = AbortSignal.any(signals);
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     ...extraHeaders,
   };
 
-  // Only set Content-Type for requests with a body
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }
@@ -80,14 +67,17 @@ export async function graphFetch(
   try {
     response = await fetch(url, init);
   } catch (error) {
-    throw mapFetchError(error);
+    throw mapFetchError(ctx, error) as unknown as RillValue;
   }
 
   if (!response.ok) {
-    throw mapGraphError(response.status, path.split('?')[0] ?? path);
+    throw mapGraphError(
+      ctx,
+      response.status,
+      path.split('?')[0] ?? path,
+    ) as unknown as RillValue;
   }
 
-  // 202 Accepted and 204 No Content carry no response body
   if (response.status === 202 || response.status === 204) {
     return null;
   }

@@ -11,22 +11,18 @@
  *  3. Build Reply-To MIME with In-Reply-To + References threading headers
  *  4. POST /users/me/messages/send with { raw, threadId }
  */
-
-import { RuntimeError } from '@rcrsr/rill';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import { failInput } from '../../errors.js';
 import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
 import { buildRawMime } from './mime.js';
-
 const GMAIL_BASE = 'https://gmail.googleapis.com';
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
-
 export interface GmailReplyDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
 }
-
 /** Minimal shape returned by Gmail metadata fetch. */
 interface GmailMetadataMessage {
   id?: string;
@@ -35,7 +31,6 @@ interface GmailMetadataMessage {
     headers?: Array<{ name?: string; value?: string }>;
   };
 }
-
 /**
  * Factory returning the gmail_reply inner function.
  * Fetches thread metadata, builds RFC 2822 reply MIME with threading headers,
@@ -53,14 +48,12 @@ export function makeGmailReply(deps: GmailReplyDeps): (
   ): Promise<RillValue> => {
     const messageId = args['messageId'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: messageId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: messageId must be a non-empty string');
     }
-
     const body = args['body'];
     if (typeof body !== 'string') {
-      throw new RuntimeError('RILL-R004', 'google: body must be a string');
+      failInput(ctx, 'invalid_arg', 'google: body must be a string');
     }
-
     // Step 1: GET message metadata for threading headers
     const metadataPath =
       `/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}` +
@@ -69,7 +62,6 @@ export function makeGmailReply(deps: GmailReplyDeps): (
       `&metadataHeaders=References` +
       `&metadataHeaders=Subject` +
       `&metadataHeaders=From`;
-
     const metaResponse = await googleFetch(
       'GET',
       GMAIL_BASE,
@@ -85,10 +77,8 @@ export function makeGmailReply(deps: GmailReplyDeps): (
       undefined,
       messageId
     );
-
     const meta = metaResponse as GmailMetadataMessage | null;
     const threadId = meta?.threadId ?? '';
-
     const headerList = meta?.payload?.headers ?? [];
     const getHeader = (name: string): string => {
       const h = headerList.find(
@@ -96,22 +86,18 @@ export function makeGmailReply(deps: GmailReplyDeps): (
       );
       return h?.value ?? '';
     };
-
     const originalMessageId = getHeader('Message-Id');
     const existingReferences = getHeader('References');
     const originalSubject = getHeader('Subject');
     const originalFrom = getHeader('From');
-
     // Build References chain: previous References + original Message-Id
     const references = existingReferences
       ? `${existingReferences} ${originalMessageId}`.trim()
       : originalMessageId;
-
     // Use "Re: " prefix convention if not already present
     const replySubject = originalSubject.startsWith('Re:')
       ? originalSubject
       : `Re: ${originalSubject}`;
-
     // Build raw MIME with threading headers
     const raw = buildRawMime({
       to: originalFrom,
@@ -120,13 +106,11 @@ export function makeGmailReply(deps: GmailReplyDeps): (
       inReplyTo: originalMessageId || undefined,
       references: references || undefined,
     });
-
     // Step 2: POST reply with threadId for threading
     const sendBody: Record<string, unknown> = { raw };
     if (threadId) {
       sendBody['threadId'] = threadId;
     }
-
     const sendResponse = await googleFetch(
       'POST',
       GMAIL_BASE,
@@ -140,7 +124,6 @@ export function makeGmailReply(deps: GmailReplyDeps): (
       GMAIL_SCOPES,
       sendBody
     );
-
     const data = sendResponse as { id?: string } | null;
     return (data?.id ?? '') as unknown as RillValue;
   };

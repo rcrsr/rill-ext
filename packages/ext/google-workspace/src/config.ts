@@ -61,14 +61,14 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
     parsed = JSON.parse(keyJson);
   } catch {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R001',
       "google: auth.keyJson is invalid: not valid JSON"
     );
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R001',
       "google: auth.keyJson is invalid: not valid JSON"
     );
   }
@@ -77,21 +77,21 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
 
   if (!obj['client_email'] || typeof obj['client_email'] !== 'string') {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R001',
       "google: auth.keyJson is invalid: missing field 'client_email'"
     );
   }
 
   if (!obj['private_key'] || typeof obj['private_key'] !== 'string') {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R001',
       "google: auth.keyJson is invalid: missing field 'private_key'"
     );
   }
 
   if (!obj['token_uri'] || typeof obj['token_uri'] !== 'string') {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R001',
       "google: auth.keyJson is invalid: missing field 'token_uri'"
     );
   }
@@ -117,7 +117,7 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
 export function validateConfig(config: GoogleWorkspaceConfig): void {
   // EC-1: Missing auth
   if (!config.auth) {
-    throw new RuntimeError('RILL-R004', 'google: auth is required');
+    throw new RuntimeError('RILL-R001', 'google: auth is required');
   }
 
   // EC-2: Invalid auth type
@@ -128,7 +128,7 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
     authType !== 'service-account'
   ) {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R001',
       "google: auth.type must be 'bearer', 'session', or 'service-account'"
     );
   }
@@ -136,14 +136,14 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
   // EC-1: Bearer requires non-empty token
   if (config.auth.type === 'bearer') {
     if (!config.auth.token || config.auth.token === '') {
-      throw new RuntimeError('RILL-R004', 'google: auth.token is required');
+      throw new RuntimeError('RILL-R001', 'google: auth.token is required');
     }
   }
 
   // EC-1: Session requires non-empty tokenVar
   if (config.auth.type === 'session') {
     if (!config.auth.tokenVar || config.auth.tokenVar === '') {
-      throw new RuntimeError('RILL-R004', 'google: auth.tokenVar is required');
+      throw new RuntimeError('RILL-R001', 'google: auth.tokenVar is required');
     }
   }
 
@@ -157,7 +157,7 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
     const max = config.gmail.maxResults;
     if (!Number.isInteger(max) || max < 1 || max > 500) {
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R001',
         'google: gmail.maxResults must be 1-500'
       );
     }
@@ -168,7 +168,7 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
     const bytes = config.drive.maxUploadBytes;
     if (!Number.isInteger(bytes) || bytes <= 0) {
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R001',
         'google: drive.maxUploadBytes must be positive'
       );
     }
@@ -178,7 +178,7 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
   if (config.drive?.allowedFolderIds !== undefined) {
     if (config.drive.allowedFolderIds.length === 0) {
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R001',
         'google: drive.allowedFolderIds must be non-empty'
       );
     }
@@ -188,7 +188,7 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
   if (config.calendar?.allowedCalendarIds !== undefined) {
     if (config.calendar.allowedCalendarIds.length === 0) {
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R001',
         'google: calendar.allowedCalendarIds must be non-empty'
       );
     }

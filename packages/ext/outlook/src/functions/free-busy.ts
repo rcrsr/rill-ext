@@ -2,7 +2,7 @@
  * freeBusy host function — query free/busy schedules for attendees.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
 import { normalizeSchedule } from '../normalize.js';
@@ -13,7 +13,7 @@ import type { ResolvedConfig } from '../factory.js';
  * Uses POST /me/calendar/getSchedule. Inputs are epoch milliseconds.
  * Returns dict with `schedules` list and `range` string.
  *
- * @throws RuntimeError (RILL-R004) when start > end or attendees is empty
+ * @throws an invalid RillValue (#INVALID_INPUT) when start > end or attendees is empty
  */
 export async function freeBusy(
   args: Record<string, RillValue>,
@@ -25,7 +25,7 @@ export async function freeBusy(
   const end = (args['end'] as number) ?? 0;
 
   if (start > end) {
-    throw new RuntimeError('RILL-R004', 'outlook: start must be before end');
+    failInput(ctx, 'invalid_range', 'outlook: start must be before end');
   }
 
   const rawAttendees = args['attendees'];
@@ -34,7 +34,7 @@ export async function freeBusy(
     : [];
 
   if (attendees.length === 0) {
-    throw new RuntimeError('RILL-R004', 'outlook: attendees is required');
+    failInput(ctx, 'missing_attendees', 'outlook: attendees is required');
   }
 
   const startIso = new Date(start).toISOString();

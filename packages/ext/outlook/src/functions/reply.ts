@@ -3,7 +3,7 @@
  * Graph returns HTTP 202 with no body; returns SendConfirmationDict.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
 import type { ResolvedConfig } from '../factory.js';
@@ -13,7 +13,7 @@ import type { ResolvedConfig } from '../factory.js';
  * Returns SendConfirmationDict { sent: true, to: [], subject: '' }.
  * Subject is empty because Graph's 202 response carries no message data.
  *
- * @throws RuntimeError (RILL-R004) when messageId or body is empty
+ * @throws an invalid RillValue (#INVALID_INPUT) when messageId or body is empty
  */
 export async function reply(
   args: Record<string, RillValue>,
@@ -23,12 +23,12 @@ export async function reply(
 ): Promise<RillValue> {
   const messageId = (args['messageId'] as string | undefined) ?? '';
   if (messageId.trim() === '') {
-    throw new RuntimeError('RILL-R004', 'outlook: messageId is required');
+    failInput(ctx, 'missing_message_id', 'outlook: messageId is required');
   }
 
   const body = (args['body'] as string | undefined) ?? '';
   if (body.trim() === '') {
-    throw new RuntimeError('RILL-R004', 'outlook: body is required');
+    failInput(ctx, 'missing_body', 'outlook: body is required');
   }
 
   const path = `messages/${encodeURIComponent(messageId)}/reply`;

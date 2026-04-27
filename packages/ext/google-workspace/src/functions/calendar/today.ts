@@ -59,7 +59,7 @@ export function makeCalendarToday(deps: CalendarTodayDeps): (
     }
 
     // EC-11: Validate calendarId against allowlist
-    assertAllowedCalendarId(calendarId, deps.calendarConfig);
+    assertAllowedCalendarId(ctx, calendarId, deps.calendarConfig);
 
     const path =
       `/calendars/${encodeURIComponent(calendarId)}/events` +

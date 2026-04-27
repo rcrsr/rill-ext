@@ -4,7 +4,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, createRuntimeContext, type ApplicationCallable, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
 
 // ============================================================
@@ -72,7 +73,7 @@ describe('from() host function', () => {
   it('includes sender address in $filter query param [AC-3]', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'from').fn({ address: 'sender@example.com' }, ctx);
@@ -84,7 +85,7 @@ describe('from() host function', () => {
 
   it('returns MailMessageDict list filtered by sender [AC-3]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'from').fn(
@@ -101,7 +102,7 @@ describe('from() host function', () => {
   it('uses Graph OData filter with from/emailAddress/address', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'from').fn({ address: 'sender@example.com' }, ctx);
@@ -114,7 +115,7 @@ describe('from() host function', () => {
   it('sends GET request to messages endpoint', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'from').fn({ address: 'sender@example.com' }, ctx);
@@ -129,35 +130,23 @@ describe('from() host function', () => {
   // ============================================================
 
   it('throws RILL-R004 for empty address [EC-3]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'from').fn({ address: '' }, ctx);
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('address is required');
+    const caught = (await getCallable(ext, 'from').fn({ address: '' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+  expect(getStatus(caught).message).toContain('address is required');
   });
 
   it('throws RILL-R004 for whitespace-only address [EC-3]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'from').fn({ address: '   ' }, ctx);
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-  });
+    const caught = (await getCallable(ext, 'from').fn({ address: '   ' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+});
 
   // ============================================================
   // AC-19: event emission
@@ -165,7 +154,7 @@ describe('from() host function', () => {
 
   it('emits outlook:mail:read event on success [AC-19]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;

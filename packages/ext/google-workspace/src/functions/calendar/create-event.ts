@@ -4,8 +4,8 @@
  * Capability: calendar.create
  * Scopes: calendar.events
  */
-
-import { RuntimeError, isDict } from '@rcrsr/rill';
+import { isDict } from '@rcrsr/rill';
+import { failForbidden, failInput } from '../../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
@@ -16,18 +16,14 @@ import {
   assertIsoTimestamp,
   assertAllowedCalendarId,
 } from './_shared.js';
-
 const CAL_WRITE_SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
-
 /** Valid sendUpdates values per Google Calendar API v3. */
 const VALID_SEND_UPDATES = new Set(['all', 'externalOnly', 'none']);
-
 export interface CalendarCreateEventDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
   readonly calendarConfig: CalendarConfig | undefined;
 }
-
 /**
  * Factory returning the calendar_create_event inner function.
  * EC-11: Validates calendarId against allowedCalendarIds.
@@ -48,21 +44,18 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
     const title = args['title'];
     const startTime = args['startTime'];
     const endTime = args['endTime'];
-
     if (typeof title !== 'string' || title.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: title must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: title must be a non-empty string');
     }
     if (typeof startTime !== 'string' || startTime.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: startTime must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: startTime must be a non-empty string');
     }
     if (typeof endTime !== 'string' || endTime.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: endTime must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: endTime must be a non-empty string');
     }
-
     // EC-13: Reject naive ISO timestamps
-    assertIsoTimestamp(startTime, 'startTime');
-    assertIsoTimestamp(endTime, 'endTime');
-
+    assertIsoTimestamp(ctx, startTime, 'startTime');
+    assertIsoTimestamp(ctx, endTime, 'endTime');
     // Extract options
     const options = args['options'];
     let calendarId = 'primary';
@@ -70,23 +63,19 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
     let sendUpdates = 'none';
     let attendees: Array<{ email: string }> | undefined;
     let description: string | undefined;
-
     if (options !== undefined && options !== null && isDict(options)) {
       const rawCalId = options['calendarId'];
       if (typeof rawCalId === 'string' && rawCalId.trim() !== '') {
         calendarId = rawCalId;
       }
-
       const rawAllDay = options['allDay'];
       if (typeof rawAllDay === 'boolean') {
         isAllDay = rawAllDay;
       }
-
       const rawSendUpdates = options['sendUpdates'];
       if (typeof rawSendUpdates === 'string' && VALID_SEND_UPDATES.has(rawSendUpdates)) {
         sendUpdates = rawSendUpdates;
       }
-
       const rawAttendees = options['attendees'];
       if (Array.isArray(rawAttendees)) {
         attendees = rawAttendees
@@ -94,21 +83,17 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
           .map((a) => ({ email: String(a['email'] ?? '') }))
           .filter((a) => a.email !== '');
       }
-
       const rawDescription = options['description'];
       if (typeof rawDescription === 'string') {
         description = rawDescription;
       }
     }
-
     // EC-11: Validate calendarId against allowlist
-    assertAllowedCalendarId(calendarId, deps.calendarConfig);
-
+    assertAllowedCalendarId(ctx, calendarId, deps.calendarConfig);
     // EC-12: Reject all-day events when denyAllDay is configured
     if (isAllDay && deps.calendarConfig?.denyAllDay === true) {
-      throw new RuntimeError('RILL-R004', 'google: all-day events not permitted');
+      failForbidden(ctx, 'all_day_not_permitted', 'google: all-day events not permitted');
     }
-
     // Build event body
     type EventBody = {
       summary: string;
@@ -117,7 +102,6 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
       attendees?: Array<{ email: string }>;
       description?: string;
     };
-
     const body: EventBody = {
       summary: title,
       start: isAllDay
@@ -127,18 +111,15 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
         ? { date: endTime.slice(0, 10) }
         : { dateTime: endTime },
     };
-
     if (attendees !== undefined && attendees.length > 0) {
       body.attendees = attendees;
     }
     if (description !== undefined) {
       body.description = description;
     }
-
     const path =
       `/calendars/${encodeURIComponent(calendarId)}/events` +
       `?sendUpdates=${encodeURIComponent(sendUpdates)}`;
-
     const response = await googleFetch(
       'POST',
       CAL_BASE,
@@ -154,11 +135,9 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
       undefined,
       undefined
     );
-
     // Return event ID string [IR-17, AC-12]
     const data = response as { id?: string } | null;
     const eventId = data?.id ?? '';
-
     return eventId as unknown as RillValue;
   };
 }

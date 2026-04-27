@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, RuntimeError } from '@rcrsr/rill';
+import { createRuntimeContext, RuntimeError, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
 
 // Mock auth/resolve so resolveToken is controllable without real JWT
 vi.mock('../src/auth/resolve.js', () => ({
@@ -39,7 +39,7 @@ beforeEach(() => {
 // ============================================================
 
 describe('HTTPS enforcement', () => {
-  it('throws RILL-R004 when baseUrl uses http://', async () => {
+  it('emits #INVALID_INPUT when baseUrl uses http://', async () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
@@ -55,16 +55,12 @@ describe('HTTPS enforcement', () => {
         ctx,
         controller,
         makeCache(),
-        SCOPES
+        SCOPES,
       );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('google: baseUrl must be HTTPS');
-    // resolveToken must NOT be called before the check
+    } catch (e) { caught = e; }
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('INVALID_INPUT');
+    expect(getStatus(caught as RillValue).message).toBe('google: baseUrl must be HTTPS');
     expect(mockResolveToken).not.toHaveBeenCalled();
   });
 
@@ -283,7 +279,7 @@ describe('response handling', () => {
 // ============================================================
 
 describe('HTTP error mapping', () => {
-  it('maps 401 to RILL-R004 invalid token [EC-14]', async () => {
+  it('maps 401 to #AUTH invalid token [EC-14]', async () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
@@ -294,9 +290,9 @@ describe('HTTP error mapping', () => {
       await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
     } catch (e) { caught = e; }
 
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('google: invalid Gmail token');
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
+    expect(getStatus(caught as RillValue).message).toBe('google: invalid Gmail token');
 
     vi.unstubAllGlobals();
   });
@@ -312,7 +308,7 @@ describe('HTTP error mapping', () => {
       await googleFetch('POST', BASE_URL, '/send', 'gmail', 'send', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
     } catch (e) { caught = e; }
 
-    expect((caught as RuntimeError).message).toBe('google: insufficient Gmail scopes for send');
+    expect(getStatus(caught).message).toBe('google: insufficient Gmail scopes for send');
 
     vi.unstubAllGlobals();
   });
@@ -331,7 +327,7 @@ describe('HTTP error mapping', () => {
       );
     } catch (e) { caught = e; }
 
-    expect((caught as RuntimeError).message).toBe("google: Gmail resource 'msg-abc' not found");
+    expect(getStatus(caught).message).toBe("google: Gmail resource 'msg-abc' not found");
 
     vi.unstubAllGlobals();
   });
@@ -347,7 +343,7 @@ describe('HTTP error mapping', () => {
       await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
     } catch (e) { caught = e; }
 
-    expect((caught as RuntimeError).message).toBe('google: rate limit exceeded; retry after delay');
+    expect(getStatus(caught).message).toBe('google: rate limit exceeded; retry after delay');
 
     vi.unstubAllGlobals();
   });
@@ -363,7 +359,7 @@ describe('HTTP error mapping', () => {
       await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
     } catch (e) { caught = e; }
 
-    expect((caught as RuntimeError).message).toBe('google: Gmail server error (500); temporarily unavailable');
+    expect(getStatus(caught).message).toBe('google: Gmail server error (500); temporarily unavailable');
 
     vi.unstubAllGlobals();
   });
@@ -374,7 +370,7 @@ describe('HTTP error mapping', () => {
 // ============================================================
 
 describe('network and abort error mapping', () => {
-  it('maps AbortError from fetch to request timeout [EC-19]', async () => {
+  it('maps AbortError from fetch to #TIMEOUT [EC-19]', async () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
@@ -387,9 +383,9 @@ describe('network and abort error mapping', () => {
       await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
     } catch (e) { caught = e; }
 
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('google: request timeout');
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('TIMEOUT');
+    expect(getStatus(caught as RillValue).message).toBe('google: request timeout');
 
     vi.unstubAllGlobals();
   });
@@ -405,7 +401,7 @@ describe('network and abort error mapping', () => {
       await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
     } catch (e) { caught = e; }
 
-    expect((caught as RuntimeError).message).toBe('google: gmail connection failed');
+    expect(getStatus(caught).message).toBe('google: gmail connection failed');
 
     vi.unstubAllGlobals();
   });

@@ -4,21 +4,17 @@
  * Capability: gmail.read
  * Scope: gmail.readonly
  */
-
-import { RuntimeError } from '@rcrsr/rill';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import { failInput } from '../../errors.js';
 import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
-
 const GMAIL_BASE = 'https://gmail.googleapis.com';
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-
 export interface GmailReadDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
 }
-
 /** Minimal shape for a Gmail API message part. */
 interface MessagePart {
   mimeType?: string;
@@ -26,7 +22,6 @@ interface MessagePart {
   parts?: MessagePart[];
   filename?: string;
 }
-
 /** Gmail API message payload shape. */
 interface GmailMessage {
   id?: string;
@@ -38,7 +33,6 @@ interface GmailMessage {
     mimeType?: string;
   };
 }
-
 /**
  * Decode base64url-encoded string to UTF-8 text.
  * Returns empty string on missing or malformed input.
@@ -51,18 +45,15 @@ function decodeBase64Url(encoded: string | undefined): string {
     return '';
   }
 }
-
 /**
  * Find the plain-text body from MIME parts, falling back to HTML then raw body.
  */
 function extractBody(part: MessagePart | undefined): string {
   if (!part) return '';
-
   // Prefer text/plain
   if (part.mimeType === 'text/plain') {
     return decodeBase64Url(part.body?.data);
   }
-
   // Recurse into sub-parts
   if (Array.isArray(part.parts)) {
     for (const subPart of part.parts) {
@@ -70,15 +61,12 @@ function extractBody(part: MessagePart | undefined): string {
       if (text) return text;
     }
   }
-
   // Fall back to raw body data for simple messages
   if (part.body?.data) {
     return decodeBase64Url(part.body.data);
   }
-
   return '';
 }
-
 /**
  * Collect attachment metadata from MIME parts.
  */
@@ -99,7 +87,6 @@ function extractAttachments(parts: MessagePart[] | undefined): Array<{ filename:
   }
   return results;
 }
-
 /**
  * Factory returning the gmail_read inner function.
  * AC-12: Returns rill primitive dict with headers/body/attachments.
@@ -116,11 +103,9 @@ export function makeGmailRead(deps: GmailReadDeps): (
   ): Promise<RillValue> => {
     const messageId = args['messageId'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: messageId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: messageId must be a non-empty string');
     }
-
     const path = `/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`;
-
     const response = await googleFetch(
       'GET',
       GMAIL_BASE,
@@ -136,9 +121,7 @@ export function makeGmailRead(deps: GmailReadDeps): (
       undefined,
       messageId
     );
-
     const msg = response as GmailMessage | null;
-
     // Extract well-known headers
     const headerList = msg?.payload?.headers ?? [];
     const getHeader = (name: string): string => {
@@ -147,21 +130,17 @@ export function makeGmailRead(deps: GmailReadDeps): (
       );
       return header?.value ?? '';
     };
-
     const headers = {
       from: getHeader('From'),
       to: getHeader('To'),
       subject: getHeader('Subject'),
       date: getHeader('Date'),
     };
-
     // Decode body from MIME payload
     const payload = msg?.payload;
     const body = extractBody(payload as MessagePart | undefined);
-
     // Collect attachment metadata
     const attachments = extractAttachments(payload?.parts);
-
     return {
       id: msg?.id ?? messageId,
       threadId: msg?.threadId ?? '',

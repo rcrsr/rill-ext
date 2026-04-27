@@ -3,7 +3,7 @@
  * Graph returns HTTP 202 with no body; returns SendConfirmationDict.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
 import type { ResolvedConfig } from '../factory.js';
@@ -13,7 +13,7 @@ import type { ResolvedConfig } from '../factory.js';
  * `to` accepts a single string (auto-wrapped) or a list of strings (AC-37).
  * Returns SendConfirmationDict { sent: true, to, subject }.
  *
- * @throws RuntimeError (RILL-R004) when to, subject, or body is empty
+ * @throws an invalid RillValue (#INVALID_INPUT) when to, subject, or body is empty
  */
 export async function send(
   args: Record<string, RillValue>,
@@ -33,17 +33,17 @@ export async function send(
   }
 
   if (toList.length === 0) {
-    throw new RuntimeError('RILL-R004', 'outlook: to is required');
+    failInput(ctx, 'missing_to', 'outlook: to is required');
   }
 
   const subject = (args['subject'] as string | undefined) ?? '';
   if (subject.trim() === '') {
-    throw new RuntimeError('RILL-R004', 'outlook: subject is required');
+    failInput(ctx, 'missing_subject', 'outlook: subject is required');
   }
 
   const body = (args['body'] as string | undefined) ?? '';
   if (body.trim() === '') {
-    throw new RuntimeError('RILL-R004', 'outlook: body is required');
+    failInput(ctx, 'missing_body', 'outlook: body is required');
   }
 
   const toRecipients = toList.map((address) => ({

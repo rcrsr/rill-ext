@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, emitExtensionEvent, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, createRuntimeContext, emitExtensionEvent, type ApplicationCallable, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import { makeFactoryCtx } from './_helpers.js';
 import { createGoogleWorkspaceExtension } from '../src/factory.js';
 
 // ============================================================
@@ -141,23 +142,17 @@ describe('AC-4: capability gating', () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_events').fn(
+      const caught = (await getCallable(ext, 'calendar_events').fn(
         { startDate: '2026-04-01', endDate: '2026-04-30' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('calendar.read');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('calendar.read');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -165,20 +160,14 @@ describe('AC-4: capability gating', () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_today').fn({}, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('calendar.read');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      const caught = (await getCallable(ext, 'calendar_today').fn({}, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('calendar.read');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -186,23 +175,17 @@ describe('AC-4: capability gating', () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_create_event').fn(
+      const caught = (await getCallable(ext, 'calendar_create_event').fn(
         { title: 'Meeting', startTime: START_Z, endTime: END_Z },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('calendar.create');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('calendar.create');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -210,23 +193,17 @@ describe('AC-4: capability gating', () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_free_busy').fn(
+      const caught = (await getCallable(ext, 'calendar_free_busy').fn(
         { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('calendar.freeBusy');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('calendar.freeBusy');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
@@ -240,7 +217,7 @@ describe('BC-3: start equals end returns empty without fetch', () => {
     const mockFetch = makeFetchOk({ items: [SAMPLE_EVENT_ITEM] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_events').fn(
@@ -256,7 +233,7 @@ describe('BC-3: start equals end returns empty without fetch', () => {
     const mockFetch = makeFetchOk({ items: [SAMPLE_EVENT_ITEM] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_events').fn(
@@ -278,44 +255,32 @@ describe('BC-4: empty emails list rejected before fetch', () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_free_busy').fn(
+      const caught = (await getCallable(ext, 'calendar_free_busy').fn(
         { emails: [], startTime: START_Z, endTime: END_Z },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect(mockFetch).not.toHaveBeenCalled();
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('non-array emails → RILL-R004 before fetch', async () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_free_busy').fn(
+      const caught = (await getCallable(ext, 'calendar_free_busy').fn(
         { emails: 'a@x.com', startTime: START_Z, endTime: END_Z },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect(mockFetch).not.toHaveBeenCalled();
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
@@ -328,22 +293,16 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_events').fn(
+      const caught = (await getCallable(ext, 'calendar_events').fn(
         { startDate: '2026-04-01', endDate: '2026-04-30', options: { calendarId: 'other-cal' } },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain("calendar 'other-cal' not in allowed set");
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain("calendar 'other-cal' not in allowed set");
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -351,7 +310,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_events').fn(
@@ -367,7 +326,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // No calendarId in options — defaults to 'primary'
@@ -384,22 +343,16 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     const mockFetch = makeFetchOk({ items: [] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_today').fn(
+      const caught = (await getCallable(ext, 'calendar_today').fn(
         { options: { calendarId: 'other-cal' } },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain("calendar 'other-cal' not in allowed set");
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain("calendar 'other-cal' not in allowed set");
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -407,12 +360,10 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALLOWED_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_create_event').fn(
+      const caught = (await getCallable(ext, 'calendar_create_event').fn(
         {
           title: 'Meeting',
           startTime: START_Z,
@@ -420,14 +371,10 @@ describe('EC-11: allowedCalendarIds restriction', () => {
           options: { calendarId: 'other-cal' },
         },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain("calendar 'other-cal' not in allowed set");
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain("calendar 'other-cal' not in allowed set");
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
@@ -441,22 +388,16 @@ describe('EC-12/EC-13: denyAllDay blocks all-day events', () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(DENY_ALLDAY_CONFIG);
+    const ext = createGoogleWorkspaceExtension(DENY_ALLDAY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_create_event').fn(
+      const caught = (await getCallable(ext, 'calendar_create_event').fn(
         { title: 'Holiday', startTime: START_Z, endTime: END_Z, options: { allDay: true } },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('google: all-day events not permitted');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toBe('google: all-day events not permitted');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
@@ -470,22 +411,16 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_create_event').fn(
+      const caught = (await getCallable(ext, 'calendar_create_event').fn(
         { title: 'Meeting', startTime: START_NAIVE, endTime: END_Z },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('must be ISO 8601 with timezone');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+  expect(getStatus(caught).message).toContain('must be ISO 8601 with timezone');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -493,22 +428,16 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_create_event').fn(
+      const caught = (await getCallable(ext, 'calendar_create_event').fn(
         { title: 'Meeting', startTime: START_Z, endTime: END_NAIVE },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('must be ISO 8601 with timezone');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+  expect(getStatus(caught).message).toContain('must be ISO 8601 with timezone');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -516,7 +445,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const mockFetch = makeFetchOk({ id: 'evt-1' });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_create_event').fn(
@@ -532,7 +461,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const mockFetch = makeFetchOk({ id: 'evt-2' });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_create_event').fn(
@@ -548,22 +477,16 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_free_busy').fn(
+      const caught = (await getCallable(ext, 'calendar_free_busy').fn(
         { emails: ['a@x.com'], startTime: START_NAIVE, endTime: END_Z },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('must be ISO 8601 with timezone');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+  expect(getStatus(caught).message).toContain('must be ISO 8601 with timezone');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -571,22 +494,16 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const mockFetch = makeFetchOk({ calendars: {} });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_free_busy').fn(
+      const caught = (await getCallable(ext, 'calendar_free_busy').fn(
         { emails: ['a@x.com'], startTime: START_Z, endTime: END_NAIVE },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('must be ISO 8601 with timezone');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+  expect(getStatus(caught).message).toContain('must be ISO 8601 with timezone');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -594,7 +511,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const mockFetch = makeFetchOk({ items: [SAMPLE_EVENT_ITEM] });
     vi.stubGlobal('fetch', mockFetch);
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_events').fn(
@@ -618,7 +535,7 @@ describe('success cases', () => {
       const mockFetch = makeFetchOk({ items: [SAMPLE_EVENT_ITEM] });
       vi.stubGlobal('fetch', mockFetch);
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_events').fn(
@@ -643,7 +560,7 @@ describe('success cases', () => {
     it('emits google:calendar:events event with duration [AC-13]', async () => {
       vi.stubGlobal('fetch', makeFetchOk({ items: [] }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_events').fn(
@@ -662,7 +579,7 @@ describe('success cases', () => {
       const mockFetch = makeFetchOk({ items: [] });
       vi.stubGlobal('fetch', mockFetch);
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_events').fn(
@@ -679,7 +596,7 @@ describe('success cases', () => {
     it('returns empty events list when API returns no items', async () => {
       vi.stubGlobal('fetch', makeFetchOk({ items: [] }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_events').fn(
@@ -695,7 +612,7 @@ describe('success cases', () => {
     it('returns { events: [...] } from API response [AC-12]', async () => {
       vi.stubGlobal('fetch', makeFetchOk({ items: [SAMPLE_EVENT_ITEM] }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_today').fn({}, ctx) as { events: unknown[] };
@@ -707,7 +624,7 @@ describe('success cases', () => {
     it('emits google:calendar:today event with duration [AC-13]', async () => {
       vi.stubGlobal('fetch', makeFetchOk({ items: [] }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_today').fn({}, ctx);
@@ -722,7 +639,7 @@ describe('success cases', () => {
       const mockFetch = makeFetchOk({ items: [] });
       vi.stubGlobal('fetch', mockFetch);
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_today').fn({}, ctx);
@@ -737,7 +654,7 @@ describe('success cases', () => {
     it('returns event ID string from API response [AC-12]', async () => {
       vi.stubGlobal('fetch', makeFetchOk({ id: 'evt-1' }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_create_event').fn(
@@ -752,7 +669,7 @@ describe('success cases', () => {
     it('emits google:calendar:create_event event with duration [AC-13]', async () => {
       vi.stubGlobal('fetch', makeFetchOk({ id: 'evt-1' }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_create_event').fn(
@@ -770,7 +687,7 @@ describe('success cases', () => {
       const mockFetch = makeFetchOk({ id: 'evt-1' });
       vi.stubGlobal('fetch', mockFetch);
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_create_event').fn(
@@ -787,7 +704,7 @@ describe('success cases', () => {
       const mockFetch = makeFetchOk({ id: 'evt-1' });
       vi.stubGlobal('fetch', mockFetch);
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_create_event').fn(
@@ -803,7 +720,7 @@ describe('success cases', () => {
     it('returns empty string when API returns no id', async () => {
       vi.stubGlobal('fetch', makeFetchOk({}));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_create_event').fn(
@@ -827,7 +744,7 @@ describe('success cases', () => {
         },
       }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_free_busy').fn(
@@ -845,7 +762,7 @@ describe('success cases', () => {
     it('emits google:calendar:free_busy event with duration [AC-13]', async () => {
       vi.stubGlobal('fetch', makeFetchOk({ calendars: { 'a@x.com': { busy: [] } } }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_free_busy').fn(
@@ -863,7 +780,7 @@ describe('success cases', () => {
       const mockFetch = makeFetchOk({ calendars: {} });
       vi.stubGlobal('fetch', mockFetch);
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_free_busy').fn(
@@ -879,7 +796,7 @@ describe('success cases', () => {
     it('returns empty busy list when calendar has no busy slots', async () => {
       vi.stubGlobal('fetch', makeFetchOk({ calendars: { 'a@x.com': { busy: [] } } }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_free_busy').fn(
@@ -898,7 +815,7 @@ describe('success cases', () => {
         },
       }));
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_free_busy').fn(
@@ -920,7 +837,7 @@ describe('AC-13: calendar events include subsystem field', () => {
   it('calendar_events emits subsystem extension:google-workspace', async () => {
     vi.stubGlobal('fetch', makeFetchOk({ items: [] }));
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_events').fn(
@@ -938,7 +855,7 @@ describe('AC-13: calendar events include subsystem field', () => {
   it('calendar_create_event emits subsystem extension:google-workspace', async () => {
     vi.stubGlobal('fetch', makeFetchOk({ id: 'evt-1' }));
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_create_event').fn(
@@ -953,7 +870,7 @@ describe('AC-13: calendar events include subsystem field', () => {
   it('calendar_free_busy emits subsystem extension:google-workspace', async () => {
     vi.stubGlobal('fetch', makeFetchOk({ calendars: { 'a@x.com': { busy: [] } } }));
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_free_busy').fn(
@@ -968,7 +885,7 @@ describe('AC-13: calendar events include subsystem field', () => {
   it('calendar_today emits subsystem extension:google-workspace', async () => {
     vi.stubGlobal('fetch', makeFetchOk({ items: [] }));
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_today').fn({}, ctx);
@@ -998,7 +915,7 @@ describe('AC-11: calendar callables pass AbortSignal to fetch', () => {
       })
     );
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_today').fn({}, ctx);
@@ -1023,7 +940,7 @@ describe('AC-11: calendar callables pass AbortSignal to fetch', () => {
       })
     );
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_free_busy').fn(
@@ -1044,82 +961,58 @@ describe('HTTP error mapping for calendar operations', () => {
   it('401 → "google: invalid Calendar token" [EC-14]', async () => {
     vi.stubGlobal('fetch', makeFetchError(401));
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_events').fn(
+      const caught = (await getCallable(ext, 'calendar_events').fn(
         { startDate: '2026-04-01', endDate: '2026-04-30' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('google: invalid Calendar token');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('AUTH');
+  expect(getStatus(caught).message).toBe('google: invalid Calendar token');
   });
 
   it('403 → "google: insufficient Calendar scopes for <op>" [EC-15]', async () => {
     vi.stubGlobal('fetch', makeFetchError(403));
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_create_event').fn(
+      const caught = (await getCallable(ext, 'calendar_create_event').fn(
         { title: 'Meeting', startTime: START_Z, endTime: END_Z },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('insufficient Calendar scopes');
-    expect((caught as RuntimeError).message).toContain('create_event');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('insufficient Calendar scopes');
+    expect(getStatus(caught).message).toContain('create_event');
   });
 
   it('429 → rate limit error [EC-17]', async () => {
     vi.stubGlobal('fetch', makeFetchError(429));
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_today').fn({}, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('google: rate limit exceeded; retry after delay');
+      const caught = (await getCallable(ext, 'calendar_today').fn({}, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('RATE_LIMIT');
+  expect(getStatus(caught).message).toBe('google: rate limit exceeded; retry after delay');
   });
 
   it('503 → "google: Calendar server error (503); temporarily unavailable" [EC-18]', async () => {
     vi.stubGlobal('fetch', makeFetchError(503));
 
-    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'calendar_free_busy').fn(
+      const caught = (await getCallable(ext, 'calendar_free_busy').fn(
         { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('google: Calendar server error (503); temporarily unavailable');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('UNAVAILABLE');
+  expect(getStatus(caught).message).toBe('google: Calendar server error (503); temporarily unavailable');
   });
 });

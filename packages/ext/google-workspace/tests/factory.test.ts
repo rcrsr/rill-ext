@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, createRuntimeContext, type ApplicationCallable, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import { makeFactoryCtx } from './_helpers.js';
 import { createGoogleWorkspaceExtension } from '../src/factory.js';
 
 // ============================================================
@@ -119,14 +120,14 @@ const EXPECTED_CALLABLE_NAMES = [
 describe('createGoogleWorkspaceExtension', () => {
   describe('AC-1: returns ExtensionFactoryResult with all 17 callables and dispose', () => {
     it('returns an object with value and dispose', () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       expect(ext).toHaveProperty('value');
       expect(ext).toHaveProperty('dispose');
       expect(typeof ext.dispose).toBe('function');
     });
 
     it('value contains all 17 callable names', () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       const value = ext.value as Record<string, unknown>;
       for (const name of EXPECTED_CALLABLE_NAMES) {
         expect(value).toHaveProperty(name);
@@ -134,7 +135,7 @@ describe('createGoogleWorkspaceExtension', () => {
     });
 
     it('each callable has a fn function and params array', () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       const value = ext.value as Record<string, ApplicationCallable>;
       for (const name of EXPECTED_CALLABLE_NAMES) {
         const callable = value[name]!;
@@ -144,7 +145,7 @@ describe('createGoogleWorkspaceExtension', () => {
     });
 
     it('value contains exactly 17 keys', () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       const keys = Object.keys(ext.value as Record<string, unknown>);
       expect(keys).toHaveLength(17);
     });
@@ -156,7 +157,7 @@ describe('createGoogleWorkspaceExtension', () => {
 
   describe('AC-3: each callable params array contains valid RillParam objects', () => {
     it('every param entry has name, type, defaultValue, and annotations fields', () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       const value = ext.value as Record<string, ApplicationCallable>;
       for (const name of EXPECTED_CALLABLE_NAMES) {
         const callable = value[name]!;
@@ -177,7 +178,7 @@ describe('createGoogleWorkspaceExtension', () => {
     });
 
     it('gmail_search first param is named "query" with string type', () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       const callable = (ext.value as Record<string, ApplicationCallable>)['gmail_search']!;
       const firstParam = callable.params[0]!;
 
@@ -186,7 +187,7 @@ describe('createGoogleWorkspaceExtension', () => {
     });
 
     it('calendar_free_busy first param is named "emails" with list type', () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       const callable = (ext.value as Record<string, ApplicationCallable>)['calendar_free_busy']!;
       const firstParam = callable.params[0]!;
 
@@ -201,52 +202,37 @@ describe('createGoogleWorkspaceExtension', () => {
 
   describe('AC-4: capability gate throws before fetch', () => {
     it('throws RILL-R004 when gmail.send is disabled', async () => {
-      const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      let caught: unknown;
-      try {
-        await getCallable(ext, 'gmail_send').fn(
+        const caught = (await getCallable(ext, 'gmail_send').fn(
           { to: 'a@b.com', subject: 'Hi', body: 'Hello' },
           ctx
-        );
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toContain('gmail.send');
-      expect((caught as RuntimeError).message).toContain('not enabled');
+        )) as RillValue;
+      expect(isInvalid(caught)).toBe(true);
+      expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('gmail.send');
+      expect(getStatus(caught).message).toContain('not enabled');
     });
 
     it('throws RILL-R004 when drive.list is disabled', async () => {
-      const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      let caught: unknown;
-      try {
-        await getCallable(ext, 'drive_list').fn({}, ctx);
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toContain('drive.list');
+        const caught = (await getCallable(ext, 'drive_list').fn({}, ctx)) as RillValue;
+      expect(isInvalid(caught)).toBe(true);
+      expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('drive.list');
     });
 
     it('throws RILL-R004 when calendar.create is disabled', async () => {
-      const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      let caught: unknown;
-      try {
-        await getCallable(ext, 'calendar_create_event').fn(
+        const caught = (await getCallable(ext, 'calendar_create_event').fn(
           { title: 'Meeting', startTime: '09:00', endTime: '10:00' },
           ctx
-        );
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toContain('calendar.create');
+        )) as RillValue;
+      expect(isInvalid(caught)).toBe(true);
+      expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('calendar.create');
     });
   });
 
@@ -256,33 +242,24 @@ describe('createGoogleWorkspaceExtension', () => {
 
   describe('AC-6: call after dispose throws "operation cancelled"', () => {
     it('throws RILL-R004 "google: operation cancelled" when disposed', async () => {
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose();
-      let caught: unknown;
-      try {
-        await getCallable(ext, 'gmail_search').fn({ query: 'hello' }, ctx);
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('google: operation cancelled');
+      const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'hello' }, ctx)) as RillValue;
+      expect(isInvalid(caught)).toBe(true);
+      expect(getStatus(caught).code.name).toBe('DISPOSED');
+      expect(getStatus(caught).message).toBe('google: operation cancelled');
     });
 
-    it('all 17 callables throw after dispose', async () => {
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+    it('all 17 callables emit #DISPOSED after dispose', async () => {
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose();
       for (const name of EXPECTED_CALLABLE_NAMES) {
-        let caught: unknown;
-        try {
-          await getCallable(ext, name).fn({}, ctx);
-        } catch (e) {
-          caught = e;
-        }
-        expect(caught).toBeInstanceOf(RuntimeError);
-        expect((caught as RuntimeError).message).toBe('google: operation cancelled');
+        const caught = (await getCallable(ext, name).fn({}, ctx)) as RillValue;
+        expect(isInvalid(caught)).toBe(true);
+        expect(getStatus(caught).code.name).toBe('DISPOSED');
+        expect(getStatus(caught).message).toBe('google: operation cancelled');
       }
     });
   });
@@ -293,14 +270,14 @@ describe('createGoogleWorkspaceExtension', () => {
 
   describe('AC-7: dispose is idempotent', () => {
     it('second dispose call returns without throwing', async () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       await ext.dispose();
       // Second call must not throw
       await expect(ext.dispose()).resolves.toBeUndefined();
     });
 
     it('third dispose call also succeeds', async () => {
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       await ext.dispose();
       await ext.dispose();
       await expect(ext.dispose()).resolves.toBeUndefined();
@@ -317,38 +294,30 @@ describe('createGoogleWorkspaceExtension', () => {
       // BC-5 is fully testable via the disposal guard: dispose() sets
       // isDisposed=true and aborts all tracked controllers before returning.
       // Any call arriving after dispose() hits the guard at the top of wrap().
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await ext.dispose();
 
-      let caught: unknown;
-      try {
-        await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx);
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).message).toBe('google: operation cancelled');
+      const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx)) as RillValue;
+      expect(isInvalid(caught)).toBe(true);
+      expect(getStatus(caught).code.name).toBe('DISPOSED');
+      expect(getStatus(caught).message).toBe('google: operation cancelled');
     });
 
     it('dispose() clears the in-flight controller set (no leak)', async () => {
       // After dispose(), calling any host function should still get
       // "operation cancelled" — confirming the controller set was cleared
       // and the disposed flag is set.
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose();
 
       for (const name of EXPECTED_CALLABLE_NAMES) {
-        let caught: unknown;
-        try {
-          await getCallable(ext, name).fn({}, ctx);
-        } catch (e) {
-          caught = e;
-        }
-        expect(caught).toBeInstanceOf(RuntimeError);
-        expect((caught as RuntimeError).message).toBe('google: operation cancelled');
+        const caught = (await getCallable(ext, name).fn({}, ctx)) as RillValue;
+        expect(isInvalid(caught)).toBe(true);
+        expect(getStatus(caught).code.name).toBe('DISPOSED');
+        expect(getStatus(caught).message).toBe('google: operation cancelled');
       }
     });
   });
@@ -369,7 +338,7 @@ describe('createGoogleWorkspaceExtension', () => {
       // Build a config that overrides a function body via the wrap path:
       // we use ALL_CAPS_CONFIG so no capability gate fires, then rely on
       // the promise-suspend technique.
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       // We can't easily inject a custom body into an already-wrapped function
@@ -418,14 +387,10 @@ describe('createGoogleWorkspaceExtension', () => {
       await ext.dispose();
 
       let caught: unknown;
-      try {
-        await getCallable(ext, 'gmail_read').fn({ messageId: 'abc' }, ctx);
-      } catch (e) {
-        caught = e;
-      }
-
-      expect(caught).toBeInstanceOf(RuntimeError);
-      const msg = (caught as RuntimeError).message;
+      const result = (await getCallable(ext, 'gmail_read').fn({ messageId: 'abc' }, ctx)) as RillValue;
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('DISPOSED');
+      const msg = getStatus(result).message;
       // EC-20 path: must be "operation cancelled", NOT "request timeout"
       expect(msg).toBe('google: operation cancelled');
       expect(msg).not.toBe('google: request timeout');
@@ -451,15 +416,15 @@ describe('createGoogleWorkspaceExtension', () => {
       //
       // mapFetchError alone returns "request timeout":
       const { mapFetchError: mfe } = await import('../src/errors.js');
-      const timeoutResult = mfe(abortErr, 'gmail');
-      expect(timeoutResult.message).toBe('google: request timeout');
+      const timeoutResult = mfe(createRuntimeContext(), abortErr, 'gmail') as RillValue;
+      expect(getStatus(timeoutResult).message).toBe('google: request timeout');
 
-      // The wrap catch with isDisposed=true must short-circuit and throw
+      // The wrap catch with isDisposed=true must short-circuit and emit
       // "operation cancelled" instead — covered by the AC-6/BC-5 tests above
       // plus the dispose-then-call pattern which exercises the top-level guard.
       // The critical regression guard: ensure mapFetchError alone does NOT
       // produce "operation cancelled" for an AbortError.
-      expect(timeoutResult.message).not.toBe('google: operation cancelled');
+      expect(getStatus(timeoutResult).message).not.toBe('google: operation cancelled');
     });
   });
 
@@ -491,7 +456,7 @@ describe('createGoogleWorkspaceExtension', () => {
         });
       }) as unknown as typeof fetch;
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       // Act: start a call (suspends at the hanging fetch) but do not await
@@ -504,17 +469,11 @@ describe('createGoogleWorkspaceExtension', () => {
       // Dispose while the call is in-flight: sets isDisposed=true and aborts controllers
       await ext.dispose();
 
-      // Assert: the in-flight call must reject with RILL-R004
-      let caught: unknown;
-      try {
-        await inflight;
-      } catch (e) {
-        caught = e;
-      }
-
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('google: operation cancelled');
+      // Assert: the in-flight call resolves to an invalid #DISPOSED RillValue
+      const result = (await inflight) as RillValue;
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('DISPOSED');
+      expect(getStatus(result).message).toBe('google: operation cancelled');
     });
 
     it('multiple concurrent in-flight calls all reject with RILL-R004 on dispose (BC-5)', async () => {
@@ -534,7 +493,7 @@ describe('createGoogleWorkspaceExtension', () => {
         });
       }) as unknown as typeof fetch;
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       // Start 3 concurrent calls without awaiting
@@ -551,13 +510,14 @@ describe('createGoogleWorkspaceExtension', () => {
       // Dispose aborts all three in-flight controllers
       await ext.dispose();
 
-      // All three must reject with RILL-R004 (aborted by dispose)
+      // All three resolve to invalid #DISPOSED RillValues (aborted by dispose)
       const results = await Promise.allSettled(calls);
       for (const result of results) {
-        expect(result.status).toBe('rejected');
-        if (result.status === 'rejected') {
-          expect(result.reason).toBeInstanceOf(RuntimeError);
-          expect((result.reason as RuntimeError).errorId).toBe('RILL-R004');
+        expect(result.status).toBe('fulfilled');
+        if (result.status === 'fulfilled') {
+          const value = result.value as RillValue;
+          expect(isInvalid(value)).toBe(true);
+          expect(getStatus(value).code.name).toBe('DISPOSED');
         }
       }
     });
@@ -582,7 +542,7 @@ describe('createGoogleWorkspaceExtension', () => {
         });
       }) as unknown as typeof fetch;
 
-      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG);
+      const ext = createGoogleWorkspaceExtension(ALL_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       // Start in-flight call
@@ -592,25 +552,16 @@ describe('createGoogleWorkspaceExtension', () => {
       await ext.dispose();
 
       // a) In-flight call: dispose sets isDisposed=true and aborts → "operation cancelled"
-      let inflightErr: unknown;
-      try {
-        await inflight;
-      } catch (e) {
-        inflightErr = e;
-      }
-      expect(inflightErr).toBeInstanceOf(RuntimeError);
-      expect((inflightErr as RuntimeError).errorId).toBe('RILL-R004');
-      expect((inflightErr as RuntimeError).message).toBe('google: operation cancelled');
+      const inflightErr = (await inflight) as RillValue;
+      expect(isInvalid(inflightErr)).toBe(true);
+      expect(getStatus(inflightErr).code.name).toBe('DISPOSED');
+      expect(getStatus(inflightErr).message).toBe('google: operation cancelled');
 
       // b) New call after dispose: disposal guard fires → "operation cancelled"
-      let newCallErr: unknown;
-      try {
-        await getCallable(ext, 'gmail_search').fn({ query: 'post-dispose' }, ctx);
-      } catch (e) {
-        newCallErr = e;
-      }
-      expect(newCallErr).toBeInstanceOf(RuntimeError);
-      expect((newCallErr as RuntimeError).message).toBe('google: operation cancelled');
+      const newCallErr = (await getCallable(ext, 'gmail_search').fn({ query: 'post-dispose' }, ctx)) as RillValue;
+      expect(isInvalid(newCallErr)).toBe(true);
+      expect(getStatus(newCallErr).code.name).toBe('DISPOSED');
+      expect(getStatus(newCallErr).message).toBe('google: operation cancelled');
     });
   });
 
@@ -648,7 +599,7 @@ describe('createGoogleWorkspaceExtension', () => {
         );
       }) as unknown as typeof fetch;
 
-      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+      const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       // A successful call before dispose
@@ -665,15 +616,11 @@ describe('createGoogleWorkspaceExtension', () => {
       // dispose() must complete without throwing
       await expect(ext.dispose()).resolves.toBeUndefined();
 
-      // Post-dispose: cache is cleared and all calls throw "operation cancelled" (not a cache hit)
-      let caught: unknown;
-      try {
-        await getCallable(ext, 'gmail_search').fn({ query: 'after-dispose' }, ctx);
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).message).toBe('google: operation cancelled');
+      // Post-dispose: cache is cleared and all calls emit #DISPOSED (not a cache hit)
+      const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'after-dispose' }, ctx)) as RillValue;
+      expect(isInvalid(caught)).toBe(true);
+      expect(getStatus(caught).code.name).toBe('DISPOSED');
+      expect(getStatus(caught).message).toBe('google: operation cancelled');
 
       // fetch was NOT called for the post-dispose attempt (disposal guard fires first)
       // The mock call count should be exactly 1 (only the pre-dispose call)
@@ -686,21 +633,19 @@ describe('createGoogleWorkspaceExtension', () => {
   // ============================================================
 
   describe('factory validation', () => {
-    it('throws RILL-R004 when auth token is empty', () => {
+    it('throws RILL-R001 when auth token is empty', () => {
       let caught: unknown;
       try {
         createGoogleWorkspaceExtension({
           auth: { type: 'bearer', token: '' },
-        });
-      } catch (e) {
-        caught = e;
-      }
+        }, makeFactoryCtx());
+      } catch (e) { caught = e; }
       expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
     });
 
     it('succeeds with valid bearer config', () => {
-      expect(() => createGoogleWorkspaceExtension(BEARER_CONFIG)).not.toThrow();
+      expect(() => createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx())).not.toThrow();
     });
   });
 });

@@ -1,94 +1,151 @@
 /**
  * Error mapping utilities for Outlook extension.
- * Converts Microsoft Graph API HTTP errors and network failures
- * to RuntimeError with spec-defined messages.
+ *
+ * Converts Microsoft Graph HTTP errors and fetch failures into invalid
+ * RillValues via `ctx.invalidate`, using rill core's pre-registered
+ * generic atoms (`#TIMEOUT`, `#AUTH`, `#FORBIDDEN`, `#NOT_FOUND`,
+ * `#RATE_LIMIT`, `#UNAVAILABLE`).
+ *
+ * Provider-specific failure shape: (generic atom, meta.provider='outlook',
+ * meta.raw.kind, meta.raw.status). Spec-defined message strings (EC-12)
+ * are preserved on `meta.raw.message` so host scripts can `guard
+ * #UNAVAILABLE && raw.kind == 'server_error'`.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import {
+  RuntimeHaltSignal,
+  getStatus,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+
+const PROVIDER = 'outlook';
 
 /**
- * Map a Graph API HTTP error response to RuntimeError.
- * Applies spec-defined messages for each status code.
- *
- * @param status - HTTP response status code
- * @param operation - Operation name for 403 permission message (e.g., 'send', 'read')
- * @param id - Resource identifier for 404 message (e.g., message ID)
- * @returns RuntimeError (RILL-R004) with spec-defined message [EC-12]
+ * Build and throw an invalid RillValue carrying `#INVALID_INPUT`.
+ * Convenience for in-function argument validation; the wrap()'s catch
+ * passes the invalid value through unchanged.
  */
-export function mapGraphError(
-  status: number,
-  operation: string,
-  id?: string | undefined
-): RuntimeError {
-  // 401: Authentication failed
-  if (status === 401) {
-    return new RuntimeError(
-      'RILL-R004',
-      'outlook: authentication failed (401)'
-    );
-  }
-
-  // 403: Insufficient permissions for operation
-  if (status === 403) {
-    return new RuntimeError(
-      'RILL-R004',
-      `outlook: insufficient permissions for ${operation}`
-    );
-  }
-
-  // 404: Resource not found
-  if (status === 404) {
-    const identifier = id ?? operation;
-    return new RuntimeError(
-      'RILL-R004',
-      `outlook: message '${identifier}' not found`
-    );
-  }
-
-  // 429: Rate limit exceeded
-  if (status === 429) {
-    return new RuntimeError('RILL-R004', 'outlook: rate limit exceeded');
-  }
-
-  // 5xx: Server error
-  if (status >= 500 && status <= 599) {
-    return new RuntimeError(
-      'RILL-R004',
-      `outlook: server error (${status})`
-    );
-  }
-
-  // Other HTTP errors: generic message
-  return new RuntimeError(
-    'RILL-R004',
-    `outlook: request failed (${status})`
-  );
+export function failInput(
+  ctx: RuntimeContext,
+  kind: string,
+  message: string,
+): never {
+  throw ctx.invalidate(new Error(message), {
+    code: 'INVALID_INPUT',
+    provider: PROVIDER,
+    raw: { kind, message },
+  }) as unknown as RillValue;
 }
 
 /**
- * Map a fetch network error to RuntimeError.
- * AbortError maps to request timeout; TypeError maps to connection failed.
- *
- * @param error - Error caught from fetch operation
- * @returns RuntimeError (RILL-R004) with spec-defined message [EC-12]
+ * Map a Graph API HTTP error response to an invalid RillValue.
+ * The wrapper passes invalid throws through unchanged.
  */
-export function mapFetchError(error: unknown): RuntimeError {
-  // AbortError: request timed out or was cancelled
+export function mapGraphError(
+  ctx: RuntimeContext,
+  status: number,
+  operation: string,
+  id?: string | undefined,
+): RillValue {
+  if (status === 401) {
+    const message = 'outlook: authentication failed (401)';
+    return ctx.invalidate(new Error(message), {
+      code: 'AUTH',
+      provider: PROVIDER,
+      raw: { kind: 'authentication_failed', status, message },
+    });
+  }
+
+  if (status === 403) {
+    const message = `outlook: insufficient permissions for ${operation}`;
+    return ctx.invalidate(new Error(message), {
+      code: 'FORBIDDEN',
+      provider: PROVIDER,
+      raw: { kind: 'insufficient_permissions', status, operation, message },
+    });
+  }
+
+  if (status === 404) {
+    const identifier = id ?? operation;
+    const message = `outlook: message '${identifier}' not found`;
+    return ctx.invalidate(new Error(message), {
+      code: 'NOT_FOUND',
+      provider: PROVIDER,
+      raw: { kind: 'not_found', status, id: identifier, message },
+    });
+  }
+
+  if (status === 429) {
+    const message = 'outlook: rate limit exceeded';
+    return ctx.invalidate(new Error(message), {
+      code: 'RATE_LIMIT',
+      provider: PROVIDER,
+      raw: { kind: 'rate_limit_exceeded', status, message },
+    });
+  }
+
+  if (status >= 500 && status <= 599) {
+    const message = `outlook: server error (${status})`;
+    return ctx.invalidate(new Error(message), {
+      code: 'UNAVAILABLE',
+      provider: PROVIDER,
+      raw: { kind: 'server_error', status, message },
+    });
+  }
+
+  const message = `outlook: request failed (${status})`;
+  return ctx.invalidate(new Error(message), {
+    code: 'UNAVAILABLE',
+    provider: PROVIDER,
+    raw: { kind: 'http_error', status, message },
+  });
+}
+
+/**
+ * Map a fetch network error to an invalid RillValue.
+ *
+ * - `RuntimeHaltSignal` with `#TIMEOUT` atom → request cancelled by host.
+ * - `AbortError` (DOMException from undici) → request timed out.
+ * - `TypeError` → DNS / connection failure.
+ * - Anything else → generic unavailability.
+ */
+export function mapFetchError(ctx: RuntimeContext, error: unknown): RillValue {
+  if (
+    error instanceof RuntimeHaltSignal &&
+    getStatus(error.value).code.name === 'TIMEOUT'
+  ) {
+    const message = 'outlook: request cancelled';
+    return ctx.invalidate(error, {
+      code: 'TIMEOUT',
+      provider: PROVIDER,
+      raw: { kind: 'request_cancelled', message },
+    });
+  }
+
   if (error instanceof Error && error.name === 'AbortError') {
-    return new RuntimeError('RILL-R004', 'outlook: request timeout');
+    const message = 'outlook: request timeout';
+    return ctx.invalidate(error, {
+      code: 'TIMEOUT',
+      provider: PROVIDER,
+      raw: { kind: 'request_timeout', message },
+    });
   }
 
-  // TypeError: network failure (DNS, connection refused, etc.)
   if (error instanceof TypeError) {
-    return new RuntimeError('RILL-R004', 'outlook: connection failed');
+    const message = 'outlook: connection failed';
+    return ctx.invalidate(error, {
+      code: 'UNAVAILABLE',
+      provider: PROVIDER,
+      raw: { kind: 'network_error', message },
+    });
   }
 
-  // Already a RuntimeError: pass through
-  if (error instanceof RuntimeError) {
-    return error;
-  }
-
-  // Unknown error: use message if available
-  const message = error instanceof Error ? error.message : String(error);
-  return new RuntimeError('RILL-R004', `outlook: ${message}`);
+  const detail = error instanceof Error ? error.message : String(error);
+  const message = `outlook: ${detail}`;
+  return ctx.invalidate(error, {
+    code: 'UNAVAILABLE',
+    provider: PROVIDER,
+    raw: { kind: 'unknown_error', message },
+  });
 }

@@ -3,7 +3,7 @@
  * Requires calendar.create capability. Graph returns HTTP 201 with event body.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
 import { normalizeEvent } from '../normalize.js';
@@ -14,7 +14,7 @@ import type { ResolvedConfig } from '../factory.js';
  * Epoch ms inputs convert to ISO 8601 for Graph API.
  * Returns a CalendarEventDict from the 201 response body.
  *
- * @throws RuntimeError (RILL-R004) when title is empty or start > end
+ * @throws an invalid RillValue (#INVALID_INPUT) when title is empty or start > end
  */
 export async function createEvent(
   args: Record<string, RillValue>,
@@ -24,14 +24,14 @@ export async function createEvent(
 ): Promise<RillValue> {
   const title = (args['title'] as string | undefined) ?? '';
   if (title.trim() === '') {
-    throw new RuntimeError('RILL-R004', 'outlook: title is required');
+    failInput(ctx, 'missing_title', 'outlook: title is required');
   }
 
   const start = (args['start'] as number) ?? 0;
   const end = (args['end'] as number) ?? 0;
 
   if (start > end) {
-    throw new RuntimeError('RILL-R004', 'outlook: start must be before end');
+    failInput(ctx, 'invalid_range', 'outlook: start must be before end');
   }
 
   const startIso = new Date(start).toISOString();

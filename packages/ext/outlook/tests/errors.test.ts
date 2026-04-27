@@ -6,7 +6,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type ApplicationCallable,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
 import { mapGraphError, mapFetchError } from '../src/errors.js';
 
@@ -16,6 +24,24 @@ import { mapGraphError, mapFetchError } from '../src/errors.js';
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
+}
+
+function makeCtx(): RuntimeContext {
+  return createRuntimeContext();
+}
+
+function expectInvalid(
+  result: unknown,
+  atom: string,
+  message?: string,
+): void {
+  const value = result as RillValue;
+  expect(isInvalid(value)).toBe(true);
+  const status = getStatus(value);
+  expect(status.code.name).toBe(atom);
+  if (message !== undefined) {
+    expect(status.message).toContain(message);
+  }
 }
 
 /** Build a fetch mock returning a non-OK response with the given status. */
@@ -34,7 +60,6 @@ function mockFetchReject(error: unknown): ReturnType<typeof vi.fn> {
 
 const BEARER_CONFIG = {
   auth: { type: 'bearer' as const, token: 'test-token' },
-  // Enable all capabilities for unrestricted testing
   capabilities: {
     mail: { read: true, send: true, draft: true, flag: true, search: true },
     calendar: { read: true, create: true },
@@ -47,63 +72,74 @@ const BEARER_CONFIG = {
 
 describe('mapGraphError', () => {
   it('maps 401 to authentication failed [AC-23, EC-12]', () => {
-    const err = mapGraphError(401, 'inbox');
-    expect(err).toBeInstanceOf(RuntimeError);
-    expect(err.errorId).toBe('RILL-R004');
-    expect(err.message).toBe('outlook: authentication failed (401)');
+    const ctx = makeCtx();
+    expectInvalid(
+      mapGraphError(ctx, 401, 'inbox'),
+      'AUTH',
+      'outlook: authentication failed (401)',
+    );
   });
 
   it('maps 403 to insufficient permissions with operation [AC-24, EC-12]', () => {
-    const err = mapGraphError(403, 'send');
-    expect(err).toBeInstanceOf(RuntimeError);
-    expect(err.errorId).toBe('RILL-R004');
-    expect(err.message).toBe('outlook: insufficient permissions for send');
+    const ctx = makeCtx();
+    expectInvalid(
+      mapGraphError(ctx, 403, 'send'),
+      'FORBIDDEN',
+      'outlook: insufficient permissions for send',
+    );
   });
 
   it('maps 403 with different operation names', () => {
-    expect(mapGraphError(403, 'read').message).toContain('read');
-    expect(mapGraphError(403, 'calendar/events').message).toContain('calendar/events');
+    const ctx = makeCtx();
+    expect(getStatus(mapGraphError(ctx, 403, 'read')).message).toContain('read');
+    expect(getStatus(mapGraphError(ctx, 403, 'calendar/events')).message).toContain('calendar/events');
   });
 
   it('maps 404 to message not found with id [AC-25, EC-12]', () => {
-    const err = mapGraphError(404, 'read', 'msg-abc-123');
-    expect(err).toBeInstanceOf(RuntimeError);
-    expect(err.errorId).toBe('RILL-R004');
-    expect(err.message).toBe("outlook: message 'msg-abc-123' not found");
+    const ctx = makeCtx();
+    expectInvalid(
+      mapGraphError(ctx, 404, 'read', 'msg-abc-123'),
+      'NOT_FOUND',
+      "outlook: message 'msg-abc-123' not found",
+    );
   });
 
   it('maps 404 without id uses operation as identifier [AC-25]', () => {
-    const err = mapGraphError(404, 'inbox/msg-xyz');
-    expect(err.message).toContain("not found");
+    const ctx = makeCtx();
+    expect(getStatus(mapGraphError(ctx, 404, 'inbox/msg-xyz')).message).toContain('not found');
   });
 
   it('maps 429 to rate limit exceeded with no retry message [AC-26, EC-12]', () => {
-    const err = mapGraphError(429, 'inbox');
-    expect(err).toBeInstanceOf(RuntimeError);
-    expect(err.errorId).toBe('RILL-R004');
-    expect(err.message).toBe('outlook: rate limit exceeded');
+    const ctx = makeCtx();
+    expectInvalid(
+      mapGraphError(ctx, 429, 'inbox'),
+      'RATE_LIMIT',
+      'outlook: rate limit exceeded',
+    );
   });
 
   it('maps 500 to server error', () => {
-    const err = mapGraphError(500, 'inbox');
-    expect(err).toBeInstanceOf(RuntimeError);
-    expect(err.errorId).toBe('RILL-R004');
-    expect(err.message).toBe('outlook: server error (500)');
+    const ctx = makeCtx();
+    expectInvalid(
+      mapGraphError(ctx, 500, 'inbox'),
+      'UNAVAILABLE',
+      'outlook: server error (500)',
+    );
   });
 
   it('maps 503 to server error', () => {
-    const err = mapGraphError(503, 'inbox');
-    expect(err.message).toBe('outlook: server error (503)');
+    const ctx = makeCtx();
+    expect(getStatus(mapGraphError(ctx, 503, 'inbox')).message).toBe('outlook: server error (503)');
   });
 
   it('maps 599 to server error', () => {
-    const err = mapGraphError(599, 'inbox');
-    expect(err.message).toBe('outlook: server error (599)');
+    const ctx = makeCtx();
+    expect(getStatus(mapGraphError(ctx, 599, 'inbox')).message).toBe('outlook: server error (599)');
   });
 
   it('maps unknown status to generic failed message', () => {
-    const err = mapGraphError(418, 'inbox');
-    expect(err.message).toBe('outlook: request failed (418)');
+    const ctx = makeCtx();
+    expect(getStatus(mapGraphError(ctx, 418, 'inbox')).message).toBe('outlook: request failed (418)');
   });
 });
 
@@ -113,37 +149,32 @@ describe('mapGraphError', () => {
 
 describe('mapFetchError', () => {
   it('maps AbortError to request timeout [AC-27, EC-12]', () => {
+    const ctx = makeCtx();
     const abortErr = new Error('The operation was aborted');
     abortErr.name = 'AbortError';
-    const err = mapFetchError(abortErr);
-    expect(err).toBeInstanceOf(RuntimeError);
-    expect(err.errorId).toBe('RILL-R004');
-    expect(err.message).toBe('outlook: request timeout');
+    expectInvalid(mapFetchError(ctx, abortErr), 'TIMEOUT', 'outlook: request timeout');
   });
 
   it('maps TypeError to connection failed [EC-12]', () => {
-    const err = mapFetchError(new TypeError('Failed to fetch'));
-    expect(err).toBeInstanceOf(RuntimeError);
-    expect(err.errorId).toBe('RILL-R004');
-    expect(err.message).toBe('outlook: connection failed');
-  });
-
-  it('passes through existing RuntimeError unchanged', () => {
-    const rillErr = new RuntimeError('RILL-R004', 'outlook: already mapped');
-    const result = mapFetchError(rillErr);
-    expect(result).toBe(rillErr);
-    expect(result.message).toBe('outlook: already mapped');
+    const ctx = makeCtx();
+    expectInvalid(
+      mapFetchError(ctx, new TypeError('Failed to fetch')),
+      'UNAVAILABLE',
+      'outlook: connection failed',
+    );
   });
 
   it('maps unknown Error by message', () => {
-    const err = mapFetchError(new Error('Something went wrong'));
-    expect(err.message).toBe('outlook: Something went wrong');
+    const ctx = makeCtx();
+    expect(getStatus(mapFetchError(ctx, new Error('Something went wrong'))).message)
+      .toBe('outlook: Something went wrong');
   });
 
   it('maps non-Error unknown to string representation', () => {
-    const err = mapFetchError('plain string error');
-    expect(err).toBeInstanceOf(RuntimeError);
-    expect(err.message).toContain('plain string error');
+    const ctx = makeCtx();
+    const result = mapFetchError(ctx, 'plain string error');
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).message).toContain('plain string error');
   });
 });
 
@@ -165,169 +196,95 @@ describe('HTTP error mapping through host function', () => {
 
   it('HTTP 401 throws authentication failed error [AC-23, EC-12]', async () => {
     globalThis.fetch = mockHttpError(401);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('outlook: authentication failed (401)');
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'AUTH', 'outlook: authentication failed (401)');
   });
 
   it('HTTP 403 throws insufficient permissions [AC-24, EC-12]', async () => {
     globalThis.fetch = mockHttpError(403);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).message).toContain('insufficient permissions');
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'FORBIDDEN', 'insufficient permissions');
   });
 
   it('HTTP 404 throws not found [AC-25, EC-12]', async () => {
     globalThis.fetch = mockHttpError(404);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).message).toContain('not found');
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'NOT_FOUND', 'not found');
   });
 
   it('HTTP 429 throws rate limit exceeded with no retry [AC-26, EC-12]', async () => {
     globalThis.fetch = mockHttpError(429);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).message).toBe('outlook: rate limit exceeded');
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'RATE_LIMIT', 'outlook: rate limit exceeded');
   });
 
   it('HTTP 429 does not retry — fetch called exactly once [AC-26]', async () => {
     const mockFetch = mockHttpError(429);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch {
-      // expected
-    }
-
+    await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it('HTTP 500 throws server error [EC-12]', async () => {
     globalThis.fetch = mockHttpError(500);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).message).toBe('outlook: server error (500)');
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'UNAVAILABLE', 'outlook: server error (500)');
   });
 
   it('HTTP 503 throws server error [EC-12]', async () => {
     globalThis.fetch = mockHttpError(503);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).message).toBe('outlook: server error (503)');
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'UNAVAILABLE', 'outlook: server error (503)');
   });
 
   it('AbortError maps to request timeout [AC-27, EC-12]', async () => {
     const abortErr = new Error('The operation was aborted');
     abortErr.name = 'AbortError';
     globalThis.fetch = mockFetchReject(abortErr);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('outlook: request timeout');
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'TIMEOUT', 'outlook: request timeout');
   });
 
   it('TypeError maps to connection failed [EC-12]', async () => {
     globalThis.fetch = mockFetchReject(new TypeError('Failed to fetch'));
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).message).toBe('outlook: connection failed');
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'UNAVAILABLE', 'outlook: connection failed');
   });
 
-  it('all HTTP errors produce RILL-R004 errorId', async () => {
-    for (const status of [401, 403, 404, 429, 500]) {
+  it('all HTTP errors produce invalid RillValues with status-mapped atoms', async () => {
+    const expectations: Record<number, string> = {
+      401: 'AUTH',
+      403: 'FORBIDDEN',
+      404: 'NOT_FOUND',
+      429: 'RATE_LIMIT',
+      500: 'UNAVAILABLE',
+    };
+    for (const [statusStr, atom] of Object.entries(expectations)) {
+      const status = Number(statusStr);
       globalThis.fetch = mockHttpError(status);
-      const ext = createOutlookExtension(BEARER_CONFIG);
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-
-      let caught: unknown;
-      try {
-        await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-      } catch (e) {
-        caught = e;
-      }
-
-      expect(caught, `status ${status} should produce RILL-R004`).toBeInstanceOf(RuntimeError);
-      expect(
-        (caught as RuntimeError).errorId,
-        `status ${status} errorId`
-      ).toBe('RILL-R004');
+      const result = (await getCallable(ext, 'inbox').fn({ top: 10 }, ctx)) as RillValue;
+      expect(isInvalid(result), `status ${status} should be invalid`).toBe(true);
+      expect(getStatus(result).code.name, `status ${status} atom`).toBe(atom);
     }
   });
 });
@@ -348,29 +305,17 @@ describe('session token resolution [AC-28, EC-11]', () => {
     vi.restoreAllMocks();
   });
 
-  it('throws RILL-R004 when session token variable not found in context [AC-28, EC-11]', async () => {
+  it('emits #AUTH when session token variable not found [AC-28, EC-11]', async () => {
     const ext = createOutlookExtension({
       auth: { type: 'session', tokenVar: 'MY_OUTLOOK_TOKEN' },
       capabilities: {
         mail: { read: true, send: true, draft: true, flag: true, search: true },
         calendar: { read: true, create: true },
       },
-    });
-    // Empty context: no variables set
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe(
-      "outlook: session token 'MY_OUTLOOK_TOKEN' not found"
-    );
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expectInvalid(result, 'AUTH', "outlook: session token 'MY_OUTLOOK_TOKEN' not found");
   });
 
   it('session token error message includes the tokenVar name [EC-11]', async () => {
@@ -380,18 +325,11 @@ describe('session token resolution [AC-28, EC-11]', () => {
         mail: { read: true, send: true, draft: true, flag: true, search: true },
         calendar: { read: true, create: true },
       },
-    });
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect((caught as RuntimeError).message).toBe(
-      "outlook: session token 'CUSTOM_VAR_NAME' not found"
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expect(getStatus(result as RillValue).message).toBe(
+      "outlook: session token 'CUSTOM_VAR_NAME' not found",
     );
   });
 
@@ -408,13 +346,12 @@ describe('session token resolution [AC-28, EC-11]', () => {
         mail: { read: true, send: true, draft: true, flag: true, search: true },
         calendar: { read: true, create: true },
       },
-    });
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
     ctx.variables.set('MY_TOKEN', 'bearer-value-from-session');
 
-    await expect(
-      getCallable(ext, 'inbox').fn({ top: 10 }, ctx)
-    ).resolves.toBeDefined();
+    const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    expect(isInvalid(result as RillValue)).toBe(false);
   });
 
   it('session token error does not call fetch [AC-28]', async () => {
@@ -427,15 +364,49 @@ describe('session token resolution [AC-28, EC-11]', () => {
         mail: { read: true, send: true, draft: true, flag: true, search: true },
         calendar: { read: true, create: true },
       },
-    });
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
-
-    try {
-      await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    } catch {
-      // expected
-    }
-
+    await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================
+// Cancellation via ctx.signal
+// ============================================================
+
+describe('ctx.signal cancellation', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('aborting ctx.signal mid-flight yields #TIMEOUT', async () => {
+    const controller = new AbortController();
+    globalThis.fetch = vi.fn((_url: unknown, init: RequestInit | undefined) => {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal !== undefined && signal !== null) {
+          signal.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      });
+    }) as unknown as typeof globalThis.fetch;
+
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
+    const ctx = createRuntimeContext({ signal: controller.signal });
+    const promise = getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+    controller.abort();
+    const result = await promise;
+    expectInvalid(result, 'TIMEOUT');
   });
 });
