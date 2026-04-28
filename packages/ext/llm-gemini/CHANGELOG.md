@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-28
+
+### Fixed
+
+- Intermediate JSON Schema now sets `additionalProperties: false` on every emitted object. Inherited from `@rcrsr/rill-ext-llm-shared`. No observable change: `toGeminiSchema` does not read `additionalProperties` when converting to the Gemini `Schema` type.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

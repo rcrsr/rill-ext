@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-28
+
+### Fixed
+
+- `generate()` JSON Schema now sets `additionalProperties: false` on every emitted object, including untyped `dict` parameters. Previously, untyped `dict` produced bare `{ type: "object" }`, which fails OpenAI strict-mode validation and caused `400 invalid_request_error` on Groq `openai/gpt-oss-120b`. Providers that previously worked are unaffected.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

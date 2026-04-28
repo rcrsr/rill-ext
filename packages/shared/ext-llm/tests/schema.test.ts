@@ -98,7 +98,26 @@ describe('buildJsonSchemaFromStructuralType', () => {
         params
       );
       expect(result.properties['meta']?.type).toBe('object');
+      expect(result.properties['meta']?.additionalProperties).toBe(false);
       expect(result.required).toContain('meta');
+    });
+
+    it('strict mode: vector param produces type "object" with additionalProperties: false', () => {
+      const result = buildJsonSchemaFromStructuralType({
+        kind: 'closure',
+        params: [{ name: 'embedding', type: { kind: 'vector' } }],
+      });
+      expect(result.properties['embedding']?.type).toBe('object');
+      expect(result.properties['embedding']?.additionalProperties).toBe(false);
+    });
+
+    it('strict mode: shape param produces type "object" with additionalProperties: false', () => {
+      const result = buildJsonSchemaFromStructuralType({
+        kind: 'closure',
+        params: [{ name: 'geom', type: { kind: 'shape' } }],
+      });
+      expect(result.properties['geom']?.type).toBe('object');
+      expect(result.properties['geom']?.additionalProperties).toBe(false);
     });
 
     it('param with defaultValue !== undefined is optional (not in required)', () => {
@@ -351,6 +370,7 @@ describe('buildJsonSchemaFromStructuralType', () => {
       expect(result.type).toBe('object');
       expect(result.properties).toEqual({});
       expect(result.required).toEqual([]);
+      expect(result.additionalProperties).toBe(false);
     });
 
     it('returns empty properties for dict with empty fields', () => {
@@ -358,6 +378,33 @@ describe('buildJsonSchemaFromStructuralType', () => {
       expect(result.type).toBe('object');
       expect(result.properties).toEqual({});
       expect(result.required).toEqual([]);
+      expect(result.additionalProperties).toBe(false);
+    });
+
+    it('strict mode: every object in nested dict(name: string, items: list(dict(id: string))) has additionalProperties: false', () => {
+      const result = buildJsonSchemaFromStructuralType({
+        kind: 'dict',
+        fields: {
+          name: { type: { kind: 'string' } },
+          items: {
+            type: {
+              kind: 'list',
+              element: {
+                kind: 'dict',
+                fields: {
+                  id: { type: { kind: 'string' } },
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(result.additionalProperties).toBe(false);
+      const itemsProp = result.properties['items'];
+      expect(itemsProp?.type).toBe('array');
+      const itemElement = itemsProp?.items;
+      expect(itemElement?.type).toBe('object');
+      expect(itemElement?.additionalProperties).toBe(false);
     });
   });
 });

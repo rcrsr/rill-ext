@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-28
+
+### Fixed
+
+- Tool `input_schema` now sets `additionalProperties: false` on every emitted object, including untyped `dict` parameters. Inherited from `@rcrsr/rill-ext-llm-shared`. No behavioral change for Anthropic (which does not enforce strict mode), but tool schemas are now stricter and consistent across LLM extensions.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)
