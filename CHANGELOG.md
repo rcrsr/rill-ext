@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-04-28
+
+### Changed (Breaking)
+
+- All 26 extensions migrated to `@rcrsr/rill@~0.19.0`. Both `peerDependencies` and `devDependencies` ranges bump from `~0.18.x` to `~0.19.0`.
+- Error model overhaul. Rill core retired the fixed `RILL-R004` errorId. Extensions now emit invalid `RillValue`s via `ctx.invalidate(error, meta)` carrying rill core's pre-registered generic atoms: `#AUTH`, `#FORBIDDEN`, `#NOT_FOUND`, `#RATE_LIMIT`, `#QUOTA_EXCEEDED`, `#UNAVAILABLE`, `#CONFLICT`, `#PROTOCOL`, `#INVALID_INPUT`, `#TIMEOUT`, `#DISPOSED`, `#TYPE_MISMATCH`. Provider-specific failures decompose into `(generic atom, meta.provider, meta.raw.kind)` so host scripts match coarsely (`guard #AUTH`) or finely (`guard #UNAVAILABLE && raw.kind == 'connection_failed'`).
+- Factory-time configuration validation switches from `RuntimeError('RILL-R005', ...)` to `RuntimeError('RILL-R001', ...)`. Factories now accept an optional `ExtensionFactoryCtx` second argument.
+- Cancellation. `ctx.signal` from the factory ctx composes with per-request `AbortController` and `AbortSignal.timeout` via `AbortSignal.any`. Host-script cancellation now reaches in-flight HTTP, SDK, and PTY operations.
+- Per-extension `errors.ts` modules removed in built-in extensions (crypto, datetime, exec, fetch, fs-local, kv-file). Consumers that imported `EXT_*` atom constants must switch to the generic taxonomy.
+- LLM `mapProviderError` signature gains a leading `ctx` parameter and returns `RillValue` instead of `RuntimeError`. Provider errors surface as `RuntimeHaltSignal` carrying generic atom codes; host scripts that pattern-matched on `RILL-R005` must switch to generic-atom guards.
+- Shared search APIs require `RuntimeContext` as the first argument and return `RillValue` instead of throwing `RuntimeError`. Host scripts consuming search extensions can now recover failures via `guard #AUTH`, `guard #RATE_LIMIT`, etc.
+- `LlmExtensionContract` and `VectorExtensionContract` test pattern: suites migrated from `.rejects.toThrow(RuntimeError)` to `isInvalid(result)` plus `getStatus(result).code.name` assertions across 60+ test sites.
+
+### Added
+
+- `@rcrsr/rill-ext-kv-shared` adds `mapKvError`, mapping ioredis (`ECONNREFUSED`, `ETIMEDOUT`, `MaxRetriesPerRequestError`, `NOAUTH`) and better-sqlite3 (`SQLITE_BUSY`, `SQLITE_LOCKED`, `SQLITE_READONLY`) to `#UNAVAILABLE`, `#AUTH`, `#CONFLICT`, `#FORBIDDEN`, `#TIMEOUT`.
+- `@rcrsr/rill-ext-foundry` `mapRestError` adds full HTTP-status-to-atom mapping: 401→`#AUTH`, 402→`#QUOTA_EXCEEDED`, 403→`#FORBIDDEN`, 404→`#NOT_FOUND`, 408→`#TIMEOUT`, 429→`#RATE_LIMIT`, 5xx→`#UNAVAILABLE`, other→`#PROTOCOL`.
+- `@rcrsr/rill-ext-claude-code` introduces `SpawnError` plus `mapSpawnError`. Spawn errors map to `#UNAVAILABLE`/`#FORBIDDEN`; CLI timeout to `#TIMEOUT`; non-zero exit to `#UNAVAILABLE`.
+- `@rcrsr/rill-ext-mcp` adds `mapMcpError` and `factoryError` (RILL-R001) helpers; emits `#UNAVAILABLE`/`#TIMEOUT`/`#PROTOCOL`/`#AUTH`/`#NOT_FOUND`/`#INVALID_INPUT`.
+- `RuntimeHaltSignal` propagates through LLM tool loops so middleware-thrown halts (e.g. auto-shield `#FORBIDDEN`) reach the host script with their original atom instead of being re-wrapped.
+- Per-package `tests/_helpers.ts` files providing `makeFactoryCtx`, `makeRuntimeCtx`, `expectRejectsInvalid`, and halt-assertion helpers (`expectHalt`, `expectRejectedHalt`, `expectThrowHalt`).
+
+### Fixed
+
+- LLM tool-loop `callAPI` catch passes through `RuntimeHaltSignal` so middleware-thrown halts reach the host with the original atom instead of being re-wrapped as "Provider API error: runtime halt".
+- Four bare `await expect(...)` test sites that suppressed promise rejections (anthropic, openai functions/generate tests) replaced with `expectRejectedHalt` to actually await and match the halt.
+
+### Documentation
+
+- Error Behavior sections in 21 extension docs rewritten with the canonical Failure / Atom / `meta.raw.kind` table, replacing retired `RILL-R004` references.
+- Stale `RILL-R004` references in claude-code, google-workspace, outlook, and prompt-md JSDoc and test descriptions renamed to current atom names.
+- `CLAUDE.md` §Error Handling Convention rewritten to describe the generic atom taxonomy and `(atom, provider, raw.kind)` decomposition.
+
+### Tooling
+
+- `packageManager` field bumped to `pnpm@10.33.2`.
+- `pnpm.overrides` for the local rill workspace removed; lockfile now resolves `@rcrsr/rill@~0.19.0` from npm.
+
 ## [0.18.7] - 2026-04-26
 
 ### Added
