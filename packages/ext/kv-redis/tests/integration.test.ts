@@ -25,16 +25,35 @@
 
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { Redis } from 'ioredis';
+import { isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
 import { createRedisKvExtension } from '../src/factory.js';
 import type { RedisKvExtensionConfig } from '../src/factory.js';
-import { createKvFileExtension as createKvExtension } from '@rcrsr/rill-ext-kv-file';
+import { createFileKvExtension as createKvExtension } from '@rcrsr/rill-ext-kv-file';
+import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 /**
  * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
+ * Auto-injects a runtime context and converts invalid RillValue results to
+ * thrown Errors so existing `.rejects.toThrow(...)` patterns continue to work.
  */
-function getCallable(ext: { value: unknown }, name: string): { fn: (args: Record<string, unknown>) => unknown } {
-  const value = ext.value as Record<string, { fn: (args: Record<string, unknown>) => unknown }>;
-  return value[name]!;
+function getCallable(
+  ext: { value: unknown },
+  name: string,
+): { fn: (args: Record<string, unknown>) => Promise<unknown> } {
+  const value = ext.value as Record<
+    string,
+    { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }
+  >;
+  const callable = value[name]!;
+  return {
+    fn: async (args: Record<string, unknown>) => {
+      const result = await callable.fn(args, makeRuntimeCtx());
+      if (isInvalid(result as RillValue)) {
+        throw new Error(getStatus(result as RillValue).message);
+      }
+      return result;
+    },
+  };
 }
 
 // Redis test connection
@@ -105,7 +124,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const name = await getCallable(ext, 'get').fn({ mount: 'user', key: 'name' });
@@ -126,7 +145,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const result = await getCallable(ext, 'get').fn({ mount: 'cache', key: 'missing' });
@@ -144,7 +163,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'state', key: 'key', value: 'value' });
@@ -165,7 +184,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const result = await getCallable(ext, 'get_or').fn({ mount: 'cache', key: 'missing', fallback: 'fallback' });
@@ -183,7 +202,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'cache', key: 'key', value: 'stored' });
@@ -204,7 +223,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const result = await getCallable(ext, 'set').fn({ mount: 'state', key: 'key', value: 'value' });
@@ -225,7 +244,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await expect(getCallable(ext, 'set').fn({ mount: 'readonly', key: 'key', value: 'value' })).rejects.toThrow(
@@ -245,7 +264,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const largeValue = 'x'.repeat(20);
@@ -268,7 +287,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await expect(getCallable(ext, 'set').fn({ mount: 'typed', key: 'count', value: 'string' })).rejects.toThrow(
@@ -289,7 +308,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'state', key: 'config', value: { a: 1, b: 2 } });
@@ -311,7 +330,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const result = await getCallable(ext, 'merge').fn({ mount: 'state', key: 'new', partial: { x: 10 } });
@@ -332,7 +351,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'state', key: 'string', value: 'value' });
@@ -352,7 +371,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await expect(
@@ -373,7 +392,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'state', key: 'key', value: 'value' });
@@ -395,7 +414,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const result = await getCallable(ext, 'delete').fn({ mount: 'state', key: 'missing' });
@@ -415,7 +434,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'state', key: 'key1', value: 'value1' });
@@ -440,7 +459,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const keys = await getCallable(ext, 'keys').fn({ mount: 'empty' });
@@ -460,7 +479,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'state', key: 'key', value: 'value' });
@@ -479,7 +498,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const result = await getCallable(ext, 'has').fn({ mount: 'state', key: 'missing' });
@@ -499,7 +518,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'state', key: 'key1', value: 'value1' });
@@ -528,7 +547,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'user', key: 'name', value: 'Alice' });
@@ -556,7 +575,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'state', key: 'key1', value: 'value1' });
@@ -582,7 +601,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       const result = await getCallable(ext, 'getAll').fn({ mount: 'empty' });
@@ -606,10 +625,10 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = getCallable(ext, 'schema').fn({ mount: 'user' });
+      const result = await getCallable(ext, 'schema').fn({ mount: 'user' });
       expect(result).toHaveLength(2);
       expect(result).toContainEqual({
         key: 'name',
@@ -634,10 +653,10 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = getCallable(ext, 'schema').fn({ mount: 'cache' });
+      const result = await getCallable(ext, 'schema').fn({ mount: 'cache' });
       expect(result).toEqual([]);
     });
   });
@@ -664,10 +683,10 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = getCallable(ext, 'mounts').fn({});
+      const result = await getCallable(ext, 'mounts').fn({});
       expect(result).toHaveLength(2);
 
       expect(result).toContainEqual({
@@ -704,7 +723,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await expect(getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })).rejects.toThrow(
@@ -723,7 +742,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await expect(getCallable(ext, 'set').fn({ mount: 'unknown', key: 'key', value: 'value' })).rejects.toThrow(
@@ -742,7 +761,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await expect(getCallable(ext, 'keys').fn({ mount: 'unknown' })).rejects.toThrow(
@@ -764,7 +783,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'session', key: 'token', value: 'abc123' });
@@ -793,7 +812,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       await getCallable(ext, 'set').fn({ mount: 'session', key: 'data', value: { x: 1 } });
@@ -926,7 +945,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // Set initial dict value
@@ -951,7 +970,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // Set initial value
@@ -994,7 +1013,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // Test all kv functions throw for unknown mount
@@ -1034,8 +1053,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         `Mount 'unknown' not found`
       );
 
-      // schema is synchronous, so test differently
-      expect(() => getCallable(ext, 'schema').fn({ mount: 'unknown' })).toThrow(
+      await expect(getCallable(ext, 'schema').fn({ mount: 'unknown' })).rejects.toThrow(
         `Mount 'unknown' not found`
       );
     });
@@ -1053,7 +1071,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // set should throw
@@ -1097,7 +1115,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // Ensure mount is empty
@@ -1112,7 +1130,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       expect(all).toEqual({});
 
       // schema returns empty array (open mode)
-      const schema = getCallable(ext, 'schema').fn({ mount: 'empty' });
+      const schema = await getCallable(ext, 'schema').fn({ mount: 'empty' });
       expect(schema).toEqual([]);
 
       // has returns false
@@ -1139,14 +1157,14 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // Clear to initialize with defaults
       await getCallable(ext, 'clear').fn({ mount: 'declared' });
 
       // schema returns entries
-      const schema = getCallable(ext, 'schema').fn({ mount: 'declared' });
+      const schema = await getCallable(ext, 'schema').fn({ mount: 'declared' });
       expect(schema).toHaveLength(2);
 
       // keys returns schema keys (from clear initialization)
@@ -1176,7 +1194,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // Create value that serializes to exactly the size limit
@@ -1223,7 +1241,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // Create value that serializes to sizeLimit + 1 bytes
@@ -1258,7 +1276,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         },
       };
 
-      const ext = createRedisKvExtension(config);
+      const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
       // Set small initial dict

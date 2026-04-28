@@ -10,6 +10,7 @@ import {
   emitExtensionEvent,
   structureToTypeValue,
   toCallable,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillFunction,
   type RillValue,
@@ -20,6 +21,7 @@ import type { ClaudeCodeConfig, ClaudeMessage } from './types.js';
 import { spawnClaudeCli } from './process.js';
 import { createStreamParser } from './stream-parser.js';
 import { extractResult } from './result.js';
+import { mapSpawnError } from './errors.js';
 
 // ============================================================
 // TYPES
@@ -167,6 +169,12 @@ function createPtyStream(
   // Monitor exit promise — attach immediately to prevent unhandled rejections.
   // EC-9: Timeout — re-throw RuntimeError so the generator propagates it to the consumer.
   // EC-10: Non-zero exit — yield error chunk, resolve with partial data.
+  // Track the original error so resolve() can map it to a precise generic
+  // atom via mapSpawnError. Timeout, non-zero exit, and other rejections all
+  // surface as an [error] chunk plus a captured `exitError`. resolve() turns
+  // any captured error into an invalid RillValue.
+  let exitError: unknown;
+
   const exitPromise = spawn.exitCode.then(
     () => {
       parser.flush((msg) => messages.push(msg));
@@ -174,13 +182,9 @@ function createPtyStream(
       wake();
     },
     (error: unknown) => {
-      if (error instanceof RuntimeError && error.context?.['timeoutMs'] !== undefined) {
-        done = true;
-        wake();
-        throw error;
-      }
       parser.flush((msg) => messages.push(msg));
       done = true;
+      exitError = error;
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
       lineBuffer.push(`[error] ${errorMessage}`);
       wake();
@@ -230,6 +234,21 @@ function createPtyStream(
   // the caller resolves via __rill_stream_resolve() without iterating chunks.
   const resolve = async (): Promise<RillValue> => {
     await exitPromise;
+    // Timeout (`SpawnError` 'cli_timeout') maps to `#TIMEOUT`. Any other
+    // exit-promise rejection (non-zero exit, network error, etc.) maps via
+    // `mapSpawnError` so the host script sees a precise generic atom rather
+    // than a thrown plain Error.
+    if (exitError !== undefined) {
+      emitExtensionEvent(ctx, {
+        event: 'claude-code:error',
+        subsystem: 'extension:claude-code',
+        error: exitError instanceof Error ? exitError.message : 'Unknown error',
+        duration: 0,
+      });
+      tracker.disposers.delete(spawn.dispose);
+      spawn.dispose();
+      return mapSpawnError(ctx, exitError);
+    }
     const startTime = Date.now();
     const result = extractResult(messages);
     const duration = Date.now() - startTime;
@@ -318,7 +337,8 @@ function validateTimeout(timeout: number): void {
  * ```
  */
 export function createClaudeCodeExtension(
-  config: ClaudeCodeConfig = {}
+  config: ClaudeCodeConfig = {},
+  factoryCtx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
   // Extract config with defaults
   const binaryPath = config.binaryPath ?? DEFAULT_BINARY_PATH;
@@ -333,7 +353,7 @@ export function createClaudeCodeExtension(
   try {
     which.sync(binaryPath);
   } catch {
-    throw new RuntimeError('RILL-R004', 'claude binary not found', undefined, { binaryPath });
+    throw new RuntimeError('RILL-R001', `claude-code: claude binary not found: ${binaryPath}`, undefined, { binaryPath });
   }
 
   // Track active processes for cleanup
@@ -356,6 +376,9 @@ export function createClaudeCodeExtension(
     tracker.disposers.clear();
   };
 
+  // Wire ctx.signal: aborting the factory signal kills all in-flight PTYs.
+  factoryCtx.signal.addEventListener('abort', () => dispose(), { once: true });
+
   // Return extension result with implementations
   const fnDict: { prompt: RillFunction; skill: RillFunction; command: RillFunction } = {
     // IR-2: claude-code::prompt
@@ -366,33 +389,41 @@ export function createClaudeCodeExtension(
           timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
-      fn: (args, ctx): RillValue => {
-        // Extract arguments
+      fn: (args, ctxLike): RillValue => {
+        const ctx = ctxLike as RuntimeContext;
         const text = args['text'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
         // EC-7: Validate text is non-empty (before stream creation)
         if (text.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
+          throw ctx.invalidate(new Error('prompt text cannot be empty'), {
+            code: 'INVALID_INPUT',
+            provider: 'claude-code',
+            raw: { kind: 'empty_text' },
+          }) as unknown as RillValue;
         }
 
-        // Extract timeout option
         const timeout =
           typeof options['timeout'] === 'number'
             ? options['timeout']
             : defaultTimeout;
 
-        // EC-8/EC-11: Spawn process (throws RuntimeError RILL-R004 on failure)
-        const spawn = spawnClaudeCli(text, {
-          binaryPath,
-          timeoutMs: timeout,
-          dangerouslySkipPermissions,
-          settingSources,
-        });
+        let spawn: import('./process.js').SpawnResult;
+        try {
+          spawn = spawnClaudeCli(text, {
+            binaryPath,
+            timeoutMs: timeout,
+            dangerouslySkipPermissions,
+            settingSources,
+          });
+        } catch (error: unknown) {
+          throw mapSpawnError(ctx, error) as unknown as RillValue;
+        }
 
         tracker.disposers.add(spawn.dispose);
+        ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx as RuntimeContext, {
+        return createPtyStream(spawn, tracker, ctx, {
           event: 'claude-code:prompt',
           eventData: { prompt: truncateText(text) },
         });
@@ -428,38 +459,45 @@ export function createClaudeCodeExtension(
           timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
-      fn: (fnArgs, ctx): RillValue => {
-        // Extract arguments
+      fn: (fnArgs, ctxLike): RillValue => {
+        const ctx = ctxLike as RuntimeContext;
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
         // EC-7: Validate name is non-empty (before stream creation)
         if (name.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'skill name cannot be empty');
+          throw ctx.invalidate(new Error('skill name cannot be empty'), {
+            code: 'INVALID_INPUT',
+            provider: 'claude-code',
+            raw: { kind: 'empty_skill_name' },
+          }) as unknown as RillValue;
         }
 
-        // Format input as /{name} {serialized args}
         const flags = serializeArgsToFlags(args);
         const flagsText = flags.length > 0 ? ' ' + flags.join(' ') : '';
         const prompt = `/${name}${flagsText}`;
 
-        // Extract timeout option
         const timeout =
           typeof args['timeout'] === 'number'
             ? args['timeout']
             : defaultTimeout;
 
-        // EC-8/EC-11: Spawn process (throws RuntimeError RILL-R004 on failure)
-        const spawn = spawnClaudeCli(prompt, {
-          binaryPath,
-          timeoutMs: timeout,
-          dangerouslySkipPermissions,
-          settingSources,
-        });
+        let spawn: import('./process.js').SpawnResult;
+        try {
+          spawn = spawnClaudeCli(prompt, {
+            binaryPath,
+            timeoutMs: timeout,
+            dangerouslySkipPermissions,
+            settingSources,
+          });
+        } catch (error: unknown) {
+          throw mapSpawnError(ctx, error) as unknown as RillValue;
+        }
 
         tracker.disposers.add(spawn.dispose);
+        ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx as RuntimeContext, {
+        return createPtyStream(spawn, tracker, ctx, {
           event: 'claude-code:skill',
           eventData: { name, args },
         });
@@ -495,38 +533,45 @@ export function createClaudeCodeExtension(
           timeout: { type: { kind: 'number' }, defaultValue: 0 },
         }),
       ],
-      fn: (fnArgs, ctx): RillValue => {
-        // Extract arguments
+      fn: (fnArgs, ctxLike): RillValue => {
+        const ctx = ctxLike as RuntimeContext;
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
         // EC-7: Validate name is non-empty (before stream creation)
         if (name.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'command name cannot be empty');
+          throw ctx.invalidate(new Error('command name cannot be empty'), {
+            code: 'INVALID_INPUT',
+            provider: 'claude-code',
+            raw: { kind: 'empty_command_name' },
+          }) as unknown as RillValue;
         }
 
-        // Format input similar to skill
         const flags = serializeArgsToFlags(args);
         const flagsText = flags.length > 0 ? ' ' + flags.join(' ') : '';
         const prompt = `/${name}${flagsText}`;
 
-        // Extract timeout option
         const timeout =
           typeof args['timeout'] === 'number'
             ? args['timeout']
             : defaultTimeout;
 
-        // EC-8/EC-11: Spawn process (throws RuntimeError RILL-R004 on failure)
-        const spawn = spawnClaudeCli(prompt, {
-          binaryPath,
-          timeoutMs: timeout,
-          dangerouslySkipPermissions,
-          settingSources,
-        });
+        let spawn: import('./process.js').SpawnResult;
+        try {
+          spawn = spawnClaudeCli(prompt, {
+            binaryPath,
+            timeoutMs: timeout,
+            dangerouslySkipPermissions,
+            settingSources,
+          });
+        } catch (error: unknown) {
+          throw mapSpawnError(ctx, error) as unknown as RillValue;
+        }
 
         tracker.disposers.add(spawn.dispose);
+        ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx as RuntimeContext, {
+        return createPtyStream(spawn, tracker, ctx, {
           event: 'claude-code:command',
           eventData: { name, args },
         });

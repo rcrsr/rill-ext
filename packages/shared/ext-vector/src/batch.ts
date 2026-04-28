@@ -3,7 +3,6 @@
  * Provides halt-on-first-failure semantics for sequential item processing.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
 import type { BatchResult } from './types.js';
 
 /**
@@ -43,7 +42,7 @@ export async function executeBatch<TItem>(
   items: TItem[],
   validate: (item: TItem, index: number) => string | null,
   execute: (item: TItem) => Promise<void>,
-  mapError: (error: unknown) => RuntimeError
+  mapError: (error: unknown) => string
 ): Promise<BatchResult> {
   let succeeded = 0;
 
@@ -72,11 +71,10 @@ export async function executeBatch<TItem>(
       succeeded++;
     } catch (error: unknown) {
       // EC-12: Execution failure → { succeeded, failed, error }
-      const rillError = mapError(error);
       return {
         succeeded,
         failed: `index ${i}`,
-        error: rillError.message,
+        error: mapError(error),
       };
     }
   }

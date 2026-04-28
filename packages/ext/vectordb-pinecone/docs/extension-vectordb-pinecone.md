@@ -167,17 +167,29 @@ $info.totalVectorCount -> log
 
 ## Error Behavior
 
-**Validation errors** (before API call):
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #NOT_FOUND`) or finely
+(`guard #NOT_FOUND && raw.kind == 'id_not_found'`).
 
-- Missing API key → `RuntimeError RILL-R004: pinecone: apiKey is required`
-- Missing index → `RuntimeError RILL-R004: pinecone: index is required`
-- Invalid timeout → `RuntimeError RILL-R004: pinecone: timeout must be a positive integer`
+**Factory-time validation** (before any host fn runs):
 
-**API errors** (from Pinecone):
+- Missing API key → `RuntimeError RILL-R001: pinecone: apiKey is required`
+- Missing index → `RuntimeError RILL-R001: pinecone: index is required`
 
-- Index not found → `RuntimeError RILL-R004: pinecone: index not found`
-- Network timeout → `RuntimeError RILL-R004: pinecone: request timeout`
-- Other API errors → `RuntimeError RILL-R004: pinecone: {API error message}`
+**Host-fn errors** (during operations):
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Authentication failure (401, "unauthorized") | `#AUTH` | `authentication_failed` |
+| Index not found | `#NOT_FOUND` | `collection_not_found` |
+| ID not found (`get`) | `#NOT_FOUND` | `collection_not_found` |
+| Rate limit exceeded (429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Network timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| Vector dimension mismatch | `#TYPE_MISMATCH` | `dimension_mismatch` |
+| Index already exists | `#CONFLICT` | `collection_exists` |
+| Invalid `dimensions` arg on `create_collection` | `#INVALID_INPUT` | `invalid_dimensions` |
+| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `disposed` |
+| Other SDK errors | `#UNAVAILABLE` | `sdk_error` |
 
 ## Cloud Pinecone Setup
 

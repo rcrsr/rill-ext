@@ -3,9 +3,9 @@
  * Implements IR-21: resolveToken with TTL cache for service-account mode.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
 import type { RuntimeContext } from '@rcrsr/rill';
 import type { GoogleAuth, ServiceAccountKey } from '../types.js';
+import { failAuth } from '../errors.js';
 import { signServiceAccountJwt } from './jwt.js';
 import { exchangeJwtForToken } from './exchange.js';
 
@@ -71,8 +71,8 @@ export function clearTokenCache(cache: TokenCache): void {
  * @param scopes - OAuth2 scopes for service-account JWT; ignored for other modes
  * @param signal - AbortSignal for token exchange HTTP request cancellation
  * @returns Resolved Bearer token string
- * @throws RuntimeError (RILL-R004) if session token variable not found (EC-21)
- * @throws RuntimeError (RILL-R004) on JWT signing or token exchange failure
+ * @throws halt carrying invalid `#AUTH` (`raw.kind == 'session_token_missing'`) if session token variable not found (EC-21)
+ * @throws halt carrying invalid `#AUTH` on JWT signing or token exchange failure
  */
 export async function resolveToken(
   auth: GoogleAuth,
@@ -100,9 +100,11 @@ export async function resolveToken(
     }
 
     // EC-21: session token variable not found
-    throw new RuntimeError(
-      'RILL-R004',
-      `google: session token '${tokenVar}' not found`
+    failAuth(
+      ctx,
+      'session_token_missing',
+      `google: session token '${tokenVar}' not found`,
+      { tokenVar },
     );
   }
 
@@ -119,14 +121,15 @@ export async function resolveToken(
     key = JSON.parse(auth.keyJson) as ServiceAccountKey;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    throw new RuntimeError(
-      'RILL-R004',
-      `google: service account key parse failed: ${reason}`
+    failAuth(
+      ctx,
+      'service_account_key_invalid',
+      `google: service account key parse failed: ${reason}`,
     );
   }
 
-  const assertion = signServiceAccountJwt(key, scopes, auth.subject);
-  const { accessToken, expiresIn } = await exchangeJwtForToken(assertion, signal);
+  const assertion = signServiceAccountJwt(ctx, key, scopes, auth.subject);
+  const { accessToken, expiresIn } = await exchangeJwtForToken(ctx, assertion, signal);
 
   // AC-10: cache with TTL = expires_in - 300 seconds
   cache.slot = {

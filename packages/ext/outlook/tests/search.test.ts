@@ -4,7 +4,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import { RuntimeError, createRuntimeContext, type ApplicationCallable, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
 
 // ============================================================
@@ -72,7 +73,7 @@ describe('search() host function', () => {
   it('includes $search parameter in URL [AC-4]', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'search').fn({ query: 'meeting notes' }, ctx);
@@ -85,7 +86,7 @@ describe('search() host function', () => {
   it('wraps query value in double quotes in $search [AC-4]', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'search').fn({ query: 'project alpha' }, ctx);
@@ -97,7 +98,7 @@ describe('search() host function', () => {
 
   it('returns MailMessageDict list from search results [AC-4]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'search').fn(
@@ -123,7 +124,7 @@ describe('search() host function', () => {
 
   it('includes query in return value', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'search').fn(
@@ -137,7 +138,7 @@ describe('search() host function', () => {
   it('sends GET request to messages endpoint', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'search').fn({ query: 'test query' }, ctx);
@@ -148,39 +149,27 @@ describe('search() host function', () => {
   });
 
   // ============================================================
-  // EC-3: empty query throws RILL-R004
+  // EC-3: empty query throws #INVALID_INPUT
   // ============================================================
 
-  it('throws RILL-R004 for empty query [EC-3]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG);
+  it('throws #INVALID_INPUT for empty query [EC-3]', async () => {
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'search').fn({ query: '' }, ctx);
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('query is required');
+    const caught = (await getCallable(ext, 'search').fn({ query: '' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+  expect(getStatus(caught).message).toContain('query is required');
   });
 
-  it('throws RILL-R004 for whitespace-only query [EC-3]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG);
+  it('throws #INVALID_INPUT for whitespace-only query [EC-3]', async () => {
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'search').fn({ query: '   ' }, ctx);
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-  });
+    const caught = (await getCallable(ext, 'search').fn({ query: '   ' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
+});
 
   // ============================================================
   // AC-19: event emission
@@ -188,7 +177,7 @@ describe('search() host function', () => {
 
   it('emits outlook:mail:search event on success [AC-19]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-    const ext = createOutlookExtension(BEARER_CONFIG);
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;

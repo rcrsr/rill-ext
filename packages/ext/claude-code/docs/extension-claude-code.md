@@ -183,19 +183,22 @@ All 3 functions resolve to the same structure:
 
 ## Error Behavior
 
-The extension validates inputs and process state at runtime.
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #UNAVAILABLE`) or finely
+(`guard #UNAVAILABLE && raw.kind == 'binary_not_found'`).
 
-**Validation errors** (empty input):
+**Host-fn errors:**
 
-- Empty prompt text throws `RuntimeError RILL-R004: prompt text cannot be empty`
-- Empty skill name throws `RuntimeError RILL-R004: skill name cannot be empty`
-- Empty command name throws `RuntimeError RILL-R004: command name cannot be empty`
-
-**Process errors**:
-
-- Binary not found throws `RuntimeError RILL-R004: claude binary not found`
-- Timeout throws `RuntimeError RILL-R004: Claude CLI timeout after Xms`
-- Non-zero exit throws `RuntimeError RILL-R004: Claude CLI exited with code X`
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Empty prompt / skill / command name | `#INVALID_INPUT` | `invalid_input` |
+| Claude binary missing on PATH | `#UNAVAILABLE` | `binary_not_found` |
+| Claude binary present but not executable | `#FORBIDDEN` | `binary_eacces` |
+| Failed to spawn the CLI process | `#UNAVAILABLE` | `spawn_failed` |
+| CLI exceeded configured timeout | `#TIMEOUT` | `cli_timeout` |
+| Cooperative cancellation propagated from `ctx.signal` | `#TIMEOUT` | `request_cancelled` |
+| CLI exited with a non-zero status | `#UNAVAILABLE` | `exit_nonzero` |
+| Other spawn / process failure | `#UNAVAILABLE` | `unknown_error` |
 
 ## Events
 

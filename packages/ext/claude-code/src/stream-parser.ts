@@ -16,12 +16,10 @@ import type { ClaudeMessage } from './types.js';
 export interface StreamParser {
   /**
    * Process a chunk of raw PTY output.
-   * Emits parsed messages via callback.
-   * Throws RuntimeError RILL-R004 for invalid JSON on complete lines.
+   * Emits parsed messages via callback. Invalid JSON lines are skipped silently.
    *
    * @param chunk - Raw data from PTY (Buffer or string)
    * @param onMessage - Callback for each parsed message
-   * @throws RuntimeError with code RILL-R004 for invalid JSON
    */
   processChunk(
     chunk: Buffer | string,
@@ -30,10 +28,9 @@ export interface StreamParser {
 
   /**
    * Flush remaining buffered data.
-   * Call when stream ends to process incomplete lines.
+   * Call when stream ends to process incomplete lines. Invalid JSON is skipped silently.
    *
    * @param onMessage - Callback for final parsed messages
-   * @throws RuntimeError with code RILL-R004 for invalid JSON
    */
   flush(onMessage: (message: ClaudeMessage) => void): void;
 }

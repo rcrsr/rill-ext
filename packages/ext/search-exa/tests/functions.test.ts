@@ -7,12 +7,36 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type ApplicationCallable,
+  type ExtensionFactoryCtx,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createExaExtension } from '../src/factory.js';
 
 // ============================================================
 // TEST HELPERS
 // ============================================================
+
+function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
+  return {
+    signal: signal ?? new AbortController().signal,
+    registerErrorCode: () => {},
+  };
+}
+
+async function expectInvalidWithMessage(
+  promise: Promise<unknown>,
+  needle: string
+): Promise<RillValue> {
+  const result = (await promise) as RillValue;
+  expect(isInvalid(result)).toBe(true);
+  expect(getStatus(result).message).toContain(needle);
+  return result;
+}
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
@@ -99,7 +123,7 @@ describe('Exa extension host functions', () => {
   describe('search()', () => {
     it('returns results tuple [AC-2]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -113,7 +137,7 @@ describe('Exa extension host functions', () => {
 
     it('includes request_id when present in response [AC-38]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -127,7 +151,7 @@ describe('Exa extension host functions', () => {
     it('omits request_id when absent in response [AC-38]', async () => {
       const responseWithoutId = { results: [{ url: 'https://example.com' }] };
       globalThis.fetch = mockFetchJson(200, responseWithoutId);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'search').fn(
@@ -141,7 +165,7 @@ describe('Exa extension host functions', () => {
     it('sends POST to /search with x-api-key header', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test query' }, ctx);
@@ -156,7 +180,7 @@ describe('Exa extension host functions', () => {
     it('sends query in request body', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'my search query' }, ctx);
@@ -169,7 +193,7 @@ describe('Exa extension host functions', () => {
     it('respects custom baseUrl', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createExaExtension({ apiKey: 'test-key', baseUrl: 'https://custom.exa.ai' });
+      const ext = createExaExtension({ apiKey: 'test-key', baseUrl: 'https://custom.exa.ai' }, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
@@ -178,69 +202,73 @@ describe('Exa extension host functions', () => {
       expect(url).toBe('https://custom.exa.ai/search');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
-      const ext = createExaExtension(VALID_CONFIG);
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, { error: 'Unauthorized' });
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'exa: authentication failed'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, { error: 'Rate limited' });
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'exa: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, { error: 'Internal error' });
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'exa: server error (500)'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Failed to fetch'));
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'exa: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('The operation was aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'exa: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
@@ -250,27 +278,29 @@ describe('Exa extension host functions', () => {
         status: 200,
         json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
       });
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'exa: unexpected response format'
+      );
     });
 
     it('maps Exa 402 to credits depleted [EC-8, AC-25]', async () => {
       globalThis.fetch = mockFetchJson(402, { error: 'Payment required' });
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: credits depleted');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'exa: credits depleted'
+      );
     });
 
     it('emits success event on successful search [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -289,14 +319,12 @@ describe('Exa extension host functions', () => {
 
     it('emits error event on failed search [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(401, { error: 'Unauthorized' });
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -308,13 +336,14 @@ describe('Exa extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'exa: operation cancelled'
+      );
     });
   });
 
@@ -325,7 +354,7 @@ describe('Exa extension host functions', () => {
   describe('contents()', () => {
     it('returns results and statuses [AC-5]', async () => {
       globalThis.fetch = mockFetchJson(200, CONTENTS_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'contents').fn(
@@ -340,7 +369,7 @@ describe('Exa extension host functions', () => {
     it('omits statuses when not in response [AC-38]', async () => {
       const responseWithoutStatuses = { results: [{ url: 'https://example.com/1', text: 'content' }] };
       globalThis.fetch = mockFetchJson(200, responseWithoutStatuses);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'contents').fn(
@@ -354,7 +383,7 @@ describe('Exa extension host functions', () => {
     it('sends POST to /contents with urls', async () => {
       const mockFetch = mockFetchJson(200, CONTENTS_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'contents').fn(
@@ -377,7 +406,7 @@ describe('Exa extension host functions', () => {
         ],
       };
       globalThis.fetch = mockFetchJson(200, mixedResponse);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'contents').fn(
@@ -391,79 +420,86 @@ describe('Exa extension host functions', () => {
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, { error: 'Unauthorized' });
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx)
-      ).rejects.toThrow('exa: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx),
+        'exa: authentication failed'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx)
-      ).rejects.toThrow('exa: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx),
+        'exa: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx)
-      ).rejects.toThrow('exa: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx),
+        'exa: server error (500)'
+      );
     });
 
     it('maps network failure to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Network error'));
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx)
-      ).rejects.toThrow('exa: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx),
+        'exa: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx)
-      ).rejects.toThrow('exa: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx),
+        'exa: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
       globalThis.fetch = mockFetchNonJson();
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx)
-      ).rejects.toThrow('exa: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx),
+        'exa: unexpected response format'
+      );
     });
 
     it('maps Exa 402 to credits depleted [EC-8, AC-25]', async () => {
       globalThis.fetch = mockFetchJson(402, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx)
-      ).rejects.toThrow('exa: credits depleted');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx),
+        'exa: credits depleted'
+      );
     });
 
     it('emits success event on success [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, CONTENTS_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -479,13 +515,14 @@ describe('Exa extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx)
-      ).rejects.toThrow('exa: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'contents').fn({ urls: ['https://example.com'] }, ctx),
+        'exa: operation cancelled'
+      );
     });
   });
 
@@ -496,7 +533,7 @@ describe('Exa extension host functions', () => {
   describe('find_similar()', () => {
     it('returns search-shape dict with results [AC-6]', async () => {
       globalThis.fetch = mockFetchJson(200, FIND_SIMILAR_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'find_similar').fn(
@@ -510,7 +547,7 @@ describe('Exa extension host functions', () => {
 
     it('includes request_id when present in response [AC-38]', async () => {
       globalThis.fetch = mockFetchJson(200, FIND_SIMILAR_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'find_similar').fn(
@@ -524,7 +561,7 @@ describe('Exa extension host functions', () => {
     it('sends POST to /findSimilar with url', async () => {
       const mockFetch = mockFetchJson(200, FIND_SIMILAR_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'find_similar').fn(
@@ -540,69 +577,75 @@ describe('Exa extension host functions', () => {
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx)
-      ).rejects.toThrow('exa: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        'exa: authentication failed'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx)
-      ).rejects.toThrow('exa: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        'exa: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx)
-      ).rejects.toThrow('exa: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        'exa: server error (500)'
+      );
     });
 
     it('maps network failure to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Network error'));
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx)
-      ).rejects.toThrow('exa: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        'exa: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx)
-      ).rejects.toThrow('exa: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        'exa: request timeout'
+      );
     });
 
     it('maps Exa 402 to credits depleted [EC-8, AC-25]', async () => {
       globalThis.fetch = mockFetchJson(402, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx)
-      ).rejects.toThrow('exa: credits depleted');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        'exa: credits depleted'
+      );
     });
 
     it('emits success event on success [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, FIND_SIMILAR_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -618,13 +661,14 @@ describe('Exa extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx)
-      ).rejects.toThrow('exa: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        'exa: operation cancelled'
+      );
     });
   });
 
@@ -635,7 +679,7 @@ describe('Exa extension host functions', () => {
   describe('answer()', () => {
     it('returns answer string and citations [AC-7]', async () => {
       globalThis.fetch = mockFetchJson(200, ANSWER_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'answer').fn(
@@ -651,7 +695,7 @@ describe('Exa extension host functions', () => {
     it('sends POST to /answer with query', async () => {
       const mockFetch = mockFetchJson(200, ANSWER_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'answer').fn({ query: 'What is TypeScript?' }, ctx);
@@ -662,94 +706,100 @@ describe('Exa extension host functions', () => {
       expect(body['query']).toBe('What is TypeScript?');
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
-      const ext = createExaExtension(VALID_CONFIG);
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'answer').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('maps HTTP 401 to authentication failed [EC-1, AC-17]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: authentication failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: 'test' }, ctx),
+        'exa: authentication failed'
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded [EC-2, AC-18]', async () => {
       globalThis.fetch = mockFetchJson(429, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: rate limit exceeded');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: 'test' }, ctx),
+        'exa: rate limit exceeded'
+      );
     });
 
     it('maps HTTP 500 to server error [EC-3, AC-20]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: 'test' }, ctx),
+        'exa: server error (500)'
+      );
     });
 
     it('maps network failure to connection failed [EC-5, AC-19]', async () => {
       globalThis.fetch = mockFetchReject(new TypeError('Network failure'));
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: 'test' }, ctx),
+        'exa: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
       const abortErr = new Error('aborted');
       abortErr.name = 'AbortError';
       globalThis.fetch = mockFetchReject(abortErr);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: 'test' }, ctx),
+        'exa: request timeout'
+      );
     });
 
     it('maps non-JSON to unexpected format [EC-6, AC-31]', async () => {
       globalThis.fetch = mockFetchNonJson();
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: 'test' }, ctx),
+        'exa: unexpected response format'
+      );
     });
 
     it('maps Exa 402 to credits depleted [EC-8, AC-25]', async () => {
       globalThis.fetch = mockFetchJson(402, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: credits depleted');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: 'test' }, ctx),
+        'exa: credits depleted'
+      );
     });
 
     it('emits success event with result_count = citations length [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, ANSWER_RESPONSE);
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
@@ -767,14 +817,12 @@ describe('Exa extension host functions', () => {
 
     it('emits error event on failure [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'answer').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -786,13 +834,14 @@ describe('Exa extension host functions', () => {
     });
 
     it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'answer').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('exa: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'answer').fn({ query: 'test' }, ctx),
+        'exa: operation cancelled'
+      );
     });
   });
 
@@ -822,7 +871,7 @@ describe('Exa extension host functions', () => {
         });
       });
 
-      const ext = createExaExtension(VALID_CONFIG);
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
       // Start search without awaiting — request stays in-flight
@@ -831,8 +880,8 @@ describe('Exa extension host functions', () => {
       // Dispose while request is in-flight
       await ext.dispose!();
 
-      // The in-flight request should reject with mapped AbortError
-      await expect(promise).rejects.toThrow('exa: request timeout');
+      // The in-flight request should resolve with an invalid RillValue
+      await expectInvalidWithMessage(promise, 'exa: request timeout');
     });
   });
 });

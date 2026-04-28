@@ -6,70 +6,47 @@
 import Database from 'better-sqlite3';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { anyTypeValue, structureToTypeValue, toCallable, type ExtensionFactoryResult, type RillFunction, type RillValue } from '@rcrsr/rill';
-import type { KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
+import {
+  RuntimeError,
+  anyTypeValue,
+  structureToTypeValue,
+  toCallable,
+  type CallableFn,
+  type ExtensionFactoryCtx,
+  type ExtensionFactoryResult,
+  type RillFunction,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+import { mapKvError, type KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { SqliteKvConfig, SqliteKvMountConfig } from './types.js';
 
-// ============================================================
-// INTERNAL TYPES
-// ============================================================
+const PROVIDER = 'kv-sqlite';
 
-/**
- * Database instance for a mount.
- * Tracks Database connection and prepared statements.
- */
 interface MountDatabase {
-  /** better-sqlite3 Database instance */
   db: Database.Database;
-  /** Table name for this mount */
   table: string;
 }
 
-// ============================================================
-// FACTORY
-// ============================================================
-
 /**
  * Create SQLite kv extension instance.
- * Validates configuration and returns host functions with cleanup.
- *
- * @param config - Extension configuration
- * @returns ExtensionResult with kv storage functions and dispose
- * @throws Error for invalid configuration (AC-10)
- *
- * @example
- * ```typescript
- * const ext = createSqliteKvExtension({
- *   mounts: {
- *     user: {
- *       mode: 'read-write',
- *       database: './data/app.db',
- *       table: 'user_state'
- *     }
- *   }
- * });
- * // Use with rill runtime...
- * await ext.dispose();
- * ```
  */
 export function createSqliteKvExtension(
-  config: SqliteKvConfig
+  config: SqliteKvConfig,
+  ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
-  // Validate required configuration (AC-10)
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
-    throw new Error(
-      'SQLite kv extension requires at least one mount in configuration'
+    throw new RuntimeError(
+      'RILL-R005',
+      'SQLite kv extension requires at least one mount in configuration',
     );
   }
 
-  // Track database instances per mount
   const databases = new Map<string, MountDatabase>();
 
-  // Initialize databases for all mounts
   for (const [mountName, mountConfig] of Object.entries(config.mounts)) {
     try {
-      // Validate database path - ensure directory exists or can be created (AC-10)
       const dbPath = mountConfig.database;
       const dbDir = dirname(dbPath);
 
@@ -77,27 +54,22 @@ export function createSqliteKvExtension(
         try {
           mkdirSync(dbDir, { recursive: true });
         } catch (error: unknown) {
-          throw new Error(
+          throw new RuntimeError(
+            'RILL-R005',
             `Failed to create directory for database path "${dbPath}": ${error instanceof Error ? error.message : String(error)}`,
-            { cause: error }
           );
         }
       }
 
-      // Create/open database
       const db = new Database(dbPath);
-
-      // Enable WAL mode for concurrent reader safety
       db.pragma('journal_mode = WAL');
 
-      // Create table if not exists
       const tableName = mountConfig.table;
-
-      // Validate table name contains only alphanumeric and underscore
       const TABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
       if (!TABLE_NAME_PATTERN.test(tableName)) {
-        throw new Error(
-          `Invalid table name "${tableName}": must match pattern ${TABLE_NAME_PATTERN}`
+        throw new RuntimeError(
+          'RILL-R005',
+          `Invalid table name "${tableName}": must match pattern ${TABLE_NAME_PATTERN}`,
         );
       }
 
@@ -108,22 +80,38 @@ export function createSqliteKvExtension(
         )
       `);
 
-      // Store database instance
       databases.set(mountName, { db, table: tableName });
     } catch (error: unknown) {
-      // Clean up any opened databases on error
       for (const { db } of databases.values()) {
         db.close();
       }
-
-      // Re-throw with context
-      if (error instanceof Error) {
-        throw error;
-      }
-      throw new Error(
-        `Failed to initialize SQLite database for mount "${mountName}": ${String(error)}`,
-        { cause: error }
+      if (error instanceof RuntimeError) throw error;
+      throw new RuntimeError(
+        'RILL-R005',
+        `Failed to initialize SQLite database for mount "${mountName}": ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+  }
+
+  let disposed = false;
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
+    for (const { db } of databases.values()) {
+      try {
+        db.close();
+      } catch {
+        // ignore close errors
+      }
+    }
+    databases.clear();
+  };
+
+  if (ctx?.signal) {
+    if (ctx.signal.aborted) {
+      dispose();
+    } else {
+      ctx.signal.addEventListener('abort', () => dispose(), { once: true });
     }
   }
 
@@ -131,396 +119,409 @@ export function createSqliteKvExtension(
   // HELPERS
   // ============================================================
 
-  /**
-   * Get mount database and configuration.
-   * EC-7: Throws if mount unknown.
-   */
   function getMountDb(mountName: string): {
     mountDb: MountDatabase;
     mountConfig: SqliteKvMountConfig;
-  } {
+  } | null {
     const mountDb = databases.get(mountName);
     const mountConfig = config.mounts[mountName];
-
-    if (!mountDb || !mountConfig) {
-      throw new Error(
-        `Mount '${mountName}' not found. Available mounts: ${Object.keys(config.mounts).join(', ')}`
-      );
-    }
-
+    if (!mountDb || !mountConfig) return null;
     return { mountDb, mountConfig };
   }
 
-  /**
-   * Check write permission for a mount.
-   * EC-3, EC-6: Throws if mode is read-only.
-   */
-  function checkWritePermission(mountName: string, mode: string): void {
-    if (mode === 'read') {
-      throw new Error(`Mount '${mountName}' is read-only (mode: ${mode})`);
-    }
-  }
-
-  /**
-   * Calculate value size in bytes (JSON-encoded).
-   */
   function calculateValueSize(value: RillValue): number {
     return Buffer.byteLength(JSON.stringify(value), 'utf-8');
   }
 
-  /**
-   * Validate type against schema entry.
-   */
-  function validateType(
-    key: string,
-    value: RillValue,
-    expectedType: 'string' | 'number' | 'bool' | 'list' | 'dict'
-  ): void {
-    let actualType: string;
-
-    if (typeof value === 'string') {
-      actualType = 'string';
-    } else if (typeof value === 'number') {
-      actualType = 'number';
-    } else if (typeof value === 'boolean') {
-      actualType = 'bool';
-    } else if (Array.isArray(value)) {
-      actualType = 'list';
-    } else if (typeof value === 'object' && value !== null) {
-      actualType = 'dict';
-    } else {
-      actualType = typeof value;
-    }
-
-    if (actualType !== expectedType) {
-      throw new Error(
-        `key "${key}" expects ${expectedType}, got ${actualType}`
-      );
-    }
+  function actualTypeOf(value: RillValue): string {
+    if (typeof value === 'string') return 'string';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'boolean') return 'bool';
+    if (Array.isArray(value)) return 'list';
+    if (typeof value === 'object' && value !== null) return 'dict';
+    return typeof value;
   }
 
-  /**
-   * Check if value is a dict.
-   */
-  function isDict(value: RillValue): value is Record<string, RillValue> {
+  function isDictValue(value: RillValue): value is Record<string, RillValue> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  function unknownMount(runCtx: RuntimeContext, mountName: string): RillValue {
+    const available = Object.keys(config.mounts);
+    return runCtx.invalidate(
+      new Error(`Mount '${mountName}' not found. Available mounts: ${available.join(', ')}`),
+      {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: {
+          kind: 'unknown_mount',
+          mountName,
+          availableMounts: available,
+        },
+      },
+    );
+  }
+
+  function readonlyMount(runCtx: RuntimeContext, mountName: string, mode: string): RillValue {
+    return runCtx.invalidate(
+      new Error(`Mount '${mountName}' is read-only (mode: ${mode})`),
+      {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: { kind: 'readonly_mount', mountName, mode },
+      },
+    );
+  }
+
+  function disposedInvalid(runCtx: RuntimeContext): RillValue {
+    return runCtx.invalidate(new Error('SQLite kv extension disposed'), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    });
   }
 
   // ============================================================
   // KV FUNCTIONS
   // ============================================================
 
-  /**
-   * IR-1: Get value or schema default.
-   * EC-1: Returns schema default if key missing.
-   * EC-2: Throws if mount unknown (handled by getMountDb).
-   */
-  const get = (args: Record<string, RillValue>): RillValue => {
+  const get: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+    const { mountDb, mountConfig } = mount;
 
-    const { mountDb, mountConfig } = getMountDb(mountName);
-
-    // Check if schema is defined (declared mode)
     if (mountConfig.schema && !(key in mountConfig.schema)) {
-      throw new Error(`key "${key}" not declared in schema`);
-    }
-
-    // Query database
-    const stmt = mountDb.db.prepare(
-      `SELECT value FROM ${mountDb.table} WHERE key = ?`
-    );
-    const row = stmt.get(key) as { value: string } | undefined;
-
-    if (row) {
-      return JSON.parse(row.value) as RillValue;
-    }
-
-    // EC-1: Return schema default if key missing
-    if (mountConfig.schema && key in mountConfig.schema) {
-      return mountConfig.schema[key]!.default;
-    }
-
-    // Open mode - return empty string
-    return '';
-  };
-
-  /**
-   * IR-2: Get value or fallback.
-   */
-  const get_or = (args: Record<string, RillValue>): RillValue => {
-    const mountName = args['mount'] as string;
-    const key = args['key'] as string;
-    const fallback = args['fallback'] as RillValue;
-
-    const { mountDb } = getMountDb(mountName);
-
-    // Query database
-    const stmt = mountDb.db.prepare(
-      `SELECT value FROM ${mountDb.table} WHERE key = ?`
-    );
-    const row = stmt.get(key) as { value: string } | undefined;
-
-    if (row) {
-      return JSON.parse(row.value) as RillValue;
-    }
-
-    return fallback;
-  };
-
-  /**
-   * IR-3: Set value with validation.
-   * EC-3: Throws if mode is read-only.
-   * EC-4: Throws if value exceeds maxValueSize.
-   */
-  const set = (args: Record<string, RillValue>): boolean => {
-    const mountName = args['mount'] as string;
-    const key = args['key'] as string;
-    const value = args['value'] as RillValue;
-
-    const { mountDb, mountConfig } = getMountDb(mountName);
-
-    // EC-3: Check write permission
-    checkWritePermission(mountName, mountConfig.mode);
-
-    // Check schema constraints
-    if (mountConfig.schema && !(key in mountConfig.schema)) {
-      throw new Error(`key "${key}" not declared in schema`);
-    }
-
-    // Validate type if in declared mode
-    if (mountConfig.schema && key in mountConfig.schema) {
-      validateType(key, value, mountConfig.schema[key]!.type);
-    }
-
-    // EC-4: Check value size
-    const maxValueSize = mountConfig.maxValueSize ?? 102400;
-    const valueSize = calculateValueSize(value);
-    if (valueSize > maxValueSize) {
-      throw new Error(
-        `value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`
-      );
-    }
-
-    // Check max entries (only for new keys)
-    const maxEntries = mountConfig.maxEntries ?? 10000;
-    const hasStmt = mountDb.db.prepare(
-      `SELECT 1 FROM ${mountDb.table} WHERE key = ?`
-    );
-    const exists = hasStmt.get(key) !== undefined;
-
-    if (!exists) {
-      const countStmt = mountDb.db.prepare(
-        `SELECT COUNT(*) as count FROM ${mountDb.table}`
-      );
-      const countRow = countStmt.get() as { count: number };
-
-      if (countRow.count >= maxEntries) {
-        throw new Error(
-          `store exceeds entry limit (${countRow.count + 1} > ${maxEntries})`
-        );
-      }
-    }
-
-    // Insert or replace value
-    const stmt = mountDb.db.prepare(
-      `INSERT OR REPLACE INTO ${mountDb.table} (key, value) VALUES (?, ?)`
-    );
-    stmt.run(key, JSON.stringify(value));
-
-    return true;
-  };
-
-  /**
-   * IR-4: Merge partial dict into existing dict value.
-   * EC-5: Throws if existing value is not a dict.
-   * EC-6: Throws if mode is read-only.
-   */
-  const merge = (args: Record<string, RillValue>): boolean => {
-    const mountName = args['mount'] as string;
-    const key = args['key'] as string;
-    const partial = args['partial'] as Record<string, RillValue>;
-
-    const { mountDb, mountConfig } = getMountDb(mountName);
-
-    // EC-6: Check write permission
-    checkWritePermission(mountName, mountConfig.mode);
-
-    // Atomic merge using transaction
-    const mergeTransaction = mountDb.db.transaction(() => {
-      // Get current value
-      const selectStmt = mountDb.db.prepare(
-        `SELECT value FROM ${mountDb.table} WHERE key = ?`
-      );
-      const row = selectStmt.get(key) as { value: string } | undefined;
-
-      let currentValue: RillValue | undefined;
-      if (row) {
-        currentValue = JSON.parse(row.value) as RillValue;
-
-        // EC-5: Existing value must be a dict
-        if (!isDict(currentValue)) {
-          throw new Error(`Cannot merge into non-dict value at key "${key}"`);
-        }
-      }
-
-      // Merge partial into current dict (shallow merge)
-      const mergedValue = {
-        ...(currentValue as Record<string, RillValue> | undefined),
-        ...partial,
-      };
-
-      // Validate merged value
-      if (mountConfig.schema && key in mountConfig.schema) {
-        validateType(key, mergedValue, mountConfig.schema[key]!.type);
-      }
-
-      // Check value size
-      const maxValueSize = mountConfig.maxValueSize ?? 102400;
-      const valueSize = calculateValueSize(mergedValue);
-      if (valueSize > maxValueSize) {
-        throw new Error(
-          `merged value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`
-        );
-      }
-
-      // Update value
-      const updateStmt = mountDb.db.prepare(
-        `INSERT OR REPLACE INTO ${mountDb.table} (key, value) VALUES (?, ?)`
-      );
-      updateStmt.run(key, JSON.stringify(mergedValue));
-    });
-
-    mergeTransaction();
-    return true;
-  };
-
-  /**
-   * IR-5: Delete key.
-   */
-  const deleteKey = (args: Record<string, RillValue>): boolean => {
-    const mountName = args['mount'] as string;
-    const key = args['key'] as string;
-
-    const { mountDb, mountConfig } = getMountDb(mountName);
-
-    // Check write permission
-    checkWritePermission(mountName, mountConfig.mode);
-
-    const stmt = mountDb.db.prepare(
-      `DELETE FROM ${mountDb.table} WHERE key = ?`
-    );
-    const result = stmt.run(key);
-
-    return result.changes > 0;
-  };
-
-  /**
-   * IR-6: Get all keys.
-   */
-  const keys = (args: Record<string, RillValue>): string[] => {
-    const mountName = args['mount'] as string;
-    const { mountDb } = getMountDb(mountName);
-
-    const stmt = mountDb.db.prepare(`SELECT key FROM ${mountDb.table}`);
-    const rows = stmt.all() as { key: string }[];
-
-    return rows.map((row) => row.key);
-  };
-
-  /**
-   * IR-7: Check key existence.
-   */
-  const has = (args: Record<string, RillValue>): boolean => {
-    const mountName = args['mount'] as string;
-    const key = args['key'] as string;
-
-    const { mountDb } = getMountDb(mountName);
-
-    const stmt = mountDb.db.prepare(
-      `SELECT 1 FROM ${mountDb.table} WHERE key = ?`
-    );
-    const row = stmt.get(key);
-
-    return row !== undefined;
-  };
-
-  /**
-   * IR-8: Clear all keys (restores schema defaults if declared mode).
-   */
-  const clear = (args: Record<string, RillValue>): boolean => {
-    const mountName = args['mount'] as string;
-    const { mountDb, mountConfig } = getMountDb(mountName);
-
-    // Check write permission
-    checkWritePermission(mountName, mountConfig.mode);
-
-    // Delete all entries
-    const deleteStmt = mountDb.db.prepare(`DELETE FROM ${mountDb.table}`);
-    deleteStmt.run();
-
-    // Restore schema defaults if declared mode
-    if (mountConfig.schema) {
-      const insertStmt = mountDb.db.prepare(
-        `INSERT INTO ${mountDb.table} (key, value) VALUES (?, ?)`
-      );
-
-      for (const [key, entry] of Object.entries(mountConfig.schema)) {
-        insertStmt.run(key, JSON.stringify(entry.default));
-      }
-    }
-
-    return true;
-  };
-
-  /**
-   * IR-9: Get all entries as dict.
-   */
-  const getAll = (args: Record<string, RillValue>): Record<string, RillValue> => {
-    const mountName = args['mount'] as string;
-    const { mountDb } = getMountDb(mountName);
-
-    const stmt = mountDb.db.prepare(`SELECT key, value FROM ${mountDb.table}`);
-    const rows = stmt.all() as { key: string; value: string }[];
-
-    const result: Record<string, RillValue> = {};
-    for (const row of rows) {
-      result[row.key] = JSON.parse(row.value) as RillValue;
-    }
-
-    return result;
-  };
-
-  /**
-   * IR-10: Get schema information (empty list in open mode).
-   */
-  const schema = (args: Record<string, RillValue>): RillValue[] => {
-    const mountName = args['mount'] as string;
-    const { mountConfig } = getMountDb(mountName);
-
-    if (!mountConfig.schema) {
-      return []; // Open mode - no schema
-    }
-
-    // Declared mode - return schema entries as list of dicts
-    const result: RillValue[] = [];
-    for (const [key, entry] of Object.entries(mountConfig.schema)) {
-      result.push({
-        key,
-        type: entry.type,
-        description: entry.description ?? '',
+      return runCtx.invalidate(new Error(`key "${key}" not declared in schema`), {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: { kind: 'schema_violation', mount: mountName, key },
       });
     }
 
+    try {
+      const stmt = mountDb.db.prepare(`SELECT value FROM ${mountDb.table} WHERE key = ?`);
+      const row = stmt.get(key) as { value: string } | undefined;
+      if (row) return JSON.parse(row.value) as RillValue;
+      if (mountConfig.schema && key in mountConfig.schema) {
+        return mountConfig.schema[key]!.default;
+      }
+      return '';
+    } catch (error) {
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const get_or: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const fallback = args['fallback'] as RillValue;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+
+    try {
+      const stmt = mount.mountDb.db.prepare(
+        `SELECT value FROM ${mount.mountDb.table} WHERE key = ?`,
+      );
+      const row = stmt.get(key) as { value: string } | undefined;
+      if (row) return JSON.parse(row.value) as RillValue;
+      return fallback;
+    } catch (error) {
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const set: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const value = args['value'] as RillValue;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+    const { mountDb, mountConfig } = mount;
+
+    if (mountConfig.mode === 'read') return readonlyMount(runCtx, mountName, mountConfig.mode);
+
+    if (mountConfig.schema && !(key in mountConfig.schema)) {
+      return runCtx.invalidate(new Error(`key "${key}" not declared in schema`), {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: { kind: 'schema_violation', mount: mountName, key },
+      });
+    }
+
+    if (mountConfig.schema && key in mountConfig.schema) {
+      const expected = mountConfig.schema[key]!.type;
+      const actual = actualTypeOf(value);
+      if (actual !== expected) {
+        return runCtx.invalidate(new Error(`key "${key}" expects ${expected}, got ${actual}`), {
+          code: 'TYPE_MISMATCH',
+          provider: PROVIDER,
+          raw: { kind: 'type_mismatch', key, expected, actual },
+        });
+      }
+    }
+
+    const maxValueSize = mountConfig.maxValueSize ?? 102400;
+    const valueSize = calculateValueSize(value);
+    if (valueSize > maxValueSize) {
+      return runCtx.invalidate(
+        new Error(`value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'value_too_large', key, valueSize, maxValueSize },
+        },
+      );
+    }
+
+    try {
+      const maxEntries = mountConfig.maxEntries ?? 10000;
+      const hasStmt = mountDb.db.prepare(`SELECT 1 FROM ${mountDb.table} WHERE key = ?`);
+      const exists = hasStmt.get(key) !== undefined;
+
+      if (!exists) {
+        const countStmt = mountDb.db.prepare(`SELECT COUNT(*) as count FROM ${mountDb.table}`);
+        const countRow = countStmt.get() as { count: number };
+        if (countRow.count >= maxEntries) {
+          return runCtx.invalidate(
+            new Error(`store exceeds entry limit (${countRow.count + 1} > ${maxEntries})`),
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'entry_limit_exceeded', count: countRow.count + 1, maxEntries },
+            },
+          );
+        }
+      }
+
+      const stmt = mountDb.db.prepare(
+        `INSERT OR REPLACE INTO ${mountDb.table} (key, value) VALUES (?, ?)`,
+      );
+      stmt.run(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const merge: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const partial = args['partial'] as Record<string, RillValue>;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+    const { mountDb, mountConfig } = mount;
+
+    if (mountConfig.mode === 'read') return readonlyMount(runCtx, mountName, mountConfig.mode);
+
+    let invalidResult: RillValue | null = null;
+
+    try {
+      const mergeTransaction = mountDb.db.transaction(() => {
+        const selectStmt = mountDb.db.prepare(
+          `SELECT value FROM ${mountDb.table} WHERE key = ?`,
+        );
+        const row = selectStmt.get(key) as { value: string } | undefined;
+
+        let currentValue: RillValue | undefined;
+        if (row) {
+          currentValue = JSON.parse(row.value) as RillValue;
+          if (!isDictValue(currentValue)) {
+            invalidResult = runCtx.invalidate(
+              new Error(`Cannot merge into non-dict value at key "${key}"`),
+              {
+                code: 'INVALID_INPUT',
+                provider: PROVIDER,
+                raw: { kind: 'merge_non_dict', key, currentType: typeof currentValue },
+              },
+            );
+            throw new Error('__merge_invalid__');
+          }
+        }
+
+        const mergedValue = {
+          ...(currentValue as Record<string, RillValue> | undefined),
+          ...partial,
+        };
+
+        if (mountConfig.schema && key in mountConfig.schema) {
+          const expected = mountConfig.schema[key]!.type;
+          const actual = actualTypeOf(mergedValue);
+          if (actual !== expected) {
+            invalidResult = runCtx.invalidate(
+              new Error(`key "${key}" expects ${expected}, got ${actual}`),
+              {
+                code: 'TYPE_MISMATCH',
+                provider: PROVIDER,
+                raw: { kind: 'type_mismatch', key, expected, actual },
+              },
+            );
+            throw new Error('__merge_invalid__');
+          }
+        }
+
+        const maxValueSize = mountConfig.maxValueSize ?? 102400;
+        const valueSize = calculateValueSize(mergedValue);
+        if (valueSize > maxValueSize) {
+          invalidResult = runCtx.invalidate(
+            new Error(
+              `merged value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`,
+            ),
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'value_too_large', key, valueSize, maxValueSize },
+            },
+          );
+          throw new Error('__merge_invalid__');
+        }
+
+        const updateStmt = mountDb.db.prepare(
+          `INSERT OR REPLACE INTO ${mountDb.table} (key, value) VALUES (?, ?)`,
+        );
+        updateStmt.run(key, JSON.stringify(mergedValue));
+      });
+
+      mergeTransaction();
+      return true;
+    } catch (error) {
+      if (invalidResult !== null) return invalidResult;
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const deleteKey: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+    const { mountDb, mountConfig } = mount;
+
+    if (mountConfig.mode === 'read') return readonlyMount(runCtx, mountName, mountConfig.mode);
+
+    try {
+      const stmt = mountDb.db.prepare(`DELETE FROM ${mountDb.table} WHERE key = ?`);
+      const result = stmt.run(key);
+      return result.changes > 0;
+    } catch (error) {
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const keys: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const mountName = args['mount'] as string;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+
+    try {
+      const stmt = mount.mountDb.db.prepare(`SELECT key FROM ${mount.mountDb.table}`);
+      const rows = stmt.all() as { key: string }[];
+      return rows.map((row) => row.key);
+    } catch (error) {
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const has: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const mountName = args['mount'] as string;
+    const key = args['key'] as string;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+
+    try {
+      const stmt = mount.mountDb.db.prepare(
+        `SELECT 1 FROM ${mount.mountDb.table} WHERE key = ?`,
+      );
+      const row = stmt.get(key);
+      return row !== undefined;
+    } catch (error) {
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const clear: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const mountName = args['mount'] as string;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+    const { mountDb, mountConfig } = mount;
+
+    if (mountConfig.mode === 'read') return readonlyMount(runCtx, mountName, mountConfig.mode);
+
+    try {
+      const deleteStmt = mountDb.db.prepare(`DELETE FROM ${mountDb.table}`);
+      deleteStmt.run();
+
+      if (mountConfig.schema) {
+        const insertStmt = mountDb.db.prepare(
+          `INSERT INTO ${mountDb.table} (key, value) VALUES (?, ?)`,
+        );
+        for (const [k, entry] of Object.entries(mountConfig.schema)) {
+          insertStmt.run(k, JSON.stringify(entry.default));
+        }
+      }
+      return true;
+    } catch (error) {
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const getAll: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) return disposedInvalid(runCtx);
+    const mountName = args['mount'] as string;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+
+    try {
+      const stmt = mount.mountDb.db.prepare(
+        `SELECT key, value FROM ${mount.mountDb.table}`,
+      );
+      const rows = stmt.all() as { key: string; value: string }[];
+      const result: Record<string, RillValue> = {};
+      for (const row of rows) {
+        result[row.key] = JSON.parse(row.value) as RillValue;
+      }
+      return result;
+    } catch (error) {
+      return mapKvError(runCtx, PROVIDER, error);
+    }
+  };
+
+  const schema: CallableFn = (args, runtimeCtx) => {
+    const runCtx = runtimeCtx as RuntimeContext;
+    const mountName = args['mount'] as string;
+    const mount = getMountDb(mountName);
+    if (!mount) return unknownMount(runCtx, mountName);
+    const { mountConfig } = mount;
+
+    if (!mountConfig.schema) return [];
+
+    const result: RillValue[] = [];
+    for (const [key, entry] of Object.entries(mountConfig.schema)) {
+      result.push({ key, type: entry.type, description: entry.description ?? '' });
+    }
     return result;
   };
 
-  /**
-   * IR-11: Get list of mount metadata.
-   */
-  const mountsList = (): RillValue[] => {
+  const mountsList: CallableFn = () => {
     const result: RillValue[] = [];
-
     for (const [name, mountConfig] of Object.entries(config.mounts)) {
       result.push({
         name,
@@ -532,13 +533,11 @@ export function createSqliteKvExtension(
         table: mountConfig.table,
       });
     }
-
     return result;
   };
 
   // ============================================================
   // EXTENSION RESULT
-  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
   // ============================================================
 
   const fnDict: {
@@ -547,10 +546,7 @@ export function createSqliteKvExtension(
     getAll: RillFunction; schema: RillFunction; mounts: RillFunction;
   } = {
     get: {
-      params: [
-        p.str('mount', 'Mount name'),
-        p.str('key', 'Key to retrieve'),
-      ],
+      params: [p.str('mount', 'Mount name'), p.str('key', 'Key to retrieve')],
       fn: get,
       annotations: { description: 'Get value or schema default' },
       returnType: anyTypeValue,
@@ -586,10 +582,7 @@ export function createSqliteKvExtension(
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
     delete: {
-      params: [
-        p.str('mount', 'Mount name'),
-        p.str('key', 'Key to delete'),
-      ],
+      params: [p.str('mount', 'Mount name'), p.str('key', 'Key to delete')],
       fn: deleteKey,
       annotations: { description: 'Delete key' },
       returnType: structureToTypeValue({ kind: 'bool' }),
@@ -601,10 +594,7 @@ export function createSqliteKvExtension(
       returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
     },
     has: {
-      params: [
-        p.str('mount', 'Mount name'),
-        p.str('key', 'Key to check'),
-      ],
+      params: [p.str('mount', 'Mount name'), p.str('key', 'Key to check')],
       fn: has,
       annotations: { description: 'Check key existence' },
       returnType: structureToTypeValue({ kind: 'bool' }),
@@ -659,14 +649,6 @@ export function createSqliteKvExtension(
     },
   };
 
-  const dispose = (): void => {
-    // Close all database connections
-    for (const { db } of databases.values()) {
-      db.close();
-    }
-    databases.clear();
-  };
-
   const callableDict = {
     get: toCallable(fnDict.get),
     get_or: toCallable(fnDict.get_or),
@@ -681,5 +663,8 @@ export function createSqliteKvExtension(
     mounts: toCallable(fnDict.mounts),
   } satisfies KvExtensionContract;
 
-  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
+  return {
+    value: callableDict as unknown as RillValue,
+    dispose,
+  } satisfies ExtensionFactoryResult;
 }

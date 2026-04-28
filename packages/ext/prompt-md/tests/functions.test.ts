@@ -9,8 +9,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { RuntimeError, formatValue, type ApplicationCallable } from '@rcrsr/rill';
+import { createRuntimeContext, formatValue, getStatus, isInvalid, type ApplicationCallable, type RillValue } from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
+import { makeFactoryCtx } from './_helpers.js';
 import {
   ANNOTATION_KEY_ID,
   ANNOTATION_KEY_HASH,
@@ -100,7 +101,7 @@ Research: {topic}
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const keys = Object.keys(dict).sort();
 
@@ -130,7 +131,7 @@ Hello {title} {name}!
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const result = await dict['greet']!.fn({ name: 'Alice', title: 'Dr.' }, {} as never);
 
@@ -159,7 +160,7 @@ Tell me about {topic}.
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const result = await dict['chat']!.fn({ topic: 'AI' }, {} as never);
 
@@ -201,7 +202,7 @@ Context: {context}
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const callable = dict['agents.qa']!;
 
@@ -246,7 +247,7 @@ This is a static prompt.
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const result = await dict['static']!.fn({}, {} as never);
 
@@ -271,7 +272,7 @@ Open: {{ Close: }} Escaped: {{name}}
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const result = await dict['escapes']!.fn({}, {} as never);
 
@@ -310,7 +311,7 @@ Prompt body.
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const keys = Object.keys(dict);
 
@@ -323,7 +324,7 @@ Prompt body.
 
 // ── AC-17: dispose idempotency ────────────────────────────────────────────────
 
-describe('AC-17: dispose is idempotent, post-dispose call throws RILL-R004', () => {
+describe('AC-17: dispose is idempotent, post-dispose call invalidates with #DISPOSED', () => {
   it('second dispose() call does not throw', async () => {
     const dir = await tempDir();
     await writePrompt(
@@ -338,12 +339,12 @@ body
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     await expect(ext.dispose?.()).resolves.toBeUndefined();
     await expect(ext.dispose?.()).resolves.toBeUndefined();
   });
 
-  it('calling closure after dispose throws RILL-R004', async () => {
+  it('calling closure after dispose invalidates with #DISPOSED', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -357,20 +358,22 @@ body
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const fn = dict['alive']!.fn;
 
     await ext.dispose?.();
 
+    const ctx = createRuntimeContext();
     let caught: unknown;
     try {
-      await fn({}, {} as never);
+      await fn({}, ctx);
     } catch (err) {
       caught = err;
     }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    // The wrapper throws the invalid RillValue produced by ctx.invalidate.
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('DISPOSED');
   });
 });
 
@@ -390,7 +393,7 @@ Hello {text}!
     await writePrompt(dir, 'first.prompt.md', content);
     await writePrompt(dir, 'second.prompt.md', content);
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
 
     const hashFirst = dict['first']!.annotations[ANNOTATION_KEY_HASH];
@@ -426,7 +429,7 @@ Some context here.
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const result = await dict['with-heading']!.fn({}, {} as never);
 
@@ -461,7 +464,7 @@ Result: {data}
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
 
     // Dict should not throw — it formats via rill's formatValue
@@ -485,7 +488,7 @@ Items: {items}
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
 
     // List should not throw — it formats via rill's formatValue
@@ -513,7 +516,7 @@ Articles: {articles}
 `,
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir });
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
     const callable = dict['articles']!;
 
@@ -547,20 +550,17 @@ Articles: {articles}
 
 // ── EC-17: uncaught internal failure ─────────────────────────────────────────
 
-describe('EC-17: uncaught internal failure wrapped in RILL-R004', () => {
+describe('EC-17: uncaught internal failure invalidated via ctx with #PROTOCOL', () => {
   // [ASSUMPTION] EC-17 is the default catch-all in buildClosure.ts that wraps
-  // unexpected (non-RuntimeError) exceptions in RILL-R004. It cannot be triggered
-  // deterministically via the public API since all known error paths are already
-  // RILL-R004. The implementation is verified by code inspection:
-  // buildClosure.ts lines 106-115 wrap any non-RuntimeError in RILL-R004.
-  // We trigger it by calling splitRoleMessages indirectly with a body that has
-  // a list output but no @@ markers — however parseFile already blocks this at
-  // boot time, so EC-17 is a defensive branch for future edge cases.
-  //
-  // We verify the branch exists by ensuring a callable's fn wraps raw Error:
-  // This is done by directly constructing a minimal ParsedPrompt and calling
-  // buildClosure with it, then monkey-patching the interpolate import — which
-  // is not possible without vi.mock. Instead we document this as a best-effort
-  // coverage gap and note it is covered by code inspection.
+  // unexpected (non-RuntimeError) exceptions via ctx.invalidate with code
+  // 'PROTOCOL' and raw.kind 'closure_failure'. It cannot be triggered
+  // deterministically via the public API since all known error paths are
+  // already covered by RILL-R001 (factory-time) or never throw at runtime.
+  // The implementation is verified by code inspection:
+  // buildClosure.ts lines 93-108 catch any non-RuntimeError and call
+  // ctx.invalidate(err, { code: 'PROTOCOL', provider: 'prompt-md',
+  //   raw: { kind: 'closure_failure', name, detail } }).
+  // parseFile already blocks list-output-without-markers at boot time, so
+  // EC-17 is a defensive branch for future edge cases.
   it.skip('EC-17 defensive catch-all — untestable via public API (see buildClosure.ts catch branch)', () => {});
 });

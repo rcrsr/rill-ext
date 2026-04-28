@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { expectRejectedHalt } from './_halt-helpers.js';
 import {
   createRuntimeContext,
   type ApplicationCallable,
@@ -265,12 +266,13 @@ describe('generate() function', () => {
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn(
           { prompt: 'test', schema: undefined, options: {} },
           ctx
-        )
-      ).rejects.toThrow('generate requires a type expression as schema');
+        ),
+        { message: 'generate requires a type expression as schema' }
+      );
     });
 
     // AC-6: throws when schema is not a dict type
@@ -280,16 +282,16 @@ describe('generate() function', () => {
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn(
           { prompt: 'test', schema: stringSchema, options: {} },
           ctx
         )
-      ).rejects.toThrow('generate requires a dict type as schema');
+      , { message: 'generate requires a dict type as schema' });
     });
 
-    // AC-6: throws when response JSON is malformed
-    it('throws RuntimeError when response JSON cannot be parsed', async () => {
+    // AC-6: halts with #PROTOCOL when response JSON is malformed
+    it('halts with #PROTOCOL when response JSON cannot be parsed', async () => {
       mockCreate.mockResolvedValue(
         createGenerateMockResponse('not valid json {{{')
       );
@@ -297,12 +299,13 @@ describe('generate() function', () => {
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getCallable(ext, 'generate').fn(
           { prompt: 'test', schema: PERSON_SCHEMA, options: {} },
           ctx
-        )
-      ).rejects.toMatchObject({ errorId: 'RILL-R004' });
+        ) as Promise<unknown>,
+        { code: 'PROTOCOL', message: 'failed to parse response JSON' }
+      );
     });
   });
 });

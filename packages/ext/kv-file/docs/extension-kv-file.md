@@ -119,13 +119,20 @@ List all configured mounts with metadata.
 
 ## Errors
 
-| Error | Code | Description |
-|-------|------|-------------|
-| Key not in schema | RILL-R004 | Key not declared (declared mode) |
-| Type mismatch | RILL-R004 | Value type does not match schema |
-| Value too large | RILL-R004 | Value exceeds maxValueSize |
-| Store too large | RILL-R004 | Store exceeds maxStoreSize |
-| Entry limit | RILL-R004 | Exceeds maxEntries |
-| Corrupt file | RILL-R004 | JSON store file cannot be parsed |
-| Read-only | RILL-R004 | Write operation on read-only mount |
-| Mount not found | RILL-R004 | Referenced mount does not exist |
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
+(`guard #INVALID_INPUT && raw.kind == 'value_too_large'`).
+
+**Host-fn errors:**
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Key not declared in schema (declared mode) | `#INVALID_INPUT` | `key_not_declared` |
+| Value type does not match schema | `#INVALID_INPUT` | `type_mismatch` |
+| Value exceeds `maxValueSize` | `#INVALID_INPUT` | `value_too_large` |
+| Store exceeds `maxStoreSize` | `#INVALID_INPUT` | `store_too_large` |
+| Exceeds `maxEntries` | `#INVALID_INPUT` | `entry_limit_exceeded` |
+| Write attempted on read-only mount | `#INVALID_INPUT` | `read_only` |
+| Referenced mount does not exist | `#INVALID_INPUT` | `mount_not_found` |
+| JSON store file cannot be parsed | `#UNAVAILABLE` | `store_corrupt` |
+| Filesystem read / write failure | `#UNAVAILABLE` | `io_error` |

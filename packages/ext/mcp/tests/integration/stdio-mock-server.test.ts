@@ -38,6 +38,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createMcpExtension } from '../../src/factory.js';
+import { makeFactoryCtx } from '../_helpers.js';
 
 // Minimal runtime context for calling host functions in tests
 const mockContext = {
@@ -76,7 +77,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -108,7 +109,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -130,7 +131,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -151,7 +152,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -174,7 +175,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -194,7 +195,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -219,7 +220,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -241,7 +242,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -274,7 +275,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -306,7 +307,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -331,7 +332,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -361,7 +362,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -403,7 +404,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext1);
 
       const ext2 = await createMcpExtension({
@@ -413,7 +414,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       activeExtensions.push(ext2);
 
       const v1 = fns(ext1);
@@ -448,7 +449,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
       const v = fns(ext);
 
       // Verify extension works
@@ -473,7 +474,7 @@ describe('Integration: stdio mock server', () => {
           args: [MOCK_SERVER_PATH],
         },
         timeout: 10000,
-      });
+      }, makeFactoryCtx());
 
       // First dispose
       await ext.dispose();

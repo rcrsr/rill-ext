@@ -4,7 +4,7 @@
  */
 
 import * as pty from 'node-pty';
-import { RuntimeError } from '@rcrsr/rill';
+import { SpawnError } from './errors.js';
 
 // ============================================================
 // TYPES
@@ -51,7 +51,8 @@ export interface SpawnOptions {
  * @param prompt - User prompt to send to Claude
  * @param options - Spawn options
  * @returns Process handle with exit code and cleanup
- * @throws RuntimeError RILL-R004 for spawn failures
+ * @throws SpawnError on spawn-time failures (callers convert to invalid
+ *   RillValues via `mapSpawnError`)
  */
 export function spawnClaudeCli(
   prompt: string,
@@ -105,45 +106,28 @@ export function spawnClaudeCli(
       env,
     });
   } catch (error: unknown) {
-    // Handle spawn errors
     if (error instanceof Error) {
       const code = (error as Error & { code?: string }).code;
 
-      // EC-4: Binary not found
       if (code === 'ENOENT') {
-        throw new RuntimeError(
-          'RILL-R004',
-          'claude binary not found',
-          undefined,
-          { binaryPath }
-        );
+        throw new SpawnError('binary_missing', 'claude binary not found', { binaryPath });
       }
 
-      // EC-5: Permission denied
       if (code === 'EACCES') {
-        throw new RuntimeError(
-          'RILL-R004',
-          'Permission denied: claude',
-          undefined,
-          { binaryPath }
-        );
+        throw new SpawnError('binary_eacces', 'Permission denied: claude', { binaryPath });
       }
 
-      // EC-6: Generic spawn failure
-      throw new RuntimeError(
-        'RILL-R004',
+      throw new SpawnError(
+        'spawn_failed',
         `Failed to spawn claude binary: ${error.message}`,
-        undefined,
-        { binaryPath, originalError: error.message }
+        { binaryPath, originalError: error.message },
       );
     }
 
-    // Unknown error type
-    throw new RuntimeError(
-      'RILL-R004',
-      `Failed to spawn claude binary: Unknown error`,
-      undefined,
-      { binaryPath }
+    throw new SpawnError(
+      'spawn_failed',
+      'Failed to spawn claude binary: Unknown error',
+      { binaryPath },
     );
   }
 
@@ -154,12 +138,9 @@ export function spawnClaudeCli(
         disposed = true;
         ptyProcess.kill();
         rejectExit(
-          new RuntimeError(
-            'RILL-R004',
-            `Claude CLI timeout after ${timeoutMs}ms`,
-            undefined,
-            { timeoutMs }
-          )
+          new SpawnError('cli_timeout', `Claude CLI timeout after ${timeoutMs}ms`, {
+            timeoutMs,
+          }),
         );
       }
     }, timeoutMs);
@@ -178,12 +159,9 @@ export function spawnClaudeCli(
       // EC-9: Non-zero exit code
       if (code !== 0) {
         rejectExit(
-          new RuntimeError(
-            'RILL-R004',
-            `Claude CLI exited with code ${code}`,
-            undefined,
-            { exitCode: code }
-          )
+          new SpawnError('exit_nonzero', `Claude CLI exited with code ${code}`, {
+            exitCode: code,
+          }),
         );
       } else {
         resolveExit(code);

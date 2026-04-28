@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RuntimeError, createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
+import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
 
 // ============================================================
 // MODULE MOCK
@@ -291,14 +292,15 @@ describe('shield() host function', () => {
   // --------------------------------------------------------
 
   describe('missing contentSafety config', () => {
-    it('throws RILL-R004 when contentSafety not configured [AC-18, EC-7]', async () => {
+    it('halts with #UNAVAILABLE when contentSafety not configured [AC-18, EC-7]', async () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithoutSafety());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      await expectRejectedHalt(
+        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx),
+        { code: 'UNAVAILABLE', provider: 'foundry' }
+      );
     });
 
     it('error message is "foundry: content safety not configured" [EC-7]', async () => {
@@ -306,9 +308,9 @@ describe('shield() host function', () => {
       const ext = await createFoundryExtension(configWithoutSafety());
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx)
-      ).rejects.toThrow('foundry: content safety not configured');
+      , { message: 'foundry: content safety not configured' });
     });
 
     it('fetch is not called when contentSafety not configured [AC-18]', async () => {
@@ -436,9 +438,9 @@ describe('shield() host function', () => {
       const ext = await createFoundryExtension(configWithSafety());
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx)
-      ).rejects.toThrow('foundry: authentication failed');
+      , { message: 'foundry: authentication failed' });
     });
 
     it('maps HTTP 429 to rate limit exceeded', async () => {
@@ -448,9 +450,9 @@ describe('shield() host function', () => {
       const ext = await createFoundryExtension(configWithSafety());
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectRejectedHalt(
         getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx)
-      ).rejects.toThrow('foundry: rate limit exceeded');
+      , { message: 'foundry: rate limit exceeded' });
     });
   });
 });

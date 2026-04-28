@@ -4,11 +4,13 @@
  */
 
 import {
+  getStatus,
   invokeCallable,
   isCallable,
   isDict,
   isRuntimeCallable,
   RuntimeError,
+  RuntimeHaltSignal,
   type ApplicationCallable,
   type RillCallable,
   type TypeStructure,
@@ -18,6 +20,49 @@ import {
 } from '@rcrsr/rill';
 import type { ToolLoopCallbacks, ToolLoopResult } from './types.js';
 import { buildJsonSchemaFromStructuralType } from './schema.js';
+import { mapProviderError } from './errors.js';
+
+// ============================================================
+// HALT HELPERS
+// ============================================================
+
+/**
+ * Throw a catchable RuntimeHaltSignal carrying an invalid RillValue.
+ * Falls back to RuntimeError('RILL-R005', ...) when no host context is
+ * available (e.g., direct unit-test calls without a runtime context).
+ */
+/**
+ * Extract the human-readable message from a `RuntimeHaltSignal` payload.
+ * Looks up `getStatus(value).message`; falls back to the signal's own
+ * Error message when the rill module is not available.
+ */
+function readHaltMessage(halt: RuntimeHaltSignal): string {
+  const status = getStatus(halt.value);
+  if (typeof status.message === 'string' && status.message.length > 0) {
+    return status.message;
+  }
+  return halt.message;
+}
+
+function throwToolLoopHalt(
+  ctx: RuntimeContextLike | undefined,
+  code: string,
+  kind: string,
+  message: string
+): never {
+  if (ctx !== undefined) {
+    const hostCtx = ctx as RuntimeContext;
+    if (typeof hostCtx.invalidate === 'function') {
+      const invalid = hostCtx.invalidate(new Error(message), {
+        code,
+        provider: 'tool_loop',
+        raw: { kind, message },
+      });
+      throw new RuntimeHaltSignal(invalid, true);
+    }
+  }
+  throw new RuntimeError('RILL-R005', message);
+}
 
 // Minimal context interface compatible with CallableFn signature
 // Matches RuntimeContextLike from @rcrsr/rill's callable.ts
@@ -25,6 +70,8 @@ interface RuntimeContextLike {
   readonly parent?: RuntimeContextLike | undefined;
   readonly variables: Map<string, RillValue>;
   pipeValue: RillValue;
+  readonly metadata?: Record<string, string> | undefined;
+  readonly hostContext: Record<string, unknown>;
 }
 
 // ============================================================
@@ -48,8 +95,10 @@ async function executeToolCall(
 ): Promise<RillValue> {
   // EC-15: Tool name not in tool map
   if (!isDict(tools)) {
-    throw new RuntimeError(
-      'RILL-R004',
+    throwToolLoopHalt(
+      context,
+      'INVALID_INPUT',
+      'tools_not_dict',
       'tool_loop: tools must be a dict of name → callable'
     );
   }
@@ -58,21 +107,30 @@ async function executeToolCall(
   const toolFn = toolsDict[toolName];
 
   if (toolFn === undefined || toolFn === null) {
-    throw new RuntimeError('RILL-R004', `Unknown tool: ${toolName}`);
+    throwToolLoopHalt(
+      context,
+      'NOT_FOUND',
+      'unknown_tool',
+      `Unknown tool: ${toolName}`
+    );
   }
 
   // Validate tool is callable
   if (!isCallable(toolFn)) {
-    throw new RuntimeError(
-      'RILL-R004',
+    throwToolLoopHalt(
+      context,
+      'INVALID_INPUT',
+      'tool_not_callable',
       `Invalid tool input for ${toolName}: tool must be callable`
     );
   }
 
   // EC-16: Tool input validation
   if (typeof toolInput !== 'object' || toolInput === null) {
-    throw new RuntimeError(
-      'RILL-R004',
+    throwToolLoopHalt(
+      context,
+      'INVALID_INPUT',
+      'invalid_tool_input',
       `Invalid tool input for ${toolName}: input must be an object`
     );
   }
@@ -86,8 +144,10 @@ async function executeToolCall(
     callable.kind !== 'application' &&
     callable.kind !== 'script'
   ) {
-    throw new RuntimeError(
-      'RILL-R004',
+    throwToolLoopHalt(
+      context,
+      'INVALID_INPUT',
+      'tool_kind_unsupported',
       `Invalid tool input for ${toolName}: tool must be application, runtime, or script callable`
     );
   }
@@ -100,7 +160,7 @@ async function executeToolCall(
     if (callable.kind === 'script') {
       if (!context) {
         throw new RuntimeError(
-          'RILL-R004',
+          'RILL-R005',
           `Invalid tool input for ${toolName}: script callable requires a runtime context`
         );
       }
@@ -125,6 +185,7 @@ async function executeToolCall(
       parent: undefined,
       variables: new Map<string, RillValue>(),
       pipeValue: null,
+      hostContext: {},
     };
     const result = callable.fn(inputDict, ctx);
     return result instanceof Promise ? await result : result;
@@ -137,7 +198,7 @@ async function executeToolCall(
     // Wrap other errors
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `Invalid tool input for ${toolName}: ${message}`
     );
   }
@@ -295,12 +356,19 @@ export async function executeToolLoop(
 ): Promise<ToolLoopResult> {
   // Validate tools parameter
   if (tools === undefined) {
-    throw new RuntimeError('RILL-R004', 'tools parameter is required');
+    throwToolLoopHalt(
+      context,
+      'INVALID_INPUT',
+      'tools_required',
+      'tools parameter is required'
+    );
   }
 
   if (!isDict(tools)) {
-    throw new RuntimeError(
-      'RILL-R004',
+    throwToolLoopHalt(
+      context,
+      'INVALID_INPUT',
+      'tools_not_dict',
       'tool_loop: tools must be a dict of name → callable'
     );
   }
@@ -313,16 +381,20 @@ export async function executeToolLoop(
 
     // EC-3: RuntimeCallable (builtins) cannot be used as tools
     if (isRuntimeCallable(fnValue)) {
-      throw new RuntimeError(
-        'RILL-R004',
+      throwToolLoopHalt(
+        context,
+        'INVALID_INPUT',
+        'builtin_tool_unsupported',
         `tool_loop: builtin "${name}" cannot be used as a tool — wrap in a closure`
       );
     }
 
     // EC-2: Value must be a callable
     if (!isCallable(fnValue)) {
-      throw new RuntimeError(
-        'RILL-R004',
+      throwToolLoopHalt(
+        context,
+        'INVALID_INPUT',
+        'tool_not_callable',
         `tool_loop: tool "${name}" is not a callable`
       );
     }
@@ -386,7 +458,12 @@ export async function executeToolLoop(
   while (turnCount < maxTurns) {
     // Check cancellation before each turn
     if (signal?.aborted) {
-      throw new RuntimeError('RILL-R004', 'tool_loop cancelled');
+      throwToolLoopHalt(
+        context,
+        'TIMEOUT',
+        'tool_loop_cancelled',
+        'tool_loop cancelled'
+      );
     }
 
     turnCount++;
@@ -408,12 +485,29 @@ export async function executeToolLoop(
         response = await callbacks.callAPI(currentMessages, providerTools, signal);
       }
     } catch (error: unknown) {
-      // Wrap provider API errors in RuntimeError
-      // Note: Full mapProviderError not used because ProviderErrorDetector
-      // is not available in ToolLoopCallbacks interface
+      // In-fn halts (e.g. middleware-shielded callAPI) already carry a generic
+      // atom in `meta.code`; pass them through unchanged so host scripts match
+      // on the original atom (`#FORBIDDEN`, `#AUTH`, etc.).
+      if (error instanceof RuntimeHaltSignal) {
+        throw error;
+      }
+      // Provider API errors surface via the optional detectError callback so
+      // host scripts can `guard #AUTH`, `guard #RATE_LIMIT`, etc.
+      if (context !== undefined && callbacks.detectError !== undefined) {
+        const hostCtx = context as RuntimeContext;
+        if (typeof hostCtx.invalidate === 'function') {
+          const invalid = mapProviderError(
+            hostCtx,
+            'tool_loop',
+            error,
+            callbacks.detectError
+          );
+          throw new RuntimeHaltSignal(invalid, true);
+        }
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new RuntimeError(
-        'RILL-R004',
+        'RILL-R005',
         `Provider API error: ${message}`,
         undefined,
         { cause: error }
@@ -518,8 +612,15 @@ export async function executeToolLoop(
         // Capture original error message before RuntimeError wrapping
         // RuntimeError wraps tool errors as "Invalid tool input for {name}: {original}"
         let originalError: string;
-        if (error instanceof RuntimeError) {
-          // Extract original message from wrapped format
+        if (error instanceof RuntimeHaltSignal) {
+          // Halt signals carry the human-readable message in their value's
+          // status sidecar; the signal's own .message is always 'runtime halt'.
+          const haltMessage = readHaltMessage(error);
+          const prefix = `Invalid tool input for ${name}: `;
+          originalError = haltMessage.startsWith(prefix)
+            ? haltMessage.slice(prefix.length)
+            : haltMessage;
+        } else if (error instanceof RuntimeError) {
           const prefix = `Invalid tool input for ${name}: `;
           if (error.message.startsWith(prefix)) {
             originalError = error.message.slice(prefix.length);
@@ -549,8 +650,10 @@ export async function executeToolLoop(
 
         // EC-14: Consecutive errors exceed maxErrors
         if (consecutiveErrors >= maxErrors) {
-          throw new RuntimeError(
-            'RILL-R004',
+          throwToolLoopHalt(
+            context,
+            'UNAVAILABLE',
+            'consecutive_tool_errors',
             `Tool execution failed: ${maxErrors} consecutive errors (last: ${name}: ${originalError})`
           );
         }

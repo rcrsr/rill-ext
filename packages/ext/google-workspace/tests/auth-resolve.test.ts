@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
 import { RuntimeError } from '@rcrsr/rill';
 
 // Mock jwt and exchange modules before importing resolve
@@ -157,40 +157,28 @@ describe('resolveToken — session', () => {
     expect(result).toBe('grandparent-token');
   });
 
-  it('throws RILL-R004 when session variable is absent from all scopes (EC-21)', async () => {
+  it('emits #AUTH when session variable is absent from all scopes (EC-21)', async () => {
     const auth = { type: 'session' as const, tokenVar: 'MISSING_TOKEN' };
     const cache = createTokenCache();
     const ctx = createRuntimeContext();
-
     let caught: unknown;
     try {
       await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe(
-      "google: session token 'MISSING_TOKEN' not found"
-    );
+    } catch (e) { caught = e; }
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
+    expect(getStatus(caught as RillValue).message).toBe("google: session token 'MISSING_TOKEN' not found");
   });
 
-  it('throws RILL-R004 with exact var name in message (EC-21)', async () => {
+  it('session token error with exact var name in message (EC-21)', async () => {
     const auth = { type: 'session' as const, tokenVar: 'gcp_access_token' };
     const cache = createTokenCache();
     const ctx = createRuntimeContext();
-
     let caught: unknown;
     try {
       await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect((caught as RuntimeError).message).toBe(
-      "google: session token 'gcp_access_token' not found"
-    );
+    } catch (e) { caught = e; }
+    expect(getStatus(caught as RillValue).message).toBe("google: session token 'gcp_access_token' not found");
   });
 });
 
@@ -219,7 +207,7 @@ describe('resolveToken — service-account', () => {
     expect(result).toBe('new-token');
     expect(mockSign).toHaveBeenCalledTimes(1);
     expect(mockExchange).toHaveBeenCalledTimes(1);
-    expect(mockExchange).toHaveBeenCalledWith('signed-jwt', SIGNAL);
+    expect(mockExchange).toHaveBeenCalledWith(expect.anything(), 'signed-jwt', SIGNAL);
   });
 
   it('populates cache with expiresAtMs = Date.now() + (expiresIn - 300) * 1000 (BC-7, AC-10)', async () => {
@@ -351,7 +339,7 @@ describe('resolveToken — service-account', () => {
     expect(cache.slot!.expiresAtMs).toBe(now + ttlMs + 1 + ttlMs);
   });
 
-  it('throws RILL-R004 without key material when keyJson parse fails (no key in message)', async () => {
+  it('emits #AUTH without key material when keyJson parse fails (no key in message)', async () => {
     const auth = {
       type: 'service-account' as const,
       keyJson: 'not-valid-json',
@@ -362,14 +350,10 @@ describe('resolveToken — service-account', () => {
     let caught: unknown;
     try {
       await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('google: service account key parse failed');
-    // Confirm no private key material (PEM content) leaks into the message
-    expect((caught as RuntimeError).message).not.toContain('-----BEGIN PRIVATE KEY-----');
+    } catch (e) { caught = e; }
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
+    expect(getStatus(caught as RillValue).message).toContain('google: service account key parse failed');
+    expect(getStatus(caught as RillValue).message).not.toContain('-----BEGIN PRIVATE KEY-----');
   });
 });

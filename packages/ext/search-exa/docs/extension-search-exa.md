@@ -195,16 +195,25 @@ exa::answer("What is rill?", [
 
 ## Error Behavior
 
-**Validation errors** (before API call):
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #QUOTA_EXCEEDED`) or finely
+(`guard #QUOTA_EXCEEDED && raw.kind == 'credits_depleted'`).
 
-- Empty query → `RuntimeError RILL-R004: exa: query is required`
-- After dispose → `RuntimeError RILL-R004: exa: operation cancelled`
+**Host-fn errors:**
 
-**API errors** (from provider):
-
-- Rate limit → `RuntimeError RILL-R004: exa: rate limit exceeded`
-- Auth failure → `RuntimeError RILL-R004: exa: authentication failed`
-- Timeout → `RuntimeError RILL-R004: exa: request timeout`
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Empty / missing required input (e.g. `query`) | `#INVALID_INPUT` | `invalid_input` |
+| Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
+| Credits depleted (HTTP 402) | `#QUOTA_EXCEEDED` | `credits_depleted` |
+| Forbidden (HTTP 403) | `#FORBIDDEN` | `forbidden` |
+| Resource not found (HTTP 404) | `#NOT_FOUND` | `not_found` |
+| Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
+| Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
+| Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
+| Called after `dispose()` | `#DISPOSED` | `disposed` |
 
 ## Events
 

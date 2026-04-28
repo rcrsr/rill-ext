@@ -105,11 +105,18 @@ $exec.commands() -> log
 
 ## Errors
 
-| Error | Code | Description |
-|-------|------|-------------|
-| Arg not in allowlist | RILL-R004 | Argument not permitted by allowedArgs |
-| Arg in blocklist | RILL-R004 | Argument rejected by blockedArgs |
-| Binary not found | RILL-R004 | Executable not found at path |
-| Output exceeds limit | RILL-R004 | stdout/stderr exceeds maxBuffer |
-| Stdin not supported | RILL-R004 | stdin provided but command has stdin: false |
-| Command timeout | RILL-R012 | Command exceeded timeout limit |
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
+(`guard #INVALID_INPUT && raw.kind == 'arg_not_allowed'`).
+
+**Host-fn errors:**
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Argument not permitted by `allowedArgs` | `#INVALID_INPUT` | `arg_not_allowed` |
+| Argument rejected by `blockedArgs` | `#INVALID_INPUT` | `arg_blocked` |
+| Executable not found at path | `#INVALID_INPUT` | `binary_not_found` |
+| stdout / stderr exceeded `maxBuffer` | `#INVALID_INPUT` | `output_too_large` |
+| `stdin` provided but command has `stdin: false` | `#INVALID_INPUT` | `stdin_not_supported` |
+| Command exceeded configured timeout | `#TIMEOUT` | `command_timeout` |
+| Cooperative cancellation via `ctx.signal` | `#TIMEOUT` | `request_cancelled` |

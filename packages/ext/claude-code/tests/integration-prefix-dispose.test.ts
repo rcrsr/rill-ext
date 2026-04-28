@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
+import { makeFactoryCtx } from './_helpers.js';
 import { createRuntimeContext, structureToTypeValue } from '@rcrsr/rill';
 import type { ClaudeCodeResult } from '../src/types.js';
 
@@ -84,7 +85,7 @@ describe('IR-1: Factory result has correct value shape', () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const v = ext.value as any;
 
     // Verify all three function names exist in value dict
@@ -97,7 +98,7 @@ describe('IR-1: Factory result has correct value shape', () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const v = ext.value as any;
 
     // Verify dispose is on ext, not on ext.value
@@ -110,7 +111,7 @@ describe('IR-1: Factory result has correct value shape', () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const v = ext.value as any;
 
     // Verify function definitions are intact
@@ -165,7 +166,7 @@ describe('IR-1: Factory result has correct value shape', () => {
       dispose: vi.fn(),
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const v = ext.value as any;
     const ctx = createRuntimeContext();
 
@@ -235,7 +236,7 @@ describe('IR-5: dispose terminates active child processes', () => {
       duration: 100,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Start prompt but don't await completion — fn() returns RillStream synchronously
@@ -305,7 +306,7 @@ describe('IR-5: dispose terminates active child processes', () => {
       duration: 100,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Start 5 concurrent prompts — fn() returns RillStream synchronously
@@ -346,7 +347,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
 
     // Call dispose multiple times
     expect(() => ext.dispose!()).not.toThrow();
@@ -397,7 +398,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
       duration: 100,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Start process — fn() returns RillStream synchronously
@@ -464,7 +465,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
       duration: 100,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Start 3 processes — fn() returns RillStream synchronously
@@ -551,7 +552,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
       duration: 100,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Start process — fn() returns RillStream synchronously
@@ -617,7 +618,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
       duration: 100,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
@@ -689,7 +690,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
       duration: 100,
     });
 
-    const ext = createClaudeCodeExtension();
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Start 3 processes — fn() returns RillStream synchronously
@@ -732,9 +733,9 @@ describe('IR-1: Factory creation is idempotent', () => {
     const config = { binaryPath: 'claude', defaultTimeout: 1800000 };
 
     // Create multiple instances
-    const ext1 = createClaudeCodeExtension(config);
-    const ext2 = createClaudeCodeExtension(config);
-    const ext3 = createClaudeCodeExtension(config);
+    const ext1 = createClaudeCodeExtension(config, makeFactoryCtx());
+    const ext2 = createClaudeCodeExtension(config, makeFactoryCtx());
+    const ext3 = createClaudeCodeExtension(config, makeFactoryCtx());
 
     // Verify all created successfully
     expect((ext1.value as any).prompt).toBeDefined();
@@ -794,9 +795,9 @@ describe('IR-1: Factory creation is idempotent', () => {
       duration: 100,
     });
 
-    const ext1 = createClaudeCodeExtension();
-    const ext2 = createClaudeCodeExtension();
-    const ext3 = createClaudeCodeExtension();
+    const ext1 = createClaudeCodeExtension({}, makeFactoryCtx());
+    const ext2 = createClaudeCodeExtension({}, makeFactoryCtx());
+    const ext3 = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Start process on each instance — fn() returns RillStream synchronously
@@ -840,9 +841,9 @@ describe('IR-1: Factory creation is idempotent', () => {
     const which = await import('which');
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
-    const ext1 = createClaudeCodeExtension({ defaultTimeout: 10000 });
-    const ext2 = createClaudeCodeExtension({ defaultTimeout: 20000 });
-    const ext3 = createClaudeCodeExtension({ defaultTimeout: 30000 });
+    const ext1 = createClaudeCodeExtension({ defaultTimeout: 10000 }, makeFactoryCtx());
+    const ext2 = createClaudeCodeExtension({ defaultTimeout: 20000 }, makeFactoryCtx());
+    const ext3 = createClaudeCodeExtension({ defaultTimeout: 30000 }, makeFactoryCtx());
 
     // Verify all created with different configs
     expect((ext1.value as any).prompt).toBeDefined();

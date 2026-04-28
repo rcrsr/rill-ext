@@ -8,8 +8,15 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { RuntimeError, deserializeValue, type RillValue } from '@rcrsr/rill';
+import {
+  deserializeValue,
+  isInvalid,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import type { SchemaEntry } from './types.js';
+
+const PROVIDER = 'kv-file';
 
 /** Store configuration. */
 export interface StoreConfig {
@@ -23,21 +30,34 @@ export interface StoreConfig {
   readonly mode: 'read' | 'write' | 'read-write';
 }
 
+/** Sentinel raised internally to short-circuit load with a RillValue invalid. */
+class LoadInvalid {
+  constructor(public readonly value: RillValue) {}
+}
+
+export interface KvStore {
+  loadError: RillValue | null;
+  get: (key: string, ctx: RuntimeContext) => RillValue | undefined | RillValue;
+  set: (key: string, value: RillValue, ctx: RuntimeContext) => Promise<void | RillValue>;
+  delete: (key: string, ctx: RuntimeContext) => boolean | RillValue;
+  keys: () => string[];
+  has: (key: string) => boolean;
+  clear: (ctx: RuntimeContext) => void | RillValue;
+  getAll: () => Record<string, RillValue>;
+  flush: () => Promise<void>;
+}
+
 /**
  * Create KV store with JSON persistence.
  *
- * @throws RuntimeError RILL-R004 if store file is corrupt
+ * Returns a store whose `loadError` is set to an invalid `RillValue` if the
+ * load phase failed (corrupt file, schema mismatch). Operations otherwise
+ * accept a `RuntimeContext` and return invalid `RillValue`s on failure.
  */
-export async function createStore(config: StoreConfig): Promise<{
-  get: (key: string) => RillValue | undefined;
-  set: (key: string, value: RillValue) => Promise<void>;
-  delete: (key: string) => boolean;
-  keys: () => string[];
-  has: (key: string) => boolean;
-  clear: () => void;
-  getAll: () => Record<string, RillValue>;
-  flush: () => Promise<void>;
-}> {
+export async function createStore(
+  config: StoreConfig,
+  ctx: RuntimeContext,
+): Promise<KvStore> {
   const {
     mount,
     maxEntries,
@@ -54,6 +74,7 @@ export async function createStore(config: StoreConfig): Promise<{
   await fs.mkdir(storeDir, { recursive: true });
 
   const data = new Map<string, RillValue>();
+  let loadError: RillValue | null = null;
 
   // ----------------------------------------------------------
   // Load phase
@@ -61,18 +82,39 @@ export async function createStore(config: StoreConfig): Promise<{
 
   try {
     const fileContent = await fs.readFile(storePath, 'utf-8');
-    const parsed = JSON.parse(fileContent) as Record<string, unknown>;
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(fileContent) as Record<string, unknown>;
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        throw new LoadInvalid(
+          ctx.invalidate(
+            new Error('state file corrupt — reset or delete to recover'),
+            {
+              code: 'UNAVAILABLE',
+              provider: PROVIDER,
+              raw: { kind: 'corrupt_file', path: storePath },
+            },
+          ),
+        );
+      }
+      throw e;
+    }
 
     if (
       typeof parsed !== 'object' ||
       parsed === null ||
       Array.isArray(parsed)
     ) {
-      throw new RuntimeError(
-        'RILL-R004',
-        'state file corrupt — reset or delete to recover',
-        undefined,
-        { path: storePath },
+      throw new LoadInvalid(
+        ctx.invalidate(
+          new Error('state file corrupt — reset or delete to recover'),
+          {
+            code: 'UNAVAILABLE',
+            provider: PROVIDER,
+            raw: { kind: 'corrupt_file', path: storePath },
+          },
+        ),
       );
     }
 
@@ -80,7 +122,14 @@ export async function createStore(config: StoreConfig): Promise<{
       for (const [key, schemaEntry] of Object.entries(schema)) {
         if (key in parsed) {
           const value = deserializeValue(parsed[key], schemaEntry.type);
-          validateType(key, value, schemaEntry.type, storePath);
+          const typeErr = validateType(
+            key,
+            value,
+            schemaEntry.type,
+            storePath,
+            ctx,
+          );
+          if (typeErr !== null) throw new LoadInvalid(typeErr);
           data.set(key, value);
         } else {
           data.set(key, schemaEntry.default);
@@ -92,9 +141,9 @@ export async function createStore(config: StoreConfig): Promise<{
       }
     }
   } catch (error) {
-    if (error instanceof RuntimeError) throw error;
-
-    if (
+    if (error instanceof LoadInvalid) {
+      loadError = error.value;
+    } else if (
       error &&
       typeof error === 'object' &&
       'code' in error &&
@@ -105,13 +154,6 @@ export async function createStore(config: StoreConfig): Promise<{
           data.set(key, schemaEntry.default);
         }
       }
-    } else if (error instanceof SyntaxError) {
-      throw new RuntimeError(
-        'RILL-R004',
-        'state file corrupt — reset or delete to recover',
-        undefined,
-        { path: storePath },
-      );
     } else {
       throw error;
     }
@@ -121,15 +163,18 @@ export async function createStore(config: StoreConfig): Promise<{
   // Helpers
   // ----------------------------------------------------------
 
-  function checkWritePermission(): void {
+  function checkWritePermission(runCtx: RuntimeContext): RillValue | null {
     if (mode === 'read') {
-      throw new RuntimeError(
-        'RILL-R004',
-        `Mount '${mount}' is read-only (mode: ${mode})`,
-        undefined,
-        { mode, path: storePath },
+      return runCtx.invalidate(
+        new Error(`Mount '${mount}' is read-only (mode: ${mode})`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'read_only', mode, path: storePath },
+        },
       );
     }
+    return null;
   }
 
   function calculateValueSize(value: RillValue): number {
@@ -149,7 +194,8 @@ export async function createStore(config: StoreConfig): Promise<{
     value: RillValue,
     expectedType: SchemaEntry['type'],
     location: string,
-  ): void {
+    runCtx: RuntimeContext,
+  ): RillValue | null {
     let actualType: string;
 
     if (typeof value === 'string') actualType = 'string';
@@ -160,63 +206,80 @@ export async function createStore(config: StoreConfig): Promise<{
     else actualType = typeof value;
 
     if (actualType !== expectedType) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `key "${key}" expects ${expectedType}, got ${actualType}`,
-        undefined,
-        { key, expectedType, actualType, location },
+      return runCtx.invalidate(
+        new Error(`key "${key}" expects ${expectedType}, got ${actualType}`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'type_mismatch', key, expectedType, actualType, location },
+        },
       );
     }
+    return null;
   }
 
   // ----------------------------------------------------------
   // Operations
   // ----------------------------------------------------------
 
-  function get(key: string): RillValue | undefined {
+  function get(key: string, runCtx: RuntimeContext): RillValue | undefined | RillValue {
     if (schema && !(key in schema)) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `key "${key}" not declared in schema`,
-        undefined,
-        { key },
+      return runCtx.invalidate(
+        new Error(`key "${key}" not declared in schema`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'undeclared_key', key },
+        },
       );
     }
     return data.get(key);
   }
 
-  async function set(key: string, value: RillValue): Promise<void> {
-    checkWritePermission();
+  async function set(
+    key: string,
+    value: RillValue,
+    runCtx: RuntimeContext,
+  ): Promise<void | RillValue> {
+    const writeErr = checkWritePermission(runCtx);
+    if (writeErr !== null) return writeErr;
 
     if (schema && !(key in schema)) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `key "${key}" not declared in schema`,
-        undefined,
-        { key },
+      return runCtx.invalidate(
+        new Error(`key "${key}" not declared in schema`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'undeclared_key', key },
+        },
       );
     }
 
     if (schema && key in schema) {
-      validateType(key, value, schema[key]!.type, storePath);
+      const typeErr = validateType(key, value, schema[key]!.type, storePath, runCtx);
+      if (typeErr !== null) return typeErr;
     }
 
     const valueSize = calculateValueSize(value);
     if (valueSize > maxValueSize) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `value for "${key}" exceeds size limit`,
-        undefined,
-        { key, size: valueSize, max: maxValueSize },
+      return runCtx.invalidate(
+        new Error(`value for "${key}" exceeds size limit`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'value_too_large', key, size: valueSize, max: maxValueSize },
+        },
       );
     }
 
     if (!data.has(key) && data.size >= maxEntries) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `store exceeds entry limit (${data.size + 1} > ${maxEntries})`,
-        undefined,
-        { count: data.size + 1, max: maxEntries },
+      return runCtx.invalidate(
+        new Error(`store exceeds entry limit (${data.size + 1} > ${maxEntries})`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'entry_limit', count: data.size + 1, max: maxEntries },
+        },
       );
     }
 
@@ -232,11 +295,13 @@ export async function createStore(config: StoreConfig): Promise<{
       } else {
         data.delete(key);
       }
-      throw new RuntimeError(
-        'RILL-R004',
-        `store exceeds size limit (${storeSize} > ${maxStoreSize})`,
-        undefined,
-        { size: storeSize, max: maxStoreSize },
+      return runCtx.invalidate(
+        new Error(`store exceeds size limit (${storeSize} > ${maxStoreSize})`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'store_limit', size: storeSize, max: maxStoreSize },
+        },
       );
     }
 
@@ -245,8 +310,9 @@ export async function createStore(config: StoreConfig): Promise<{
     }
   }
 
-  function deleteKey(key: string): boolean {
-    checkWritePermission();
+  function deleteKey(key: string, runCtx: RuntimeContext): boolean | RillValue {
+    const writeErr = checkWritePermission(runCtx);
+    if (writeErr !== null) return writeErr;
     return data.delete(key);
   }
 
@@ -258,8 +324,9 @@ export async function createStore(config: StoreConfig): Promise<{
     return data.has(key);
   }
 
-  function clear(): void {
-    checkWritePermission();
+  function clear(runCtx: RuntimeContext): void | RillValue {
+    const writeErr = checkWritePermission(runCtx);
+    if (writeErr !== null) return writeErr;
     data.clear();
     if (schema) {
       for (const [key, schemaEntry] of Object.entries(schema)) {
@@ -297,5 +364,17 @@ export async function createStore(config: StoreConfig): Promise<{
     }
   }
 
-  return { get, set, delete: deleteKey, keys, has, clear, getAll, flush };
+  return {
+    loadError,
+    get,
+    set,
+    delete: deleteKey,
+    keys,
+    has,
+    clear,
+    getAll,
+    flush,
+  };
 }
+
+export { isInvalid };

@@ -149,13 +149,26 @@ $result.failed_results -> log
 
 ## Error Behavior
 
-| Condition | Error Code | Message |
-|-----------|------------|---------|
-| Empty query string | `RILL-R004` | `tavily: query is required` |
-| HTTP 429 from Tavily API | `RILL-R004` | `tavily: rate limit exceeded` |
-| HTTP 401 from Tavily API | `RILL-R004` | `tavily: authentication failed` |
-| Request timeout | `RILL-R004` | `tavily: request timeout` |
-| Called after `dispose()` | `RILL-R004` | `tavily: operation cancelled` |
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #QUOTA_EXCEEDED`) or finely
+(`guard #QUOTA_EXCEEDED && raw.kind == 'plan_limit_exceeded'`).
+
+**Host-fn errors:**
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Empty / missing required input (e.g. `query`) | `#INVALID_INPUT` | `invalid_input` |
+| Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
+| Forbidden (HTTP 403) | `#FORBIDDEN` | `forbidden` |
+| Resource not found (HTTP 404) | `#NOT_FOUND` | `not_found` |
+| Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Plan limit exceeded (HTTP 432) | `#QUOTA_EXCEEDED` | `plan_limit_exceeded` |
+| Pay-as-you-go limit exceeded (HTTP 433) | `#QUOTA_EXCEEDED` | `payg_limit_exceeded` |
+| Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
+| Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
+| Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
+| Called after `dispose()` | `#DISPOSED` | `disposed` |
 
 ## Events
 

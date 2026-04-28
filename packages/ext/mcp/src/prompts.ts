@@ -8,24 +8,27 @@
  */
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { RillFunction, RillValue, RuntimeCallbacks } from '@rcrsr/rill';
-import { emitExtensionEvent, structureToTypeValue } from '@rcrsr/rill';
-import { p } from '@rcrsr/rill-ext-param-shared';
-
-// RuntimeContextLike type for ctx parameter (structural type matching CallableFn)
-type RuntimeContextLike = {
-  readonly variables: Map<string, RillValue>;
-  readonly callbacks?: RuntimeCallbacks | undefined;
-  pipeValue: RillValue;
-};
+import type { RillFunction, RillValue, RuntimeContext } from '@rcrsr/rill';
 import {
-  createToolError,
-  createProtocolError,
-  createTimeoutError,
-  createConnectionLostError,
-  createAuthFailedError,
+  emitExtensionEvent,
+  getStatus,
+  isInvalid,
+  structureToTypeValue,
+} from '@rcrsr/rill';
+import { p } from '@rcrsr/rill-ext-param-shared';
+import {
+  failInput,
+  failTimeout,
+  mapMcpError,
 } from './errors.js';
 import { sanitizeNames } from './naming.js';
+
+function describeError(error: unknown): string {
+  if (isInvalid(error as RillValue)) {
+    return getStatus(error as RillValue).message;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
 
 // ============================================================
 // MCP TYPES (subset from SDK)
@@ -170,12 +173,12 @@ function createPromptFunction(
     p.str(arg.name, arg.description ?? `Prompt argument: ${arg.name}`)
   );
 
-  // Create async function wrapper
   const fn = async (
     args: Record<string, RillValue>,
-    ctx: RuntimeContextLike
+    ctxLike: unknown,
   ): Promise<RillValue> => {
-    // Emit mcp:connect on first prompt call [IR-1]
+    const ctx = ctxLike as RuntimeContext;
+
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
         event: 'mcp:connect',
@@ -183,33 +186,31 @@ function createPromptFunction(
       });
       lifecycleState.connectEmitted = true;
     }
-    // Build arguments dict for MCP call
-    const argsDict: Record<string, string> = {};
 
+    const argsDict: Record<string, string> = {};
     for (let i = 0; i < promptArgs.length; i++) {
       const promptArg = promptArgs[i]!;
       const value = args[promptArg.name];
 
-      // Validate argument is string (or undefined for optional args)
       if (value !== undefined && typeof value !== 'string') {
-        throw createToolError(
-          `${prompt.name}`,
-          `expected string for parameter ${promptArg.name}, got ${typeof value}`
+        throw failInput(
+          ctx,
+          `expected string for parameter ${promptArg.name}, got ${typeof value}`,
+          { name: prompt.name, parameter: promptArg.name },
         );
       }
 
-      // Add to dict if provided (or required)
       if (value !== undefined) {
         argsDict[promptArg.name] = value;
       } else if (promptArg.required === true) {
-        throw createToolError(
-          `${prompt.name}`,
-          `required parameter ${promptArg.name} is missing`
+        throw failInput(
+          ctx,
+          `required parameter ${promptArg.name} is missing`,
+          { name: prompt.name, parameter: promptArg.name, kind: 'missing_required' },
         );
       }
     }
 
-    // Emit mcp:prompt_get event [IR-1]
     emitExtensionEvent(ctx, {
       event: 'mcp:prompt_get',
       subsystem: 'extension:mcp',
@@ -217,16 +218,14 @@ function createPromptFunction(
       params: argsDict,
     });
 
-    // Set up timeout promise
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => {
-        reject(createTimeoutError(`${prompt.name}`, timeoutMs));
+        reject(failTimeout(ctx, prompt.name, timeoutMs));
       }, timeoutMs);
       timer.unref();
     });
 
     try {
-      // Call MCP getPrompt with prompt name and arguments
       const result = (await Promise.race([
         client.getPrompt({
           name: prompt.name,
@@ -235,55 +234,15 @@ function createPromptFunction(
         timeoutPromise,
       ])) as McpPromptResult;
 
-      // Parse and return messages
       return parsePromptMessages(result);
     } catch (error) {
-      // Emit mcp:error event [IR-1]
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
-        error: error instanceof Error ? error.message : String(error),
+        error: describeError(error),
         prompt: prompt.name,
       });
-
-      // Handle error categories (same pattern as resources/tools)
-      if (error instanceof Error) {
-        if (error.name === 'RuntimeError') {
-          throw error;
-        }
-
-        const message = error.message.toLowerCase();
-
-        if (
-          message.includes('connection closed') ||
-          message.includes('connection lost') ||
-          message.includes('disconnected')
-        ) {
-          throw createConnectionLostError();
-        }
-
-        if (
-          message.includes('unauthorized') ||
-          message.includes('authentication failed') ||
-          message.includes('token') ||
-          message.includes('auth')
-        ) {
-          throw createAuthFailedError();
-        }
-
-        if (
-          message.includes('protocol') ||
-          message.includes('invalid response') ||
-          message.includes('parse') ||
-          message.includes('malformed')
-        ) {
-          throw createProtocolError(error.message);
-        }
-
-        throw createToolError(`${prompt.name}`, error.message);
-      }
-
-      throw createToolError(`${prompt.name}`, String(error));
+      throw mapMcpError(ctx, error, prompt.name);
     }
   };
 

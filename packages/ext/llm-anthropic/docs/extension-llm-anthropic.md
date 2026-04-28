@@ -265,33 +265,47 @@ The `tool_loop` result adds `turns` (number of LLM round-trips).
 
 ## Error Behavior
 
-**Validation errors** (before API call):
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
+(`guard #AUTH && raw.kind == 'authentication_failed'`).
 
-- Empty prompt → `RuntimeError RILL-R004: prompt text cannot be empty`
-- Missing role → `RuntimeError RILL-R004: message missing required 'role' field`
-- Invalid role → `RuntimeError RILL-R004: invalid role '{value}'`
-- Missing content → `RuntimeError RILL-R004: {role} message requires 'content'`
-- No embed_model → `RuntimeError RILL-R004: embed_model not configured`
-- Missing tools → `RuntimeError RILL-R004: tools parameter is required`
+`meta.provider == 'anthropic'` on every host-fn failure.
 
-**API errors** (from provider):
+**Factory-time validation** (throws `RuntimeError RILL-R001`):
 
-- Rate limit → `RuntimeError RILL-R004: Anthropic: rate limit`
-- Auth failure → `RuntimeError RILL-R004: Anthropic: authentication failed (401)`
-- Timeout → `RuntimeError RILL-R004: Anthropic: request timeout`
-- Other → `RuntimeError RILL-R004: Anthropic: {detail} ({status})`
+- `api_key is required`
+- `model is required`
+- `temperature must be between 0.0 and 2.0`
+- `embed_model is required when calling embed()`
 
-**Tool loop errors**:
+**Host-fn errors:**
 
-- Unknown tool → `RuntimeError RILL-R004: unknown tool '{name}'`
-- Error limit → `RuntimeError RILL-R004: tool loop aborted after {n} consecutive errors`
-
-**Generate errors**:
-
-- Missing schema → `RuntimeError RILL-R004: generate requires a type expression as schema`
-- Non-dict schema → `RuntimeError RILL-R004: generate requires a dict type as schema, got {kind}`
-- Unsupported field type → `RuntimeError RILL-R004: unsupported type for JSON Schema: {kind}` or `unsupported type: {kind}`
-- JSON parse failure → `RuntimeError RILL-R004: generate: failed to parse response JSON: {detail}`
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Empty prompt or messages list | `#INVALID_INPUT` | `empty_prompt` / `empty_messages` |
+| Message missing required `role` field | `#INVALID_INPUT` | `invalid_message_format` |
+| Invalid `role` value | `#INVALID_INPUT` | `invalid_role` |
+| Missing message `content` | `#INVALID_INPUT` | `missing_message_content` |
+| Assistant message missing `content` and `tool_calls` | `#INVALID_INPUT` | `invalid_assistant_message` |
+| `generate()` schema missing or non-dict | `#INVALID_INPUT` | `invalid_schema` / `invalid_schema_type` |
+| `tool_loop()` `tools` missing or wrong shape | `#INVALID_INPUT` | `tools_required` / `tools_not_dict` |
+| `tool_loop()` builtin used as tool | `#INVALID_INPUT` | `builtin_tool_unsupported` |
+| `tool_loop()` value not callable | `#INVALID_INPUT` | `tool_not_callable` |
+| `tool_loop()` tool not in dict | `#NOT_FOUND` | `unknown_tool` |
+| `tool_loop()` aborted after N consecutive tool errors | `#UNAVAILABLE` | `consecutive_tool_errors` |
+| `tool_loop()` cancelled via `ctx.signal` | `#TIMEOUT` | `tool_loop_cancelled` |
+| `embed()` / `embed_batch()` not configured | `#UNAVAILABLE` | `feature_unavailable` |
+| Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
+| Forbidden (HTTP 403) | `#FORBIDDEN` | `forbidden` |
+| Resource not found (HTTP 404) | `#NOT_FOUND` | `not_found` |
+| Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Quota / credits exceeded (HTTP 402) | `#QUOTA_EXCEEDED` | `quota_exceeded` |
+| Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
+| Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` / `request_cancelled` |
+| Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
+| `generate()` failed to parse response JSON | `#PROTOCOL` | `json_parse_failed` |
+| Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
+| Other SDK / unknown failure | `#UNAVAILABLE` | `unknown_error` |
 
 ## Events
 

@@ -58,12 +58,12 @@ const RILL_TYPE_MAP: Record<string, string> = {
 
 /**
  * Convert a rill type name to the corresponding JSON Schema type string.
- * Throws RuntimeError RILL-R004 for unsupported types.
+ * Throws RuntimeError RILL-R005 for unsupported types.
  */
 export function mapRillType(rillType: string): string {
   const jsonType = RILL_TYPE_MAP[rillType];
   if (jsonType === undefined) {
-    throw new RuntimeError('RILL-R004', `unsupported type: ${rillType}`);
+    throw new RuntimeError('RILL-R005', `unsupported type: ${rillType}`);
   }
   return jsonType;
 }
@@ -71,7 +71,7 @@ export function mapRillType(rillType: string): string {
 /**
  * Build a JsonSchemaProperty from a RillType in param position.
  *
- * - closure and tuple types throw RuntimeError RILL-R004 (EC-3).
+ * - closure and tuple types throw RuntimeError RILL-R005 (EC-3).
  * - any type produces an unconstrained property (no type field).
  * - list type maps to array, recursing into element if present (AC-25).
  * - dict type maps to object.
@@ -80,7 +80,7 @@ export function mapRillType(rillType: string): string {
 function buildPropertyFromStructuralType(rillType: TypeStructure): JsonSchemaProperty {
   if (rillType.kind === 'closure' || rillType.kind === 'tuple') {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `unsupported type for JSON Schema: ${rillType.kind}`
     );
   }
@@ -167,9 +167,9 @@ function buildDictSchema(dictType: DictTypeStructure): JsonSchemaObject {
  * - optional = rillParam.defaultValue !== undefined.
  * - Non-optional params added to required[].
  *
- * @throws RuntimeError RILL-R004 for unsupported top-level kind
- * @throws RuntimeError RILL-R004 for closure/tuple type in param position (EC-3)
- * @throws RuntimeError RILL-R004 for unsupported type name (EC-3)
+ * @throws RuntimeError RILL-R005 for unsupported top-level kind
+ * @throws RuntimeError RILL-R005 for closure/tuple type in param position (EC-3)
+ * @throws RuntimeError RILL-R005 for unsupported type name (EC-3)
  */
 export function buildJsonSchemaFromStructuralType(
   type: TypeStructure,
@@ -181,7 +181,7 @@ export function buildJsonSchemaFromStructuralType(
 
   if (type.kind !== 'closure') {
     throw new RuntimeError(
-      'RILL-R004',
+      'RILL-R005',
       `unsupported schema kind: ${type.kind} (expected dict or closure)`
     );
   }

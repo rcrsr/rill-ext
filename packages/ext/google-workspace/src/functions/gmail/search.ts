@@ -4,26 +4,22 @@
  * Capability: gmail.search
  * Scope: gmail.readonly
  */
-
-import { RuntimeError, isDict } from '@rcrsr/rill';
+import { isDict } from '@rcrsr/rill';
+import { failInput } from '../../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { GmailConfig } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
-
 const GMAIL_BASE = 'https://gmail.googleapis.com';
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-
 /** Default and ceiling for maxResults per BC-1. */
 const DEFAULT_MAX_RESULTS = 50;
-
 export interface GmailSearchDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
   readonly gmailConfig: GmailConfig | undefined;
 }
-
 /**
  * Factory returning the gmail_search inner function.
  * BC-1: Truncates options.maxResults to gmailConfig.maxResults ceiling (default 50).
@@ -41,12 +37,10 @@ export function makeGmailSearch(deps: GmailSearchDeps): (
   ): Promise<RillValue> => {
     const query = args['query'];
     if (typeof query !== 'string' || query.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: query must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: query must be a non-empty string');
     }
-
     // BC-1: cap maxResults at the configured ceiling (default 50)
     const ceiling = deps.gmailConfig?.maxResults ?? DEFAULT_MAX_RESULTS;
-
     let maxResults = ceiling;
     const options = args['options'];
     if (options !== undefined && options !== null && isDict(options)) {
@@ -55,10 +49,8 @@ export function makeGmailSearch(deps: GmailSearchDeps): (
         maxResults = Math.min(rawMax, ceiling);
       }
     }
-
     const encodedQuery = encodeURIComponent(query);
     const path = `/gmail/v1/users/me/messages?q=${encodedQuery}&maxResults=${maxResults}`;
-
     const response = await googleFetch(
       'GET',
       GMAIL_BASE,
@@ -74,7 +66,6 @@ export function makeGmailSearch(deps: GmailSearchDeps): (
       undefined,
       undefined
     );
-
     // Project response to { messages: [{ id, threadId }, ...] } per AC-12
     const data = response as { messages?: Array<{ id?: string; threadId?: string }> } | null;
     const rawMessages = data?.messages ?? [];
@@ -82,7 +73,6 @@ export function makeGmailSearch(deps: GmailSearchDeps): (
       id: m.id ?? '',
       threadId: m.threadId ?? '',
     }));
-
     return { messages } as unknown as RillValue;
   };
 }

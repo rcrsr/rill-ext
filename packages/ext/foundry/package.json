@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-foundry",
-  "version": "0.18.5",
+  "version": "0.19.0",
   "description": "rill extension for Azure AI Foundry integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -25,7 +25,7 @@
   },
   "peerDependencies": {
     "@azure/identity": "^4.13.0",
-    "@rcrsr/rill": "~0.18.4"
+    "@rcrsr/rill": "~0.19.0"
   },
   "peerDependenciesMeta": {
     "@azure/identity": {
@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@azure/msal-node": "^5.1.2",
-    "@rcrsr/rill": "~0.18.4",
+    "@rcrsr/rill": "~0.19.0",
     "@rcrsr/rill-ext-llm-shared": "workspace:^",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/node": "^25.5.2",

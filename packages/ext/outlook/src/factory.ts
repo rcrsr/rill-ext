@@ -12,11 +12,13 @@
  */
 
 import {
-  RuntimeError,
   toCallable,
   structureToTypeValue,
   emitExtensionEvent,
+  isInvalid,
+  getStatus,
   type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
   type RuntimeContext,
@@ -82,7 +84,7 @@ const PROVIDER = 'outlook';
  *
  * @param config - Extension configuration
  * @returns ExtensionFactoryResult with 12 callables and dispose
- * @throws RuntimeError (RILL-R004) for invalid configuration
+ * @throws RuntimeError (RILL-R001) for invalid configuration
  *
  * @example
  * ```typescript
@@ -93,8 +95,11 @@ const PROVIDER = 'outlook';
  * await ext.dispose();
  * ```
  */
-export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryResult {
-  // Validate config — throws RILL-R004 on failure
+export function createOutlookExtension(
+  config: OutlookConfig,
+  _ctx: ExtensionFactoryCtx,
+): ExtensionFactoryResult {
+  // Validate config — throws RuntimeError(RILL-R001) on failure
   validateConfig(config);
 
   // Merge capabilities with defaults [AC-15]
@@ -125,45 +130,67 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
    * Wrap a host function with: disposal check, capability gate,
    * AbortController lifecycle, timing, event emission, and error mapping.
    *
-   * @param capabilityCheck - Throws RILL-R004 when capability disabled; null = no gate
+   * @param capabilityCheck - Halts with invalid `#FORBIDDEN` when capability disabled; null = no gate
    * @param eventFactory - Builds success event fields from the result
    * @param fn - Inner function (args, ctx, controller, config) => RillValue
    */
   function wrap(
-    capabilityCheck: (() => void) | null,
+    capabilityCheck: ((ctx: RuntimeContext) => void) | null,
     eventFactory: (result: RillValue) => Record<string, RillValue>,
     fn: (
       args: Record<string, RillValue>,
       ctx: RuntimeContext,
       controller: AbortController,
       cfg: ResolvedConfig
-    ) => Promise<RillValue>
+    ) => Promise<RillValue>,
   ): (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue> {
     return async (
       args: Record<string, RillValue>,
-      ctx: RuntimeContext
+      ctx: RuntimeContext,
     ): Promise<RillValue> => {
-      // EC-13: Check disposal before any work
+      const startTime = Date.now();
+
+      const emitError = (message: string): void => {
+        emitExtensionEvent(ctx, {
+          event: `${PROVIDER}:error`,
+          subsystem: `extension:${PROVIDER}`,
+          duration: Date.now() - startTime,
+          error: message,
+        });
+      };
+
       if (disposalState.isDisposed) {
-        throw new RuntimeError('RILL-R004', `${PROVIDER}: operation cancelled`);
+        const message = `${PROVIDER}: operation cancelled`;
+        const invalid = ctx.invalidate(new Error(message), {
+          code: 'DISPOSED',
+          provider: PROVIDER,
+          raw: { kind: 'disposed', message },
+        });
+        emitError(message);
+        return invalid;
       }
 
-      // Capability gate (if provided)
       if (capabilityCheck !== null) {
-        capabilityCheck();
+        try {
+          capabilityCheck(ctx);
+        } catch (error: unknown) {
+          if (isInvalid(error as RillValue)) {
+            const invalid = error as RillValue;
+            emitError(getStatus(invalid).message);
+            return invalid;
+          }
+          const invalid = mapFetchError(ctx, error);
+          emitError(getStatus(invalid).message);
+          return invalid;
+        }
       }
 
-      // Create and track AbortController
       const controller = new AbortController();
       inFlightState.controllers.add(controller);
-
-      // Record wall-clock start
-      const startTime = Date.now();
 
       try {
         const result = await fn(args, ctx, controller, resolvedConfig);
 
-        // IR-8: Emit named success event
         const duration = Date.now() - startTime;
         const eventFields = eventFactory(result);
         emitExtensionEvent(ctx, {
@@ -174,21 +201,12 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
         return result;
       } catch (error: unknown) {
-        // IR-8: Emit error event on any failure
-        const duration = Date.now() - startTime;
-        const mappedError =
-          error instanceof RuntimeError ? error : mapFetchError(error);
-
-        emitExtensionEvent(ctx, {
-          event: `${PROVIDER}:error`,
-          subsystem: `extension:${PROVIDER}`,
-          duration,
-          error: mappedError.message,
-        });
-
-        throw mappedError;
+        const invalid = isInvalid(error as RillValue)
+          ? (error as RillValue)
+          : mapFetchError(ctx, error);
+        emitError(getStatus(invalid).message);
+        return invalid;
       } finally {
-        // Always remove controller regardless of outcome
         inFlightState.controllers.delete(controller);
       }
     };
@@ -200,7 +218,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Mail: inbox — emits outlook:mail:read
   const inboxWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.mail.read, 'mail.read'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const messages = dict['messages'] as RillValue[] | undefined;
@@ -215,7 +233,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Mail: from — emits outlook:mail:read
   const fromWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.mail.read, 'mail.read'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const messages = dict['messages'] as RillValue[] | undefined;
@@ -230,9 +248,9 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Mail: search — emits outlook:mail:search
   const searchWrapped = wrap(
-    () => {
-      checkCapability(resolvedConfig.capabilities.mail.read, 'mail.read');
-      checkCapability(resolvedConfig.capabilities.mail.search, 'mail.search');
+    (c) => {
+      checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read');
+      checkCapability(c, resolvedConfig.capabilities.mail.search, 'mail.search');
     },
     (result) => {
       const dict = result as Record<string, RillValue>;
@@ -248,7 +266,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Mail: read — emits outlook:mail:read
   const readWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.mail.read, 'mail.read'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -262,7 +280,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Mail: send — emits outlook:mail:send
   const sendWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.mail.send, 'mail.send'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.mail.send, 'mail.send'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -276,7 +294,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Mail: draft — emits outlook:mail:draft
   const draftWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.mail.draft, 'mail.draft'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.mail.draft, 'mail.draft'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -290,7 +308,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Mail: reply — emits outlook:mail:send
   const replyWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.mail.send, 'mail.send'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.mail.send, 'mail.send'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -304,7 +322,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Mail: flag — emits outlook:mail:flag
   const flagWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.mail.flag, 'mail.flag'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.mail.flag, 'mail.flag'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -317,7 +335,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Calendar: events — emits outlook:calendar:read
   const eventsWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.calendar.read, 'calendar.read'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.calendar.read, 'calendar.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const eventsArr = dict['events'] as RillValue[] | undefined;
@@ -332,7 +350,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Calendar: today — emits outlook:calendar:read
   const todayWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.calendar.read, 'calendar.read'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.calendar.read, 'calendar.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const eventsArr = dict['events'] as RillValue[] | undefined;
@@ -347,7 +365,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Calendar: free_busy — emits outlook:calendar:read
   const freeBusyWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.calendar.read, 'calendar.read'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.calendar.read, 'calendar.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const schedules = dict['schedules'] as RillValue[] | undefined;
@@ -362,7 +380,7 @@ export function createOutlookExtension(config: OutlookConfig): ExtensionFactoryR
 
   // Calendar: create_event — emits outlook:calendar:create
   const createEventWrapped = wrap(
-    () => checkCapability(resolvedConfig.capabilities.calendar.create, 'calendar.create'),
+    (c) => checkCapability(c, resolvedConfig.capabilities.calendar.create, 'calendar.create'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {

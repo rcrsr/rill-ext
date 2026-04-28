@@ -13,6 +13,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { RuntimeError } from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
+import { makeFactoryCtx } from './_helpers.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -56,36 +57,36 @@ async function tempDir(): Promise<string> {
 // ── Config validation ────────────────────────────────────────────────────────
 
 describe('EC-6: empty/whitespace basePath', () => {
-  it('throws RILL-R004 for empty string basePath', async () => {
-    await expect(createPromptMdExtension({ basePath: '' })).rejects.toSatisfy(
+  it('throws RILL-R001 for empty string basePath', async () => {
+    await expect(createPromptMdExtension({ basePath: '' }, makeFactoryCtx())).rejects.toSatisfy(
       (err: unknown) =>
-        err instanceof RuntimeError && err.errorId === 'RILL-R004',
+        err instanceof RuntimeError && err.errorId === 'RILL-R001',
     );
   });
 
-  it('throws RILL-R004 for whitespace-only basePath', async () => {
-    await expect(createPromptMdExtension({ basePath: '   ' })).rejects.toSatisfy(
+  it('throws RILL-R001 for whitespace-only basePath', async () => {
+    await expect(createPromptMdExtension({ basePath: '   ' }, makeFactoryCtx())).rejects.toSatisfy(
       (err: unknown) =>
-        err instanceof RuntimeError && err.errorId === 'RILL-R004',
+        err instanceof RuntimeError && err.errorId === 'RILL-R001',
     );
   });
 });
 
 describe('EC-7: non-existing path and file-as-basePath', () => {
-  it('throws RILL-R004 when basePath does not exist', async () => {
+  it('throws RILL-R001 when basePath does not exist', async () => {
     await expect(
-      createPromptMdExtension({ basePath: '/tmp/rill-nonexistent-12345678' }),
+      createPromptMdExtension({ basePath: '/tmp/rill-nonexistent-12345678' }, makeFactoryCtx()),
     ).rejects.toSatisfy(
-      (err: unknown) => err instanceof RuntimeError && err.errorId === 'RILL-R004',
+      (err: unknown) => err instanceof RuntimeError && err.errorId === 'RILL-R001',
     );
   });
 
-  it('throws RILL-R004 when basePath is a file, not a directory', async () => {
+  it('throws RILL-R001 when basePath is a file, not a directory', async () => {
     const dir = await tempDir();
     const filePath = path.join(dir, 'file.txt');
     await fs.writeFile(filePath, 'content', 'utf-8');
-    await expect(createPromptMdExtension({ basePath: filePath })).rejects.toSatisfy(
-      (err: unknown) => err instanceof RuntimeError && err.errorId === 'RILL-R004',
+    await expect(createPromptMdExtension({ basePath: filePath }, makeFactoryCtx())).rejects.toSatisfy(
+      (err: unknown) => err instanceof RuntimeError && err.errorId === 'RILL-R001',
     );
   });
 });
@@ -93,7 +94,7 @@ describe('EC-7: non-existing path and file-as-basePath', () => {
 // ── Parse-time errors ────────────────────────────────────────────────────────
 
 describe('AC-7 / EC-8: unclosed YAML quote', () => {
-  it('throws RILL-R004 with path in context', async () => {
+  it('throws RILL-R001 with path in context', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -108,20 +109,20 @@ body
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     expect(re.context?.['path']).toBeTruthy();
     expect(re.context?.['cause']).toBeTruthy();
   });
 });
 
 describe('AC-8 / EC-13: undeclared template reference', () => {
-  it('throws RILL-R004 with path, line, and missing name in context', async () => {
+  it('throws RILL-R001 with path, line, and missing name in context', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -136,13 +137,13 @@ Hello {undeclared}!
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     expect(re.context?.['path']).toBeTruthy();
     expect(re.context?.['name']).toBe('undeclared');
     expect(typeof re.context?.['line']).toBe('number');
@@ -150,7 +151,7 @@ Hello {undeclared}!
 });
 
 describe('AC-9 / EC-15: resolution name collision', () => {
-  it('throws RILL-R004 when two files resolve to the same dotted name', async () => {
+  it('throws RILL-R001 when two files resolve to the same dotted name', async () => {
     // a.b.prompt.md → resolution name 'a.b'
     // a/b.prompt.md  → resolution name 'a.b'
     // Both yield the same dotted name from different FS paths.
@@ -160,13 +161,13 @@ describe('AC-9 / EC-15: resolution name collision', () => {
 
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     // Context must contain both paths
     const paths = re.context?.['paths'] as string[] | undefined;
     expect(Array.isArray(paths)).toBe(true);
@@ -175,7 +176,7 @@ describe('AC-9 / EC-15: resolution name collision', () => {
 });
 
 describe('AC-10 / EC-9: missing required fields', () => {
-  it('throws RILL-R004 for missing output field', async () => {
+  it('throws RILL-R001 for missing output field', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -189,17 +190,17 @@ body
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     expect(re.context?.['field']).toBe('output');
   });
 
-  it('throws RILL-R004 for missing description field', async () => {
+  it('throws RILL-R001 for missing description field', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -213,17 +214,17 @@ body
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     expect(re.context?.['field']).toBe('description');
   });
 
-  it('throws RILL-R004 for missing params field', async () => {
+  it('throws RILL-R001 for missing params field', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -237,19 +238,19 @@ body
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     expect(re.context?.['field']).toBe('params');
   });
 });
 
 describe('AC-11 / EC-10: output: dict reserved', () => {
-  it('throws RILL-R004 with field and value in context', async () => {
+  it('throws RILL-R001 with field and value in context', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -264,20 +265,20 @@ body
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     expect(re.context?.['field']).toBe('output');
     expect(re.context?.['value']).toBe('dict');
   });
 });
 
 describe('EC-11: unrecognized output value', () => {
-  it('throws RILL-R004 for output: json', async () => {
+  it('throws RILL-R001 for output: json', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -292,19 +293,19 @@ body
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     expect(re.context?.['value']).toBe('json');
   });
 });
 
 describe('AC-12 / EC-12: malformed params entry', () => {
-  it('throws RILL-R004 with path and entry in context for "tone = neutral"', async () => {
+  it('throws RILL-R001 with path and entry in context for "tone = neutral"', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -320,20 +321,20 @@ body
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
     expect(re.context?.['path']).toBeTruthy();
     expect(re.context?.['entry']).toBe('tone = neutral');
   });
 });
 
 describe('EC-14: output:list with no @@ marker', () => {
-  it('throws RILL-R004 when output is list but body has no role markers', async () => {
+  it('throws RILL-R001 when output is list but body has no role markers', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -348,18 +349,18 @@ No role markers here.
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
   });
 });
 
 describe('AC-13: single malformed file among valid ones surfaces error', () => {
-  it('does not silently skip invalid file — throws RILL-R004', async () => {
+  it('does not silently skip invalid file — throws RILL-R001', async () => {
     const dir = await tempDir();
     // One valid file
     await writePrompt(dir, 'valid.prompt.md', VALID_PROMPT);
@@ -376,13 +377,13 @@ body
     );
     let caught: unknown;
     try {
-      await createPromptMdExtension({ basePath: dir });
+      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R004');
+    expect(re.errorId).toBe('RILL-R001');
   });
 });
 

@@ -4,24 +4,20 @@
  * Capability: calendar.freeBusy
  * Scopes: calendar.readonly
  */
-
-import { RuntimeError } from '@rcrsr/rill';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import { failInput } from '../../errors.js';
 import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
 import { CAL_BASE, assertIsoTimestamp } from './_shared.js';
-
 const CAL_FREEBUSY_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
-
 export interface CalendarFreeBusyDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
 }
-
 /**
  * Factory returning the calendar_free_busy inner function.
- * BC-4: Empty emails list → throws RILL-R004 before fetch.
+ * BC-4: Empty emails list → halts with invalid `#INVALID_INPUT` before fetch.
  * EC-13: Rejects naive ISO timestamps (no timezone).
  * AC-12: Returns rill primitive dict keyed by email.
  */
@@ -38,43 +34,30 @@ export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
     const emails = args['emails'];
     const startTime = args['startTime'];
     const endTime = args['endTime'];
-
     // BC-4: Validate emails before fetch
     if (!Array.isArray(emails) || emails.length === 0) {
-      throw new RuntimeError(
-        'RILL-R004',
-        'google: calendar.free_busy: emails must be non-empty'
-      );
+      failInput(ctx, 'invalid_arg', 'google: calendar.free_busy: emails must be non-empty');
     }
-
     // Extract string emails from the list
     const emailStrings = emails
       .filter((e): e is string => typeof e === 'string' && e.trim() !== '');
-
     if (emailStrings.length === 0) {
-      throw new RuntimeError(
-        'RILL-R004',
-        'google: calendar.free_busy: emails must be non-empty'
-      );
+      failInput(ctx, 'invalid_arg', 'google: calendar.free_busy: emails must be non-empty');
     }
-
     if (typeof startTime !== 'string' || startTime.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: startTime must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: startTime must be a non-empty string');
     }
     if (typeof endTime !== 'string' || endTime.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: endTime must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: endTime must be a non-empty string');
     }
-
     // EC-13: Reject naive ISO timestamps
-    assertIsoTimestamp(startTime, 'startTime');
-    assertIsoTimestamp(endTime, 'endTime');
-
+    assertIsoTimestamp(ctx, startTime, 'startTime');
+    assertIsoTimestamp(ctx, endTime, 'endTime');
     const body = {
       timeMin: startTime,
       timeMax: endTime,
       items: emailStrings.map((email) => ({ id: email })),
     };
-
     const response = await googleFetch(
       'POST',
       CAL_BASE,
@@ -90,7 +73,6 @@ export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
       undefined,
       undefined
     );
-
     // Project to { <email>: { busy: [{ start, end }, ...] }, ... } [AC-12]
     const data = response as {
       calendars?: Record<
@@ -100,10 +82,8 @@ export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
         }
       >;
     } | null;
-
     const calendars = data?.calendars ?? {};
     const result: Record<string, { busy: Array<{ start: string; end: string }> }> = {};
-
     for (const email of emailStrings) {
       const calData = calendars[email];
       const busySlots = (calData?.busy ?? []).map((slot) => ({
@@ -112,7 +92,6 @@ export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
       }));
       result[email] = { busy: busySlots };
     }
-
     return result as unknown as RillValue;
   };
 }

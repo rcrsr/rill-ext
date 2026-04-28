@@ -2437,8 +2437,8 @@ describe('executeToolLoop yieldChunk', () => {
   });
 
   describe('EC-4: streaming API failure', () => {
-    it('wraps callAPIStreaming failure as RuntimeError RILL-R004', async () => {
-      // EC-4: provider streaming failure → RuntimeError RILL-R004
+    it('wraps callAPIStreaming failure as RuntimeError RILL-R005', async () => {
+      // EC-4: provider streaming failure → RuntimeError RILL-R005
       const streamingError = new Error('stream connection lost');
       const mockCallAPIStreaming = vi.fn(async () => {
         throw streamingError;
@@ -2459,7 +2459,7 @@ describe('executeToolLoop yieldChunk', () => {
           yieldChunk
         )
       ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
+        errorId: 'RILL-R005',
         message: expect.stringContaining('stream connection lost'),
       });
     });

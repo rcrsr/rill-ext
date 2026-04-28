@@ -27,7 +27,7 @@ export async function inbox(
 
   // Enforce folder allowlist before any API call (EC-4 / AC-22)
   if (folder !== undefined) {
-    checkFolder(config.folders, folder);
+    checkFolder(ctx, config.folders, folder);
   }
 
   // Cap top at maxResults ceiling

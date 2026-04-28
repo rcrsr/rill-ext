@@ -11,9 +11,16 @@
  * API version: 2024-09-01
  */
 
-import { RuntimeError, emitExtensionEvent, type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  RuntimeHaltSignal,
+  emitExtensionEvent,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
 import { buildRestAuthHeaders } from './client.js';
-import { mapRestError, createTimeoutError } from './errors.js';
+import { mapRestError, createTimeoutError, detectFoundryError } from './errors.js';
 import type {
   FoundryAuth,
   FoundryContentSafetyConfig,
@@ -78,19 +85,19 @@ export async function callShield(
   disposed: { value: boolean }
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw new RuntimeError('RILL-R004', `${PROVIDER}: extension disposed`);
+    throw haltDisposed(ctx);
   }
 
   // EC-7: Content Safety must be configured
   if (!config.contentSafety) {
-    throw new RuntimeError('RILL-R004', 'foundry: content safety not configured');
+    throw haltUnconfigured(ctx, 'safety_unconfigured', 'foundry: content safety not configured');
   }
 
   const safetyConfig: FoundryContentSafetyConfig = config.contentSafety;
   const startTime = Date.now();
 
   try {
-    const result = await runShieldRequest(text, documents, safetyConfig, auth);
+    const result = await runShieldRequest(ctx, text, documents, safetyConfig, auth);
     const duration = Date.now() - startTime;
 
     emitExtensionEvent(ctx, {
@@ -110,12 +117,14 @@ export async function callShield(
       analysis: analysis as RillValue,
     } as RillValue;
   } catch (error: unknown) {
+    if (error instanceof RuntimeHaltSignal) {
+      throw error;
+    }
     if (error instanceof RuntimeError) {
       throw error;
     }
-    // Rethrow unexpected errors as RuntimeError
-    const message = error instanceof Error ? error.message : String(error);
-    throw new RuntimeError('RILL-R004', `${PROVIDER}: ${message}`);
+    const invalid = mapProviderError(ctx, 'Foundry', error, detectFoundryError);
+    throw new RuntimeHaltSignal(invalid, true);
   }
 }
 
@@ -154,7 +163,7 @@ export function createAutoShieldMiddleware(
     const promptText = extractPromptText(args);
     const startTime = Date.now();
 
-    const result = await runShieldRequest(promptText, [], safetyConfig, auth);
+    const result = await runShieldRequest(ctx, promptText, [], safetyConfig, auth);
     const duration = Date.now() - startTime;
 
     emitExtensionEvent(ctx, {
@@ -168,7 +177,15 @@ export function createAutoShieldMiddleware(
 
     // EC-8: Prompt attack detected
     if (!result.safe) {
-      throw new RuntimeError('RILL-R004', 'foundry: prompt attack detected');
+      const message = 'foundry: prompt attack detected';
+      throw new RuntimeHaltSignal(
+        ctx.invalidate(new Error(message), {
+          code: 'FORBIDDEN',
+          provider: PROVIDER,
+          raw: { kind: 'attack_detected', attackType: result.attackType, message },
+        }),
+        true
+      );
     }
 
     return inner(args, ctx);
@@ -189,6 +206,7 @@ export function createAutoShieldMiddleware(
  * @returns Parsed ShieldResult
  */
 async function runShieldRequest(
+  ctx: RuntimeContext,
   text: string,
   documents: string[],
   safetyConfig: FoundryContentSafetyConfig,
@@ -218,14 +236,14 @@ async function runShieldRequest(
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'TimeoutError') {
-      throw createTimeoutError();
+      createTimeoutError(ctx);
     }
     throw error;
   }
 
   if (!response.ok) {
     const responseBody = await response.json().catch(() => null);
-    throw mapRestError(response.status, responseBody);
+    mapRestError(ctx, response.status, responseBody);
   }
 
   const data = (await response.json()) as {
@@ -253,6 +271,37 @@ async function runShieldRequest(
     safe: !attackDetected,
     attackType,
   };
+}
+
+// ============================================================
+// HALT HELPERS
+// ============================================================
+
+function haltDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  const message = `${PROVIDER}: extension disposed`;
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed', message },
+    }),
+    true
+  );
+}
+
+function haltUnconfigured(
+  ctx: RuntimeContext,
+  rawKind: string,
+  message: string
+): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code: 'UNAVAILABLE',
+      provider: PROVIDER,
+      raw: { kind: rawKind, message },
+    }),
+    true
+  );
 }
 
 /**

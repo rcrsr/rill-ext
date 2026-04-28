@@ -11,61 +11,48 @@
  *  3. POST /users/me/messages/<id>/modify with { addLabelIds: [labelId] }
  *  4. Return true
  */
-
-import { RuntimeError } from '@rcrsr/rill';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import { failForbidden, failInput } from '../../errors.js';
 import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { GmailConfig } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
-
 const GMAIL_BASE = 'https://gmail.googleapis.com';
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.modify'];
-
 export interface GmailLabelDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
   readonly gmailConfig: GmailConfig | undefined;
 }
-
 /** Minimal shape of a Gmail API Label object. */
 interface GmailLabel {
   id?: string;
   name?: string;
 }
-
 /**
  * Validate labelName against allowed/denied label config.
- * EC-6/EC-12: Throws RuntimeError (RILL-R004) before fetch on violation.
+ * EC-6/EC-12: Halts with invalid `#FORBIDDEN` before fetch on violation.
  * BC-9: allowedLabels undefined → all labels accepted.
- * BC-10: allowedLabels non-empty + label not in list → RILL-R004.
+ * BC-10: allowedLabels non-empty + label not in list → invalid `#FORBIDDEN`.
  */
 function validateLabelAccess(
+  ctx: RuntimeContext,
   labelName: string,
-  gmailConfig: GmailConfig | undefined
+  gmailConfig: GmailConfig | undefined,
 ): void {
   const allowedLabels = gmailConfig?.allowedLabels;
   const deniedLabels = gmailConfig?.deniedLabels ?? [];
-
   // EC-12: Check denied list first (before fetch)
   if (deniedLabels.includes(labelName)) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `google: label '${labelName}' in denied set`
-    );
+    failForbidden(ctx, 'forbidden', `google: label '${labelName}' in denied set`);
   }
-
   // BC-10: Check allowed list when defined and non-empty
   if (allowedLabels !== undefined && allowedLabels.length > 0) {
     if (!allowedLabels.includes(labelName)) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `google: label '${labelName}' not in allowed set`
-      );
+      failForbidden(ctx, 'forbidden', `google: label '${labelName}' not in allowed set`);
     }
   }
 }
-
 /**
  * Factory returning the gmail_label inner function.
  * Validates label access, resolves the label ID, then applies it via messages.modify.
@@ -83,17 +70,14 @@ export function makeGmailLabel(deps: GmailLabelDeps): (
   ): Promise<RillValue> => {
     const messageId = args['messageId'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: messageId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: messageId must be a non-empty string');
     }
-
     const labelName = args['labelName'];
     if (typeof labelName !== 'string' || labelName.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: labelName must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: labelName must be a non-empty string');
     }
-
     // EC-6/EC-12/BC-9/BC-10: Validate before any API call
-    validateLabelAccess(labelName, deps.gmailConfig);
-
+    validateLabelAccess(ctx, labelName, deps.gmailConfig);
     // Step 1: List all labels to find the label ID by name
     const labelsResponse = await googleFetch(
       'GET',
@@ -107,21 +91,14 @@ export function makeGmailLabel(deps: GmailLabelDeps): (
       deps.cache,
       GMAIL_SCOPES
     );
-
     const labelsData = labelsResponse as { labels?: GmailLabel[] } | null;
     const labels = labelsData?.labels ?? [];
-
     const matched = labels.find((l) => l.name === labelName);
     if (!matched?.id) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `google: label '${labelName}' not found`
-      );
+      throw ctx.invalidate(new Error(`google: label '${labelName}' not found`), { code: 'NOT_FOUND', provider: 'google-workspace', raw: { kind: 'label_not_found', message: `google: label '${labelName}' not found` } });
     }
-
     // Step 2: Apply label to the message
     const modifyPath = `/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`;
-
     await googleFetch(
       'POST',
       GMAIL_BASE,
@@ -137,7 +114,6 @@ export function makeGmailLabel(deps: GmailLabelDeps): (
       undefined,
       messageId
     );
-
     return true as unknown as RillValue;
   };
 }

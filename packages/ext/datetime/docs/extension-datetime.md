@@ -161,10 +161,16 @@ Non-token characters (hyphens, colons, spaces, slashes) pass through as literals
 
 ## Errors
 
-| Error | Code | Description |
-|-------|------|-------------|
-| Unknown timezone | RILL-R004 | Zone name not in `Intl.supportedValuesOf('timeZone')` |
-| Unknown format token | RILL-R004 | Pattern contains unrecognized alphabetic token |
-| Parse mismatch | RILL-R004 | Input string does not match the given pattern |
-| Type mismatch | RILL-R004 | Argument type does not match expected type |
-| Operation cancelled | RILL-R004 | Extension disposed while operation in progress |
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
+(`guard #INVALID_INPUT && raw.kind == 'unknown_timezone'`).
+
+**Host-fn errors:**
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Zone name not in `Intl.supportedValuesOf('timeZone')` | `#INVALID_INPUT` | `unknown_timezone` |
+| Pattern contains unrecognized format token | `#INVALID_INPUT` | `unknown_format_token` |
+| Input string does not match the given pattern | `#INVALID_INPUT` | `parse_mismatch` |
+| Argument type does not match expected type | `#INVALID_INPUT` | `type_mismatch` |
+| Extension disposed while operation in progress | `#DISPOSED` | `disposed` |

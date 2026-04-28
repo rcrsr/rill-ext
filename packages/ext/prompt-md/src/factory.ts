@@ -13,8 +13,10 @@ import {
   RuntimeError,
   type ApplicationCallable,
   type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import type { PromptExtensionContract } from '@rcrsr/rill-ext-prompt-shared';
 import type { PromptMdExtensionConfig } from './types.js';
@@ -29,27 +31,21 @@ import { buildClosure } from './buildClosure.js';
 /**
  * Creates a prompt-md extension from a directory of *.prompt.md files.
  *
- * Behaviour:
- * - Validates config.basePath (EC-6, EC-7).
- * - Scans basePath recursively and parses every file (EC-8 through EC-14
- *   bubble up from parseFile; all errors are RILL-R004).
- * - Detects resolution name collisions across files (EC-15).
- * - Builds ApplicationCallable closures via buildClosure for each prompt.
- * - Returns `{ value: callableDict, dispose }` satisfying ExtensionFactoryResult.
- * - dispose() is idempotent: setting disposed=true and clearing innerDict on
- *   every call (no early return needed).
- * - Closures wrapped with a disposed-check that throws RILL-R004 if invoked
- *   after disposal (FR-PROMPT-10 AC-3).
+ * Factory-time validation failures throw `RuntimeError('RILL-R001', ...)`.
+ * Closure-runtime failures invalidate the call via `ctx.invalidate` using
+ * generic atoms (`#DISPOSED`, `#PROTOCOL`).
  *
  * @param config - Extension configuration containing basePath.
+ * @param _ctx - Factory context (unused; closure has no in-flight work).
  * @returns A fully-loaded ExtensionFactoryResult with one callable per prompt.
  */
 export async function createPromptMdExtension(
   config: PromptMdExtensionConfig,
+  _ctx: ExtensionFactoryCtx,
 ): Promise<ExtensionFactoryResult> {
   // ── EC-6: validate basePath is non-empty ──────────────────────────────────
   if (typeof config.basePath !== 'string' || config.basePath.trim().length === 0) {
-    throw new RuntimeError('RILL-R004', 'basePath must be a non-empty string', undefined, {
+    throw new RuntimeError('RILL-R001', 'prompt-md: basePath must be a non-empty string', undefined, {
       config: 'basePath',
     });
   }
@@ -60,7 +56,7 @@ export async function createPromptMdExtension(
   try {
     const info = await stat(basePath);
     if (!info.isDirectory()) {
-      throw new RuntimeError('RILL-R004', `basePath "${basePath}" is not a directory`, undefined, {
+      throw new RuntimeError('RILL-R001', `prompt-md: basePath "${basePath}" is not a directory`, undefined, {
         path: basePath,
       });
     }
@@ -71,8 +67,8 @@ export async function createPromptMdExtension(
     // stat threw — path does not exist or is inaccessible.
     const message = err instanceof Error ? err.message : String(err);
     throw new RuntimeError(
-      'RILL-R004',
-      `basePath "${basePath}" does not exist or is not accessible: ${message}`,
+      'RILL-R001',
+      `prompt-md: basePath "${basePath}" does not exist or is not accessible: ${message}`,
       undefined,
       { path: basePath },
     );
@@ -81,7 +77,7 @@ export async function createPromptMdExtension(
   // ── Collect *.prompt.md files ─────────────────────────────────────────────
   const entries = await traversePromptFiles(basePath);
 
-  // ── Parse all files (EC-8 through EC-14 propagate as RILL-R004) ──────────
+  // ── Parse all files (EC-8 through EC-14 propagate as RILL-R001) ──────────
   const parsed = await Promise.all(
     entries.map((entry) => parseFile(entry.absolutePath, entry.relativePath)),
   );
@@ -99,8 +95,8 @@ export async function createPromptMdExtension(
   for (const [name, paths] of nameToAbsolutePaths) {
     if (paths.length > 1) {
       throw new RuntimeError(
-        'RILL-R004',
-        `collision: multiple files resolve to the same prompt name "${name}"`,
+        'RILL-R001',
+        `prompt-md: collision: multiple files resolve to the same prompt name "${name}"`,
         undefined,
         { name, paths },
       );
@@ -118,14 +114,19 @@ export async function createPromptMdExtension(
     const name = prompt.name;
 
     // Wrap the closure fn to check the disposed flag before executing.
-    const wrappedFn: CallableFn = (args, ctx, location) => {
+    const wrappedFn: CallableFn = (args, ctxLike, location) => {
       if (disposed) {
-        throw new RuntimeError(
-          'RILL-R004',
-          `prompt-md: extension has been disposed; cannot invoke "${name}"`,
-        );
+        const ctx = ctxLike as RuntimeContext;
+        throw ctx.invalidate(
+          new Error(`prompt-md: extension has been disposed; cannot invoke "${name}"`),
+          {
+            code: 'DISPOSED',
+            provider: 'prompt-md',
+            raw: { kind: 'disposed', name },
+          },
+        ) as unknown as RillValue;
       }
-      return closure.fn(args, ctx, location);
+      return closure.fn(args, ctxLike, location);
     };
     const wrappedClosure: ApplicationCallable = { ...closure, fn: wrappedFn };
 

@@ -142,7 +142,11 @@ Tools are passed as a rill dict (JS object) mapping `name → callable`. The cal
 
 ### Error Handling Convention
 
-Extensions use `RuntimeError` with error code `RILL-R004` for extension-level errors. Shared validation uses `RILL-R001`. The `wrapValidation()` pattern in factory files converts shared `RILL-R001` errors to `RILL-R004` for consistency. Provider SDK errors are mapped through `mapProviderError()` with provider-specific `ProviderErrorDetector` functions.
+rill 0.19 removed `RILL-R004` from `ERROR_REGISTRY`. Extensions emit failures as invalid `RillValue`s via `ctx.invalidate(error, meta)` from inside host functions, and as `RuntimeError('RILL-R001', message)` from factory-time config validation. Full policy: `.claude/policies/policy-domain-ext.md` §EXT.7.
+
+**Reuse rill core's generic atom taxonomy.** rill core pre-registers 12 atoms at module load: `#ok`, `#R001`, `#TIMEOUT`, `#AUTH`, `#FORBIDDEN`, `#RATE_LIMIT`, `#QUOTA_EXCEEDED`, `#NOT_FOUND`, `#CONFLICT`, `#UNAVAILABLE`, `#PROTOCOL`, `#INVALID_INPUT`, `#DISPOSED`, `#TYPE_MISMATCH`. Use these in `meta.code` directly. Do not define `EXT_<EXTENSION>_*` constants. Do not call `ctx.registerErrorCode` for categories the generic taxonomy already covers.
+
+Provider-specific failures decompose into `(generic atom, meta.provider, meta.raw.kind)`. Example: Tavily 432 → `{ code: 'QUOTA_EXCEEDED', provider: 'tavily', raw: { kind: 'plan_limit_exceeded', status: 432 } }`. Host scripts match coarsely (`guard #QUOTA_EXCEEDED`) or finely (`guard #QUOTA_EXCEEDED && raw.kind == 'plan_limit_exceeded'`).
 
 ### Build Toolchain
 

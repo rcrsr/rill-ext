@@ -3,7 +3,8 @@
  * Implements IR-23: exchangeJwtForAccessToken and internal exchangeJwtForToken.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import type { RuntimeContext } from '@rcrsr/rill';
+import { failAuth } from '../errors.js';
 
 /** Google OAuth2 token endpoint URL (AC-9 — HTTPS only, fixed URL). */
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -27,22 +28,22 @@ export interface JwtTokenResult {
  * Returns both the access token and expires_in so the caller (resolveToken in 2.2)
  * can compute the cache TTL as expires_in - 300 (BC-6/BC-7).
  *
- * @param assertion - Base64url JWT assertion from signServiceAccountJwt
- * @param signal - AbortSignal for request cancellation
- * @returns Object with accessToken and expiresIn
- * @throws RuntimeError (RILL-R004) on non-OK HTTP response (token never in message)
- * @throws Network errors are rethrown for caller to wrap via mapFetchError
+ * On non-OK HTTP response throws an invalid RillValue carrying `#AUTH`
+ * with `meta.raw.kind = 'token_refresh_failed'`. The token never appears
+ * in the message (IR-23 security constraint).
+ *
+ * Network errors propagate to caller for `mapFetchError` to handle.
  */
 export async function exchangeJwtForToken(
+  ctx: RuntimeContext,
   assertion: string,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): Promise<JwtTokenResult> {
   const body = new URLSearchParams({
     grant_type: JWT_BEARER_GRANT_TYPE,
     assertion,
   });
 
-  // Network errors propagate to caller — do not catch here (IR-23).
   const response = await fetch(GOOGLE_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -51,10 +52,11 @@ export async function exchangeJwtForToken(
   });
 
   if (!response.ok) {
-    // Token must never appear in error messages (IR-23 security constraint).
-    throw new RuntimeError(
-      'RILL-R004',
-      `google: token exchange failed: ${response.status}`
+    failAuth(
+      ctx,
+      'token_refresh_failed',
+      `google: token exchange failed: ${response.status}`,
+      { status: response.status },
     );
   }
 
@@ -67,21 +69,13 @@ export async function exchangeJwtForToken(
 
 /**
  * Exchange a signed JWT assertion for a Google OAuth2 access token (IR-23).
- *
- * Thin wrapper over exchangeJwtForToken that returns only the access_token string
- * per the IR-23 signature. Task 2.2 (resolveToken) should call exchangeJwtForToken
- * directly to access expires_in for cache TTL computation (BC-6/BC-7).
- *
- * @param assertion - Base64url JWT assertion from signServiceAccountJwt
- * @param signal - AbortSignal for request cancellation
- * @returns Access token string
- * @throws RuntimeError (RILL-R004) on non-OK HTTP response
- * @throws Network errors are rethrown for caller to wrap via mapFetchError
+ * Thin wrapper that returns only the access token string.
  */
 export async function exchangeJwtForAccessToken(
+  ctx: RuntimeContext,
   assertion: string,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): Promise<string> {
-  const result = await exchangeJwtForToken(assertion, signal);
+  const result = await exchangeJwtForToken(ctx, assertion, signal);
   return result.accessToken;
 }

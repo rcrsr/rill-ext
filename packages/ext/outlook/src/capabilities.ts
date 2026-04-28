@@ -1,38 +1,50 @@
 /**
  * Capability and folder access guards for Outlook extension.
- * Throws RuntimeError before any API call when access is not permitted.
+ *
+ * Capability and folder denials surface as invalid RillValues
+ * carrying `#FORBIDDEN` (capability disabled) or `#INVALID_INPUT`
+ * (folder not in allowlist). Helpers throw the invalid value so
+ * the wrap()'s catch block passes it through unchanged.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
+import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+
+const PROVIDER = 'outlook';
 
 /**
  * Check that a named capability is enabled.
- * Throws RuntimeError RILL-R004 when the capability flag is false.
- *
- * @param enabled - Whether the capability is enabled
- * @param name - Human-readable capability name for the error message
- * @throws RuntimeError (RILL-R004) when enabled is false [EC-2, EC-5, EC-7, EC-10]
+ * Throws an invalid RillValue (`#FORBIDDEN`) when disabled.
  */
-export function checkCapability(enabled: boolean, name: string): void {
+export function checkCapability(
+  ctx: RuntimeContext,
+  enabled: boolean,
+  name: string,
+): void {
   if (!enabled) {
-    throw new RuntimeError('RILL-R004', `outlook: ${name} not enabled`);
+    const message = `outlook: ${name} not enabled`;
+    throw ctx.invalidate(new Error(message), {
+      code: 'FORBIDDEN',
+      provider: PROVIDER,
+      raw: { kind: 'capability_disabled', capability: name, message },
+    }) as unknown as RillValue;
   }
 }
 
 /**
  * Check that a folder name is in the configured allowlist.
- * Throws RuntimeError RILL-R004 when the folder is not accessible.
- *
- * @param folders - Allowlist of accessible folder names
- * @param name - Folder name to check
- * @throws RuntimeError (RILL-R004) when name is not in folders [EC-4]
+ * Throws an invalid RillValue (`#FORBIDDEN`) when not accessible.
  */
-export function checkFolder(folders: readonly string[], name: string): void {
+export function checkFolder(
+  ctx: RuntimeContext,
+  folders: readonly string[],
+  name: string,
+): void {
   if (!folders.includes(name)) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `outlook: folder '${name}' not accessible`
-    );
+    const message = `outlook: folder '${name}' not accessible`;
+    throw ctx.invalidate(new Error(message), {
+      code: 'FORBIDDEN',
+      provider: PROVIDER,
+      raw: { kind: 'folder_not_allowed', folder: name, message },
+    }) as unknown as RillValue;
   }
 }
-

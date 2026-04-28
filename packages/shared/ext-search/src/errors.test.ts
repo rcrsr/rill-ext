@@ -1,235 +1,175 @@
 /**
  * Test suite for search error mapping utilities.
- * Validates all error contract cases (EC-1 through EC-12).
+ * Errors map to invalid RillValues via ctx.invalidate; tests inspect
+ * the resulting status sidecar.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import {
+  createRuntimeContext,
+  getStatus,
+  RuntimeHaltSignal,
+  type RuntimeContext,
+  type RillValue,
+} from '@rcrsr/rill';
 import { mapSearchError, mapProviderSearchError } from './errors.js';
-import { RuntimeError } from '@rcrsr/rill';
+
+function makeCtx(): RuntimeContext {
+  return createRuntimeContext();
+}
+
+function statusOf(value: RillValue) {
+  return getStatus(value);
+}
 
 describe('mapSearchError', () => {
   const provider = 'testsearch';
-
-  describe('EC-4: AbortError — request timeout', () => {
-    it('maps error with name AbortError to request timeout', () => {
-      const error = new Error('The operation was aborted');
-      error.name = 'AbortError';
-      const result = mapSearchError(provider, error);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe(`${provider}: request timeout`);
-    });
+  let ctx: RuntimeContext;
+  beforeAll(() => {
+    ctx = makeCtx();
   });
 
-  describe('EC-5: TypeError — connection failed', () => {
-    it('maps TypeError to connection failed', () => {
-      const error = new TypeError('Failed to fetch');
-      const result = mapSearchError(provider, error);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe(`${provider}: connection failed`);
-    });
-
-    it('maps TypeError with DNS failure message', () => {
-      const error = new TypeError('getaddrinfo ENOTFOUND');
-      const result = mapSearchError(provider, error);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe(`${provider}: connection failed`);
-    });
+  it('maps RuntimeHaltSignal to TIMEOUT atom', () => {
+    const halt = new RuntimeHaltSignal(null as unknown as RillValue, true);
+    const result = mapSearchError(ctx, provider, halt);
+    const status = statusOf(result);
+    expect(status.code.name).toBe('TIMEOUT');
+    expect(status.message).toBe(`${provider}: request cancelled`);
   });
 
-  describe('EC-6: SyntaxError — unexpected response format', () => {
-    it('maps SyntaxError from JSON.parse to unexpected response format', () => {
-      const error = new SyntaxError('Unexpected token < in JSON');
-      const result = mapSearchError(provider, error);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe(`${provider}: unexpected response format`);
-    });
+  it('maps AbortError name to TIMEOUT atom', () => {
+    const error = new Error('The operation was aborted');
+    error.name = 'AbortError';
+    const result = mapSearchError(ctx, provider, error);
+    const status = statusOf(result);
+    expect(status.code.name).toBe('TIMEOUT');
+    expect(status.message).toBe(`${provider}: request timeout`);
   });
 
-  describe('RuntimeError passthrough', () => {
-    it('returns already-mapped RuntimeError without wrapping', () => {
-      const original = new RuntimeError('RILL-R004', 'already mapped');
-      const result = mapSearchError(provider, original);
-
-      expect(result).toBe(original);
-      expect(result.message).toBe('already mapped');
-    });
+  it('maps TypeError to UNAVAILABLE with connection_failed kind', () => {
+    const result = mapSearchError(ctx, provider, new TypeError('Failed to fetch'));
+    const status = statusOf(result);
+    expect(status.code.name).toBe('UNAVAILABLE');
+    expect(status.message).toBe(`${provider}: connection failed`);
+    expect(status.raw['kind']).toBe('connection_failed');
   });
 
-  describe('EC-1: HTTP 401/403 — authentication failed', () => {
-    it('maps status 401 to authentication failed', () => {
-      const result = mapSearchError(provider, { status: 401 });
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe(`${provider}: authentication failed`);
-    });
-
-    it('maps status 403 to authentication failed', () => {
-      const result = mapSearchError(provider, { status: 403 });
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe(`${provider}: authentication failed`);
-    });
+  it('maps SyntaxError to PROTOCOL with unexpected_response_format kind', () => {
+    const result = mapSearchError(ctx, provider, new SyntaxError('Unexpected token'));
+    const status = statusOf(result);
+    expect(status.code.name).toBe('PROTOCOL');
+    expect(status.message).toBe(`${provider}: unexpected response format`);
+    expect(status.raw['kind']).toBe('unexpected_response_format');
   });
 
-  describe('EC-2: HTTP 429 — rate limit exceeded', () => {
-    it('maps status 429 to rate limit exceeded', () => {
-      const result = mapSearchError(provider, { status: 429 });
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe(`${provider}: rate limit exceeded`);
-    });
+  it.each([
+    [401, 'AUTH', 'authentication failed'],
+    [403, 'FORBIDDEN', 'forbidden'],
+    [404, 'NOT_FOUND', 'not found'],
+    [408, 'TIMEOUT', 'request failed (408)'],
+    [409, 'CONFLICT', 'request failed (409)'],
+    [429, 'RATE_LIMIT', 'rate limit exceeded'],
+    [402, 'QUOTA_EXCEEDED', 'quota exceeded'],
+    [500, 'UNAVAILABLE', 'server error (500)'],
+    [502, 'UNAVAILABLE', 'server error (502)'],
+    [503, 'UNAVAILABLE', 'server error (503)'],
+  ])('maps HTTP status %d to atom #%s with message "%s"', (status, atom, fragment) => {
+    const result = mapSearchError(ctx, provider, { status });
+    expect(statusOf(result).code.name).toBe(atom);
+    expect(statusOf(result).message).toBe(`${provider}: ${fragment}`);
   });
 
-  describe('EC-3: HTTP 5xx — server error', () => {
-    it('maps status 500 to server error (500)', () => {
-      const result = mapSearchError(provider, { status: 500 });
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe(`${provider}: server error (500)`);
-    });
-
-    it('maps status 502 to server error (502)', () => {
-      const result = mapSearchError(provider, { status: 502 });
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe(`${provider}: server error (502)`);
-    });
-
-    it('maps status 503 to server error (503)', () => {
-      const result = mapSearchError(provider, { status: 503 });
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe(`${provider}: server error (503)`);
-    });
+  it('maps generic Error to UNAVAILABLE with provider-prefixed message', () => {
+    const result = mapSearchError(ctx, provider, new Error('something unexpected'));
+    expect(statusOf(result).code.name).toBe('UNAVAILABLE');
+    expect(statusOf(result).message).toBe(`${provider}: something unexpected`);
   });
 
-  describe('EC-7: Unknown error — provider-prefixed message', () => {
-    it('maps generic Error to provider-prefixed message', () => {
-      const error = new Error('something unexpected');
-      const result = mapSearchError(provider, error);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe(`${provider}: something unexpected`);
-    });
-
-    it('maps unknown object via String() conversion', () => {
-      const result = mapSearchError(provider, 'raw string error');
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe(`${provider}: raw string error`);
-    });
-
-    it('maps null-ish non-Error values via String() conversion', () => {
-      const result = mapSearchError(provider, 42);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe(`${provider}: 42`);
-    });
+  it('maps non-Error values via String() conversion', () => {
+    const result = mapSearchError(ctx, provider, 'raw string error');
+    expect(statusOf(result).message).toBe(`${provider}: raw string error`);
   });
 
-  describe('Provider name in messages', () => {
-    it('prefixes all messages with provider name', () => {
-      const customProvider = 'my-provider';
-      const result = mapSearchError(customProvider, new Error('test'));
-
-      expect(result.message).toContain(customProvider);
-    });
+  it('prefixes provider name in messages', () => {
+    const result = mapSearchError(ctx, 'my-provider', new Error('test'));
+    expect(statusOf(result).message).toContain('my-provider');
   });
 });
 
 describe('mapProviderSearchError', () => {
-  describe('EC-8: Exa 402 — credits depleted', () => {
-    it('maps exa + 402 to credits depleted', () => {
-      const result = mapProviderSearchError('exa', 402, {});
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe('exa: credits depleted');
-    });
-
-    it('does not apply exa override to other providers at 402', () => {
-      const result = mapProviderSearchError('tavily', 402, {});
-
-      expect(result.message).not.toBe('exa: credits depleted');
-    });
+  let ctx: RuntimeContext;
+  beforeAll(() => {
+    ctx = makeCtx();
   });
 
-  describe('EC-9: Tavily 432 — plan limit exceeded', () => {
-    it('maps tavily + 432 to plan limit exceeded', () => {
-      const result = mapProviderSearchError('tavily', 432, {});
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe('tavily: plan limit exceeded');
-    });
+  it('maps exa 402 to QUOTA_EXCEEDED with credits_depleted kind', () => {
+    const result = mapProviderSearchError(ctx, 'exa', 402, {});
+    const status = statusOf(result);
+    expect(status.code.name).toBe('QUOTA_EXCEEDED');
+    expect(status.message).toBe('exa: credits depleted');
+    expect(status.raw['kind']).toBe('credits_depleted');
   });
 
-  describe('EC-10: Tavily 433 — pay-as-you-go limit exceeded', () => {
-    it('maps tavily + 433 to pay-as-you-go limit exceeded', () => {
-      const result = mapProviderSearchError('tavily', 433, {});
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe('tavily: pay-as-you-go limit exceeded');
-    });
+  it('does not apply exa override to other providers at 402', () => {
+    const result = mapProviderSearchError(ctx, 'tavily', 402, {});
+    expect(statusOf(result).message).not.toBe('exa: credits depleted');
   });
 
-  describe('EC-11: Brave 403 with error code — access denied', () => {
-    it('maps brave + 403 with error.code to access denied (code)', () => {
-      const body = { error: { code: 'SUBSCRIPTION_TOKEN_EXPIRED' } };
-      const result = mapProviderSearchError('brave', 403, body);
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.errorId).toBe('RILL-R004');
-      expect(result.message).toBe(
-        'brave: access denied (SUBSCRIPTION_TOKEN_EXPIRED)'
-      );
-    });
-
-    it('maps brave + 403 without error code falls back to authentication failed', () => {
-      const result = mapProviderSearchError('brave', 403, {});
-
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe('brave: authentication failed');
-    });
-
-    it('maps brave + 403 with null error code falls back to authentication failed', () => {
-      const body = { error: { code: null } };
-      const result = mapProviderSearchError('brave', 403, body);
-
-      expect(result.message).toBe('brave: authentication failed');
-    });
+  it('maps tavily 432 to QUOTA_EXCEEDED with plan_limit_exceeded kind', () => {
+    const result = mapProviderSearchError(ctx, 'tavily', 432, {});
+    const status = statusOf(result);
+    expect(status.code.name).toBe('QUOTA_EXCEEDED');
+    expect(status.message).toBe('tavily: plan limit exceeded');
+    expect(status.raw['kind']).toBe('plan_limit_exceeded');
   });
 
-  describe('Fallback to mapSearchError for unknown provider/status', () => {
-    it('falls back to generic 401 mapping for unknown provider', () => {
-      const result = mapProviderSearchError('serper', 401, {});
+  it('maps tavily 433 to QUOTA_EXCEEDED with payg_limit_exceeded kind', () => {
+    const result = mapProviderSearchError(ctx, 'tavily', 433, {});
+    const status = statusOf(result);
+    expect(status.code.name).toBe('QUOTA_EXCEEDED');
+    expect(status.message).toBe('tavily: pay-as-you-go limit exceeded');
+    expect(status.raw['kind']).toBe('payg_limit_exceeded');
+  });
 
-      expect(result).toBeInstanceOf(RuntimeError);
-      expect(result.message).toBe('serper: authentication failed');
-    });
+  it('maps brave 403 with error.code to FORBIDDEN with access_denied kind', () => {
+    const body = { error: { code: 'SUBSCRIPTION_TOKEN_EXPIRED' } };
+    const result = mapProviderSearchError(ctx, 'brave', 403, body);
+    const status = statusOf(result);
+    expect(status.code.name).toBe('FORBIDDEN');
+    expect(status.message).toBe('brave: access denied (SUBSCRIPTION_TOKEN_EXPIRED)');
+    expect(status.raw['kind']).toBe('access_denied');
+  });
 
-    it('falls back to generic 429 mapping for unknown provider', () => {
-      const result = mapProviderSearchError('serper', 429, {});
+  it('maps brave 403 without error.code falls back to FORBIDDEN', () => {
+    const result = mapProviderSearchError(ctx, 'brave', 403, {});
+    const status = statusOf(result);
+    expect(status.code.name).toBe('FORBIDDEN');
+    expect(status.message).toBe('brave: forbidden');
+  });
 
-      expect(result.message).toBe('serper: rate limit exceeded');
-    });
+  it('maps brave 403 with null error.code falls back to FORBIDDEN', () => {
+    const body = { error: { code: null } };
+    const result = mapProviderSearchError(ctx, 'brave', 403, body);
+    const status = statusOf(result);
+    expect(status.code.name).toBe('FORBIDDEN');
+    expect(status.message).toBe('brave: forbidden');
+  });
 
-    it('falls back to generic 500 mapping for unknown provider', () => {
-      const result = mapProviderSearchError('serper', 500, {});
+  it('falls back to generic 401 mapping for unknown provider', () => {
+    const result = mapProviderSearchError(ctx, 'serper', 401, {});
+    expect(statusOf(result).code.name).toBe('AUTH');
+    expect(statusOf(result).message).toBe('serper: authentication failed');
+  });
 
-      expect(result.message).toBe('serper: server error (500)');
-    });
+  it('falls back to generic 429 mapping for unknown provider', () => {
+    const result = mapProviderSearchError(ctx, 'serper', 429, {});
+    expect(statusOf(result).code.name).toBe('RATE_LIMIT');
+    expect(statusOf(result).message).toBe('serper: rate limit exceeded');
+  });
+
+  it('falls back to generic 500 mapping for unknown provider', () => {
+    const result = mapProviderSearchError(ctx, 'serper', 500, {});
+    expect(statusOf(result).code.name).toBe('UNAVAILABLE');
+    expect(statusOf(result).message).toBe('serper: server error (500)');
   });
 });

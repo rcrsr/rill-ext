@@ -8,6 +8,7 @@ import {
   toCallable,
   structureToTypeValue,
   type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
 } from '@rcrsr/rill';
@@ -24,86 +25,57 @@ import {
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { TavilyConfig, TavilyExtensionContract } from './types.js';
 
-// ============================================================
-// CONSTANTS
-// ============================================================
-
 const DEFAULT_BASE_URL = 'https://api.tavily.com';
 const DEFAULT_TIMEOUT = 30000;
 const PROVIDER = 'tavily';
 
-// ============================================================
-// FACTORY
-// ============================================================
+export function createTavilyExtension(
+  config: TavilyConfig,
+  _ctx: ExtensionFactoryCtx
+): ExtensionFactoryResult {
 
-/**
- * Create Tavily extension instance.
- * Validates configuration and returns host functions with cleanup.
- *
- * @param config - Extension configuration
- * @returns ExtensionFactoryResult with search, extract and dispose
- * @throws RuntimeError (RILL-R004) for invalid configuration
- *
- * @example
- * ```typescript
- * const ext = createTavilyExtension({
- *   apiKey: process.env.TAVILY_API_KEY,
- * });
- * // Use with rill runtime...
- * await ext.dispose();
- * ```
- */
-export function createTavilyExtension(config: TavilyConfig): ExtensionFactoryResult {
-  // Validate required config fields
+  // Validate required config fields. Factory-time validation throws using the
+  // built-in `RILL-R001` validation atom; the 'INVALID_INPUT' atom is
+  // reserved for runtime invalid values surfaced through `ctx.invalidate`.
   try {
     assertRequired(config.apiKey, 'apiKey');
     if (config.baseUrl !== undefined) {
       validateBaseUrl(config.baseUrl);
     }
   } catch (error) {
-    if (error instanceof RuntimeError) {
-      throw new RuntimeError('RILL-R004', error.message);
-    }
     if (error instanceof Error) {
-      throw new RuntimeError('RILL-R004', error.message);
+      throw new RuntimeError('RILL-R001', error.message);
     }
     throw error;
   }
 
-  // Extract config values at factory time
   const apiKey = config.apiKey;
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
   const timeout = config.timeout ?? DEFAULT_TIMEOUT;
 
-  // Create disposal and in-flight state
   const disposalState = createDisposalState();
   const inFlightState = createInFlightState();
 
-  // Create function wrapper
   const wrap = createSearchFunctionWrapper(PROVIDER, disposalState, inFlightState);
 
-  // Build auth headers
   const authHeaders = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${apiKey}`,
   };
 
-  // ============================================================
-  // HOST FUNCTIONS
-  // ============================================================
-
-  const search = wrap('search', async (args, _ctx, controller) => {
+  const search = wrap('search', async (args, callCtx, signal) => {
     const query = args['query'] as string;
     const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-    // EC-17: Empty query raises RILL-R004
     if (!query) {
-      throw new RuntimeError('RILL-R004', `${PROVIDER}: query is required`);
+      throw callCtx.invalidate(new Error(`${PROVIDER}: query is required`), {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: { kind: 'empty_query', message: `${PROVIDER}: query is required` },
+      });
     }
 
-    // Build request body
     const body: Record<string, unknown> = { query };
-
     if (options['search_depth'] !== undefined) body['search_depth'] = options['search_depth'];
     if (options['max_results'] !== undefined) body['max_results'] = options['max_results'];
     if (options['topic'] !== undefined) body['topic'] = options['topic'];
@@ -115,17 +87,17 @@ export function createTavilyExtension(config: TavilyConfig): ExtensionFactoryRes
     if (options['exclude_domains'] !== undefined) body['exclude_domains'] = options['exclude_domains'];
     if (options['country'] !== undefined) body['country'] = options['country'];
 
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
     const response = await fetch(`${baseUrl}/search`, {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify(body),
-      signal,
+      signal: requestSignal,
     });
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
     }
 
     const data = await response.json() as {
@@ -141,7 +113,6 @@ export function createTavilyExtension(config: TavilyConfig): ExtensionFactoryRes
       results: data.results as RillValue,
       response_time: data.response_time,
     };
-
     if (data.answer !== undefined) result['answer'] = data.answer;
     if (data.images !== undefined) result['images'] = data.images as RillValue;
 
@@ -152,29 +123,27 @@ export function createTavilyExtension(config: TavilyConfig): ExtensionFactoryRes
     };
   });
 
-  const extract = wrap('extract', async (args, _ctx, controller) => {
+  const extract = wrap('extract', async (args, callCtx, signal) => {
     const urls = args['urls'] as unknown[];
     const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-    // Build request body
     const body: Record<string, unknown> = { urls };
-
     if (options['extract_depth'] !== undefined) body['extract_depth'] = options['extract_depth'];
     if (options['format'] !== undefined) body['format'] = options['format'];
     if (options['chunks_per_source'] !== undefined) body['chunks_per_source'] = options['chunks_per_source'];
     if (options['query'] !== undefined) body['query'] = options['query'];
 
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
     const response = await fetch(`${baseUrl}/extract`, {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify(body),
-      signal,
+      signal: requestSignal,
     });
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
     }
 
     const data = await response.json() as {
@@ -194,19 +163,13 @@ export function createTavilyExtension(config: TavilyConfig): ExtensionFactoryRes
     };
   });
 
-  // ============================================================
-  // DISPOSE
-  // ============================================================
-
   const disposeExtension = async (): Promise<void> => {
     abortAll(inFlightState);
     await dispose(disposalState);
   };
 
-  // Return type shared across all host functions
   const dictReturnType = structureToTypeValue({ kind: 'dict' });
 
-  // Build callable dict
   const callableDict = {
     search: toCallable({
       fn: search as CallableFn,

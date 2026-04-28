@@ -8,8 +8,6 @@
  * The summarize host function performs a 2-step flow:
  *   1. GET /res/v1/web/search?q={query}&summary=1 to obtain summarizer.key
  *   2. GET /res/v1/summarizer/search?key={encoded_key} to obtain the summary
- *
- * Note: The Brave Summarizer API is deprecated in favor of the Answers API.
  */
 
 import {
@@ -17,8 +15,10 @@ import {
   toCallable,
   structureToTypeValue,
   type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import {
   assertRequired,
@@ -33,65 +33,36 @@ import {
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { BraveConfig, BraveExtensionContract } from './types.js';
 
-// ============================================================
-// CONSTANTS
-// ============================================================
-
 const DEFAULT_BASE_URL = 'https://api.search.brave.com';
 const DEFAULT_TIMEOUT = 30000;
 const PROVIDER = 'brave';
 
-// ============================================================
-// FACTORY
-// ============================================================
+export function createBraveExtension(
+  config: BraveConfig,
+  _ctx: ExtensionFactoryCtx
+): ExtensionFactoryResult {
 
-/**
- * Create Brave extension instance.
- * Validates configuration and returns host functions with cleanup.
- *
- * @param config - Extension configuration
- * @returns ExtensionFactoryResult with search, news, summarize and dispose
- * @throws RuntimeError (RILL-R004) for invalid configuration
- *
- * @example
- * ```typescript
- * const ext = createBraveExtension({
- *   apiKey: process.env.BRAVE_API_KEY,
- * });
- * // Use with rill runtime...
- * await ext.dispose();
- * ```
- */
-export function createBraveExtension(config: BraveConfig): ExtensionFactoryResult {
-  // Validate required config fields
   try {
     assertRequired(config.apiKey, 'apiKey');
     if (config.baseUrl !== undefined) {
       validateBaseUrl(config.baseUrl);
     }
   } catch (error) {
-    if (error instanceof RuntimeError) {
-      throw new RuntimeError('RILL-R004', error.message);
-    }
     if (error instanceof Error) {
-      throw new RuntimeError('RILL-R004', error.message);
+      throw new RuntimeError('RILL-R001', error.message);
     }
     throw error;
   }
 
-  // Extract config values at factory time
   const apiKey = config.apiKey;
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
   const timeout = config.timeout ?? DEFAULT_TIMEOUT;
 
-  // Create disposal and in-flight state
   const disposalState = createDisposalState();
   const inFlightState = createInFlightState();
 
-  // Create function wrapper
   const wrap = createSearchFunctionWrapper(PROVIDER, disposalState, inFlightState);
 
-  // Build auth headers — Brave requires X-Subscription-Token and Cache-Control on all requests
   const authHeaders = {
     'Accept': 'application/json',
     'Accept-Encoding': 'gzip',
@@ -99,22 +70,23 @@ export function createBraveExtension(config: BraveConfig): ExtensionFactoryResul
     'Cache-Control': 'no-cache',
   };
 
-  // ============================================================
-  // HOST FUNCTIONS
-  // ============================================================
+  const requireQuery = (callCtx: RuntimeContext, query: string): void => {
+    if (!query) {
+      throw callCtx.invalidate(new Error(`${PROVIDER}: query is required`), {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: { kind: 'empty_query', message: `${PROVIDER}: query is required` },
+      });
+    }
+  };
 
-  const search = wrap('search', async (args, _ctx, controller) => {
+  const search = wrap('search', async (args, callCtx, signal) => {
     const query = args['query'] as string;
     const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-    // EC-17: Empty query raises RILL-R004
-    if (!query) {
-      throw new RuntimeError('RILL-R004', `${PROVIDER}: query is required`);
-    }
+    requireQuery(callCtx, query);
 
-    // Build URL with query parameters (GET request)
     const params = new URLSearchParams({ q: query });
-
     if (options['count'] !== undefined) params.set('count', String(options['count']));
     if (options['offset'] !== undefined) params.set('offset', String(options['offset']));
     if (options['country'] !== undefined) params.set('country', String(options['country']));
@@ -124,16 +96,16 @@ export function createBraveExtension(config: BraveConfig): ExtensionFactoryResul
     if (options['extra_snippets'] !== undefined) params.set('extra_snippets', String(options['extra_snippets']));
     if (options['goggles'] !== undefined) params.set('goggles', String(options['goggles']));
 
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
     const response = await fetch(`${baseUrl}/res/v1/web/search?${params.toString()}`, {
       method: 'GET',
       headers: authHeaders,
-      signal,
+      signal: requestSignal,
     });
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
     }
 
     const data = await response.json() as {
@@ -155,18 +127,13 @@ export function createBraveExtension(config: BraveConfig): ExtensionFactoryResul
     };
   });
 
-  const news = wrap('news', async (args, _ctx, controller) => {
+  const news = wrap('news', async (args, callCtx, signal) => {
     const query = args['query'] as string;
     const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-    // EC-17: Empty query raises RILL-R004
-    if (!query) {
-      throw new RuntimeError('RILL-R004', `${PROVIDER}: query is required`);
-    }
+    requireQuery(callCtx, query);
 
-    // Build URL with query parameters (GET request)
     const params = new URLSearchParams({ q: query });
-
     if (options['count'] !== undefined) params.set('count', String(options['count']));
     if (options['offset'] !== undefined) params.set('offset', String(options['offset']));
     if (options['country'] !== undefined) params.set('country', String(options['country']));
@@ -176,52 +143,42 @@ export function createBraveExtension(config: BraveConfig): ExtensionFactoryResul
     if (options['extra_snippets'] !== undefined) params.set('extra_snippets', String(options['extra_snippets']));
     if (options['goggles'] !== undefined) params.set('goggles', String(options['goggles']));
 
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
     const response = await fetch(`${baseUrl}/res/v1/news/search?${params.toString()}`, {
       method: 'GET',
       headers: authHeaders,
-      signal,
+      signal: requestSignal,
     });
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
     }
 
     const data = await response.json() as {
       results?: unknown[];
     };
 
-    const result: Record<string, RillValue> = {
-      results: (data.results ?? []) as RillValue,
-    };
-
     return {
-      result: result as RillValue,
+      result: { results: (data.results ?? []) as RillValue } as RillValue,
       query,
       resultCount: data.results?.length ?? 0,
     };
   });
 
-  const summarize = wrap('summarize', async (args, _ctx, controller) => {
+  const summarize = wrap('summarize', async (args, callCtx, signal) => {
     const query = args['query'] as string;
     const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-    // EC-17: Empty query raises RILL-R004
-    if (!query) {
-      throw new RuntimeError('RILL-R004', `${PROVIDER}: query is required`);
-    }
+    requireQuery(callCtx, query);
 
-    // Build URL with query parameters for the first step
     const searchParams = new URLSearchParams({ q: query, summary: '1' });
-
     if (options['count'] !== undefined) searchParams.set('count', String(options['count']));
     if (options['country'] !== undefined) searchParams.set('country', String(options['country']));
     if (options['search_lang'] !== undefined) searchParams.set('search_lang', String(options['search_lang']));
     if (options['safesearch'] !== undefined) searchParams.set('safesearch', String(options['safesearch']));
 
-    // Step 1: GET /res/v1/web/search?q={query}&summary=1 to obtain summarizer.key
-    const signal1 = AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
+    const signal1 = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
     const searchResponse = await fetch(
       `${baseUrl}/res/v1/web/search?${searchParams.toString()}`,
       {
@@ -233,23 +190,24 @@ export function createBraveExtension(config: BraveConfig): ExtensionFactoryResul
 
     if (!searchResponse.ok) {
       const responseBody = await searchResponse.json().catch(() => null);
-      throw mapProviderSearchError(PROVIDER, searchResponse.status, responseBody);
+      throw mapProviderSearchError(callCtx, PROVIDER, searchResponse.status, responseBody);
     }
 
     const searchData = await searchResponse.json() as {
       summarizer?: { key?: string };
     };
 
-    // EC-19: No summarizer key in response
     const summarizerKey = searchData.summarizer?.key;
     if (!summarizerKey) {
-      throw new RuntimeError('RILL-R004', `${PROVIDER}: summarizer key not found`);
+      throw callCtx.invalidate(new Error(`${PROVIDER}: summarizer key not found`), {
+        code: 'UNAVAILABLE',
+        provider: PROVIDER,
+        raw: { kind: 'summarizer_key_missing', message: `${PROVIDER}: summarizer key not found` },
+      });
     }
 
-    // Step 2: GET /res/v1/summarizer/search?key={url_encoded_key} to obtain summary
     const summarizerParams = new URLSearchParams({ key: summarizerKey });
-
-    const signal2 = AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
+    const signal2 = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
     const summarizerResponse = await fetch(
       `${baseUrl}/res/v1/summarizer/search?${summarizerParams.toString()}`,
       {
@@ -259,9 +217,16 @@ export function createBraveExtension(config: BraveConfig): ExtensionFactoryResul
       }
     );
 
-    // EC-18: Second request fails
     if (!summarizerResponse.ok) {
-      throw new RuntimeError('RILL-R004', `${PROVIDER}: summarizer request failed`);
+      throw callCtx.invalidate(new Error(`${PROVIDER}: summarizer request failed`), {
+        code: 'UNAVAILABLE',
+        provider: PROVIDER,
+        raw: {
+          kind: 'summarizer_request_failed',
+          status: summarizerResponse.status,
+          message: `${PROVIDER}: summarizer request failed`,
+        },
+      });
     }
 
     const summaryData = await summarizerResponse.json() as {
@@ -285,19 +250,13 @@ export function createBraveExtension(config: BraveConfig): ExtensionFactoryResul
     };
   });
 
-  // ============================================================
-  // DISPOSE
-  // ============================================================
-
   const disposeExtension = async (): Promise<void> => {
     abortAll(inFlightState);
     await dispose(disposalState);
   };
 
-  // Return type shared across all host functions
   const dictReturnType = structureToTypeValue({ kind: 'dict' });
 
-  // Build callable dict
   const callableDict = {
     search: toCallable({
       fn: search as CallableFn,

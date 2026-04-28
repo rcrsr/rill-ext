@@ -105,7 +105,7 @@ export async function buildRestAuthHeaders(
   const credential = auth.credential ?? new DefaultAzureCredential();
   const tokenResponse = await credential.getToken(SCOPE_COGNITIVE);
   if (!tokenResponse?.token) {
-    throw new RuntimeError('RILL-R004', 'foundry: failed to acquire Entra token');
+    throw new RuntimeError('RILL-R001', 'foundry: failed to acquire Entra token');
   }
   return { Authorization: `Bearer ${tokenResponse.token}` };
 }

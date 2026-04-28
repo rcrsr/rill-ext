@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { createMcpExtension } from '../src/factory.js';
+import { makeFactoryCtx, makeRuntimeCtx, expectRejectsInvalid } from './_helpers.js';
 import type { McpExtensionConfig } from '../src/types.js';
 
 describe('Integration: Dispose and Connection Lifecycle', () => {
@@ -81,20 +82,18 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         },
       };
 
-      const extension = await createMcpExtension(config);
+      const extension = await createMcpExtension(config, makeFactoryCtx());
       const fns = extension.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
       // Start a long-running tool call
-      const toolCallPromise = tools.long_operation!.fn({}, {
-        _lifecycle: { connectEmitted: false },
-      } as any);
+      const toolCallPromise = tools.long_operation!.fn({}, makeRuntimeCtx());
 
       // Immediately dispose while the tool call is pending
       await extension.dispose?.();
 
       // The pending tool call should reject with connection lost error
-      await expect(toolCallPromise).rejects.toThrow('connection lost');
+      await expectRejectsInvalid(toolCallPromise, 'connection lost');
     });
 
     it('handles disposal with multiple pending calls', async () => {
@@ -151,17 +150,13 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         },
       };
 
-      const extension = await createMcpExtension(config);
+      const extension = await createMcpExtension(config, makeFactoryCtx());
       const fns = extension.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
       // Start multiple tool calls
-      const call1 = tools.tool_one!.fn({}, {
-        _lifecycle: { connectEmitted: false },
-      } as any);
-      const call2 = tools.tool_two!.fn({}, {
-        _lifecycle: { connectEmitted: false },
-      } as any);
+      const call1 = tools.tool_one!.fn({}, makeRuntimeCtx());
+      const call2 = tools.tool_two!.fn({}, makeRuntimeCtx());
 
       // Verify both calls are pending
       expect(pendingCalls).toHaveLength(2);
@@ -170,8 +165,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       await extension.dispose?.();
 
       // Both pending calls should reject
-      await expect(call1).rejects.toThrow('connection lost');
-      await expect(call2).rejects.toThrow('connection lost');
+      await expectRejectsInvalid(call1, 'connection lost');
+      await expectRejectsInvalid(call2, 'connection lost');
     });
   });
 
@@ -203,7 +198,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         },
       };
 
-      const extension = await createMcpExtension(config);
+      const extension = await createMcpExtension(config, makeFactoryCtx());
 
       // First dispose
       await extension.dispose?.();
@@ -251,7 +246,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         },
       };
 
-      const extension = await createMcpExtension(config);
+      const extension = await createMcpExtension(config, makeFactoryCtx());
 
       // First dispose throws error (swallowed)
       await expect(extension.dispose?.()).resolves.toBeUndefined();
@@ -306,14 +301,12 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         },
       };
 
-      const extension = await createMcpExtension(config);
+      const extension = await createMcpExtension(config, makeFactoryCtx());
       const fns = extension.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
 
       // Tool call before dispose works
-      const resultBefore = await tools.test_tool!.fn({ param1: 'value' }, {
-        _lifecycle: { connectEmitted: false },
-      } as any);
+      const resultBefore = await tools.test_tool!.fn({ param1: 'value' }, makeRuntimeCtx());
       expect(resultBefore).toBe('success');
       expect(mockCallTool).toHaveBeenCalledTimes(1);
 
@@ -324,11 +317,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       mockCallTool.mockRejectedValue(new Error('connection closed'));
 
       // Tool call after dispose should throw connection lost error
-      await expect(
-        tools.test_tool!.fn({ param1: 'value' }, {
-          _lifecycle: { connectEmitted: false },
-        } as any)
-      ).rejects.toThrow('mcp: connection lost');
+      await expectRejectsInvalid(tools.test_tool!.fn({ param1: 'value' }, makeRuntimeCtx()), 'mcp: connection lost');
     });
 
     it('resource reads after dispose throw connection lost error', async () => {
@@ -367,16 +356,14 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         },
       };
 
-      const extension = await createMcpExtension(config);
+      const extension = await createMcpExtension(config, makeFactoryCtx());
       const fns = extension.value as Record<string, any>;
       const resources = fns.resources as Record<string, any>;
 
       // Resource read before dispose works
       const resultBefore = await resources.read_resource!.fn(
         { uri: 'test://resource' },
-        {
-          _lifecycle: { connectEmitted: false },
-        } as any
+        makeRuntimeCtx()
       );
       expect(resultBefore).toBe('content');
       expect(mockReadResource).toHaveBeenCalledTimes(1);
@@ -388,11 +375,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       mockReadResource.mockRejectedValue(new Error('connection lost'));
 
       // Resource read after dispose should throw
-      await expect(
-        resources.read_resource!.fn({ uri: 'test://resource' }, {
-          _lifecycle: { connectEmitted: false },
-        } as any)
-      ).rejects.toThrow('mcp: connection lost');
+      await expectRejectsInvalid(resources.read_resource!.fn({ uri: 'test://resource' }, makeRuntimeCtx()), 'mcp: connection lost');
     });
 
     it('prompt calls after dispose throw connection lost error', async () => {
@@ -436,14 +419,12 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         },
       };
 
-      const extension = await createMcpExtension(config);
+      const extension = await createMcpExtension(config, makeFactoryCtx());
       const fns = extension.value as Record<string, any>;
       const prompts = fns.prompts as Record<string, any>;
 
       // Prompt call before dispose works
-      const resultBefore = await prompts.test!.fn({}, {
-        _lifecycle: { connectEmitted: false },
-      } as any);
+      const resultBefore = await prompts.test!.fn({}, makeRuntimeCtx());
       // Prompt returns list of dicts with role and content
       expect(resultBefore).toEqual([{ role: 'user', content: 'prompt text' }]);
       expect(mockGetPrompt).toHaveBeenCalledTimes(1);
@@ -455,11 +436,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       mockGetPrompt.mockRejectedValue(new Error('connection lost'));
 
       // Prompt call after dispose should throw
-      await expect(
-        prompts.test!.fn({}, {
-          _lifecycle: { connectEmitted: false },
-        } as any)
-      ).rejects.toThrow('mcp: connection lost');
+      await expectRejectsInvalid(prompts.test!.fn({}, makeRuntimeCtx()), 'mcp: connection lost');
     });
   });
 
@@ -502,15 +479,13 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       // Connect
-      const extension = await createMcpExtension(config);
+      const extension = await createMcpExtension(config, makeFactoryCtx());
       const fns = extension.value as Record<string, any>;
       const tools = fns.tools as Record<string, any>;
       expect(mockConnect).toHaveBeenCalledTimes(1);
 
       // Use
-      const result = await tools.my_tool!.fn({}, {
-        _lifecycle: { connectEmitted: false },
-      } as any);
+      const result = await tools.my_tool!.fn({}, makeRuntimeCtx());
       expect(result).toBe('result');
       expect(mockCallTool).toHaveBeenCalledTimes(1);
 

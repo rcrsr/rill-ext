@@ -6,11 +6,22 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
-import { RuntimeError } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  createRuntimeContext,
+  isInvalid,
+  getStatus,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import { signServiceAccountJwt } from '../src/auth/jwt.js';
 import { exchangeJwtForToken, exchangeJwtForAccessToken } from '../src/auth/exchange.js';
 import { parseServiceAccountKey } from '../src/config.js';
 import type { ServiceAccountKey } from '../src/types.js';
+
+function makeTestCtx(): RuntimeContext {
+  return createRuntimeContext();
+}
 
 // ============================================================
 // TEST RSA KEY PAIR
@@ -89,7 +100,7 @@ const MULTI_SCOPES = [
 describe('signServiceAccountJwt — AC-9: JWT claims', () => {
   it('header encodes { alg: "RS256", typ: "JWT" }', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     const { header } = parseJwt(assertion);
 
     expect(header).toStrictEqual({ alg: 'RS256', typ: 'JWT' });
@@ -97,7 +108,7 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 
   it('aud is https://oauth2.googleapis.com/token (AC-9)', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     const { payload } = parseJwt(assertion);
 
     expect(payload['aud']).toBe('https://oauth2.googleapis.com/token');
@@ -106,7 +117,7 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
   it('exp equals iat + 3600 (AC-9)', () => {
     const key = makeTestKey();
     const before = Math.floor(Date.now() / 1000);
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     const after = Math.floor(Date.now() / 1000);
 
     const { payload } = parseJwt(assertion);
@@ -120,7 +131,7 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 
   it('iss is key.client_email (AC-9)', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     const { payload } = parseJwt(assertion);
 
     expect(payload['iss']).toBe('test-sa@test-project.iam.gserviceaccount.com');
@@ -128,7 +139,7 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 
   it('scope is scopes joined with a single space (AC-9)', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, MULTI_SCOPES);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, MULTI_SCOPES);
     const { payload } = parseJwt(assertion);
 
     expect(payload['scope']).toBe(
@@ -138,7 +149,7 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 
   it('single scope has no trailing or leading space', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     const { payload } = parseJwt(assertion);
 
     expect(payload['scope']).toBe('https://www.googleapis.com/auth/gmail.readonly');
@@ -148,7 +159,7 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 
   it('sub claim is present when subject is provided (AC-9)', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE, 'user@domain.com');
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE, 'user@domain.com');
     const { payload } = parseJwt(assertion);
 
     expect(payload['sub']).toBe('user@domain.com');
@@ -156,7 +167,7 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 
   it('sub claim is absent when subject is not provided (AC-9)', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     const { payload } = parseJwt(assertion);
 
     expect('sub' in payload).toBe(false);
@@ -164,7 +175,7 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 
   it('sub claim is absent when subject is undefined explicitly (AC-9)', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE, undefined);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE, undefined);
     const { payload } = parseJwt(assertion);
 
     expect('sub' in payload).toBe(false);
@@ -178,28 +189,28 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 describe('signServiceAccountJwt — signature verification', () => {
   it('produces a valid RS256 signature verifiable with the test public key', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
 
     expect(verifyJwtSignature(assertion)).toBe(true);
   });
 
   it('RS256 signature is valid for multi-scope assertions', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, MULTI_SCOPES);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, MULTI_SCOPES);
 
     expect(verifyJwtSignature(assertion)).toBe(true);
   });
 
   it('RS256 signature is valid when subject is provided', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE, 'admin@domain.com');
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE, 'admin@domain.com');
 
     expect(verifyJwtSignature(assertion)).toBe(true);
   });
 
   it('assertion has exactly three dot-separated parts', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
 
     expect(assertion.split('.').length).toBe(3);
   });
@@ -213,7 +224,7 @@ describe('signServiceAccountJwt — signature verification', () => {
 describe('signServiceAccountJwt — VAL-1: RS256 fixture verification', () => {
   it('all three parts use base64url alphabet with no padding', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE, 'sub@domain.com');
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE, 'sub@domain.com');
 
     // RFC 7515 §2: base64url uses A-Z, a-z, 0-9, '-', '_'; no '+', '/', or '='
     expect(assertion).not.toMatch(/[+/=]/);
@@ -224,7 +235,7 @@ describe('signServiceAccountJwt — VAL-1: RS256 fixture verification', () => {
 
   it('signing input matches header-dot-payload exactly (signature covers what we decode)', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, MULTI_SCOPES);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, MULTI_SCOPES);
 
     const parts = assertion.split('.');
     const signingInput = `${parts[0]}.${parts[1]}`;
@@ -244,7 +255,7 @@ describe('signServiceAccountJwt — VAL-1: RS256 fixture verification', () => {
 
   it('negative control: tampered signing input fails RS256 verification', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
 
     const parts = assertion.split('.');
     const tamperedInput = `${parts[0]}.${parts[1]}X`; // mutate payload segment
@@ -263,7 +274,7 @@ describe('signServiceAccountJwt — VAL-1: RS256 fixture verification', () => {
 
   it('decoded header is byte-exact { alg, typ } with no extra fields', () => {
     const key = makeTestKey();
-    const assertion = signServiceAccountJwt(key, SINGLE_SCOPE);
+    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
 
     const headerJson = decodeBase64Url(assertion.split('.')[0]!);
     // JSON.parse + strict equality already covered above; here assert the
@@ -273,53 +284,45 @@ describe('signServiceAccountJwt — VAL-1: RS256 fixture verification', () => {
 });
 
 // ============================================================
-// EC-3: Invalid private key → RILL-R004, no key material in message
+// EC-3: Invalid private key → #AUTH, no key material in message
 // ============================================================
 
 describe('signServiceAccountJwt — EC-3: invalid private_key', () => {
-  it('throws RILL-R004 when private_key is malformed', () => {
+  it('emits #AUTH when private_key is malformed', () => {
     const key = makeTestKey({ private_key: 'not-a-valid-pem-key' });
-
     let caught: unknown;
     try {
-      signServiceAccountJwt(key, SINGLE_SCOPE);
+      signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     } catch (e) {
       caught = e;
     }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
   });
 
   it('error message does not contain key material on signing failure', () => {
     const key = makeTestKey({ private_key: '-----BEGIN PRIVATE KEY-----\nBADDATA\n-----END PRIVATE KEY-----\n' });
-
     let caught: unknown;
     try {
-      signServiceAccountJwt(key, SINGLE_SCOPE);
+      signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     } catch (e) {
       caught = e;
     }
-
-    // Error message must not leak PEM key material
-    const msg = (caught as RuntimeError).message;
+    const msg = getStatus(caught as RillValue).message;
     expect(msg).not.toContain('BADDATA');
-    // Message should identify the failure class
     expect(msg).toContain('google: JWT signing failed');
   });
 
-  it('throws RILL-R004 for empty private_key string', () => {
+  it('emits #AUTH for empty private_key string', () => {
     const key = makeTestKey({ private_key: '' });
-
     let caught: unknown;
     try {
-      signServiceAccountJwt(key, SINGLE_SCOPE);
+      signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
     } catch (e) {
       caught = e;
     }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
   });
 });
 
@@ -341,88 +344,59 @@ describe('parseServiceAccountKey — AC-8: required field validation', () => {
     expect(result.token_uri).toBe('https://oauth2.googleapis.com/token');
   });
 
-  it('throws RILL-R004 when client_email is missing (AC-8)', () => {
+  it('throws RILL-R001 when client_email is missing (AC-8)', () => {
     const keyJson = JSON.stringify({
       private_key: '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
       token_uri: 'https://oauth2.googleapis.com/token',
     });
-
     let caught: unknown;
-    try {
-      parseServiceAccountKey(keyJson);
-    } catch (e) {
-      caught = e;
-    }
-
+    try { parseServiceAccountKey(keyJson); } catch (e) { caught = e; }
     expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
     expect((caught as RuntimeError).message).toContain('client_email');
   });
 
-  it('throws RILL-R004 when private_key is missing (AC-8)', () => {
+  it('throws RILL-R001 when private_key is missing (AC-8)', () => {
     const keyJson = JSON.stringify({
       client_email: 'sa@project.iam.gserviceaccount.com',
       token_uri: 'https://oauth2.googleapis.com/token',
     });
-
     let caught: unknown;
-    try {
-      parseServiceAccountKey(keyJson);
-    } catch (e) {
-      caught = e;
-    }
-
+    try { parseServiceAccountKey(keyJson); } catch (e) { caught = e; }
     expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
     expect((caught as RuntimeError).message).toContain('private_key');
   });
 
-  it('throws RILL-R004 when token_uri is missing (AC-8)', () => {
+  it('throws RILL-R001 when token_uri is missing (AC-8)', () => {
     const keyJson = JSON.stringify({
       client_email: 'sa@project.iam.gserviceaccount.com',
       private_key: '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
     });
-
     let caught: unknown;
-    try {
-      parseServiceAccountKey(keyJson);
-    } catch (e) {
-      caught = e;
-    }
-
+    try { parseServiceAccountKey(keyJson); } catch (e) { caught = e; }
     expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
     expect((caught as RuntimeError).message).toContain('token_uri');
   });
 
-  it('throws RILL-R004 for non-JSON input', () => {
+  it('throws RILL-R001 for non-JSON input', () => {
     let caught: unknown;
-    try {
-      parseServiceAccountKey('not-json');
-    } catch (e) {
-      caught = e;
-    }
-
+    try { parseServiceAccountKey('not-json'); } catch (e) { caught = e; }
     expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
   });
 
-  it('throws RILL-R004 when client_email is empty string', () => {
+  it('throws RILL-R001 when client_email is empty string', () => {
     const keyJson = JSON.stringify({
       client_email: '',
       private_key: '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
       token_uri: 'https://oauth2.googleapis.com/token',
     });
-
     let caught: unknown;
-    try {
-      parseServiceAccountKey(keyJson);
-    } catch (e) {
-      caught = e;
-    }
-
+    try { parseServiceAccountKey(keyJson); } catch (e) { caught = e; }
     expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
   });
 });
 
@@ -448,7 +422,7 @@ describe('exchangeJwtForToken — fetch contract', () => {
       );
     }) as unknown as typeof fetch;
 
-    await exchangeJwtForToken('test-assertion', new AbortController().signal);
+    await exchangeJwtForToken(makeTestCtx(), 'test-assertion', new AbortController().signal);
 
     expect(capturedUrl).toBe('https://oauth2.googleapis.com/token');
   });
@@ -466,7 +440,7 @@ describe('exchangeJwtForToken — fetch contract', () => {
       );
     }) as unknown as typeof fetch;
 
-    await exchangeJwtForToken('test-assertion', new AbortController().signal);
+    await exchangeJwtForToken(makeTestCtx(), 'test-assertion', new AbortController().signal);
 
     expect(capturedMethod).toBe('POST');
     expect(capturedContentType).toBe('application/x-www-form-urlencoded');
@@ -483,7 +457,7 @@ describe('exchangeJwtForToken — fetch contract', () => {
       );
     }) as unknown as typeof fetch;
 
-    await exchangeJwtForToken('my-assertion-value', new AbortController().signal);
+    await exchangeJwtForToken(makeTestCtx(), 'my-assertion-value', new AbortController().signal);
 
     expect(capturedBody).toContain('grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer');
     expect(capturedBody).toContain('assertion=my-assertion-value');
@@ -497,7 +471,7 @@ describe('exchangeJwtForToken — fetch contract', () => {
       )
     ) as unknown as typeof fetch;
 
-    const result = await exchangeJwtForToken('test', new AbortController().signal);
+    const result = await exchangeJwtForToken(makeTestCtx(), 'test', new AbortController().signal);
 
     expect(result.accessToken).toBe('returned-token');
     expect(result.expiresIn).toBe(7200);
@@ -515,12 +489,12 @@ describe('exchangeJwtForToken — fetch contract', () => {
     }) as unknown as typeof fetch;
 
     const controller = new AbortController();
-    await exchangeJwtForToken('test', controller.signal);
+    await exchangeJwtForToken(makeTestCtx(), 'test', controller.signal);
 
     expect(capturedSignal).toBe(controller.signal);
   });
 
-  it('throws RILL-R004 on non-OK HTTP response', async () => {
+  it('emits #AUTH on non-OK HTTP response', async () => {
     globalThis.fetch = vi.fn(async () =>
       new Response('{"error":"invalid_grant"}', {
         status: 401,
@@ -530,13 +504,10 @@ describe('exchangeJwtForToken — fetch contract', () => {
 
     let caught: unknown;
     try {
-      await exchangeJwtForToken('test', new AbortController().signal);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+      await exchangeJwtForToken(makeTestCtx(), 'test', new AbortController().signal);
+    } catch (e) { caught = e; }
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
   });
 
   it('error message on non-OK response does not contain any token material', async () => {
@@ -549,16 +520,12 @@ describe('exchangeJwtForToken — fetch contract', () => {
 
     let caught: unknown;
     try {
-      await exchangeJwtForToken('my-secret-assertion', new AbortController().signal);
-    } catch (e) {
-      caught = e;
-    }
+      await exchangeJwtForToken(makeTestCtx(), 'my-secret-assertion', new AbortController().signal);
+    } catch (e) { caught = e; }
 
-    const msg = (caught as RuntimeError).message;
-    // Token material and assertion must not appear in the error message
+    const msg = getStatus(caught as RillValue).message;
     expect(msg).not.toContain('leaked-token');
     expect(msg).not.toContain('my-secret-assertion');
-    // Message must contain status code only
     expect(msg).toContain('400');
   });
 });
@@ -582,12 +549,12 @@ describe('exchangeJwtForAccessToken — returns only access_token string', () =>
       )
     ) as unknown as typeof fetch;
 
-    const token = await exchangeJwtForAccessToken('test', new AbortController().signal);
+    const token = await exchangeJwtForAccessToken(makeTestCtx(), 'test', new AbortController().signal);
 
     expect(token).toBe('wrapper-token');
   });
 
-  it('throws RILL-R004 on non-OK response (same as exchangeJwtForToken)', async () => {
+  it('emits #AUTH on non-OK response (same as exchangeJwtForToken)', async () => {
     globalThis.fetch = vi.fn(async () =>
       new Response('', {
         status: 403,
@@ -597,12 +564,9 @@ describe('exchangeJwtForAccessToken — returns only access_token string', () =>
 
     let caught: unknown;
     try {
-      await exchangeJwtForAccessToken('test', new AbortController().signal);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+      await exchangeJwtForAccessToken(makeTestCtx(), 'test', new AbortController().signal);
+    } catch (e) { caught = e; }
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
   });
 });

@@ -11,9 +11,17 @@
  * Default API version: 2025-09-01
  */
 
-import { RuntimeError, emitExtensionEvent, type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  RuntimeHaltSignal,
+  emitExtensionEvent,
+  getStatus,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
 import { buildRestAuthHeaders } from './client.js';
-import { mapRestError, createTimeoutError } from './errors.js';
+import { mapRestError, createTimeoutError, detectFoundryError } from './errors.js';
 import type {
   FoundryAuth,
   FoundryConfig,
@@ -63,12 +71,12 @@ export async function callSearch(
   disposed: { value: boolean }
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw new RuntimeError('RILL-R004', `${PROVIDER}: extension disposed`);
+    throw haltDisposed(ctx);
   }
 
   // EC-10: Search must be configured
   if (!config.search) {
-    throw new RuntimeError('RILL-R004', 'foundry: search not configured');
+    throw haltUnconfigured(ctx, 'search_unconfigured', 'foundry: search not configured');
   }
 
   const searchConfig: FoundrySearchConfig = config.search;
@@ -90,6 +98,7 @@ export async function callSearch(
 
   try {
     const results = await runSearchRequest(
+      ctx,
       query,
       indexName,
       queryType,
@@ -115,6 +124,17 @@ export async function callSearch(
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
 
+    if (error instanceof RuntimeHaltSignal) {
+      emitExtensionEvent(ctx, {
+        event: 'foundry:search:error',
+        subsystem: `extension:${PROVIDER}`,
+        index: indexName,
+        error: getStatus(error.value).message,
+        duration,
+      });
+      throw error;
+    }
+
     if (error instanceof RuntimeError) {
       emitExtensionEvent(ctx, {
         event: 'foundry:search:error',
@@ -126,18 +146,15 @@ export async function callSearch(
       throw error;
     }
 
-    const message = error instanceof Error ? error.message : String(error);
-    const rillError = new RuntimeError('RILL-R004', `${PROVIDER}: ${message}`);
-
+    const invalid = mapProviderError(ctx, 'Foundry', error, detectFoundryError);
     emitExtensionEvent(ctx, {
       event: 'foundry:search:error',
       subsystem: `extension:${PROVIDER}`,
       index: indexName,
-      error: rillError.message,
+      error: getStatus(invalid).message,
       duration,
     });
-
-    throw rillError;
+    throw new RuntimeHaltSignal(invalid, true);
   }
 }
 
@@ -159,6 +176,7 @@ export async function callSearch(
  * @returns Array of result dicts with id, score, content fields
  */
 async function runSearchRequest(
+  ctx: RuntimeContext,
   query: string,
   indexName: string,
   queryType: string,
@@ -208,22 +226,27 @@ async function runSearchRequest(
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'TimeoutError') {
-      throw createTimeoutError();
+      createTimeoutError(ctx);
     }
     throw error;
   }
 
   // EC-11: Search index not found
   if (response.status === 404) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `foundry: search index '${indexName}' not found`
+    const message = `foundry: search index '${indexName}' not found`;
+    throw new RuntimeHaltSignal(
+      ctx.invalidate(new Error(message), {
+        code: 'NOT_FOUND',
+        provider: PROVIDER,
+        raw: { kind: 'index_not_found', index: indexName, message },
+      }),
+      true
     );
   }
 
   if (!response.ok) {
     const responseBody = await response.json().catch(() => null);
-    throw mapRestError(response.status, responseBody);
+    mapRestError(ctx, response.status, responseBody);
   }
 
   const data = (await response.json()) as {
@@ -290,6 +313,33 @@ function extractDocumentId(item: Record<string, unknown>): string {
  * @param item - Raw search result item
  * @returns Dict of document fields (excluding Azure-prefixed metadata)
  */
+function haltDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  const message = `${PROVIDER}: extension disposed`;
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed', message },
+    }),
+    true
+  );
+}
+
+function haltUnconfigured(
+  ctx: RuntimeContext,
+  rawKind: string,
+  message: string
+): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(message), {
+      code: 'UNAVAILABLE',
+      provider: PROVIDER,
+      raw: { kind: rawKind, message },
+    }),
+    true
+  );
+}
+
 function buildContentDict(item: Record<string, unknown>): Record<string, RillValue> {
   const content: Record<string, RillValue> = {};
   for (const [key, value] of Object.entries(item)) {

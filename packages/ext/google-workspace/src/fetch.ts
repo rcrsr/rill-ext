@@ -3,12 +3,11 @@
  * Implements IR-27: token resolution, signal combination, error mapping.
  */
 
-import { RuntimeError } from '@rcrsr/rill';
-import type { RuntimeContext } from '@rcrsr/rill';
+import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import type { GoogleAuth } from './types.js';
 import type { TokenCache } from './auth/resolve.js';
 import { resolveToken } from './auth/resolve.js';
-import { mapGoogleError, mapFetchError } from './errors.js';
+import { mapGoogleError, mapFetchError, failInput } from './errors.js';
 
 /** Fixed request timeout per AC-11. */
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -38,9 +37,9 @@ const REQUEST_TIMEOUT_MS = 30_000;
  * @param headers - Optional extra request headers
  * @param resourceId - Optional resource ID for 404 error messages
  * @returns Parsed JSON response body, or null for 202/204 responses
- * @throws RuntimeError (RILL-R004) on HTTP errors [EC-14..EC-18]
- * @throws RuntimeError (RILL-R004) on network/abort errors [EC-19, EC-20]
- * @throws RuntimeError (RILL-R004) if baseUrl is not HTTPS
+ * @throws halt carrying invalid generic atom on HTTP errors [EC-14..EC-18]: `#AUTH` (401), `#FORBIDDEN` (403), `#NOT_FOUND` (404), `#RATE_LIMIT` (429), `#UNAVAILABLE` (5xx)
+ * @throws halt carrying invalid `#TIMEOUT` (`request_timeout`) or `#UNAVAILABLE` (`connection_failed`) on network/abort errors [EC-19, EC-20]
+ * @throws halt carrying invalid `#INVALID_INPUT` if baseUrl is not HTTPS
  */
 export async function googleFetch(
   method: string,
@@ -59,14 +58,18 @@ export async function googleFetch(
 ): Promise<unknown> {
   // Security defense in depth: assert HTTPS-only baseUrl
   if (!baseUrl.startsWith('https://')) {
-    throw new RuntimeError('RILL-R004', 'google: baseUrl must be HTTPS');
+    failInput(ctx, 'baseurl_not_https', 'google: baseUrl must be HTTPS');
   }
 
-  // AC-11: combine caller signal with 30s hard timeout
-  const combinedSignal = AbortSignal.any([
+  // AC-11: combine lifecycle (ctx.signal), caller signal, and 30s hard timeout
+  const signals: AbortSignal[] = [
     controller.signal,
     AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  ]);
+  ];
+  if (ctx.signal !== undefined) {
+    signals.unshift(ctx.signal);
+  }
+  const combinedSignal = AbortSignal.any(signals);
 
   // Resolve Bearer token — pass combinedSignal so exchange honors the 30s limit
   const token = await resolveToken(auth, ctx, cache, scopes, combinedSignal);
@@ -88,11 +91,17 @@ export async function googleFetch(
   try {
     response = await fetch(url, init);
   } catch (error) {
-    throw mapFetchError(error, service);
+    throw mapFetchError(ctx, error, service) as unknown as RillValue;
   }
 
   if (!response.ok) {
-    throw mapGoogleError(response.status, service, operation, resourceId);
+    throw mapGoogleError(
+      ctx,
+      response.status,
+      service,
+      operation,
+      resourceId,
+    ) as unknown as RillValue;
   }
 
   // 202 Accepted and 204 No Content carry no response body

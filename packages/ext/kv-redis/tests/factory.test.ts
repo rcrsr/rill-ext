@@ -9,6 +9,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createRedisKvExtension } from '../src/factory.js';
 import type { RedisKvExtensionConfig } from '../src/factory.js';
+import { makeFactoryCtx } from './_setup.js';
 
 describe('createRedisKvExtension', () => {
   // Track created extensions for cleanup
@@ -40,7 +41,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      const result = createRedisKvExtension(config);
+      const result = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(result);
 
       expect(typeof result).toBe('object');
@@ -59,7 +60,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      const result = createRedisKvExtension(config);
+      const result = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(result);
 
       // Check all 11 functions are present (IR-1 through IR-11)
@@ -98,7 +99,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      const result = createRedisKvExtension(config);
+      const result = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(result);
 
       expect(typeof result.dispose).toBe('function');
@@ -116,7 +117,7 @@ describe('createRedisKvExtension', () => {
       };
 
       expect(() => {
-        const result = createRedisKvExtension(config);
+        const result = createRedisKvExtension(config, makeFactoryCtx());
         extensions.push(result);
       }).not.toThrow();
     });
@@ -133,7 +134,7 @@ describe('createRedisKvExtension', () => {
       };
 
       expect(() => {
-        const result = createRedisKvExtension(config);
+        const result = createRedisKvExtension(config, makeFactoryCtx());
         extensions.push(result);
       }).not.toThrow();
     });
@@ -158,7 +159,7 @@ describe('createRedisKvExtension', () => {
       };
 
       expect(() => {
-        const result = createRedisKvExtension(config);
+        const result = createRedisKvExtension(config, makeFactoryCtx());
         extensions.push(result);
       }).not.toThrow();
     });
@@ -171,7 +172,7 @@ describe('createRedisKvExtension', () => {
         mounts: {},
       } as RedisKvExtensionConfig;
 
-      expect(() => createRedisKvExtension(config)).toThrow(
+      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
         'Redis kv extension requires at least one mount in configuration'
       );
     });
@@ -181,7 +182,7 @@ describe('createRedisKvExtension', () => {
         url: 'redis://localhost:6379',
       } as unknown as RedisKvExtensionConfig;
 
-      expect(() => createRedisKvExtension(config)).toThrow(
+      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
         'Redis kv extension requires at least one mount in configuration'
       );
     });
@@ -194,7 +195,7 @@ describe('createRedisKvExtension', () => {
         },
       } as RedisKvExtensionConfig;
 
-      expect(() => createRedisKvExtension(config)).toThrow(
+      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
         'Redis kv extension requires a valid connection URL'
       );
     });
@@ -207,7 +208,7 @@ describe('createRedisKvExtension', () => {
         },
       } as unknown as RedisKvExtensionConfig;
 
-      expect(() => createRedisKvExtension(config)).toThrow(
+      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
         'Redis kv extension requires a valid connection URL'
       );
     });
@@ -220,7 +221,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      expect(() => createRedisKvExtension(config)).toThrow(
+      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
         'Invalid Redis connection URL: must start with redis:// or rediss://'
       );
     });
@@ -233,7 +234,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      expect(() => createRedisKvExtension(config)).toThrow(
+      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
         'Invalid Redis connection URL: must start with redis:// or rediss://'
       );
     });
@@ -253,7 +254,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      expect(() => createRedisKvExtension(config)).toThrow(
+      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
         'Mount prefix overlap detected'
       );
     });
@@ -273,7 +274,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      expect(() => createRedisKvExtension(config)).toThrow(
+      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
         'Mount prefix overlap detected'
       );
     });
@@ -291,7 +292,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      const result = createRedisKvExtension(config);
+      const result = createRedisKvExtension(config, makeFactoryCtx());
 
       // Should not throw
       await expect(result.dispose?.()).resolves.toBeUndefined();
@@ -308,7 +309,7 @@ describe('createRedisKvExtension', () => {
         },
       };
 
-      const result = createRedisKvExtension(config);
+      const result = createRedisKvExtension(config, makeFactoryCtx());
 
       // First dispose
       await result.dispose?.();

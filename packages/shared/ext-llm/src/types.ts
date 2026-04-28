@@ -80,6 +80,15 @@ export interface ToolParamMetadata {
  */
 export interface ToolLoopCallbacks {
   /**
+   * Optional provider-specific error detector. When provided alongside a
+   * runtime context, provider API errors thrown from `callAPI` /
+   * `callAPIStreaming` are mapped via {@link mapProviderError} and
+   * surfaced as a catchable `RuntimeHaltSignal` carrying a generic atom
+   * (`#AUTH`, `#RATE_LIMIT`, etc.) so scripts can `guard #ATOM`.
+   */
+  detectError?: ProviderErrorDetector;
+
+  /**
    * Build provider-specific tool format from tool definitions
    */
   buildTools: (

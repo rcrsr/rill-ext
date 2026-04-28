@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-search-searxng",
-  "version": "0.18.4",
+  "version": "0.19.0",
   "description": "rill extension for SearXNG self-hosted search integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -24,10 +24,10 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.18.4"
+    "@rcrsr/rill": "~0.19.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.18.4",
+    "@rcrsr/rill": "~0.19.0",
     "@rcrsr/rill-ext-param-shared": "workspace:^",
     "@rcrsr/rill-ext-search-shared": "workspace:^",
     "@types/node": "^25.5.2",

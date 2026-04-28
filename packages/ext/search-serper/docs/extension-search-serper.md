@@ -170,16 +170,25 @@ Each item in `images` contains:
 
 ## Error Behavior
 
-**Validation errors** (before API call):
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #RATE_LIMIT`) or finely
+(`guard #RATE_LIMIT && raw.kind == 'rate_limit_exceeded'`).
 
-- Empty query → `RuntimeError RILL-R004: serper: query is required`
-- After dispose → `RuntimeError RILL-R004: serper: operation cancelled`
+**Host-fn errors:**
 
-**API errors** (from Serper):
-
-- Rate limit → `RuntimeError RILL-R004: serper: rate limit exceeded`
-- Auth failure → `RuntimeError RILL-R004: serper: authentication failed`
-- Timeout → `RuntimeError RILL-R004: serper: request timeout`
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Empty / missing required input (e.g. `query`) | `#INVALID_INPUT` | `invalid_input` |
+| Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
+| Forbidden (HTTP 403) | `#FORBIDDEN` | `forbidden` |
+| Resource not found (HTTP 404) | `#NOT_FOUND` | `not_found` |
+| Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Quota exceeded (HTTP 402) | `#QUOTA_EXCEEDED` | `quota_exceeded` |
+| Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
+| Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
+| Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
+| Called after `dispose()` | `#DISPOSED` | `disposed` |
 
 ## Events
 

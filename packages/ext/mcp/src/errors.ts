@@ -1,173 +1,216 @@
 /**
- * Error mapping utilities for MCP Server Mapper Extension.
- * Maps MCP protocol errors to rill error types per spec.
- */
-
-import { RuntimeError } from '@rcrsr/rill';
-
-// ============================================================
-// FACTORY ERRORS (SYNC)
-// ============================================================
-
-/**
- * Creates a factory error for synchronous validation failures.
- * Plain Error with descriptive message.
+ * Error mapping utilities for the MCP extension (rill 0.19+).
  *
- * @param message - Error message describing validation failure
- * @returns Error instance
+ * Factory-time validation throws `RuntimeError('RILL-R001', ...)`.
+ * Runtime failures decompose into `(generic atom, meta.provider='mcp',
+ * meta.raw.kind)` tuples emitted via `ctx.invalidate`.
+ *
+ * Callers `throw fail*(...)`. The wrapper / outer catch detects invalid
+ * `RillValue`s via `isInvalid` and passes them through unchanged.
  */
-export function createFactoryError(message: string): Error {
-  return new Error(message);
-}
+
+import {
+  RuntimeError,
+  isInvalid,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+
+const PROVIDER = 'mcp';
 
 // ============================================================
-// CONNECTION ERRORS (ASYNC)
+// FACTORY-TIME ERRORS (sync, before any host fn runs)
 // ============================================================
 
 /**
- * Creates a connection error for MCP server failures.
- * Plain Error with 'mcp: failed to connect' prefix.
- *
- * EC-3: Server process exit
- * EC-4: Connection refused
- * EC-5: Auth required
- *
- * @param reason - Connection failure reason
- * @returns Error instance
+ * Build a factory-time `RuntimeError(RILL-R001)` for invalid configuration
+ * or transport-construction failures.
  */
-export function createConnectionError(reason: string): Error {
-  return new Error(`mcp: failed to connect -- ${reason}`);
-}
-
-/**
- * Creates connection error for server process exit.
- * EC-3: Server process exited with code N.
- *
- * @param exitCode - Process exit code
- * @returns Error instance
- */
-export function createProcessExitError(exitCode: number): Error {
-  return createConnectionError(`server process exited with code ${exitCode}`);
-}
-
-/**
- * Creates connection error for connection refused.
- * EC-4: Connection refused at URL.
- *
- * @param url - Server URL
- * @returns Error instance
- */
-export function createConnectionRefusedError(url: string): Error {
-  return createConnectionError(`connection refused at ${url}`);
-}
-
-/**
- * Creates connection error for authentication required.
- * EC-5: Server requires authentication.
- *
- * @returns Error instance
- */
-export function createAuthRequiredError(): Error {
-  return new Error(
-    'mcp: server requires authentication -- complete OAuth flow before connecting'
-  );
-}
-
-// ============================================================
-// RUNTIME ERRORS
-// ============================================================
-
-/**
- * Creates runtime error for MCP tool failures.
- * RuntimeError RILL-R004 for tool call failures.
- *
- * EC-6: Tool error
- * EC-7: Protocol error
- * EC-8: Timeout
- * EC-9: Connection lost
- * EC-10: Auth failed
- *
- * @param message - Error message
- * @param context - Context data for error
- * @returns RuntimeError instance
- */
-export function createRuntimeError(
+export function factoryError(
   message: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
 ): RuntimeError {
-  return new RuntimeError('RILL-R004', message, undefined, context);
+  return new RuntimeError('RILL-R001', `mcp: ${message}`, undefined, context);
 }
 
 /**
- * Creates runtime error for tool execution failure.
- * EC-6: MCP tool "name": error text.
- *
- * @param toolName - Name of the tool that failed
- * @param errorText - Error message from tool
- * @returns RuntimeError instance
+ * Stdio-only: server process exited with the given code.
  */
-export function createToolError(
-  toolName: string,
-  errorText: string
-): RuntimeError {
-  return createRuntimeError(`mcp tool "${toolName}": ${errorText}`, {
-    toolName,
-    errorText,
-  });
+export function processExitError(exitCode: number): RuntimeError {
+  return factoryError(`server process exited with code ${exitCode}`, { exitCode });
 }
 
 /**
- * Creates runtime error for protocol errors.
- * EC-7: MCP protocol error.
- *
- * @param message - Protocol error message
- * @returns RuntimeError instance
+ * HTTP-only: connection refused at the given URL.
  */
-export function createProtocolError(message: string): RuntimeError {
-  return createRuntimeError(`mcp: protocol error -- ${message}`, {
-    protocolError: message,
-  });
+export function connectionRefusedError(url: string): RuntimeError {
+  return factoryError(`connection refused at ${url}`, { url });
 }
 
 /**
- * Creates runtime error for operation timeout.
- * EC-8: MCP tool timeout.
- *
- * @param toolName - Name of the tool that timed out
- * @param timeoutMs - Timeout duration in milliseconds
- * @returns RuntimeError instance
+ * HTTP-only: server requires authentication.
  */
-export function createTimeoutError(
-  toolName: string,
-  timeoutMs: number
-): RuntimeError {
-  return createRuntimeError(
-    `mcp tool "${toolName}": timeout after ${timeoutMs}ms`,
-    { toolName, timeoutMs }
+export function authRequiredError(): RuntimeError {
+  return factoryError(
+    'server requires authentication -- complete OAuth flow before connecting',
+    { kind: 'auth_required' },
   );
 }
 
-/**
- * Creates runtime error for connection lost.
- * EC-9: MCP connection lost during operation.
- *
- * @returns RuntimeError instance
- */
-export function createConnectionLostError(): RuntimeError {
-  return createRuntimeError('mcp: connection lost', {
-    connectionLost: true,
+// ============================================================
+// RUNTIME ERRORS (host fns; emitted via ctx.invalidate)
+// ============================================================
+
+/** Tool execution failed with an explicit error response. */
+export function failTool(
+  ctx: RuntimeContext,
+  toolName: string,
+  errorText: string,
+): RillValue {
+  return ctx.invalidate(new Error(`mcp tool "${toolName}": ${errorText}`), {
+    code: 'UNAVAILABLE',
+    provider: PROVIDER,
+    raw: { kind: 'tool_error', toolName, errorText },
   });
 }
 
-/**
- * Creates runtime error for authentication failure.
- * EC-10: MCP authentication failed.
- *
- * @returns RuntimeError instance
- */
-export function createAuthFailedError(): RuntimeError {
-  return createRuntimeError(
-    'mcp: authentication failed -- token may be expired',
-    { authFailed: true }
+/** Tool / resource / prompt name not found on the server. */
+export function failNotFound(
+  ctx: RuntimeContext,
+  callableName: string,
+  detail?: string,
+): RillValue {
+  return ctx.invalidate(
+    new Error(`mcp: not found "${callableName}"${detail ? `: ${detail}` : ''}`),
+    {
+      code: 'NOT_FOUND',
+      provider: PROVIDER,
+      raw: { kind: 'not_found', name: callableName, detail },
+    },
   );
+}
+
+/** Malformed protocol response or schema mismatch. */
+export function failProtocol(ctx: RuntimeContext, message: string): RillValue {
+  return ctx.invalidate(new Error(`mcp: protocol error -- ${message}`), {
+    code: 'PROTOCOL',
+    provider: PROVIDER,
+    raw: { kind: 'protocol_error', detail: message },
+  });
+}
+
+/** Operation exceeded the configured timeout. */
+export function failTimeout(
+  ctx: RuntimeContext,
+  callableName: string,
+  timeoutMs: number,
+): RillValue {
+  return ctx.invalidate(
+    new Error(`mcp tool "${callableName}": timeout after ${timeoutMs}ms`),
+    {
+      code: 'TIMEOUT',
+      provider: PROVIDER,
+      raw: { kind: 'tool_timeout', name: callableName, timeoutMs },
+    },
+  );
+}
+
+/** Transport disconnected during an in-flight operation. */
+export function failConnectionLost(ctx: RuntimeContext): RillValue {
+  return ctx.invalidate(new Error('mcp: connection lost'), {
+    code: 'UNAVAILABLE',
+    provider: PROVIDER,
+    raw: { kind: 'connection_lost' },
+  });
+}
+
+/** Authentication required or token rejected. */
+export function failAuth(ctx: RuntimeContext): RillValue {
+  return ctx.invalidate(
+    new Error('mcp: authentication failed -- token may be expired'),
+    {
+      code: 'AUTH',
+      provider: PROVIDER,
+      raw: { kind: 'auth_failed' },
+    },
+  );
+}
+
+/** Bad input from the host script. */
+export function failInput(
+  ctx: RuntimeContext,
+  message: string,
+  raw: Record<string, unknown> = {},
+): RillValue {
+  return ctx.invalidate(new Error(`mcp: ${message}`), {
+    code: 'INVALID_INPUT',
+    provider: PROVIDER,
+    raw: { kind: 'invalid_input', ...raw },
+  });
+}
+
+/** Generic unavailable error (server unreachable, 5xx, network failure). */
+export function failUnavailable(
+  ctx: RuntimeContext,
+  message: string,
+  raw: Record<string, unknown> = {},
+): RillValue {
+  return ctx.invalidate(new Error(`mcp: ${message}`), {
+    code: 'UNAVAILABLE',
+    provider: PROVIDER,
+    raw: { kind: 'unknown_error', detail: message, ...raw },
+  });
+}
+
+// ============================================================
+// CATCH-BLOCK MAPPER
+// ============================================================
+
+/**
+ * Map an unknown error caught around an MCP SDK call to an invalid RillValue
+ * via `ctx.invalidate`. Existing invalid values pass through unchanged.
+ */
+export function mapMcpError(
+  ctx: RuntimeContext,
+  error: unknown,
+  callableName: string,
+): RillValue {
+  // Already an invalid RillValue thrown by an inner helper: pass through.
+  if (isInvalid(error as RillValue)) {
+    return error as RillValue;
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+
+    if (
+      message.includes('connection closed') ||
+      message.includes('connection lost') ||
+      message.includes('disconnected')
+    ) {
+      return failConnectionLost(ctx);
+    }
+
+    if (
+      message.includes('unauthorized') ||
+      message.includes('authentication failed') ||
+      message.includes('token') ||
+      (message.includes('auth') && !message.includes('author'))
+    ) {
+      return failAuth(ctx);
+    }
+
+    if (
+      message.includes('protocol') ||
+      message.includes('invalid response') ||
+      message.includes('parse') ||
+      message.includes('malformed')
+    ) {
+      return failProtocol(ctx, error.message);
+    }
+
+    return failTool(ctx, callableName, error.message);
+  }
+
+  return failTool(ctx, callableName, String(error));
 }

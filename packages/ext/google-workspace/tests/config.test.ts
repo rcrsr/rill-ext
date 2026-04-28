@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { RuntimeError } from '@rcrsr/rill';
+import { RuntimeError, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
 import { validateConfig, mergeCapabilities } from '../src/config.js';
 import type { GoogleWorkspaceConfig } from '../src/types.js';
 
@@ -14,40 +14,34 @@ import type { GoogleWorkspaceConfig } from '../src/types.js';
 
 describe('validateConfig', () => {
   describe('EC-1: missing or empty auth', () => {
-    it('throws RILL-R004 when auth is missing', () => {
+    it('throws RILL-R001 when auth is missing', () => {
       let caught: unknown;
       try {
         validateConfig({ auth: undefined as unknown as GoogleWorkspaceConfig['auth'] });
-      } catch (e) {
-        caught = e;
-      }
+      } catch (e) { caught = e; }
       expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
       expect((caught as RuntimeError).message).toBe('google: auth is required');
     });
 
-    it('throws RILL-R004 when bearer token is empty', () => {
-      let caught: unknown;
-      try {
-        validateConfig({ auth: { type: 'bearer', token: '' } });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('google: auth.token is required');
+    it('throws RILL-R001 when bearer token is empty', () => {
+        let caught: unknown;
+        try {
+          validateConfig({ auth: { type: 'bearer', token: '' } });
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+        expect((caught as RuntimeError).message).toBe('google: auth.token is required');
     });
 
-    it('throws RILL-R004 when session tokenVar is empty', () => {
-      let caught: unknown;
-      try {
-        validateConfig({ auth: { type: 'session', tokenVar: '' } });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('google: auth.tokenVar is required');
+    it('throws RILL-R001 when session tokenVar is empty', () => {
+        let caught: unknown;
+        try {
+          validateConfig({ auth: { type: 'session', tokenVar: '' } });
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+        expect((caught as RuntimeError).message).toBe('google: auth.tokenVar is required');
     });
   });
 
@@ -56,18 +50,16 @@ describe('validateConfig', () => {
   // ============================================================
 
   describe('EC-2: invalid auth.type', () => {
-    it('throws RILL-R004 for unsupported auth type', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+    it('throws RILL-R001 for unsupported auth type', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
           auth: { type: 'oauth2' as unknown as 'bearer', token: 'tok' },
         });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe(
+          } catch (e) { caught = e; }
+          expect(caught).toBeInstanceOf(RuntimeError);
+          expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+expect((caught as RuntimeError).message).toBe(
         "google: auth.type must be 'bearer', 'session', or 'service-account'"
       );
     });
@@ -78,24 +70,22 @@ describe('validateConfig', () => {
   // ============================================================
 
   describe('EC-3: malformed auth.keyJson', () => {
-    it('throws RILL-R004 when keyJson is not valid JSON', () => {
-      let caught: unknown;
-      try {
-        validateConfig({ auth: { type: 'service-account', keyJson: 'not-json' } });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe(
+    it('throws RILL-R001 when keyJson is not valid JSON', () => {
+        let caught: unknown;
+        try {
+          validateConfig({ auth: { type: 'service-account', keyJson: 'not-json' } });
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+expect((caught as RuntimeError).message).toBe(
         'google: auth.keyJson is invalid: not valid JSON'
       );
     });
 
-    it('throws RILL-R004 when keyJson is missing client_email', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+    it('throws RILL-R001 when keyJson is missing client_email', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
           auth: {
             type: 'service-account',
             keyJson: JSON.stringify({
@@ -104,20 +94,18 @@ describe('validateConfig', () => {
             }),
           },
         });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe(
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+expect((caught as RuntimeError).message).toBe(
         "google: auth.keyJson is invalid: missing field 'client_email'"
       );
     });
 
-    it('throws RILL-R004 when keyJson is missing private_key', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+    it('throws RILL-R001 when keyJson is missing private_key', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
           auth: {
             type: 'service-account',
             keyJson: JSON.stringify({
@@ -126,20 +114,18 @@ describe('validateConfig', () => {
             }),
           },
         });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe(
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+expect((caught as RuntimeError).message).toBe(
         "google: auth.keyJson is invalid: missing field 'private_key'"
       );
     });
 
-    it('throws RILL-R004 when keyJson is missing token_uri', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+    it('throws RILL-R001 when keyJson is missing token_uri', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
           auth: {
             type: 'service-account',
             keyJson: JSON.stringify({
@@ -148,12 +134,10 @@ describe('validateConfig', () => {
             }),
           },
         });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe(
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+expect((caught as RuntimeError).message).toBe(
         "google: auth.keyJson is invalid: missing field 'token_uri'"
       );
     });
@@ -164,83 +148,71 @@ describe('validateConfig', () => {
   // ============================================================
 
   describe('EC-4: service config boundaries', () => {
-    it('throws RILL-R004 when gmail.maxResults is 0 (below minimum)', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+    it('throws RILL-R001 when gmail.maxResults is 0 (below minimum)', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
           auth: { type: 'bearer', token: 'tok' },
           gmail: { maxResults: 0 },
         });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('google: gmail.maxResults must be 1-500');
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+        expect((caught as RuntimeError).message).toBe('google: gmail.maxResults must be 1-500');
     });
 
-    it('throws RILL-R004 when gmail.maxResults is 501 (above maximum)', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+    it('throws RILL-R001 when gmail.maxResults is 501 (above maximum)', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
           auth: { type: 'bearer', token: 'tok' },
           gmail: { maxResults: 501 },
         });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('google: gmail.maxResults must be 1-500');
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+        expect((caught as RuntimeError).message).toBe('google: gmail.maxResults must be 1-500');
     });
 
-    it('throws RILL-R004 when drive.maxUploadBytes is 0', () => {
+    it('throws RILL-R001 when drive.maxUploadBytes is 0', () => {
       let caught: unknown;
       try {
         validateConfig({
           auth: { type: 'bearer', token: 'tok' },
           drive: { maxUploadBytes: 0 },
         });
-      } catch (e) {
-        caught = e;
-      }
+      } catch (e) { caught = e; }
       expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe(
-        'google: drive.maxUploadBytes must be positive'
-      );
+      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+      expect((caught as RuntimeError).message).toBe('google: drive.maxUploadBytes must be positive');
     });
 
-    it('throws RILL-R004 when drive.maxUploadBytes is negative', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+    it('throws RILL-R001 when drive.maxUploadBytes is negative', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
           auth: { type: 'bearer', token: 'tok' },
           drive: { maxUploadBytes: -1 },
         });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe(
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+expect((caught as RuntimeError).message).toBe(
         'google: drive.maxUploadBytes must be positive'
       );
     });
 
-    it('throws RILL-R004 when drive.allowedFolderIds is empty array', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+    it('throws RILL-R001 when drive.allowedFolderIds is empty array', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
           auth: { type: 'bearer', token: 'tok' },
           drive: { allowedFolderIds: [] },
         });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe(
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+expect((caught as RuntimeError).message).toBe(
         'google: drive.allowedFolderIds must be non-empty'
       );
     });

@@ -6,7 +6,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
-  RuntimeError,
+  RuntimeHaltSignal,
+  getStatus,
   type ApplicationCallable,
   type RillTypeValue,
   type TypeStructure,
@@ -14,6 +15,7 @@ import {
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 import type { ExtensionEvent } from '@rcrsr/rill';
+import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
 function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
@@ -367,17 +369,15 @@ describe('generate() function', () => {
   // --------------------------------------------------------
 
   describe('error cases', () => {
-    // AC-18 / EC-3: Missing schema throws RILL-R004
-    it('throws RILL-R004 when schema option is missing', async () => {
+    // AC-18 / EC-3: Missing schema throws RILL-R005
+    it('throws RILL-R005 when schema option is missing', async () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: 'generate requires a type expression as schema',
-      });
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx),
+        { code: 'INVALID_INPUT', message: 'generate requires a type expression as schema' },
+      );
     });
 
     // AC-25 / EC-3: No HTTP call when schema is missing
@@ -385,44 +385,41 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx),
+      );
 
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
-    // AC-21 / EC-5: "not json" response throws RILL-R004
-    it('throws RILL-R004 when model returns non-JSON text', async () => {
+    // AC-21 / EC-5: "not json" response throws RILL-R005
+    it('throws RILL-R005 when model returns non-JSON text', async () => {
       mockCreate.mockResolvedValue(createMockGenerateResponse('not json'));
 
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-      });
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx),
+        { code: 'PROTOCOL' },
+      );
     });
 
     // AC-22 / EC-5: "{broken" response includes original parse error detail
-    it('throws RILL-R004 with original parse error detail for malformed JSON', async () => {
+    it('throws RILL-R005 with original parse error detail for malformed JSON', async () => {
       mockCreate.mockResolvedValue(createMockGenerateResponse('{broken'));
 
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('failed to parse response JSON'),
-      });
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx),
+        { code: 'PROTOCOL', message: 'failed to parse response JSON' },
+      );
     });
 
-    // AC-23 / EC-5: Parse failure error is instance of RuntimeError with RILL-R004
-    it('parse failure throws RuntimeError instance with RILL-R004', async () => {
+    // AC-23 / EC-5: Parse failure error is instance of RuntimeError with RILL-R005
+    it('parse failure throws RuntimeError instance with RILL-R005', async () => {
       mockCreate.mockResolvedValue(createMockGenerateResponse('not json'));
 
       const ext = createAnthropicExtension(BASE_CONFIG);
@@ -438,8 +435,8 @@ describe('generate() function', () => {
         thrown = e;
       }
 
-      expect(thrown).toBeInstanceOf(RuntimeError);
-      expect((thrown as RuntimeError).errorId).toBe('RILL-R004');
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe('PROTOCOL');
     });
 
     // AC-24 / EC-5: Parse failure never returns a partial dict
@@ -472,9 +469,9 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createCtxWithEvents(events);
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx),
+      );
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -524,9 +521,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createCtxWithEvents(events);
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx));
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -544,9 +539,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createCtxWithEvents(events);
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx));
 
       const generateEvents = events.filter(
         (e) => e.event === 'anthropic:generate'

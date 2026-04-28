@@ -7,6 +7,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createExecExtension } from '../src/factory.js';
 import type { ExecExtensionConfig } from '../src/types.js';
+import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 describe('exec extension factory', () => {
   describe('factory creation', () => {
@@ -18,7 +19,7 @@ describe('exec extension factory', () => {
         },
       };
 
-      const ext = createExecExtension(config);
+      const ext = createExecExtension(config, makeFactoryCtx());
 
       expect(ext).toHaveProperty('value');
       expect(ext).toHaveProperty('dispose');
@@ -32,7 +33,7 @@ describe('exec extension factory', () => {
         commands: { echo: { binary: 'echo' } },
       };
 
-      const ext = createExecExtension(config);
+      const ext = createExecExtension(config, makeFactoryCtx());
       const callable = ext.value.echo as Record<string, unknown>;
 
       expect(callable).toMatchObject({
@@ -54,7 +55,7 @@ describe('exec extension factory', () => {
         },
       };
 
-      const ext = createExecExtension(config);
+      const ext = createExecExtension(config, makeFactoryCtx());
 
       expect(ext.value).toHaveProperty('git');
       expect(ext.value).toHaveProperty('npm');
@@ -66,7 +67,7 @@ describe('exec extension factory', () => {
     it('includes params with default values', () => {
       const ext = createExecExtension({
         commands: { echo: { binary: 'echo' } },
-      });
+      }, makeFactoryCtx());
 
       expect(ext.value.echo.params).toEqual([
         {
@@ -87,7 +88,7 @@ describe('exec extension factory', () => {
     it('includes description from config', () => {
       const ext = createExecExtension({
         commands: { git: { binary: 'git', description: 'Git version control' } },
-      });
+      }, makeFactoryCtx());
 
       expect(ext.value.git.annotations?.['description']).toBe('Git version control');
     });
@@ -95,7 +96,7 @@ describe('exec extension factory', () => {
     it('generates default description when not provided', () => {
       const ext = createExecExtension({
         commands: { echo: { binary: 'echo' } },
-      });
+      }, makeFactoryCtx());
 
       expect(ext.value.echo.annotations?.['description']).toBe('Execute echo command');
     });
@@ -103,7 +104,7 @@ describe('exec extension factory', () => {
     it('declares returnType as dict', () => {
       const ext = createExecExtension({
         commands: { echo: { binary: 'echo' } },
-      });
+      }, makeFactoryCtx());
 
       expect(ext.value.echo.returnType).toMatchObject({
         __rill_type: true,
@@ -119,9 +120,9 @@ describe('exec extension factory', () => {
           git: { binary: 'git', description: 'Git VCS' },
           npm: { binary: 'npm', description: 'Node package manager' },
         },
-      });
+      }, makeFactoryCtx());
 
-      const result = await ext.value.commands.fn({});
+      const result = await ext.value.commands.fn({}, makeRuntimeCtx());
 
       expect(result).toEqual([
         { name: 'git', description: 'Git VCS' },
@@ -132,15 +133,15 @@ describe('exec extension factory', () => {
     it('returns empty description for commands without description', async () => {
       const ext = createExecExtension({
         commands: { echo: { binary: 'echo' } },
-      });
+      }, makeFactoryCtx());
 
-      const result = await ext.value.commands.fn({});
+      const result = await ext.value.commands.fn({}, makeRuntimeCtx());
       expect(result).toEqual([{ name: 'echo', description: '' }]);
     });
 
     it('returns empty list when no commands configured', async () => {
-      const ext = createExecExtension({ commands: {} });
-      const result = await ext.value.commands.fn({});
+      const ext = createExecExtension({ commands: {} }, makeFactoryCtx());
+      const result = await ext.value.commands.fn({}, makeRuntimeCtx());
       expect(result).toEqual([]);
     });
   });
@@ -155,9 +156,9 @@ describe('exec extension factory', () => {
     it('aborts in-flight processes', async () => {
       ext = createExecExtension({
         commands: { sleep: { binary: 'sleep', timeout: 10000 } },
-      });
+      }, makeFactoryCtx());
 
-      const promise = ext.value.sleep.fn({ args: ['5'] });
+      const promise = ext.value.sleep.fn({ args: ['5'] }, makeRuntimeCtx());
       await new Promise((resolve) => setTimeout(resolve, 50));
       await ext.dispose!();
 
@@ -172,8 +173,29 @@ describe('exec extension factory', () => {
     it('disposes cleanly with no in-flight processes', async () => {
       ext = createExecExtension({
         commands: { echo: { binary: 'echo' } },
-      });
+      }, makeFactoryCtx());
       await expect(ext.dispose!()).resolves.toBeUndefined();
+    });
+
+    it('factory-scope signal aborts in-flight child processes', async () => {
+      const controller = new AbortController();
+      ext = createExecExtension(
+        { commands: { sleep: { binary: 'sleep', timeout: 10000 } } },
+        makeFactoryCtx(controller.signal),
+      );
+
+      const start = Date.now();
+      const promise = ext.value.sleep.fn({ args: ['5'] }, makeRuntimeCtx());
+      // give the process a moment to spawn
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      controller.abort();
+
+      // Should resolve promptly (well under the 5s sleep)
+      const result = await promise.catch((e) => e);
+      const elapsed = Date.now() - start;
+      expect(elapsed).toBeLessThan(2000);
+      // Either resolves to invalid value or rejects — both acceptable
+      expect(result).toBeDefined();
     });
   });
 
@@ -181,7 +203,7 @@ describe('exec extension factory', () => {
     it('script cannot execute undeclared binaries', () => {
       const ext = createExecExtension({
         commands: { git: { binary: 'git' } },
-      });
+      }, makeFactoryCtx());
 
       expect(ext.value).toHaveProperty('git');
       expect(ext.value).not.toHaveProperty('rm');

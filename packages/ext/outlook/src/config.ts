@@ -4,7 +4,7 @@
  */
 
 import { RuntimeError } from '@rcrsr/rill';
-import type { RuntimeContext } from '@rcrsr/rill';
+import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import type {
   OutlookAuth,
   OutlookCapabilities,
@@ -36,62 +36,55 @@ export const DEFAULT_MAX_RESULTS = 50;
 /** Default mail folders allowlist when not specified. */
 export const DEFAULT_FOLDERS: readonly string[] = ['inbox'];
 
+const PROVIDER = 'outlook';
+
 // ============================================================
 // VALIDATION
 // ============================================================
 
 /**
- * Validate OutlookConfig fields.
- * Throws RuntimeError RILL-R004 on any invalid field.
- *
- * @param config - Configuration to validate
- * @throws RuntimeError (RILL-R004) on validation failure
+ * Validate OutlookConfig fields at factory time.
+ * Throws RuntimeError(RILL-R001) on any invalid field.
  */
 export function validateConfig(config: OutlookConfig): void {
-  // EC-1: Missing auth
   if (!config.auth) {
-    throw new RuntimeError('RILL-R004', 'outlook: auth is required');
+    throw new RuntimeError('RILL-R001', 'outlook: auth is required');
   }
 
-  // EC-1: Invalid auth type
   if (config.auth.type !== 'bearer' && config.auth.type !== 'session') {
     throw new RuntimeError(
-      'RILL-R004',
-      "outlook: auth.type must be 'bearer' or 'session'"
+      'RILL-R001',
+      "outlook: auth.type must be 'bearer' or 'session'",
     );
   }
 
-  // EC-1: Bearer requires non-empty token
   if (config.auth.type === 'bearer') {
     if (!config.auth.token || config.auth.token === '') {
-      throw new RuntimeError('RILL-R004', 'outlook: auth.token is required');
+      throw new RuntimeError('RILL-R001', 'outlook: auth.token is required');
     }
   }
 
-  // EC-1: Session requires non-empty tokenVar
   if (config.auth.type === 'session') {
     if (!config.auth.tokenVar || config.auth.tokenVar === '') {
-      throw new RuntimeError('RILL-R004', 'outlook: auth.tokenVar is required');
+      throw new RuntimeError('RILL-R001', 'outlook: auth.tokenVar is required');
     }
   }
 
-  // EC-1: maxResults range 1-1000
   if (config.mail?.maxResults !== undefined) {
     const max = config.mail.maxResults;
     if (!Number.isInteger(max) || max < 1 || max > 1000) {
       throw new RuntimeError(
-        'RILL-R004',
-        'outlook: maxResults must be 1-1000'
+        'RILL-R001',
+        'outlook: maxResults must be 1-1000',
       );
     }
   }
 
-  // EC-1: folders must be non-empty array if provided
   if (config.mail?.folders !== undefined) {
     if (!Array.isArray(config.mail.folders) || config.mail.folders.length === 0) {
       throw new RuntimeError(
-        'RILL-R004',
-        'outlook: folders must be non-empty'
+        'RILL-R001',
+        'outlook: folders must be non-empty',
       );
     }
   }
@@ -101,13 +94,6 @@ export function validateConfig(config: OutlookConfig): void {
 // CAPABILITIES MERGE
 // ============================================================
 
-/**
- * Merge partial capabilities config with defaults.
- * Partial fields override defaults; absent fields use defaults.
- *
- * @param partial - Partial capabilities from config
- * @returns Fully merged OutlookCapabilities with all defaults applied
- */
 export function mergeCapabilities(
   partial?: Partial<{
     readonly mail: Partial<{
@@ -121,7 +107,7 @@ export function mergeCapabilities(
       readonly read: boolean;
       readonly create: boolean;
     }>;
-  }>
+  }>,
 ): OutlookCapabilities {
   if (!partial) {
     return DEFAULT_CAPABILITIES;
@@ -151,17 +137,14 @@ export function mergeCapabilities(
  * Bearer mode returns config.token directly.
  * Session mode reads the variable from RuntimeContext, walking the parent chain.
  *
- * @param auth - Authentication configuration
- * @param ctx - RuntimeContext for session variable lookup
- * @returns Resolved Bearer token string
- * @throws RuntimeError (RILL-R004) if session token variable not found
+ * Throws an invalid RillValue (`#AUTH`) when a session token variable is
+ * not found; the wrap()'s catch passes it through unchanged.
  */
 export function resolveToken(auth: OutlookAuth, ctx: RuntimeContext): string {
   if (auth.type === 'bearer') {
     return auth.token;
   }
 
-  // Session mode: walk the context parent chain to find the variable
   const tokenVar = auth.tokenVar;
   let scope: RuntimeContext | undefined = ctx;
 
@@ -173,9 +156,10 @@ export function resolveToken(auth: OutlookAuth, ctx: RuntimeContext): string {
     scope = scope.parent;
   }
 
-  // EC-11: Session token not found in context
-  throw new RuntimeError(
-    'RILL-R004',
-    `outlook: session token '${tokenVar}' not found`
-  );
+  const message = `outlook: session token '${tokenVar}' not found`;
+  throw ctx.invalidate(new Error(message), {
+    code: 'AUTH',
+    provider: PROVIDER,
+    raw: { kind: 'session_token_missing', tokenVar, message },
+  }) as unknown as RillValue;
 }

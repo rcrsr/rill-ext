@@ -9,8 +9,10 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { RuntimeError } from '@rcrsr/rill';
+import { RuntimeError, type RillValue, type RuntimeContext } from '@rcrsr/rill';
 import type { MountConfig } from './types.js';
+
+const PROVIDER = 'fs-local';
 
 // ============================================================
 // TYPES
@@ -37,40 +39,41 @@ export type Operation = 'read' | 'write';
  * 8. Check mode permits operation
  * 9. Return validated path for node:fs operation
  *
- * @param mountName - Mount identifier from script
- * @param relativePath - Script-provided path relative to mount
- * @param mounts - Mount configuration map
- * @param operation - Operation type for mode validation
- * @param createMode - For write operations creating new files (checks parent dir)
- * @returns Validated absolute path
- * @throws RuntimeError - EC-1 (unknown mount), EC-2 (path escape), EC-3 (glob), EC-4 (mode), EC-7 (permission)
+ * Returns the validated absolute path string on success, or an invalid
+ * RillValue on any sandbox / I/O failure. Use `isInvalid()` from rill to
+ * discriminate.
  */
 export async function resolvePath(
   mountName: string,
   relativePath: string,
   mounts: Record<string, MountConfig>,
   operation: Operation,
-  createMode = false
-): Promise<string> {
+  ctx: RuntimeContext,
+  createMode = false,
+): Promise<string | RillValue> {
   // Step 1: Resolve mount name to MountConfig
   const mount = mounts[mountName];
   if (!mount) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `mount "${mountName}" not configured`,
-      undefined,
-      { mountName }
+    return ctx.invalidate(
+      new Error(`mount "${mountName}" not configured`),
+      {
+        code: 'FORBIDDEN',
+        provider: PROVIDER,
+        raw: { kind: 'unknown_mount', mountName },
+      },
     );
   }
 
   // Step 2: Use mount's resolved physical path (set at creation time)
   const mountBase = mount.resolvedPath;
   if (!mountBase) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `mount "${mountName}" not initialized (missing resolvedPath)`,
-      undefined,
-      { mountName }
+    return ctx.invalidate(
+      new Error(`mount "${mountName}" not initialized (missing resolvedPath)`),
+      {
+        code: 'FORBIDDEN',
+        provider: PROVIDER,
+        raw: { kind: 'mount_uninitialized', mountName },
+      },
     );
   }
 
@@ -85,11 +88,19 @@ export async function resolvePath(
     !normalized.startsWith(mountBase + path.sep) &&
     normalized !== mountBase
   ) {
-    throw new RuntimeError(
-      'RILL-R004',
-      'path escapes mount boundary',
-      undefined,
-      { mountName, path: relativePath, normalized, mountBase }
+    return ctx.invalidate(
+      new Error('path escapes mount boundary'),
+      {
+        code: 'FORBIDDEN',
+        provider: PROVIDER,
+        raw: {
+          kind: 'path_escape',
+          mountName,
+          path: relativePath,
+          normalized,
+          mountBase,
+        },
+      },
     );
   }
 
@@ -110,29 +121,36 @@ export async function resolvePath(
     if (error && typeof error === 'object' && 'code' in error) {
       const code = (error as { code: string }).code;
       if (code === 'EACCES' || code === 'EPERM') {
-        throw new RuntimeError(
-          'RILL-R004',
-          `permission denied: ${normalized}`,
-          undefined,
-          { path: normalized, code }
+        return ctx.invalidate(
+          new Error(`permission denied: ${normalized}`),
+          {
+            code: 'FORBIDDEN',
+            provider: PROVIDER,
+            raw: { kind: 'permission_denied', path: normalized, code },
+          },
         );
       }
       if (code === 'ENOENT') {
         if (createMode) {
-          throw new RuntimeError(
-            'RILL-R004',
-            `parent directory does not exist: ${path.dirname(normalized)}`,
-            undefined,
-            { path: normalized }
-          );
-        } else {
-          throw new RuntimeError(
-            'RILL-R004',
-            `file not found: ${normalized}`,
-            undefined,
-            { path: normalized }
+          return ctx.invalidate(
+            new Error(
+              `parent directory does not exist: ${path.dirname(normalized)}`,
+            ),
+            {
+              code: 'FORBIDDEN',
+              provider: PROVIDER,
+              raw: { kind: 'parent_missing', path: normalized },
+            },
           );
         }
+        return ctx.invalidate(
+          new Error(`file not found: ${normalized}`),
+          {
+            code: 'FORBIDDEN',
+            provider: PROVIDER,
+            raw: { kind: 'file_not_found', path: normalized },
+          },
+        );
       }
     }
     throw error;
@@ -143,11 +161,19 @@ export async function resolvePath(
     !resolvedPath.startsWith(mountBase + path.sep) &&
     resolvedPath !== mountBase
   ) {
-    throw new RuntimeError(
-      'RILL-R004',
-      'path escapes mount boundary',
-      undefined,
-      { mountName, path: relativePath, resolvedPath, mountBase }
+    return ctx.invalidate(
+      new Error('path escapes mount boundary'),
+      {
+        code: 'FORBIDDEN',
+        provider: PROVIDER,
+        raw: {
+          kind: 'symlink_escape',
+          mountName,
+          path: relativePath,
+          resolvedPath,
+          mountBase,
+        },
+      },
     );
   }
 
@@ -155,22 +181,26 @@ export async function resolvePath(
   if (mount.glob) {
     const filename = path.basename(resolvedPath);
     if (!matchesGlob(filename, mount.glob)) {
-      throw new RuntimeError(
-        'RILL-R004',
-        `file type not permitted in mount "${mountName}"`,
-        undefined,
-        { mountName, glob: mount.glob, filename }
+      return ctx.invalidate(
+        new Error(`file type not permitted in mount "${mountName}"`),
+        {
+          code: 'FORBIDDEN',
+          provider: PROVIDER,
+          raw: { kind: 'glob_mismatch', mountName, glob: mount.glob, filename },
+        },
       );
     }
   }
 
   // Step 8: Check mode permits operation
   if (!checkMode(mount.mode, operation)) {
-    throw new RuntimeError(
-      'RILL-R004',
-      `mount "${mountName}" does not permit ${operation}`,
-      undefined,
-      { mountName, mode: mount.mode, operation }
+    return ctx.invalidate(
+      new Error(`mount "${mountName}" does not permit ${operation}`),
+      {
+        code: 'FORBIDDEN',
+        provider: PROVIDER,
+        raw: { kind: 'mode_violation', mountName, mode: mount.mode, operation },
+      },
     );
   }
 
@@ -190,10 +220,6 @@ export async function resolvePath(
  * - *.{json,yaml} - Files ending in .json or .yaml
  * - * - All files (default when omitted)
  * - **\/*.csv - CSV files at any depth (for find() only)
- *
- * @param filename - Filename to match (basename only)
- * @param pattern - Glob pattern
- * @returns true if filename matches pattern
  */
 export function matchesGlob(filename: string, pattern: string): boolean {
   // Pattern: * (all files)
@@ -230,14 +256,10 @@ export function matchesGlob(filename: string, pattern: string): boolean {
 
 /**
  * Checks if mount mode permits operation.
- *
- * @param mode - Mount access mode
- * @param operation - Operation type
- * @returns true if operation permitted
  */
 export function checkMode(
   mode: 'read' | 'write' | 'read-write',
-  operation: Operation
+  operation: Operation,
 ): boolean {
   if (mode === 'read-write') return true;
   if (mode === 'read' && operation === 'read') return true;
@@ -254,8 +276,9 @@ export function checkMode(
  *
  * Mutates MountConfig to set resolvedPath field.
  *
- * @param mount - Mount configuration
- * @throws RuntimeError - If mount path invalid or inaccessible
+ * Throws synchronously (factory-init) — uses RILL-R005 because mounts are
+ * configured before any host fn returns. Configuration errors should fail
+ * extension creation, not produce invalid RillValues at runtime.
  */
 export async function initializeMount(mount: MountConfig): Promise<void> {
   try {
@@ -265,18 +288,18 @@ export async function initializeMount(mount: MountConfig): Promise<void> {
       const code = (error as { code: string }).code;
       if (code === 'ENOENT') {
         throw new RuntimeError(
-          'RILL-R004',
+          'RILL-R005',
           `mount path does not exist: ${mount.path}`,
           undefined,
-          { path: mount.path }
+          { path: mount.path },
         );
       }
       if (code === 'EACCES' || code === 'EPERM') {
         throw new RuntimeError(
-          'RILL-R004',
+          'RILL-R005',
           `permission denied: ${mount.path}`,
           undefined,
-          { path: mount.path, code }
+          { path: mount.path, code },
         );
       }
     }
@@ -295,15 +318,14 @@ export async function initializeMount(mount: MountConfig): Promise<void> {
  * Strips a leading `/` before matching.
  * Example: "/workspace/my/file.txt" → { mountName: "workspace", relativePath: "my/file.txt" }
  *
- * @param fullPath - Path with leading `/` and mount prefix
- * @param mounts - Mount configuration map
- * @returns Parsed mount name and relative path
- * @throws RuntimeError - If no mount matches the path prefix
+ * Returns either the parsed result or an invalid RillValue if no mount
+ * matches the path prefix.
  */
 export function parseMountPath(
   fullPath: string,
-  mounts: Record<string, MountConfig>
-): { mountName: string; relativePath: string } {
+  mounts: Record<string, MountConfig>,
+  ctx: RuntimeContext,
+): { mountName: string; relativePath: string } | RillValue {
   const normalized = fullPath.startsWith('/') ? fullPath.slice(1) : fullPath;
   const sortedNames = Object.keys(mounts).sort((a, b) => b.length - a.length);
 
@@ -319,10 +341,12 @@ export function parseMountPath(
     }
   }
 
-  throw new RuntimeError(
-    'RILL-R004',
-    `no mount matches path "${fullPath}"`,
-    undefined,
-    { path: fullPath }
+  return ctx.invalidate(
+    new Error(`no mount matches path "${fullPath}"`),
+    {
+      code: 'FORBIDDEN',
+      provider: PROVIDER,
+      raw: { kind: 'no_mount_match', path: fullPath },
+    },
   );
 }

@@ -411,28 +411,40 @@ All mail read functions return message dicts with this shape:
 
 ## Error Behavior
 
-| Condition | Error Code | Message |
-|-----------|------------|---------|
-| Missing or invalid `auth` config | `RILL-R004` | `outlook: auth is required` |
-| Invalid `auth.type` value | `RILL-R004` | `outlook: auth.type must be 'bearer' or 'session'` |
-| Bearer mode missing token | `RILL-R004` | `outlook: auth.token is required` |
-| Session mode missing tokenVar | `RILL-R004` | `outlook: auth.tokenVar is required` |
-| `maxResults` out of range | `RILL-R004` | `outlook: maxResults must be 1-1000` |
-| Empty folders array | `RILL-R004` | `outlook: folders must be non-empty` |
-| Session token variable not found | `RILL-R004` | `outlook: session token '{name}' not found` |
-| Capability disabled | `RILL-R004` | `outlook: {capability} not enabled` |
-| Empty `to` list on send/draft | `RILL-R004` | `outlook: to is required` |
-| Empty `subject` on send/draft | `RILL-R004` | `outlook: subject is required` |
-| Empty `body` on send/reply/draft | `RILL-R004` | `outlook: body is required` |
-| `start` after `end` on events/free_busy | `RILL-R004` | `outlook: start must be before end` |
-| HTTP 401 from Graph API | `RILL-R004` | `outlook: authentication failed (401)` |
-| HTTP 403 from Graph API | `RILL-R004` | `outlook: insufficient permissions for {operation}` |
-| HTTP 404 from Graph API | `RILL-R004` | `outlook: message '{id}' not found` |
-| HTTP 429 from Graph API | `RILL-R004` | `outlook: rate limit exceeded` |
-| HTTP 5xx from Graph API | `RILL-R004` | `outlook: server error ({status})` |
-| Request timeout or abort | `RILL-R004` | `outlook: request timeout` |
-| Network connection failure | `RILL-R004` | `outlook: connection failed` |
-| Called after `dispose()` | `RILL-R004` | `outlook: operation cancelled` |
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
+(`guard #AUTH && raw.kind == 'authentication_failed'`).
+
+`meta.provider == 'outlook'` on every host-fn failure.
+
+**Factory-time validation** (throws `RuntimeError RILL-R001`):
+
+- `outlook: auth is required` — missing `auth` config
+- `outlook: auth.type must be 'bearer' or 'session'`
+- `outlook: auth.token is required` — bearer mode missing token
+- `outlook: auth.tokenVar is required` — session mode missing tokenVar
+- `outlook: maxResults must be 1-1000` — `maxResults` out of range
+- `outlook: folders must be non-empty` — empty folders array
+
+**Host-fn errors:**
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Session token variable not found | `#AUTH` | `session_token_missing` |
+| Capability disabled in config | `#FORBIDDEN` | `capability_disabled` |
+| Empty `to` / `subject` / `body` / required field | `#INVALID_INPUT` | `invalid_input` |
+| `start` after `end` on events / `free_busy` | `#INVALID_INPUT` | `invalid_input` |
+| Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
+| Insufficient permissions for operation (HTTP 403) | `#FORBIDDEN` | `forbidden` |
+| Message / resource not found (HTTP 404) | `#NOT_FOUND` | `not_found` |
+| Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
+| Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
+| Request timeout / abort | `#TIMEOUT` | `request_timeout` |
+| Cooperative cancellation via `ctx.signal` | `#TIMEOUT` | `request_cancelled` |
+| Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
+| Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
+| Called after `dispose()` | `#DISPOSED` | `disposed` |
+| Other Graph API / unknown failure | `#UNAVAILABLE` | `unknown_error` |
 
 ## Events
 

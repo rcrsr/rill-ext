@@ -10,12 +10,14 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { HeadersInit } from 'undici-types';
-import type { ExtensionFactoryResult, RillValue } from '@rcrsr/rill';
+import type { ExtensionFactoryCtx, ExtensionFactoryResult, RillValue } from '@rcrsr/rill';
+import { RuntimeError } from '@rcrsr/rill';
 import type { McpExtensionConfig } from './types.js';
 import {
-  createProcessExitError,
-  createConnectionRefusedError,
-  createAuthRequiredError,
+  factoryError,
+  processExitError,
+  connectionRefusedError,
+  authRequiredError,
 } from './errors.js';
 import { generateToolFunctions } from './tools.js';
 import {
@@ -49,7 +51,8 @@ import { createIntrospectionDicts } from './introspection.js';
  * ```
  */
 export async function createMcpExtension(
-  config: McpExtensionConfig
+  config: McpExtensionConfig,
+  factoryCtx: ExtensionFactoryCtx,
 ): Promise<ExtensionFactoryResult> {
   // ============================================================
   // STEP 1: CONFIG VALIDATION (sync)
@@ -199,6 +202,15 @@ export async function createMcpExtension(
     }
   };
 
+  // Wire ctx.signal: aborting the factory signal closes client + transport.
+  factoryCtx.signal.addEventListener(
+    'abort',
+    () => {
+      void dispose();
+    },
+    { once: true },
+  );
+
   // Build value dict from introspection dicts — capabilities are namespaced
   const value: Record<string, RillValue> = {
     tools: introspectionDicts.tools as unknown as RillValue,
@@ -220,14 +232,12 @@ function validateConfig(config: McpExtensionConfig): void {
   const { transport } = config;
 
   if (transport.type === 'stdio') {
-    // EC-1: stdio transport missing command
     if (!transport.command) {
-      throw new Error('transport.command is required for stdio transport');
+      throw factoryError('transport.command is required for stdio transport');
     }
   } else if (transport.type === 'http') {
-    // EC-2: http transport missing url
     if (!transport.url) {
-      throw new Error('transport.url is required for http transport');
+      throw factoryError('transport.url is required for http transport');
     }
   }
 }
@@ -432,67 +442,49 @@ function filterCapabilities<T>(
  * @param config - Extension configuration (for context)
  * @returns Mapped error
  */
-function mapConnectionError(error: unknown, config: McpExtensionConfig): Error {
-  // Extract error message and code for analysis
+function mapConnectionError(error: unknown, config: McpExtensionConfig): RuntimeError {
+  if (error instanceof RuntimeError) {
+    return error;
+  }
   const message = error instanceof Error ? error.message : String(error);
   const code =
     error && typeof error === 'object' && 'code' in error
       ? String(error.code)
       : '';
 
-  // EC-3: Process exit error (stdio only)
   if (config.transport.type === 'stdio') {
-    // ENOENT means command not found - treat as process exit
     if (code === 'ENOENT' || /enoent/i.test(message)) {
-      return createProcessExitError(1);
+      return processExitError(1);
     }
 
-    // Check for exit code in error
-    const exitCodeMatch = /exit(?:ed)?\s+(?:with\s+)?code\s+(\d+)/i.exec(
-      message
-    );
+    const exitCodeMatch = /exit(?:ed)?\s+(?:with\s+)?code\s+(\d+)/i.exec(message);
     if (exitCodeMatch) {
-      const exitCode = Number.parseInt(exitCodeMatch[1]!, 10);
-      return createProcessExitError(exitCode);
+      return processExitError(Number.parseInt(exitCodeMatch[1]!, 10));
     }
 
-    // Generic process spawn/exit errors
-    if (
-      /spawn/i.test(message) ||
-      /exit/i.test(message) ||
-      /process/i.test(message)
-    ) {
-      return createProcessExitError(1);
+    if (/spawn/i.test(message) || /exit/i.test(message) || /process/i.test(message)) {
+      return processExitError(1);
     }
   }
 
-  // EC-4: Connection refused error (http only)
   if (config.transport.type === 'http') {
-    // Connection timeout
     if (/timeout/i.test(message) || code === 'ETIMEDOUT') {
-      return createConnectionRefusedError(config.transport.url);
+      return connectionRefusedError(config.transport.url);
     }
 
-    // Connection refused
     if (
       code === 'ECONNREFUSED' ||
       /refused/i.test(message) ||
       /econnrefused/i.test(message) ||
       /fetch.*failed/i.test(message)
     ) {
-      return createConnectionRefusedError(config.transport.url);
+      return connectionRefusedError(config.transport.url);
     }
 
-    // EC-5: Auth required (401 status)
     if (/401/i.test(message) || /unauthorized/i.test(message)) {
-      return createAuthRequiredError();
+      return authRequiredError();
     }
   }
 
-  // Return original error if no specific mapping
-  if (error instanceof Error) {
-    return error;
-  }
-
-  return new Error(`mcp: failed to connect -- ${message}`);
+  return factoryError(`failed to connect -- ${message}`);
 }

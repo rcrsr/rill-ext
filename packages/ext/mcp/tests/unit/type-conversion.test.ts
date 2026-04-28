@@ -10,6 +10,7 @@ import type { McpToolResult, McpToolContent } from '../../src/tools.js';
 
 // Test helper to access internal parseToolResult via tool function generation
 import { generateToolFunctions, type McpTool } from '../../src/tools.js';
+import { makeRuntimeCtx, expectRejectsInvalid } from '../_helpers.js';
 
 /**
  * Helper to extract parseToolResult behavior by generating a tool function
@@ -31,10 +32,7 @@ async function testParseToolResult(result: McpToolResult): Promise<any> {
     callTool: async () => result,
   } as any;
 
-  const mockContext = {
-    variables: new Map(),
-    pipeValue: undefined,
-  };
+  const mockContext = makeRuntimeCtx();
 
   const functions = generateToolFunctions(
     [mockTool],
@@ -352,18 +350,16 @@ describe('AC-8: Type conversion', () => {
         isError: true,
       };
 
-      await expect(testParseToolResult(result)).rejects.toThrow();
+      await expectRejectsInvalid(testParseToolResult(result));
     });
 
-    it('throws with error text from content', async () => {
+    it('invalidates with error text from content', async () => {
       const result: McpToolResult = {
         content: [{ type: 'text', text: 'Custom error message' }],
         isError: true,
       };
 
-      await expect(testParseToolResult(result)).rejects.toThrow(
-        'Custom error message'
-      );
+      await expectRejectsInvalid(testParseToolResult(result), 'Custom error message');
     });
 
     it('handles isError with empty content', async () => {
@@ -372,9 +368,7 @@ describe('AC-8: Type conversion', () => {
         isError: true,
       };
 
-      await expect(testParseToolResult(result)).rejects.toThrow(
-        'unknown error'
-      );
+      await expectRejectsInvalid(testParseToolResult(result), 'unknown error');
     });
   });
 

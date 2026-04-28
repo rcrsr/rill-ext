@@ -12,7 +12,7 @@ This document covers the capability matrix, default-deny rationale, and allowlis
 
 ## Capability Matrix
 
-Capabilities control which host functions the extension accepts at runtime. A disabled capability causes an immediate `RILL-R004` error before any network call.
+Capabilities control which host functions the extension accepts at runtime. A disabled capability returns an invalid value carrying `#FORBIDDEN` (`raw.kind == 'capability_disabled'`) before any network call.
 
 ### Gmail Capabilities
 
@@ -129,7 +129,7 @@ Configure via `gmail.allowedLabels` and `gmail.deniedLabels`.
 | Setting | Effect |
 |---------|--------|
 | `allowedLabels` absent | All labels accessible (no allowlist). |
-| `allowedLabels` set | Only listed label names are permitted. Calling `gmail_label` with any other label throws `RILL-R004`. |
+| `allowedLabels` set | Only listed label names are permitted. Calling `gmail_label` with any other label returns invalid `#FORBIDDEN` (`raw.kind == 'label_not_allowed'`). |
 | `deniedLabels` | Listed label names are always blocked, even if `allowedLabels` is absent. Default: `[]`. |
 
 The allowlist takes precedence. If `allowedLabels` is set, any label not in the list is blocked regardless of `deniedLabels`.
@@ -199,7 +199,7 @@ Configure via `drive.maxUploadBytes`.
 | Setting | Effect |
 |---------|--------|
 | `maxUploadBytes` absent | No size limit. |
-| `maxUploadBytes` set | Files exceeding the limit throw `RILL-R004` before the upload request. Must be a positive integer. |
+| `maxUploadBytes` set | Files exceeding the limit return invalid `#INVALID_INPUT` (`raw.kind == 'upload_too_large'`) before the upload request. Must be a positive integer. |
 
 **Example — limit uploads to 10 MB:**
 
@@ -237,7 +237,7 @@ Configure via `calendar.denyAllDay`.
 | Setting | Effect |
 |---------|--------|
 | `denyAllDay: false` (default) | All-day events included in results and creation is permitted. |
-| `denyAllDay: true` | All-day events excluded from `calendar_events` and `calendar_today` results; `calendar_create_event` throws `RILL-R004` for all-day events. |
+| `denyAllDay: true` | All-day events excluded from `calendar_events` and `calendar_today` results; `calendar_create_event` returns invalid `#FORBIDDEN` (`raw.kind == 'all_day_denied'`) for all-day events. |
 
 ## Capability Gate Ordering
 

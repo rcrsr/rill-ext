@@ -5,9 +5,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { RuntimeError } from '@rcrsr/rill';
+import { getStatus } from '@rcrsr/rill';
 import { createDatetimeExtension } from '../src/factory.js';
 import type { DatetimeExtensionConfig } from '../src/types.js';
+import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+
+function mk(config?: DatetimeExtensionConfig) {
+  return createDatetimeExtension(config ?? {}, makeFactoryCtx());
+}
 
 describe('datetime extension factory', () => {
   // ============================================================
@@ -16,7 +21,7 @@ describe('datetime extension factory', () => {
 
   describe('factory creation', () => {
     it('returns ExtensionFactoryResult with value and dispose', () => {
-      const ext = createDatetimeExtension();
+      const ext = mk();
 
       expect(ext).toHaveProperty('value');
       expect(ext).toHaveProperty('dispose');
@@ -24,7 +29,7 @@ describe('datetime extension factory', () => {
     });
 
     it('returns all 7 function keys on value dict', () => {
-      const ext = createDatetimeExtension();
+      const ext = mk();
 
       expect(ext.value).toHaveProperty('iso');
       expect(ext.value).toHaveProperty('date');
@@ -36,9 +41,8 @@ describe('datetime extension factory', () => {
     });
 
     it('wraps each function as callable with params, fn, annotations, returnType', () => {
-      const ext = createDatetimeExtension();
+      const ext = mk();
 
-      // Verify shape against one representative function (iso)
       expect(ext.value.iso).toMatchObject({
         __type: 'callable',
         kind: 'application',
@@ -54,7 +58,7 @@ describe('datetime extension factory', () => {
     });
 
     it('wraps all 7 functions as callables', () => {
-      const ext = createDatetimeExtension();
+      const ext = mk();
       const keys = ['iso', 'date', 'time', 'offset', 'zones', 'format', 'parse'] as const;
 
       for (const key of keys) {
@@ -76,8 +80,8 @@ describe('datetime extension factory', () => {
 
   describe('no side effects', () => {
     it('creates two independent instances without interference', () => {
-      const extA = createDatetimeExtension();
-      const extB = createDatetimeExtension();
+      const extA = mk();
+      const extB = mk();
 
       expect(extA.value).not.toBe(extB.value);
       expect(extA.dispose).not.toBe(extB.dispose);
@@ -90,14 +94,14 @@ describe('datetime extension factory', () => {
 
   describe('config variants', () => {
     it('accepts undefined config', () => {
-      const ext = createDatetimeExtension(undefined);
+      const ext = mk(undefined);
       expect(ext).toBeDefined();
       expect(ext.value).toHaveProperty('iso');
     });
 
     it('accepts empty config object', () => {
       const config: DatetimeExtensionConfig = {};
-      const ext = createDatetimeExtension(config);
+      const ext = mk(config);
       expect(ext).toBeDefined();
       expect(ext.value).toHaveProperty('iso');
     });
@@ -109,71 +113,50 @@ describe('datetime extension factory', () => {
 
   describe('dispose()', () => {
     it('resolves without throw on first call', async () => {
-      const ext = createDatetimeExtension();
+      const ext = mk();
       await expect(ext.dispose!()).resolves.toBeUndefined();
     });
 
     it('is idempotent: second call does not throw', async () => {
-      const ext = createDatetimeExtension();
+      const ext = mk();
       await ext.dispose!();
       await expect(ext.dispose!()).resolves.toBeUndefined();
     });
   });
 
   // ============================================================
-  // AC-E4 / EC-4: Function call after dispose throws RILL-R004
+  // AC-E4 / EC-4: Function call after dispose returns invalid value
   // ============================================================
 
   describe('post-dispose function calls', () => {
-    it('throws RuntimeError RILL-R004 when iso is called after dispose', async () => {
-      const ext = createDatetimeExtension();
+    it('returns invalid value when iso is called after dispose', async () => {
+      const ext = mk();
       await ext.dispose!();
 
-      const iso = ext.value.iso as { fn: (args: Record<string, unknown>) => Promise<unknown> };
-      let caught: unknown;
-      try {
-        await iso.fn({ dt: Date.now(), zone: 'UTC' });
-      } catch (err) {
-        caught = err;
-      }
-
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('datetime: operation cancelled');
+      const result = await ext.value.iso.fn({ dt: Date.now(), zone: 'UTC' }, makeRuntimeCtx());
+      const status = getStatus(result);
+      expect(status.code.name).toBe('INVALID_INPUT');
+      expect(status.message).toMatch(/datetime: operation cancelled/);
     });
 
-    it('throws RuntimeError RILL-R004 when zones is called after dispose', async () => {
-      const ext = createDatetimeExtension();
+    it('returns invalid value when zones is called after dispose', async () => {
+      const ext = mk();
       await ext.dispose!();
 
-      const zones = ext.value.zones as { fn: (args: Record<string, unknown>) => Promise<unknown> };
-      let caught: unknown;
-      try {
-        await zones.fn({});
-      } catch (err) {
-        caught = err;
-      }
-
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('datetime: operation cancelled');
+      const result = await ext.value.zones.fn({}, makeRuntimeCtx());
+      const status = getStatus(result);
+      expect(status.code.name).toBe('INVALID_INPUT');
+      expect(status.message).toMatch(/datetime: operation cancelled/);
     });
 
-    it('throws RuntimeError RILL-R004 with exact message "datetime: operation cancelled"', async () => {
-      const ext = createDatetimeExtension();
+    it('returns invalid value with message "datetime: operation cancelled"', async () => {
+      const ext = mk();
       await ext.dispose!();
 
-      const format = ext.value.format as { fn: (args: Record<string, unknown>) => Promise<unknown> };
-      let caught: unknown;
-      try {
-        await format.fn({ dt: Date.now(), pattern: 'YYYY-MM-DD' });
-      } catch (err) {
-        caught = err;
-      }
-
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-      expect((caught as RuntimeError).message).toBe('datetime: operation cancelled');
+      const result = await ext.value.format.fn({ dt: Date.now(), pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
+      const status = getStatus(result);
+      expect(status.code.name).toBe('INVALID_INPUT');
+      expect(status.message).toMatch(/datetime: operation cancelled/);
     });
   });
 });

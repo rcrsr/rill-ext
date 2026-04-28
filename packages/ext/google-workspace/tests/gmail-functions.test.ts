@@ -10,11 +10,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
-import {
-  RuntimeError,
-  createRuntimeContext,
-  type ApplicationCallable,
-} from '@rcrsr/rill';
+import { RuntimeError, createRuntimeContext, type ApplicationCallable, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import { makeFactoryCtx } from './_helpers.js';
 import { createGoogleWorkspaceExtension } from '../src/factory.js';
 
 // ============================================================
@@ -124,151 +121,109 @@ afterEach(() => {
 // ============================================================
 
 describe('capability gating [AC-4, EC-3]', () => {
-  it('gmail_send with gmail.send=false → RILL-R004 before fetch', async () => {
+  it('gmail_send with gmail.send=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
-    const ext = createGoogleWorkspaceExtension(makeNoCapConfig());
+    const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_send').fn(
+      const caught = (await getCallable(ext, 'gmail_send').fn(
         { to: 'a@b.com', subject: 'Hi', body: 'Hello' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('gmail.send');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('gmail.send');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_draft with gmail.draft=false → RILL-R004 before fetch', async () => {
+  it('gmail_draft with gmail.draft=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
-    const ext = createGoogleWorkspaceExtension(makeNoCapConfig());
+    const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_draft').fn(
+      const caught = (await getCallable(ext, 'gmail_draft').fn(
         { to: 'a@b.com', subject: 'Hi', body: 'Hello' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('gmail.draft');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('gmail.draft');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_reply with gmail.reply=false → RILL-R004 before fetch', async () => {
+  it('gmail_reply with gmail.reply=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
-    const ext = createGoogleWorkspaceExtension(makeNoCapConfig());
+    const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_reply').fn(
+      const caught = (await getCallable(ext, 'gmail_reply').fn(
         { messageId: 'm1', body: 'ok' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('gmail.reply');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('gmail.reply');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_flag with gmail.modify=false → RILL-R004 before fetch', async () => {
+  it('gmail_flag with gmail.modify=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
-    const ext = createGoogleWorkspaceExtension(makeNoCapConfig());
+    const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_flag').fn(
+      const caught = (await getCallable(ext, 'gmail_flag').fn(
         { messageId: 'm1', flagged: true },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('gmail.modify');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('gmail.modify');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_label with gmail.label=false → RILL-R004 before fetch', async () => {
+  it('gmail_label with gmail.label=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
-    const ext = createGoogleWorkspaceExtension(makeNoCapConfig());
+    const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_label').fn(
+      const caught = (await getCallable(ext, 'gmail_label').fn(
         { messageId: 'm1', labelName: 'Important' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('gmail.label');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('gmail.label');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_search with gmail.search=false → RILL-R004 before fetch', async () => {
+  it('gmail_search with gmail.search=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
-    const ext = createGoogleWorkspaceExtension(makeNoCapConfig());
+    const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_search').fn({ query: 'hello' }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
+      const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'hello' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     // gmail_search checks both gmail.read and gmail.search — either hits first
-    expect((caught as RuntimeError).message).toContain('not enabled');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('gmail_read with gmail.read=false → RILL-R004 before fetch', async () => {
+  it('gmail_read with gmail.read=false → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
-    const ext = createGoogleWorkspaceExtension(makeNoCapConfig());
+    const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_read').fn({ messageId: 'm1' }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('gmail.read');
-    expect((caught as RuntimeError).message).toContain('not enabled');
+      const caught = (await getCallable(ext, 'gmail_read').fn({ messageId: 'm1' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('gmail.read');
+    expect(getStatus(caught).message).toContain('not enabled');
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 });
@@ -284,7 +239,7 @@ describe('gmail_search success [AC-12, AC-13]', () => {
     ) as typeof fetch;
 
     const result = (await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_search',
       { query: 'from:alice' }
     )) as Record<string, unknown>;
@@ -302,7 +257,7 @@ describe('gmail_search success [AC-12, AC-13]', () => {
       mockOkJson({ messages: [{ id: 'm1', threadId: 't1' }] })
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -325,7 +280,7 @@ describe('gmail_search success [AC-12, AC-13]', () => {
     ) as typeof fetch;
 
     const result = await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_search',
       { query: 'subject:hello' }
     );
@@ -361,7 +316,7 @@ describe('gmail_read success [AC-12, AC-13]', () => {
     ) as typeof fetch;
 
     const result = (await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_read',
       { messageId: 'msg-1' }
     )) as Record<string, unknown>;
@@ -383,7 +338,7 @@ describe('gmail_read success [AC-12, AC-13]', () => {
       mockOkJson(GMAIL_MESSAGE_PAYLOAD)
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -405,7 +360,7 @@ describe('gmail_send success [AC-12, AC-13]', () => {
     ) as typeof fetch;
 
     const result = await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_send',
       { to: 'bob@example.com', subject: 'Test', body: 'Hello' }
     );
@@ -418,7 +373,7 @@ describe('gmail_send success [AC-12, AC-13]', () => {
       mockOkJson({ id: 'sent-id' })
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -444,7 +399,7 @@ describe('gmail_draft success [AC-12, AC-13]', () => {
     ) as typeof fetch;
 
     const result = await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_draft',
       { to: 'bob@example.com', subject: 'Draft', body: 'Draft body' }
     );
@@ -457,7 +412,7 @@ describe('gmail_draft success [AC-12, AC-13]', () => {
       mockOkJson({ id: 'draft-id' })
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -503,7 +458,7 @@ describe('gmail_reply success [AC-12, AC-13]', () => {
     mockReplyFetches('reply-sent-id');
 
     const result = await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_reply',
       { messageId: 'original-msg', body: 'Reply here' }
     );
@@ -515,7 +470,7 @@ describe('gmail_reply success [AC-12, AC-13]', () => {
     const mockFetchImpl = mockReplyFetches('reply-id');
 
     await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_reply',
       { messageId: 'original-msg', body: 'Reply here' }
     );
@@ -530,7 +485,7 @@ describe('gmail_reply success [AC-12, AC-13]', () => {
   it('emits google:gmail:reply event with duration [AC-13]', async () => {
     mockReplyFetches('reply-sent-id');
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -555,7 +510,7 @@ describe('gmail_flag success [AC-12, AC-13]', () => {
     ) as typeof fetch;
 
     const result = await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_flag',
       { messageId: 'm1', flagged: true }
     );
@@ -569,7 +524,7 @@ describe('gmail_flag success [AC-12, AC-13]', () => {
     ) as typeof fetch;
 
     const result = await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_flag',
       { messageId: 'm1', flagged: false }
     );
@@ -582,7 +537,7 @@ describe('gmail_flag success [AC-12, AC-13]', () => {
       mockOkJson({ id: 'm1', labelIds: ['STARRED'] })
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -616,7 +571,7 @@ describe('gmail_label success [AC-12, AC-13]', () => {
     mockLabelFetches();
 
     const result = await callGmail(
-      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG),
+      createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_label',
       { messageId: 'm1', labelName: 'Important' }
     );
@@ -627,7 +582,7 @@ describe('gmail_label success [AC-12, AC-13]', () => {
   it('emits google:gmail:label event with duration [AC-13]', async () => {
     mockLabelFetches();
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -658,7 +613,7 @@ describe('BC-1: gmail_search maxResults truncation', () => {
     const ext = createGoogleWorkspaceExtension({
       auth: { type: 'bearer' as const, token: 'test-token' },
       gmail: { maxResults: 10 },
-    });
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'gmail_search').fn(
@@ -681,7 +636,7 @@ describe('BC-1: gmail_search maxResults truncation', () => {
     const ext = createGoogleWorkspaceExtension({
       auth: { type: 'bearer' as const, token: 'test-token' },
       gmail: { maxResults: 50 },
-    });
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'gmail_search').fn(
@@ -710,7 +665,7 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
         mockOkJson({ id: 'm1', labelIds: ['L1'] })
       ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const result = await callGmail(ext, 'gmail_label', {
       messageId: 'm1',
       labelName: 'AnyLabel',
@@ -722,53 +677,41 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     expect(mockFetchImpl.mock.calls).toHaveLength(2);
   });
 
-  it('BC-10: allowedLabels set + label not in list → RILL-R004 before fetch', async () => {
+  it('BC-10: allowedLabels set + label not in list → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
     const ext = createGoogleWorkspaceExtension({
       auth: { type: 'bearer' as const, token: 'test-token' },
       gmail: { allowedLabels: ['Important'] },
-    });
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_label').fn(
+      const caught = (await getCallable(ext, 'gmail_label').fn(
         { messageId: 'm1', labelName: 'Spam' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain("label 'Spam' not in allowed set");
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain("label 'Spam' not in allowed set");
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
-  it('EC-12: deniedLabels includes label → RILL-R004 before fetch', async () => {
+  it('EC-12: deniedLabels includes label → #FORBIDDEN before fetch', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
     const ext = createGoogleWorkspaceExtension({
       auth: { type: 'bearer' as const, token: 'test-token' },
       gmail: { deniedLabels: ['Spam'] },
-    });
+    }, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_label').fn(
+      const caught = (await getCallable(ext, 'gmail_label').fn(
         { messageId: 'm1', labelName: 'Spam' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain("label 'Spam' in denied set");
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain("label 'Spam' in denied set");
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 
@@ -785,7 +728,7 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     const ext = createGoogleWorkspaceExtension({
       auth: { type: 'bearer' as const, token: 'test-token' },
       gmail: { allowedLabels: ['IMPORTANT'] },
-    });
+    }, makeFactoryCtx());
 
     const result = await callGmail(ext, 'gmail_label', {
       messageId: 'm1',
@@ -797,25 +740,19 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     expect(mockFetchImpl.mock.calls).toHaveLength(2);
   });
 
-  it('EC-6: gmail.label=false + valid label → RILL-R004 before fetch (cap gate fires first)', async () => {
+  it('EC-6: gmail.label=false + valid label → #FORBIDDEN before fetch (cap gate fires first)', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(makeNoCapConfig({ label: false }));
+    const ext = createGoogleWorkspaceExtension(makeNoCapConfig({ label: false }), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_label').fn(
+      const caught = (await getCallable(ext, 'gmail_label').fn(
         { messageId: 'm1', labelName: 'Important' },
         ctx
-      );
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('gmail.label');
+      )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('gmail.label');
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 });
@@ -830,19 +767,13 @@ describe('HTTP error mapping [EC-14, EC-15, EC-17, EC-18]', () => {
       mockErrorResponse(401)
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe('google: invalid Gmail token');
+      const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('AUTH');
+  expect(getStatus(caught).message).toBe('google: invalid Gmail token');
   });
 
   it('EC-15: 403 → "google: insufficient Gmail scopes for <op>"', async () => {
@@ -850,19 +781,13 @@ describe('HTTP error mapping [EC-14, EC-15, EC-17, EC-18]', () => {
       mockErrorResponse(403)
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain('insufficient Gmail scopes');
+      const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
+  expect(getStatus(caught).message).toContain('insufficient Gmail scopes');
   });
 
   it('EC-17: 429 → "google: rate limit exceeded; retry after delay"', async () => {
@@ -870,19 +795,13 @@ describe('HTTP error mapping [EC-14, EC-15, EC-17, EC-18]', () => {
       mockErrorResponse(429)
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe(
+      const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('RATE_LIMIT');
+expect(getStatus(caught as RillValue).message).toBe(
       'google: rate limit exceeded; retry after delay'
     );
   });
@@ -892,19 +811,13 @@ describe('HTTP error mapping [EC-14, EC-15, EC-17, EC-18]', () => {
       mockErrorResponse(503)
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toBe(
+      const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('UNAVAILABLE');
+expect(getStatus(caught as RillValue).message).toBe(
       'google: Gmail server error (503); temporarily unavailable'
     );
   });
@@ -914,20 +827,13 @@ describe('HTTP error mapping [EC-14, EC-15, EC-17, EC-18]', () => {
       mockErrorResponse(500)
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).message).toBe(
-      'google: Gmail server error (500); temporarily unavailable'
-    );
+    const caught = (await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('UNAVAILABLE');
+    expect(getStatus(caught).message).toBe('google: Gmail server error (500); temporarily unavailable');
   });
 });
 
@@ -972,7 +878,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
       },
     };
 
-    const ext = createGoogleWorkspaceExtension(sessionConfig);
+    const ext = createGoogleWorkspaceExtension(sessionConfig, makeFactoryCtx());
     const ctx = createRuntimeContext();
     // Inject the token into the context variable at call time (IR-21 session branch)
     ctx.variables.set('google_token', 'session-resolved-token');
@@ -995,7 +901,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
     expect(Array.isArray(result['attachments'])).toBe(true);
   });
 
-  it('raises RILL-R004 when session tokenVar not found in context (IR-21 error path)', async () => {
+  it('emits #AUTH when session tokenVar not found in context (IR-21 error path)', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
     const sessionConfig = {
@@ -1013,20 +919,14 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
       },
     };
 
-    const ext = createGoogleWorkspaceExtension(sessionConfig);
+    const ext = createGoogleWorkspaceExtension(sessionConfig, makeFactoryCtx());
     const ctx = createRuntimeContext();
     // Intentionally do not set 'missing_token' in ctx.variables
 
-    let caught: unknown;
-    try {
-      await getCallable(ext, 'gmail_read').fn({ messageId: 'msg-x' }, ctx);
-    } catch (e) {
-      caught = e;
-    }
-
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R004');
-    expect((caught as RuntimeError).message).toContain("session token 'missing_token' not found");
+    const caught = (await getCallable(ext, 'gmail_read').fn({ messageId: 'msg-x' }, ctx)) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    expect(getStatus(caught).code.name).toBe('AUTH');
+    expect(getStatus(caught).message).toContain("session token 'missing_token' not found");
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
   });
 });
@@ -1072,7 +972,7 @@ describe('gmail_send service-account auth [AC-9, AC-10, AC-12]', () => {
         mockOkJson({ id: 'sa-sent-msg-id' })
       ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(SA_CONFIG);
+    const ext = createGoogleWorkspaceExtension(SA_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'gmail_send').fn(
@@ -1108,7 +1008,7 @@ describe('gmail_send service-account auth [AC-9, AC-10, AC-12]', () => {
       .mockResolvedValueOnce(mockOkJson({ id: 'msg-1' }))
       .mockResolvedValueOnce(mockOkJson({ id: 'msg-2' })) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(SA_CONFIG);
+    const ext = createGoogleWorkspaceExtension(SA_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // First call — triggers token exchange
@@ -1156,7 +1056,7 @@ describe('AC-11: AbortSignal combined via AbortSignal.any with 30s timeout', () 
       }
     ) as typeof fetch;
 
-    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG);
+    const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'gmail_search').fn({ query: 'test' }, ctx);
@@ -1184,7 +1084,7 @@ describe('AC-3: callable params are valid RillParam objects', () => {
   ] as const;
 
   it('every Gmail callable has at least one param with name, type, defaultValue, annotations', () => {
-    const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+    const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
     const value = ext.value as Record<string, ApplicationCallable>;
 
     for (const name of GMAIL_CALLABLES) {
@@ -1203,7 +1103,7 @@ describe('AC-3: callable params are valid RillParam objects', () => {
   });
 
   it('gmail_search first param is "query" with string type', () => {
-    const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+    const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
     const callable = (ext.value as Record<string, ApplicationCallable>)['gmail_search']!;
     const firstParam = callable.params[0]!;
 
@@ -1212,7 +1112,7 @@ describe('AC-3: callable params are valid RillParam objects', () => {
   });
 
   it('gmail_flag second param is "flagged" with bool type', () => {
-    const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+    const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
     const callable = (ext.value as Record<string, ApplicationCallable>)['gmail_flag']!;
     const secondParam = callable.params[1]!;
 
@@ -1221,7 +1121,7 @@ describe('AC-3: callable params are valid RillParam objects', () => {
   });
 
   it('gmail_label params are messageId (str) and labelName (str)', () => {
-    const ext = createGoogleWorkspaceExtension(BEARER_CONFIG);
+    const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
     const callable = (ext.value as Record<string, ApplicationCallable>)['gmail_label']!;
 
     expect(callable.params[0]!.name).toBe('messageId');

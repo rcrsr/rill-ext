@@ -106,10 +106,18 @@ $crypto.random(32) -> log
 
 ## Errors
 
-| Error | Code | Description |
-|-------|------|-------------|
-| Unsupported algorithm | RILL-R004 | Algorithm not available in Node.js crypto |
-| Missing hmacKey | RILL-R004 | hmac() called without hmacKey in config |
+The extension emits failures as invalid `RillValue`s carrying rill core's
+generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
+(`guard #INVALID_INPUT && raw.kind == 'unsupported_algorithm'`).
+
+**Host-fn errors:**
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Algorithm not available in Node.js crypto | `#INVALID_INPUT` | `unsupported_algorithm` |
+| `hmac()` called without `hmacKey` in config | `#INVALID_INPUT` | `missing_hmac_key` |
+| `random()` called with non-integer or negative `bytes` | `#INVALID_INPUT` | `invalid_bytes` |
+| `random()` called with `bytes` greater than 1 MB | `#INVALID_INPUT` | `bytes_too_large` |
 
 ## Supported Algorithms
 

@@ -4,22 +4,18 @@
  * Capability: gmail.send
  * Scope: gmail.send
  */
-
-import { RuntimeError } from '@rcrsr/rill';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import { failInput } from '../../errors.js';
 import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
 import { buildRawMime } from './mime.js';
-
 const GMAIL_BASE = 'https://gmail.googleapis.com';
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
-
 export interface GmailSendDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
 }
-
 /**
  * Factory returning the gmail_send inner function.
  * POSTs base64url-encoded RFC 2822 MIME to /users/me/messages/send.
@@ -37,21 +33,17 @@ export function makeGmailSend(deps: GmailSendDeps): (
   ): Promise<RillValue> => {
     const to = args['to'];
     if (typeof to !== 'string' || to.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: to must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: to must be a non-empty string');
     }
-
     const subject = args['subject'];
     if (typeof subject !== 'string' || subject.trim() === '') {
-      throw new RuntimeError('RILL-R004', 'google: subject must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: subject must be a non-empty string');
     }
-
     const body = args['body'];
     if (typeof body !== 'string') {
-      throw new RuntimeError('RILL-R004', 'google: body must be a string');
+      failInput(ctx, 'invalid_arg', 'google: body must be a string');
     }
-
     const raw = buildRawMime({ to, subject, body });
-
     const response = await googleFetch(
       'POST',
       GMAIL_BASE,
@@ -65,7 +57,6 @@ export function makeGmailSend(deps: GmailSendDeps): (
       GMAIL_SCOPES,
       { raw }
     );
-
     const data = response as { id?: string } | null;
     return (data?.id ?? '') as unknown as RillValue;
   };

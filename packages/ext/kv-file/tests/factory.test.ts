@@ -9,6 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createFileKvExtension } from '../src/factory.js';
+import { makeFactoryCtx } from './_setup.js';
 
 describe('kv-file extension factory', () => {
   let tempDir: string;
@@ -29,7 +30,7 @@ describe('kv-file extension factory', () => {
 
   describe('factory creation', () => {
     it('creates ExtensionFactoryResult with 11 functions and dispose', () => {
-      const ext = createFileKvExtension({ store: storePath });
+      const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
 
       expect(ext).toHaveProperty('value');
       expect(ext).toHaveProperty('dispose');
@@ -48,7 +49,7 @@ describe('kv-file extension factory', () => {
     });
 
     it('wraps functions as ApplicationCallable', () => {
-      const ext = createFileKvExtension({ store: storePath });
+      const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
 
       expect(ext.value.get).toMatchObject({
         __type: 'callable',
@@ -60,22 +61,25 @@ describe('kv-file extension factory', () => {
     });
 
     it('throws when neither mounts nor store provided', () => {
-      expect(() => createFileKvExtension({})).toThrow(
+      expect(() => createFileKvExtension({}, makeFactoryCtx())).toThrow(
         'KV file extension requires either "mounts" or "store" configuration',
       );
     });
 
     it('accepts mount-based config', () => {
-      const ext = createFileKvExtension({
-        mounts: {
-          user: { mode: 'read-write', store: storePath },
+      const ext = createFileKvExtension(
+        {
+          mounts: {
+            user: { mode: 'read-write', store: storePath },
+          },
         },
-      });
+        makeFactoryCtx(),
+      );
       expect(ext).toBeDefined();
     });
 
     it('accepts legacy single-store config', () => {
-      const ext = createFileKvExtension({ store: storePath });
+      const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
       expect(ext).toBeDefined();
     });
   });

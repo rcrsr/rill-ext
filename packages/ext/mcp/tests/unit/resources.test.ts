@@ -16,6 +16,7 @@ import {
   type McpResourceResult,
   type McpResource,
 } from '../../src/resources.js';
+import { makeRuntimeCtx, expectRejectsInvalid } from '../_helpers.js';
 
 // ============================================================
 // TEMPLATE VARIABLE EXTRACTION TESTS
@@ -108,9 +109,7 @@ describe('createReadResourceFunction', () => {
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
     });
-    await func.fn({ uri: 'config://app' }, {
-      _lifecycle: { connectEmitted: false },
-    } as any);
+    await func.fn({ uri: 'config://app' }, makeRuntimeCtx());
 
     expect(mockClient.readResource).toHaveBeenCalledWith({
       uri: 'config://app',
@@ -133,9 +132,7 @@ describe('createReadResourceFunction', () => {
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
     });
-    const result = await func.fn({ uri: 'config://app' }, {
-      _lifecycle: { connectEmitted: false },
-    } as any);
+    const result = await func.fn({ uri: 'config://app' }, makeRuntimeCtx());
 
     // Task 3.2: Text content returns string
     expect(result).toBe('config data');
@@ -157,9 +154,7 @@ describe('createReadResourceFunction', () => {
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
     });
-    const result = await func.fn({ uri: 'image://logo' }, {
-      _lifecycle: { connectEmitted: false },
-    } as any);
+    const result = await func.fn({ uri: 'image://logo' }, makeRuntimeCtx());
 
     // Task 3.2: Blob content returns dict with type/data/mime
     expect(result).toEqual({
@@ -179,9 +174,7 @@ describe('createReadResourceFunction', () => {
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
     });
-    const result = await func.fn({ uri: 'empty://resource' }, {
-      _lifecycle: { connectEmitted: false },
-    } as any);
+    const result = await func.fn({ uri: 'empty://resource' }, makeRuntimeCtx());
 
     // BC-6: Empty content returns empty string
     expect(result).toBe('');
@@ -200,9 +193,7 @@ describe('createReadResourceFunction', () => {
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
     });
-    const result = await func.fn({ uri: 'resource://multi' }, {
-      _lifecycle: { connectEmitted: false },
-    } as any);
+    const result = await func.fn({ uri: 'resource://multi' }, makeRuntimeCtx());
 
     // Task 3.2: Multiple text contents concatenated with newlines
     expect(result).toBe('first\nsecond');
@@ -213,11 +204,7 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expect(
-      func.fn({ uri: 123 }, { _lifecycle: { connectEmitted: false } } as any)
-    ).rejects.toThrow(
-      'mcp tool "read_resource": expected string uri, got number'
-    );
+    await expectRejectsInvalid(func.fn({ uri: 123 }, makeRuntimeCtx()), 'mcp: expected string uri, got number');
   });
 
   it('handles timeout during read operation', async () => {
@@ -230,11 +217,7 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expect(
-      func.fn({ uri: 'slow://resource' }, {
-        _lifecycle: { connectEmitted: false },
-      } as any)
-    ).rejects.toThrow('mcp tool "read_resource": timeout after 100ms');
+    await expectRejectsInvalid(func.fn({ uri: 'slow://resource' }, makeRuntimeCtx()), 'mcp tool "read_resource": timeout after 100ms');
   });
 
   it('handles connection lost error', async () => {
@@ -246,11 +229,7 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expect(
-      func.fn({ uri: 'config://app' }, {
-        _lifecycle: { connectEmitted: false },
-      } as any)
-    ).rejects.toThrow('mcp: connection lost');
+    await expectRejectsInvalid(func.fn({ uri: 'config://app' }, makeRuntimeCtx()), 'mcp: connection lost');
   });
 
   it('handles authentication failed error', async () => {
@@ -262,11 +241,7 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expect(
-      func.fn({ uri: 'config://app' }, {
-        _lifecycle: { connectEmitted: false },
-      } as any)
-    ).rejects.toThrow('mcp: authentication failed');
+    await expectRejectsInvalid(func.fn({ uri: 'config://app' }, makeRuntimeCtx()), 'mcp: authentication failed');
   });
 
   it('handles protocol error', async () => {
@@ -278,11 +253,7 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expect(
-      func.fn({ uri: 'config://app' }, {
-        _lifecycle: { connectEmitted: false },
-      } as any)
-    ).rejects.toThrow('mcp: protocol error');
+    await expectRejectsInvalid(func.fn({ uri: 'config://app' }, makeRuntimeCtx()), 'mcp: protocol error');
   });
 
   it('handles generic read error', async () => {
@@ -294,11 +265,7 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expect(
-      func.fn({ uri: 'config://app' }, {
-        _lifecycle: { connectEmitted: false },
-      } as any)
-    ).rejects.toThrow('mcp tool "read_resource": resource not found');
+    await expectRejectsInvalid(func.fn({ uri: 'config://app' }, makeRuntimeCtx()), 'mcp tool "read_resource": resource not found');
   });
 });
 
@@ -405,9 +372,7 @@ describe('generateResourceTemplateFunctions', () => {
     );
 
     const func = functions.resource_database_row!;
-    await func.fn({ tableName: 'users', rowId: '123' }, {
-      _lifecycle: { connectEmitted: false },
-    } as any);
+    await func.fn({ tableName: 'users', rowId: '123' }, makeRuntimeCtx());
 
     expect(mockClient.readResource).toHaveBeenCalledWith({
       uri: 'db://table/users/row/123',
@@ -481,11 +446,7 @@ describe('generateResourceTemplateFunctions', () => {
 
     const func = functions.resource_table!;
 
-    await expect(
-      func.fn({ tableName: 123 }, { _lifecycle: { connectEmitted: false } } as any)
-    ).rejects.toThrow(
-      'mcp tool "table": expected string for parameter tableName, got number'
-    );
+    await expectRejectsInvalid(func.fn({ tableName: 123 }, makeRuntimeCtx()), 'mcp: expected string for parameter tableName, got number');
   });
 
   it('handles timeout during template expansion', async () => {
@@ -504,9 +465,7 @@ describe('generateResourceTemplateFunctions', () => {
     );
     const func = functions.resource_slow_resource!;
 
-    await expect(
-      func.fn({ id: 'test' }, { _lifecycle: { connectEmitted: false } } as any)
-    ).rejects.toThrow('mcp tool "slow_resource": timeout after 100ms');
+    await expectRejectsInvalid(func.fn({ id: 'test' }, makeRuntimeCtx()), 'mcp tool "slow_resource": timeout after 100ms');
   });
 
   it('handles connection lost during template read', async () => {
@@ -526,9 +485,7 @@ describe('generateResourceTemplateFunctions', () => {
 
     const func = functions.resource_table!;
 
-    await expect(
-      func.fn({ table: 'users' }, { _lifecycle: { connectEmitted: false } } as any)
-    ).rejects.toThrow('mcp: connection lost');
+    await expectRejectsInvalid(func.fn({ table: 'users' }, makeRuntimeCtx()), 'mcp: connection lost');
   });
 
   it('returns empty object for templates array', () => {
@@ -556,11 +513,7 @@ describe('generateResourceTemplateFunctions', () => {
     const func = functions.resource_item!;
 
     // This should throw because we validate string types
-    await expect(
-      func.fn({ id: 42 }, { _lifecycle: { connectEmitted: false } } as any)
-    ).rejects.toThrow(
-      'mcp tool "item": expected string for parameter id, got number'
-    );
+    await expectRejectsInvalid(func.fn({ id: 42 }, makeRuntimeCtx()), 'mcp: expected string for parameter id, got number');
   });
 
   it('handles templates without description field', () => {
@@ -621,7 +574,7 @@ describe('generateStaticResourceFunctions', () => {
     const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
     const func = functions['resource_app_config']!;
 
-    await func.fn({}, { _lifecycle: { connectEmitted: false } } as any);
+    await func.fn({}, makeRuntimeCtx());
 
     expect(mockClient.readResource).toHaveBeenCalledWith({ uri: 'config://app' });
   });

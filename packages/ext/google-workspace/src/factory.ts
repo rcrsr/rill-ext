@@ -16,11 +16,13 @@
  */
 
 import {
-  RuntimeError,
   toCallable,
   structureToTypeValue,
   emitExtensionEvent,
+  isInvalid,
+  getStatus,
   type CallableFn,
+  type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
   type RuntimeContext,
@@ -73,7 +75,7 @@ const SUBSYSTEM = `extension:${PROVIDER}` as const;
  *
  * @param config - Extension configuration
  * @returns ExtensionFactoryResult with 17 callables and dispose
- * @throws RuntimeError (RILL-R004) for invalid configuration
+ * @throws RuntimeError (RILL-R001) for invalid configuration
  *
  * @example
  * ```typescript
@@ -85,9 +87,10 @@ const SUBSYSTEM = `extension:${PROVIDER}` as const;
  * ```
  */
 export function createGoogleWorkspaceExtension(
-  config: GoogleWorkspaceConfig
+  config: GoogleWorkspaceConfig,
+  _ctx: ExtensionFactoryCtx,
 ): ExtensionFactoryResult {
-  // Validate config — throws RILL-R004 on failure
+  // Validate config — throws RuntimeError(RILL-R001) on failure
   validateConfig(config);
 
   // Merge capabilities with defaults
@@ -121,45 +124,54 @@ export function createGoogleWorkspaceExtension(
    * @param _fnName - Host function name (reserved for diagnostics)
    * @param service - Google service identifier for event name
    * @param operation - Operation name for event name (e.g. 'search', 'send')
-   * @param capabilityCheck - Throws RILL-R004 when capability disabled; null = no gate
+   * @param capabilityCheck - Returns invalid `#FORBIDDEN` when capability disabled; null = no gate
    * @param fn - Inner function (args, ctx, controller) => RillValue
    */
   function wrap(
     _fnName: string,
     service: 'gmail' | 'drive' | 'calendar',
     operation: string,
-    capabilityCheck: (() => void) | null,
+    capabilityCheck: ((ctx: RuntimeContext) => void) | null,
     fn: (
       args: Record<string, RillValue>,
       ctx: RuntimeContext,
-      controller: AbortController
-    ) => Promise<RillValue>
+      controller: AbortController,
+    ) => Promise<RillValue>,
   ): (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue> {
     return async (
       args: Record<string, RillValue>,
-      ctx: RuntimeContext
+      ctx: RuntimeContext,
     ): Promise<RillValue> => {
-      // AC-6: Check disposal before any work
+      const disposed = (): RillValue =>
+        ctx.invalidate(new Error('google: operation cancelled'), {
+          code: 'DISPOSED',
+          provider: PROVIDER,
+          raw: { kind: 'disposed', message: 'google: operation cancelled' },
+        });
+
       if (disposalState.isDisposed) {
-        throw new RuntimeError('RILL-R004', 'google: operation cancelled');
+        return disposed();
       }
 
-      // Capability gate (if provided) [AC-4]
       if (capabilityCheck !== null) {
-        capabilityCheck();
+        try {
+          capabilityCheck(ctx);
+        } catch (error: unknown) {
+          if (isInvalid(error as RillValue)) {
+            return error as RillValue;
+          }
+          return mapFetchError(ctx, error, service);
+        }
       }
 
-      // Create and track AbortController [BC-5]
       const controller = new AbortController();
       inFlightState.controllers.add(controller);
 
-      // Record wall-clock start
       const startTime = Date.now();
 
       try {
         const result = await fn(args, ctx, controller);
 
-        // AC-13: Emit named success event
         const duration = Date.now() - startTime;
         emitExtensionEvent(ctx, {
           event: `google:${service}:${operation}`,
@@ -169,20 +181,27 @@ export function createGoogleWorkspaceExtension(
 
         return result;
       } catch (error: unknown) {
-        // EC-20 / BC-5: any rejection during or after dispose maps to
-        // "operation cancelled". Check isDisposed before any other mapping
-        // because googleFetch() converts AbortError to RuntimeError
-        // ("request timeout") before it reaches this catch block.
         if (disposalState.isDisposed) {
-          throw new RuntimeError('RILL-R004', 'google: operation cancelled');
+          const invalid = disposed();
+          emitExtensionEvent(ctx, {
+            event: `google:${service}:error`,
+            subsystem: SUBSYSTEM,
+            duration: Date.now() - startTime,
+            error: getStatus(invalid).message,
+          });
+          return invalid;
         }
-        const mappedError =
-          error instanceof RuntimeError
-            ? error
-            : mapFetchError(error, service);
-        throw mappedError;
+        const invalid = isInvalid(error as RillValue)
+          ? (error as RillValue)
+          : mapFetchError(ctx, error, service);
+        emitExtensionEvent(ctx, {
+          event: `google:${service}:error`,
+          subsystem: SUBSYSTEM,
+          duration: Date.now() - startTime,
+          error: getStatus(invalid).message,
+        });
+        return invalid;
       } finally {
-        // Always remove controller regardless of outcome
         inFlightState.controllers.delete(controller);
       }
     };
@@ -223,7 +242,7 @@ export function createGoogleWorkspaceExtension(
     'gmail_search',
     'gmail',
     'search',
-    () => checkCapability(capabilities.gmail.search, 'gmail.search'),
+    (c) => checkCapability(c, capabilities.gmail.search, 'gmail.search'),
     makeGmailSearch({ auth, cache: tokenCache, gmailConfig })
   );
 
@@ -231,7 +250,7 @@ export function createGoogleWorkspaceExtension(
     'gmail_read',
     'gmail',
     'read',
-    () => checkCapability(capabilities.gmail.read, 'gmail.read'),
+    (c) => checkCapability(c, capabilities.gmail.read, 'gmail.read'),
     makeGmailRead({ auth, cache: tokenCache })
   );
 
@@ -239,7 +258,7 @@ export function createGoogleWorkspaceExtension(
     'gmail_send',
     'gmail',
     'send',
-    () => checkCapability(capabilities.gmail.send, 'gmail.send'),
+    (c) => checkCapability(c, capabilities.gmail.send, 'gmail.send'),
     makeGmailSend({ auth, cache: tokenCache })
   );
 
@@ -247,7 +266,7 @@ export function createGoogleWorkspaceExtension(
     'gmail_draft',
     'gmail',
     'draft',
-    () => checkCapability(capabilities.gmail.draft, 'gmail.draft'),
+    (c) => checkCapability(c, capabilities.gmail.draft, 'gmail.draft'),
     makeGmailDraft({ auth, cache: tokenCache })
   );
 
@@ -255,7 +274,7 @@ export function createGoogleWorkspaceExtension(
     'gmail_reply',
     'gmail',
     'reply',
-    () => checkCapability(capabilities.gmail.reply, 'gmail.reply'),
+    (c) => checkCapability(c, capabilities.gmail.reply, 'gmail.reply'),
     makeGmailReply({ auth, cache: tokenCache })
   );
 
@@ -263,7 +282,7 @@ export function createGoogleWorkspaceExtension(
     'gmail_flag',
     'gmail',
     'flag',
-    () => checkCapability(capabilities.gmail.modify, 'gmail.modify'),
+    (c) => checkCapability(c, capabilities.gmail.modify, 'gmail.modify'),
     makeGmailFlag({ auth, cache: tokenCache })
   );
 
@@ -271,7 +290,7 @@ export function createGoogleWorkspaceExtension(
     'gmail_label',
     'gmail',
     'label',
-    () => checkCapability(capabilities.gmail.label, 'gmail.label'),
+    (c) => checkCapability(c, capabilities.gmail.label, 'gmail.label'),
     makeGmailLabel({ auth, cache: tokenCache, gmailConfig })
   );
 
@@ -283,7 +302,7 @@ export function createGoogleWorkspaceExtension(
     'drive_list',
     'drive',
     'list',
-    () => checkCapability(capabilities.drive.list, 'drive.list'),
+    (c) => checkCapability(c, capabilities.drive.list, 'drive.list'),
     makeDriveList({ auth, cache: tokenCache, driveConfig })
   );
 
@@ -291,7 +310,7 @@ export function createGoogleWorkspaceExtension(
     'drive_upload',
     'drive',
     'upload',
-    () => checkCapability(capabilities.drive.upload, 'drive.upload'),
+    (c) => checkCapability(c, capabilities.drive.upload, 'drive.upload'),
     makeDriveUpload({ auth, cache: tokenCache, driveConfig })
   );
 
@@ -299,7 +318,7 @@ export function createGoogleWorkspaceExtension(
     'drive_download',
     'drive',
     'download',
-    () => checkCapability(capabilities.drive.download, 'drive.download'),
+    (c) => checkCapability(c, capabilities.drive.download, 'drive.download'),
     makeDriveDownload({ auth, cache: tokenCache })
   );
 
@@ -307,7 +326,7 @@ export function createGoogleWorkspaceExtension(
     'drive_share',
     'drive',
     'share',
-    () => checkCapability(capabilities.drive.share, 'drive.share'),
+    (c) => checkCapability(c, capabilities.drive.share, 'drive.share'),
     makeDriveShare({ auth, cache: tokenCache })
   );
 
@@ -315,7 +334,7 @@ export function createGoogleWorkspaceExtension(
     'drive_delete',
     'drive',
     'delete',
-    () => checkCapability(capabilities.drive.delete, 'drive.delete'),
+    (c) => checkCapability(c, capabilities.drive.delete, 'drive.delete'),
     makeDriveDelete({ auth, cache: tokenCache })
   );
 
@@ -323,7 +342,7 @@ export function createGoogleWorkspaceExtension(
     'drive_get_metadata',
     'drive',
     'get_metadata',
-    () => checkCapability(capabilities.drive.read, 'drive.read'),
+    (c) => checkCapability(c, capabilities.drive.read, 'drive.read'),
     makeDriveGetMetadata({ auth, cache: tokenCache })
   );
 
@@ -335,7 +354,7 @@ export function createGoogleWorkspaceExtension(
     'calendar_events',
     'calendar',
     'events',
-    () => checkCapability(capabilities.calendar.read, 'calendar.read'),
+    (c) => checkCapability(c, capabilities.calendar.read, 'calendar.read'),
     makeCalendarEvents({ auth, cache: tokenCache, calendarConfig })
   );
 
@@ -343,7 +362,7 @@ export function createGoogleWorkspaceExtension(
     'calendar_today',
     'calendar',
     'today',
-    () => checkCapability(capabilities.calendar.read, 'calendar.read'),
+    (c) => checkCapability(c, capabilities.calendar.read, 'calendar.read'),
     makeCalendarToday({ auth, cache: tokenCache, calendarConfig })
   );
 
@@ -351,7 +370,7 @@ export function createGoogleWorkspaceExtension(
     'calendar_create_event',
     'calendar',
     'create_event',
-    () => checkCapability(capabilities.calendar.create, 'calendar.create'),
+    (c) => checkCapability(c, capabilities.calendar.create, 'calendar.create'),
     makeCalendarCreateEvent({ auth, cache: tokenCache, calendarConfig })
   );
 
@@ -359,7 +378,7 @@ export function createGoogleWorkspaceExtension(
     'calendar_free_busy',
     'calendar',
     'free_busy',
-    () => checkCapability(capabilities.calendar.freeBusy, 'calendar.freeBusy'),
+    (c) => checkCapability(c, capabilities.calendar.freeBusy, 'calendar.freeBusy'),
     makeCalendarFreeBusy({ auth, cache: tokenCache })
   );
 

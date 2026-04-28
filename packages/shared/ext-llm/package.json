@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-llm-shared",
   "private": true,
-  "version": "0.18.4",
+  "version": "0.19.0",
   "description": "Shared utilities for rill LLM extensions",
   "license": "MIT",
   "type": "module",
@@ -18,10 +18,10 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.18.4"
+    "@rcrsr/rill": "~0.19.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.18.4",
+    "@rcrsr/rill": "~0.19.0",
     "@types/node": "^25.5.2"
   },
   "repository": {

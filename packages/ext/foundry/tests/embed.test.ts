@@ -13,6 +13,7 @@ import {
 } from '@rcrsr/rill';
 import { createFoundryExtension } from '../src/factory.js';
 import type { FoundryConfig } from '../src/types.js';
+import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
 
 // ============================================================
 // MOCK SETUP
@@ -172,9 +173,9 @@ describe('embed() function', () => {
     const ext = await createFoundryExtension(config);
     const ctx = createRuntimeContext();
 
-    await expect(
+    await expectRejectedHalt(
       getCallable(ext, 'embed').fn({ text: 'test' }, ctx)
-    ).rejects.toThrow('embed_model not configured');
+    , { message: 'embed_model not configured' });
   });
 
   // AC-4: throws RuntimeError for empty text
@@ -182,9 +183,9 @@ describe('embed() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    await expect(
+    await expectRejectedHalt(
       getCallable(ext, 'embed').fn({ text: '' }, ctx)
-    ).rejects.toThrow('embed text cannot be empty');
+    , { message: 'embed text cannot be empty' });
   });
 
   // AC-4: throws RuntimeError for whitespace-only text
@@ -192,9 +193,9 @@ describe('embed() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    await expect(
+    await expectRejectedHalt(
       getCallable(ext, 'embed').fn({ text: '   \t\n  ' }, ctx)
-    ).rejects.toThrow('embed text cannot be empty');
+    , { message: 'embed text cannot be empty' });
   });
 
   // AC-4: calls embeddings API with correct model and text
@@ -327,9 +328,9 @@ describe('embed_batch() function', () => {
     const ext = await createFoundryExtension(config);
     const ctx = createRuntimeContext();
 
-    await expect(
+    await expectRejectedHalt(
       getCallable(ext, 'embed_batch').fn({ texts: ['test'] }, ctx)
-    ).rejects.toThrow('embed_model not configured');
+    , { message: 'embed_model not configured' });
   });
 
   // AC-5: throws RuntimeError for non-string element
@@ -337,9 +338,9 @@ describe('embed_batch() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    await expect(
+    await expectRejectedHalt(
       getCallable(ext, 'embed_batch').fn({ texts: ['valid', 123, 'text'] }, ctx)
-    ).rejects.toThrow('embed_batch requires list of strings');
+    , { message: 'embed_batch requires list of strings' });
   });
 
   // AC-5: sends all texts to the embeddings API

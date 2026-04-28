@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
 
 // ============================================================
@@ -60,7 +61,7 @@ describe('today() host function', () => {
       status: 200,
       json: vi.fn().mockResolvedValue({ value: [GRAPH_EVENT_TODAY] }),
     });
-    const ext = createOutlookExtension(CALENDAR_READ_CONFIG);
+    const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'today').fn({}, ctx)) as Record<string, unknown>;
@@ -81,7 +82,7 @@ describe('today() host function', () => {
       status: 200,
       json: vi.fn().mockResolvedValue({ value: [] }),
     });
-    const ext = createOutlookExtension(CALENDAR_READ_CONFIG);
+    const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'today').fn({}, ctx)) as Record<string, unknown>;
@@ -97,7 +98,7 @@ describe('today() host function', () => {
       json: vi.fn().mockResolvedValue({ value: [] }),
     });
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(CALENDAR_READ_CONFIG);
+    const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     // Capture the date before the call to check the URL
@@ -121,7 +122,7 @@ describe('today() host function', () => {
       status: 200,
       json: vi.fn().mockResolvedValue({ value: [GRAPH_EVENT_TODAY] }),
     });
-    const ext = createOutlookExtension(CALENDAR_READ_CONFIG);
+    const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
@@ -143,7 +144,7 @@ describe('today() host function', () => {
       status: 200,
       json: vi.fn().mockResolvedValue({ value: [GRAPH_EVENT_TODAY] }),
     });
-    const ext = createOutlookExtension(CALENDAR_READ_CONFIG);
+    const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;

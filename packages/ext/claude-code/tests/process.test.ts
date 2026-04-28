@@ -52,7 +52,7 @@ afterEach(() => {
 
 describe('Process Manager', () => {
   describe('spawn errors', () => {
-    it('throws RILL-R004 for binary not found (ENOENT)', () => {
+    it('throws for binary not found (ENOENT)', () => {
       // EC-4: Binary not found triggers ENOENT error
       const error = new Error('spawn claude ENOENT') as Error & {
         code?: string;
@@ -68,7 +68,7 @@ describe('Process Manager', () => {
       ).toThrow('claude binary not found');
     });
 
-    it('throws RILL-R004 for permission denied (EACCES)', () => {
+    it('throws for permission denied (EACCES)', () => {
       // EC-5: Permission denied triggers EACCES error
       const error = new Error('spawn claude EACCES') as Error & {
         code?: string;
@@ -84,7 +84,7 @@ describe('Process Manager', () => {
       );
     });
 
-    it('throws RILL-R004 for generic spawn failure', () => {
+    it('throws for generic spawn failure', () => {
       // EC-6: Generic spawn failure includes error details
       const error = new Error('Unknown spawn error');
 
@@ -97,7 +97,7 @@ describe('Process Manager', () => {
       );
     });
 
-    it('throws RILL-R004 for unknown error type', () => {
+    it('throws for unknown error type', () => {
       // EC-6: Non-Error objects handled
       vi.mocked(pty.spawn).mockImplementation(() => {
         throw 'string error';
@@ -273,7 +273,7 @@ describe('Process Manager', () => {
       await expect(result.exitCode).resolves.toBe(0);
     });
 
-    it('rejects with RILL-R004 on non-zero exit', async () => {
+    it('rejects on non-zero exit', async () => {
       // EC-9: Non-zero exit code propagates
       const mockPty = createMockPty();
       let exitCallback: ((event: { exitCode: number }) => void) | undefined;
@@ -293,7 +293,7 @@ describe('Process Manager', () => {
       );
     });
 
-    it('rejects with RILL-R004 on exit code 127', async () => {
+    it('rejects on exit code 127', async () => {
       // Common error code (command not found)
       const mockPty = createMockPty();
       let exitCallback: ((event: { exitCode: number }) => void) | undefined;

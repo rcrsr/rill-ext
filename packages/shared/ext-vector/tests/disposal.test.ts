@@ -1,219 +1,115 @@
 /**
- * Test suite for disposal lifecycle utilities.
- * Validates disposal state management (EC-15, EC-16, AC-4, AC-11, AC-15, AC-21).
+ * Test suite for vector disposal lifecycle utilities.
+ * Disposed state surfaces as an invalid RillValue via ctx.invalidate.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import {
-  createDisposalState,
-  checkDisposed,
-  dispose,
-} from '../src/disposal.js';
-import { RuntimeError } from '@rcrsr/rill';
+  createRuntimeContext,
+  getStatus,
+  type RuntimeContext,
+} from '@rcrsr/rill';
+import { createDisposalState, checkDisposed, dispose } from '../src/disposal.js';
 
 describe('createDisposalState', () => {
-  it('returns initial state with isDisposed false (IR-4)', () => {
-    const state = createDisposalState('test-provider');
-
-    expect(state).toEqual({ isDisposed: false });
+  it('returns initial state with isDisposed false', () => {
+    expect(createDisposalState('test-provider')).toEqual({ isDisposed: false });
   });
 
   it('creates independent state objects', () => {
-    const state1 = createDisposalState('provider-1');
-    const state2 = createDisposalState('provider-2');
-
-    expect(state1).not.toBe(state2);
-    expect(state1.isDisposed).toBe(false);
-    expect(state2.isDisposed).toBe(false);
+    const a = createDisposalState('p1');
+    const b = createDisposalState('p2');
+    expect(a).not.toBe(b);
   });
 });
 
 describe('checkDisposed', () => {
   const provider = 'test-db';
-
-  describe('EC-15, AC-11: isDisposed === true throws RuntimeError', () => {
-    it('throws RuntimeError with RILL-R004 code', () => {
-      const state = { isDisposed: true };
-
-      expect(() => checkDisposed(state, provider)).toThrow(RuntimeError);
-
-      try {
-        checkDisposed(state, provider);
-      } catch (error) {
-        expect(error).toBeInstanceOf(RuntimeError);
-        expect((error as RuntimeError).errorId).toBe('RILL-R004');
-        expect((error as RuntimeError).message).toBe(
-          `${provider}: operation cancelled`
-        );
-      }
-    });
-
-    it('includes provider name in error message', () => {
-      const state = { isDisposed: true };
-      const customProvider = 'my-custom-provider';
-
-      expect(() => checkDisposed(state, customProvider)).toThrow(
-        `${customProvider}: operation cancelled`
-      );
-    });
+  let ctx: RuntimeContext;
+  beforeAll(() => {
+    ctx = createRuntimeContext();
   });
 
-  describe('IR-5: isDisposed === false returns void', () => {
-    it('returns void without throwing', () => {
-      const state = { isDisposed: false };
+  it('returns null when not disposed', () => {
+    const state = { isDisposed: false };
+    expect(checkDisposed(ctx, state, provider)).toBeNull();
+  });
 
-      expect(() => checkDisposed(state, provider)).not.toThrow();
-      const result = checkDisposed(state, provider);
-      expect(result).toBeUndefined();
-    });
+  it('returns invalid RillValue with disposed message when disposed', () => {
+    const state = { isDisposed: true };
+    const result = checkDisposed(ctx, state, provider);
+    expect(result).not.toBeNull();
+    expect(getStatus(result!).message).toBe(`${provider}: operation cancelled`);
+  });
+
+  it('includes provider name in disposed message', () => {
+    const state = { isDisposed: true };
+    const result = checkDisposed(ctx, state, 'my-custom-provider');
+    expect(getStatus(result!).message).toBe('my-custom-provider: operation cancelled');
+  });
+
+  it('emits #DISPOSED atom code', () => {
+    const state = { isDisposed: true };
+    const result = checkDisposed(ctx, state, provider);
+    expect(getStatus(result!).code.name).toBe('DISPOSED');
   });
 });
 
 describe('dispose', () => {
-  describe('AC-4: Success case - calls cleanup once and sets flag', () => {
-    it('calls cleanup callback once', async () => {
-      const state = createDisposalState('test-provider');
-      const cleanup = vi.fn(async () => {});
-
-      await dispose(state, cleanup);
-
-      expect(cleanup).toHaveBeenCalledTimes(1);
-      expect(state.isDisposed).toBe(true);
-    });
-
-    it('sets isDisposed to true after cleanup', async () => {
-      const state = createDisposalState('test-provider');
-      const cleanup = vi.fn(async () => {});
-
-      expect(state.isDisposed).toBe(false);
-      await dispose(state, cleanup);
-      expect(state.isDisposed).toBe(true);
-    });
-
-    it('works without cleanup callback', async () => {
-      const state = createDisposalState('test-provider');
-
-      await dispose(state);
-
-      expect(state.isDisposed).toBe(true);
-    });
+  it('calls cleanup once and sets disposed flag', async () => {
+    const state = createDisposalState('test-provider');
+    const cleanup = vi.fn(async () => {});
+    await dispose(state, cleanup);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(state.isDisposed).toBe(true);
   });
 
-  describe('AC-4, AC-21: Second and subsequent calls are no-ops', () => {
-    it('does not call cleanup on second call', async () => {
-      const state = createDisposalState('test-provider');
-      const cleanup = vi.fn(async () => {});
-
-      await dispose(state, cleanup);
-      await dispose(state, cleanup);
-
-      expect(cleanup).toHaveBeenCalledTimes(1);
-    });
-
-    it('remains disposed after second call', async () => {
-      const state = createDisposalState('test-provider');
-
-      await dispose(state);
-      await dispose(state);
-
-      expect(state.isDisposed).toBe(true);
-    });
-
-    it('handles three dispose calls: first sets flag, rest are no-ops (AC-21)', async () => {
-      const state = createDisposalState('test-provider');
-      const cleanup = vi.fn(async () => {});
-
-      // First call should invoke cleanup
-      await dispose(state, cleanup);
-      expect(cleanup).toHaveBeenCalledTimes(1);
-      expect(state.isDisposed).toBe(true);
-
-      // Second call should not invoke cleanup
-      await dispose(state, cleanup);
-      expect(cleanup).toHaveBeenCalledTimes(1);
-      expect(state.isDisposed).toBe(true);
-
-      // Third call should not invoke cleanup
-      await dispose(state, cleanup);
-      expect(cleanup).toHaveBeenCalledTimes(1);
-      expect(state.isDisposed).toBe(true);
-    });
+  it('works without cleanup callback', async () => {
+    const state = createDisposalState('test-provider');
+    await dispose(state);
+    expect(state.isDisposed).toBe(true);
   });
 
-  describe('EC-16, AC-15: Cleanup errors are logged but do not propagate', () => {
-    it('logs warning when cleanup throws', async () => {
-      const state = createDisposalState('test-provider');
-      const cleanupError = new Error('Cleanup failed');
-      const cleanup = vi.fn(async () => {
-        throw cleanupError;
-      });
-
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      await dispose(state, cleanup);
-
-      expect(warnSpy).toHaveBeenCalledWith('Cleanup failed: Cleanup failed');
-      expect(state.isDisposed).toBe(true);
-
-      warnSpy.mockRestore();
-    });
-
-    it('still sets isDisposed flag when cleanup fails', async () => {
-      const state = createDisposalState('test-provider');
-      const cleanup = vi.fn(async () => {
-        throw new Error('Cleanup error');
-      });
-
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      expect(state.isDisposed).toBe(false);
-      await dispose(state, cleanup);
-      expect(state.isDisposed).toBe(true);
-
-      warnSpy.mockRestore();
-    });
-
-    it('handles non-Error cleanup throws', async () => {
-      const state = createDisposalState('test-provider');
-      const cleanup = vi.fn(async () => {
-        throw 'string error';
-      });
-
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      await dispose(state, cleanup);
-
-      expect(warnSpy).toHaveBeenCalledWith('Cleanup failed: Unknown error');
-      expect(state.isDisposed).toBe(true);
-
-      warnSpy.mockRestore();
-    });
-
-    it('does not throw when cleanup fails', async () => {
-      const state = createDisposalState('test-provider');
-      const cleanup = vi.fn(async () => {
-        throw new Error('Cleanup error');
-      });
-
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      await expect(dispose(state, cleanup)).resolves.toBeUndefined();
-
-      warnSpy.mockRestore();
-    });
+  it('is idempotent — three dispose calls invoke cleanup once', async () => {
+    const state = createDisposalState('test-provider');
+    const cleanup = vi.fn(async () => {});
+    await dispose(state, cleanup);
+    await dispose(state, cleanup);
+    await dispose(state, cleanup);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(state.isDisposed).toBe(true);
   });
 
-  describe('Integration: checkDisposed after dispose', () => {
-    it('throws when checking disposed state', async () => {
-      const provider = 'test-provider';
-      const state = createDisposalState(provider);
-
-      await dispose(state);
-
-      expect(() => checkDisposed(state, provider)).toThrow(RuntimeError);
-      expect(() => checkDisposed(state, provider)).toThrow(
-        `${provider}: operation cancelled`
-      );
+  it('logs warning and still disposes when cleanup throws', async () => {
+    const state = createDisposalState('test-provider');
+    const cleanup = vi.fn(async () => {
+      throw new Error('Cleanup failed');
     });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await dispose(state, cleanup);
+    expect(warnSpy).toHaveBeenCalledWith('Cleanup failed: Cleanup failed');
+    expect(state.isDisposed).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('handles non-Error cleanup throws', async () => {
+    const state = createDisposalState('test-provider');
+    const cleanup = vi.fn(async () => {
+      throw 'string error';
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await dispose(state, cleanup);
+    expect(warnSpy).toHaveBeenCalledWith('Cleanup failed: Unknown error');
+    warnSpy.mockRestore();
+  });
+
+  it('checkDisposed returns invalid value after dispose', async () => {
+    const ctx = createRuntimeContext();
+    const provider = 'test-provider';
+    const state = createDisposalState(provider);
+    await dispose(state);
+    const result = checkDisposed(ctx, state, provider);
+    expect(result).not.toBeNull();
+    expect(getStatus(result!).message).toBe(`${provider}: operation cancelled`);
   });
 });

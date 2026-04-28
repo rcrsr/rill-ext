@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
+import { makeFactoryCtx } from './_helpers.js';
 import { createRuntimeContext, type ExtensionEvent } from '@rcrsr/rill';
 
 // Mock which module
@@ -99,7 +100,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
 
       // Create event collector
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -160,7 +161,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
 
       const longPrompt = 'a'.repeat(150);
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -215,7 +216,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -275,7 +276,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -329,7 +330,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -377,7 +378,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -422,7 +423,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -461,7 +462,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -501,7 +502,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -567,7 +568,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),
@@ -625,7 +626,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const events = createEventCollector();
-      const ext = createClaudeCodeExtension();
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
           onLog: vi.fn(),

@@ -10,15 +10,17 @@
  * This file adds:
  *   AC-1: data field contains schema-matching keys
  *   AC-19/EC-4: no HTTP call when unsupported type (mockCreate not called)
- *   AC-23/EC-5: parse error is RuntimeError instance with RILL-R004 code
+ *   AC-23/EC-5: parse error is RuntimeError instance with RILL-R005 code
  *   AC-24/EC-5: parse failure returns no partial dict (rejects, does not resolve)
  *   AC-27/EC-6: openai:error event emitted on provider API error
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { expectRejectedHalt } from './_halt-helpers.js';
 import {
   createRuntimeContext,
-  RuntimeError,
+  RuntimeHaltSignal,
+  getStatus,
   type ApplicationCallable,
   type RillTypeValue,
   type TypeStructure,
@@ -166,11 +168,11 @@ describe('generate() function', () => {
         thrown = err;
       }
 
-      expect(thrown).toBeInstanceOf(RuntimeError);
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
     });
 
-    // AC-23/EC-5: parse error has RILL-R004 error code
-    it('parse error RuntimeError has RILL-R004 code', async () => {
+    // AC-23/EC-5: parse error has RILL-R005 error code
+    it('parse error RuntimeError has RILL-R005 code', async () => {
       mockCreate.mockResolvedValue(createGenerateMockResponse('{broken'));
 
       const ext = createOpenAIExtension(baseConfig);
@@ -183,8 +185,8 @@ describe('generate() function', () => {
         thrown = err;
       }
 
-      expect(thrown).toBeInstanceOf(RuntimeError);
-      expect((thrown as RuntimeError).errorId).toBe('RILL-R004');
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe('PROTOCOL');
     });
 
     // AC-22/EC-5: "{broken" response throws with original parse error detail
@@ -194,9 +196,10 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow('generate: failed to parse response JSON:');
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx),
+        { message: 'generate: failed to parse response JSON:' }
+      );
 
       // Verify message contains the native JSON parse error detail
       let thrown: unknown;
@@ -206,7 +209,7 @@ describe('generate() function', () => {
         thrown = err;
       }
 
-      const message = (thrown as RuntimeError).message;
+      const message = getStatus((thrown as RuntimeHaltSignal).value).message;
       // Message must contain detail beyond just the prefix
       expect(message.length).toBeGreaterThan(
         'generate: failed to parse response JSON:'.length
@@ -221,22 +224,16 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       // Must reject, never resolve to a value
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx));
     });
 
-    // EC-4: missing schema arg throws RILL-R004
-    it('throws RILL-R004 when called without schema argument', async () => {
+    // EC-4: missing schema arg throws RILL-R005
+    it('throws RILL-R005 when called without schema argument', async () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R004',
-        message: expect.stringContaining('generate requires a type expression as schema'),
-      });
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
+      , { message: expect.stringContaining('generate requires a type expression as schema') });
     });
 
     // AC-27/EC-6: provider API error emits openai:error event
@@ -257,9 +254,8 @@ describe('generate() function', () => {
         },
       });
 
-      await expect(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} }, ctx));
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');
       expect(errorEvent).toBeDefined();

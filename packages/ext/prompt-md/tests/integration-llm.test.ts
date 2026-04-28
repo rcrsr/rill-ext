@@ -14,6 +14,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { createRuntimeContext, isRillStream, type ApplicationCallable } from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
+import { makeFactoryCtx } from './_helpers.js';
 
 // ============================================================
 // SDK MOCKS
@@ -238,7 +239,7 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
     const ctx = createRuntimeContext();
 
     // ── Act: create prompt-md extension and invoke closure ────────────────────
-    const promptExt = await createPromptMdExtension({ basePath: dir });
+    const promptExt = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const chatCallable = getCallable(promptExt, 'chat');
 
     // Invoke the closure to produce the rill list of role dicts.

@@ -88,7 +88,7 @@ Resolve the Bearer token from a named `RuntimeContext` variable at each call. Th
 
 **When to use:** Multi-tenant applications where each user has their own OAuth token. The host application sets the variable in the RuntimeContext before invoking the script.
 
-**Token resolution:** At each call, the extension reads `ctx.getVariable(tokenVar)`. If the variable is absent, the call throws `RILL-R004: google: session token '<var>' not found`.
+**Token resolution:** At each call, the extension reads `ctx.getVariable(tokenVar)`. If the variable is absent, the call returns an invalid value carrying `#AUTH` (`raw.kind == 'session_token_missing'`).
 
 **Token lifetime:** Same as bearer. The host application is responsible for refreshing the token before it expires and updating the RuntimeContext variable.
 
@@ -125,7 +125,7 @@ With domain-wide delegation to act on behalf of a specific user:
 
 **When to use:** Automated server workflows, background jobs, or any scenario where no human user is involved and you want automatic token refresh.
 
-**Required JSON fields:** The `keyJson` must be a valid JSON object containing `client_email`, `private_key`, and `token_uri`. Missing fields produce a `RILL-R004` error at factory creation time.
+**Required JSON fields:** The `keyJson` must be a valid JSON object containing `client_email`, `private_key`, and `token_uri`. Missing fields produce a `RuntimeError RILL-R001` at factory creation time.
 
 ## GCP Project & Scopes Reference
 

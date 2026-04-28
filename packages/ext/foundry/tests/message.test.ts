@@ -14,6 +14,7 @@ import {
 } from '@rcrsr/rill';
 import { createFoundryExtension } from '../src/factory.js';
 import type { FoundryConfig } from '../src/types.js';
+import { expectThrowHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MOCK SETUP
@@ -289,14 +290,14 @@ describe('message() function', () => {
     );
   });
 
-  // AC-2: empty text throws RuntimeError
-  it('throws RuntimeError for empty text', async () => {
+  // AC-2: empty text halts with #INVALID_INPUT
+  it('halts with #INVALID_INPUT for empty text', async () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    expect(() => {
+    expectThrowHalt(() => {
       getCallable(ext, 'message').fn({ text: '' }, ctx);
-    }).toThrow('prompt text cannot be empty');
+    }, { code: 'INVALID_INPUT', message: 'prompt text cannot be empty' });
   });
 });
 
@@ -412,39 +413,39 @@ describe('messages() function', () => {
     expect(chunks).toEqual(['Sure', ', I', ' can', ' help!']);
   });
 
-  // AC-3: empty messages list throws RuntimeError
-  it('throws RuntimeError for empty messages list', async () => {
+  // AC-3: empty messages list halts with #INVALID_INPUT
+  it('halts with #INVALID_INPUT for empty messages list', async () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    expect(() => {
+    expectThrowHalt(() => {
       getCallable(ext, 'messages').fn({ messages: [] }, ctx);
-    }).toThrow('messages list cannot be empty');
+    }, { code: 'INVALID_INPUT', message: 'messages list cannot be empty' });
   });
 
-  // AC-3: message missing role throws RuntimeError
-  it('throws RuntimeError when message is missing role field', async () => {
+  // AC-3: message missing role halts with #INVALID_INPUT
+  it('halts with #INVALID_INPUT when message is missing role field', async () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    expect(() => {
+    expectThrowHalt(() => {
       getCallable(ext, 'messages').fn(
         { messages: [{ content: 'no role here' }] },
         ctx
       );
-    }).toThrow("required 'role' field");
+    }, { code: 'INVALID_INPUT', message: "required 'role' field" });
   });
 
-  // AC-3: invalid role throws RuntimeError
-  it('throws RuntimeError for invalid role', async () => {
+  // AC-3: invalid role halts with #INVALID_INPUT
+  it('halts with #INVALID_INPUT for invalid role', async () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    expect(() => {
+    expectThrowHalt(() => {
       getCallable(ext, 'messages').fn(
         { messages: [{ role: 'system', content: 'system message' }] },
         ctx
       );
-    }).toThrow("invalid role");
+    }, { code: 'INVALID_INPUT', message: 'invalid role' });
   });
 });

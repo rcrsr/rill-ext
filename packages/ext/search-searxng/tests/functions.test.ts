@@ -7,8 +7,32 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type ApplicationCallable,
+  type ExtensionFactoryCtx,
+  type RillValue,
+} from "@rcrsr/rill";
 import { createSearxngExtension } from '../src/factory.js';
+
+function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
+  return {
+    signal: signal ?? new AbortController().signal,
+    registerErrorCode: () => {},
+  };
+}
+
+async function expectInvalidWithMessage(
+  promise: Promise<unknown>,
+  needle: string
+): Promise<RillValue> {
+  const result = (await promise) as RillValue;
+  expect(isInvalid(result)).toBe(true);
+  expect(getStatus(result).message).toContain(needle);
+  return result;
+}
 import type { SearxngConfig } from '../src/types.js';
 
 // ============================================================
@@ -52,7 +76,7 @@ async function createTestExtension(config?: Partial<SearxngConfig>): Promise<{ v
     status: 200,
     json: vi.fn().mockResolvedValue({ formats: ['html', 'json'] }),
   });
-  return createSearxngExtension({ baseUrl: 'http://localhost:8888', ...config });
+  return createSearxngExtension({ baseUrl: 'http://localhost:8888', ...config }, makeFactoryCtx());
 }
 
 // ============================================================
@@ -84,7 +108,7 @@ describe('SearXNG extension host functions', () => {
 
   beforeEach(() => {
     originalFetch = globalThis.fetch;
-  });
+  }, makeFactoryCtx());
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -184,36 +208,29 @@ describe('SearXNG extension host functions', () => {
       expect(Array.isArray(result['suggestions'])).toBe(true);
     });
 
-    it('throws RILL-R004 for empty query [EC-17, AC-16]', async () => {
+    it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = await createTestExtension();
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: '' }, ctx)
-      ).rejects.toThrow(RuntimeError);
+      {const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: '' }, ctx)
-      ).rejects.toThrow('query is required');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: '' }, ctx),
+        'query is required'
+      );
     });
 
     it('rejects time_range: "week" [AC-39]', async () => {
       const ext = await createTestExtension();
       const ctx = createRuntimeContext();
 
-      await expect(
+      await expectInvalidWithMessage(
         getCallable(ext, 'search').fn(
           { query: 'news', options: { time_range: 'week' } },
           ctx
-        )
-      ).rejects.toThrow(RuntimeError);
-
-      await expect(
-        getCallable(ext, 'search').fn(
-          { query: 'news', options: { time_range: 'week' } },
-          ctx
-        )
-      ).rejects.toThrow('time_range must be one of: day, month, year');
+        ),
+        'time_range must be one of: day, month, year'
+      );
     });
 
     it('accepts time_range: "day" [AC-39]', async () => {
@@ -266,9 +283,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchJson(401, {});
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('searxng: server error (401)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng: server error (401)'
+      );
     });
 
     it('maps HTTP 403 to server error [AC-17]', async () => {
@@ -276,9 +294,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchJson(403, {});
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('searxng: server error (403)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng: server error (403)'
+      );
     });
 
     it('maps HTTP 429 to server error (SearXNG has no specific 429 handling) [AC-18]', async () => {
@@ -286,9 +305,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchJson(429, {});
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('searxng: server error (429)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng: server error (429)'
+      );
     });
 
     it('maps HTTP 500 to server error [AC-20]', async () => {
@@ -296,9 +316,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchJson(500, {});
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('searxng: server error (500)');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng: server error (500)'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
@@ -306,9 +327,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchReject(new TypeError('Failed to fetch'));
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('searxng: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
@@ -318,9 +340,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchReject(abortErr);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('searxng: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
@@ -328,9 +351,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchNonJson();
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('searxng: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng: unexpected response format'
+      );
     });
 
     it('emits success event on successful search [AC-11]', async () => {
@@ -359,9 +383,7 @@ describe('SearXNG extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -377,9 +399,10 @@ describe('SearXNG extension host functions', () => {
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow('searxng: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng: operation cancelled'
+      );
     });
   });
 
@@ -430,9 +453,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchJson(503, {});
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'config').fn({}, ctx)
-      ).rejects.toThrow('searxng: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'config').fn({}, ctx),
+        'searxng: connection failed'
+      );
     });
 
     it('maps network TypeError to connection failed [EC-5, AC-19]', async () => {
@@ -440,9 +464,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchReject(new TypeError('Failed to fetch'));
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'config').fn({}, ctx)
-      ).rejects.toThrow('searxng: connection failed');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'config').fn({}, ctx),
+        'searxng: connection failed'
+      );
     });
 
     it('maps AbortError to request timeout [EC-4, AC-21]', async () => {
@@ -452,9 +477,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchReject(abortErr);
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'config').fn({}, ctx)
-      ).rejects.toThrow('searxng: request timeout');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'config').fn({}, ctx),
+        'searxng: request timeout'
+      );
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
@@ -462,9 +488,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchNonJson();
       const ctx = createRuntimeContext();
 
-      await expect(
-        getCallable(ext, 'config').fn({}, ctx)
-      ).rejects.toThrow('searxng: unexpected response format');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'config').fn({}, ctx),
+        'searxng: unexpected response format'
+      );
     });
 
     it('emits success event on successful config fetch [AC-11]', async () => {
@@ -491,9 +518,7 @@ describe('SearXNG extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await expect(
-        getCallable(ext, 'config').fn({}, ctx)
-      ).rejects.toThrow();
+      {const __r = await getCallable(ext, 'config').fn({}, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -509,9 +534,10 @@ describe('SearXNG extension host functions', () => {
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expect(
-        getCallable(ext, 'config').fn({}, ctx)
-      ).rejects.toThrow('searxng: operation cancelled');
+      await expectInvalidWithMessage(
+        getCallable(ext, 'config').fn({}, ctx),
+        'searxng: operation cancelled'
+      );
     });
   });
 
@@ -552,7 +578,7 @@ describe('SearXNG extension host functions', () => {
       await ext.dispose!();
 
       // The in-flight request should reject with mapped AbortError
-      await expect(promise).rejects.toThrow('searxng: request timeout');
+      await expectInvalidWithMessage(promise, 'searxng: request timeout');
     });
   });
 });

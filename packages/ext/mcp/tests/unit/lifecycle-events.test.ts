@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { emitExtensionEvent } from '@rcrsr/rill';
 import { generateToolFunctions, type McpTool } from '../../src/tools.js';
+import { makeRuntimeCtx, expectRejectsInvalid } from '../_helpers.js';
 import {
   createReadResourceFunction,
   generateResourceTemplateFunctions,
@@ -34,16 +35,11 @@ vi.mock('@rcrsr/rill', async () => {
 // ============================================================
 
 /**
- * Create mock runtime context for testing.
+ * Create runtime context for testing. The MCP error helpers depend on
+ * `ctx.invalidate`, which only the real RuntimeContext provides.
  */
 function createMockContext(): any {
-  return {
-    variables: new Map(),
-    pipeValue: null,
-    callbacks: {
-      onLogEvent: vi.fn(),
-    },
-  };
+  return makeRuntimeCtx();
 }
 
 /**

@@ -6,10 +6,12 @@
 
 import {
   RuntimeError,
+  RuntimeHaltSignal,
   createRillStream,
   emitExtensionEvent,
   createVector,
   isVector,
+  getStatus,
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryResult,
@@ -24,6 +26,7 @@ import {
   validateEmbedModel,
   validateEmbedBatch,
   mapProviderError,
+  throwProviderHalt,
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
   buildResponseMessages,
@@ -101,17 +104,17 @@ export async function createFoundryExtension(
 ): Promise<ExtensionFactoryResult> {
   // EC-1: Validate endpoint is non-empty
   if (!config.endpoint || config.endpoint.trim().length === 0) {
-    throw new RuntimeError('RILL-R004', 'foundry: endpoint is required');
+    throw new RuntimeError('RILL-R001', 'foundry: endpoint is required');
   }
 
   // EC-2: Validate auth is present
   if (!config.auth) {
-    throw new RuntimeError('RILL-R004', 'foundry: auth is required');
+    throw new RuntimeError('RILL-R001', 'foundry: auth is required');
   }
 
   // EC-3: Validate auth.type
   if (config.auth.type !== 'api-key' && config.auth.type !== 'entra') {
-    throw new RuntimeError('RILL-R004', "foundry: auth.type must be 'api-key' or 'entra'");
+    throw new RuntimeError('RILL-R001', "foundry: auth.type must be 'api-key' or 'entra'");
   }
 
   // Create the AzureOpenAI client (may be unused if inference not configured)
@@ -168,6 +171,30 @@ export async function createFoundryExtension(
   }
 
   // ============================================================
+  // IN-FN HALT HELPER
+  // ============================================================
+
+  /**
+   * Build an invalid-RillValue halt signal carrying a generic atom.
+   * Host scripts recover via `guard #<ATOM>`.
+   */
+  function haltInvalid(
+    ctx: RuntimeContext,
+    code: string,
+    rawKind: string,
+    message: string,
+  ): RuntimeHaltSignal {
+    return new RuntimeHaltSignal(
+      ctx.invalidate(new Error(message), {
+        code,
+        provider: 'foundry',
+        raw: { kind: rawKind, message },
+      }),
+      true,
+    );
+  }
+
+  // ============================================================
   // INFERENCE GUARD
   // ============================================================
 
@@ -175,17 +202,17 @@ export async function createFoundryExtension(
    * Guard: throws EC-4/EC-5/EC-6 when inference config is absent or incomplete.
    * Called at the top of every LLM host function.
    */
-  function assertInference(): { model: string; apiVersion: string } {
+  function assertInference(ctx: RuntimeContext): { model: string; apiVersion: string } {
     if (!inference) {
-      throw new RuntimeError('RILL-R004', 'foundry: inference not configured');
+      throw haltInvalid(ctx, 'UNAVAILABLE', 'inference_unconfigured', 'foundry: inference not configured');
     }
     // EC-5: model is required
     if (!inference.model || inference.model.trim().length === 0) {
-      throw new RuntimeError('RILL-R004', 'foundry: model is required');
+      throw haltInvalid(ctx, 'INVALID_INPUT', 'model_missing', 'foundry: model is required');
     }
     // EC-6: apiVersion is required
     if (!inference.apiVersion || inference.apiVersion.trim().length === 0) {
-      throw new RuntimeError('RILL-R004', 'foundry: inference.apiVersion is required');
+      throw haltInvalid(ctx, 'INVALID_INPUT', 'apiversion_missing', 'foundry: inference.apiVersion is required');
     }
     return { model: inference.model, apiVersion: inference.apiVersion };
   }
@@ -194,9 +221,9 @@ export async function createFoundryExtension(
   // DISPOSAL GUARD
   // ============================================================
 
-  function assertNotDisposed(): void {
+  function assertNotDisposed(ctx: RuntimeContext): void {
     if (!abortController) {
-      throw new RuntimeError('RILL-R004', 'foundry: extension disposed');
+      throw haltInvalid(ctx, 'DISPOSED', 'extension_disposed', 'foundry: extension disposed');
     }
   }
 
@@ -245,14 +272,14 @@ export async function createFoundryExtension(
         }),
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed();
-        assertInference();
+        assertNotDisposed(ctx as RuntimeContext);
+        assertInference(ctx as RuntimeContext);
 
         const text = args['text'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
         if (text.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
         }
 
         const system =
@@ -285,7 +312,7 @@ export async function createFoundryExtension(
               }
             }
           } catch (error: unknown) {
-            throw mapProviderError('Foundry', error, detectFoundryError);
+            throwProviderHalt(ctx as RuntimeContext, 'Foundry', error, detectFoundryError);
           }
         }
 
@@ -327,14 +354,15 @@ export async function createFoundryExtension(
             return result as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
-            const rillError = error instanceof RuntimeError
-              ? error
-              : mapProviderError('Foundry', error, detectFoundryError);
+            const rillError: RuntimeError | RuntimeHaltSignal =
+              error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+                ? error
+                : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'foundry:message:error',
               subsystem: 'extension:foundry',
               model: factoryModel ?? '',
-              error: rillError.message,
+              error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
               duration,
             });
             throw rillError;
@@ -391,14 +419,14 @@ export async function createFoundryExtension(
         }),
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed();
-        assertInference();
+        assertNotDisposed(ctx as RuntimeContext);
+        assertInference(ctx as RuntimeContext);
 
         const messages = args['messages'] as Array<Record<string, unknown>>;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
         if (messages.length === 0) {
-          throw new RuntimeError('RILL-R004', 'messages list cannot be empty');
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_messages', 'messages list cannot be empty');
         }
 
         const system =
@@ -417,18 +445,18 @@ export async function createFoundryExtension(
           const msg = messages[i];
 
           if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-            throw new RuntimeError('RILL-R004', "message missing required 'role' field");
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'role_missing', "message missing required 'role' field");
           }
 
           const role = msg['role'];
 
           if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw new RuntimeError('RILL-R004', `invalid role '${role}'`);
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${role as string}'`);
           }
 
           if (role === 'user' || role === 'tool') {
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw new RuntimeError('RILL-R004', `${role} message requires 'content'`);
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'content_missing', `${role} message requires 'content'`);
             }
             apiMessages.push({ role: role as 'user', content: msg['content'] as string });
           } else if (role === 'assistant') {
@@ -436,7 +464,7 @@ export async function createFoundryExtension(
             const hasToolCalls = 'tool_calls' in msg && msg['tool_calls'];
 
             if (!hasContent && !hasToolCalls) {
-              throw new RuntimeError('RILL-R004', "assistant message requires 'content' or 'tool_calls'");
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'content_missing', "assistant message requires 'content' or 'tool_calls'");
             }
 
             if (hasContent) {
@@ -462,7 +490,7 @@ export async function createFoundryExtension(
               }
             }
           } catch (error: unknown) {
-            throw mapProviderError('Foundry', error, detectFoundryError);
+            throwProviderHalt(ctx as RuntimeContext, 'Foundry', error, detectFoundryError);
           }
         }
 
@@ -504,14 +532,15 @@ export async function createFoundryExtension(
             return result as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
-            const rillError = error instanceof RuntimeError
-              ? error
-              : mapProviderError('Foundry', error, detectFoundryError);
+            const rillError: RuntimeError | RuntimeHaltSignal =
+              error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+                ? error
+                : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'foundry:message:error',
               subsystem: 'extension:foundry',
               model: factoryModel ?? '',
-              error: rillError.message,
+              error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
               duration,
             });
             throw rillError;
@@ -564,8 +593,8 @@ export async function createFoundryExtension(
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
-        assertNotDisposed();
-        assertInference();
+        assertNotDisposed(ctx as RuntimeContext);
+        assertInference(ctx as RuntimeContext);
 
         try {
           const text = args['text'] as string;
@@ -581,7 +610,7 @@ export async function createFoundryExtension(
 
           const embeddingData = response.data[0]?.embedding;
           if (!embeddingData || embeddingData.length === 0) {
-            throw new RuntimeError('RILL-R004', 'foundry: empty embedding returned');
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding', 'foundry: empty embedding returned');
           }
 
           const float32Data = new Float32Array(embeddingData);
@@ -599,13 +628,14 @@ export async function createFoundryExtension(
           return vector as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError = error instanceof RuntimeError
-            ? error
-            : mapProviderError('Foundry', error, detectFoundryError);
+          const rillError: RuntimeError | RuntimeHaltSignal =
+            error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+              ? error
+              : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
-            error: rillError.message,
+            error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
             duration,
           });
           throw rillError;
@@ -623,8 +653,8 @@ export async function createFoundryExtension(
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
-        assertNotDisposed();
-        assertInference();
+        assertNotDisposed(ctx as RuntimeContext);
+        assertInference(ctx as RuntimeContext);
 
         try {
           const texts = args['texts'] as Array<RillValue>;
@@ -647,7 +677,7 @@ export async function createFoundryExtension(
           for (const embeddingItem of response.data) {
             const embeddingData = embeddingItem.embedding;
             if (!embeddingData || embeddingData.length === 0) {
-              throw new RuntimeError('RILL-R004', 'foundry: empty embedding returned');
+              throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding', 'foundry: empty embedding returned');
             }
             const float32Data = new Float32Array(embeddingData);
             const vector = createVector(float32Data, factoryEmbedModel);
@@ -671,13 +701,14 @@ export async function createFoundryExtension(
           return vectors as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError = error instanceof RuntimeError
-            ? error
-            : mapProviderError('Foundry', error, detectFoundryError);
+          const rillError: RuntimeError | RuntimeHaltSignal =
+            error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+              ? error
+              : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
-            error: rillError.message,
+            error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
             duration,
           });
           throw rillError;
@@ -708,15 +739,15 @@ export async function createFoundryExtension(
         }),
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed();
-        assertInference();
+        assertNotDisposed(ctx as RuntimeContext);
+        assertInference(ctx as RuntimeContext);
 
         const prompt = args['prompt'] as string;
         const toolsDict = args['tools'] as RillValue;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
         if (prompt.trim().length === 0) {
-          throw new RuntimeError('RILL-R004', 'prompt text cannot be empty');
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
         }
 
         const system =
@@ -741,16 +772,16 @@ export async function createFoundryExtension(
 
           for (const msg of prependedMessages) {
             if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-              throw new RuntimeError('RILL-R004', "message missing required 'role' field");
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'role_missing', "message missing required 'role' field");
             }
 
             const role = msg['role'];
             if (role !== 'user' && role !== 'assistant') {
-              throw new RuntimeError('RILL-R004', `invalid role '${role}'`);
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${role as string}'`);
             }
 
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw new RuntimeError('RILL-R004', `${role} message requires 'content'`);
+              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'content_missing', `${role as string} message requires 'content'`);
             }
 
             messages.push({
@@ -1020,7 +1051,7 @@ export async function createFoundryExtension(
               yield chunk;
             }
           } catch (error: unknown) {
-            throw mapProviderError('Foundry', error, detectFoundryError);
+            throwProviderHalt(ctx as RuntimeContext, 'Foundry', error, detectFoundryError);
           }
         }
 
@@ -1081,13 +1112,14 @@ export async function createFoundryExtension(
             return result as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
-            const rillError = error instanceof RuntimeError
-              ? error
-              : mapProviderError('Foundry', error, detectFoundryError);
+            const rillError: RuntimeError | RuntimeHaltSignal =
+              error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+                ? error
+                : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'foundry:error',
               subsystem: 'extension:foundry',
-              error: rillError.message,
+              error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
               duration,
             });
             throw rillError;
@@ -1148,8 +1180,8 @@ export async function createFoundryExtension(
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
-        assertNotDisposed();
-        assertInference();
+        assertNotDisposed(ctx as RuntimeContext);
+        assertInference(ctx as RuntimeContext);
 
         try {
           const prompt = args['prompt'] as string;
@@ -1157,11 +1189,13 @@ export async function createFoundryExtension(
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
-            throw new RuntimeError('RILL-R004', 'generate requires a type expression as schema');
+            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'schema_missing', 'generate requires a type expression as schema');
           }
           if (schemaArg.structure.kind !== 'dict') {
-            throw new RuntimeError(
-              'RILL-R004',
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'INVALID_INPUT',
+              'invalid_schema',
               `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
             );
           }
@@ -1186,16 +1220,16 @@ export async function createFoundryExtension(
 
             for (const msg of prependedMessages) {
               if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-                throw new RuntimeError('RILL-R004', "message missing required 'role' field");
+                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'role_missing', "message missing required 'role' field");
               }
 
               const role = msg['role'];
               if (role !== 'user' && role !== 'assistant') {
-                throw new RuntimeError('RILL-R004', `invalid role '${role}'`);
+                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${role as string}'`);
               }
 
               if (!('content' in msg) || typeof msg['content'] !== 'string') {
-                throw new RuntimeError('RILL-R004', `${role} message requires 'content'`);
+                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'content_missing', `${role as string} message requires 'content'`);
               }
 
               apiMessages.push({
@@ -1235,7 +1269,7 @@ export async function createFoundryExtension(
           } catch (parseError: unknown) {
             const detail =
               parseError instanceof Error ? parseError.message : String(parseError);
-            throw new RuntimeError('RILL-R004', `generate: failed to parse response JSON: ${detail}`);
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'json_parse_failed', `generate: failed to parse response JSON: ${detail}`);
           }
 
           const inputTokens = response.usage?.prompt_tokens ?? 0;
@@ -1264,13 +1298,14 @@ export async function createFoundryExtension(
           return result as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError = error instanceof RuntimeError
-            ? error
-            : mapProviderError('Foundry', error, detectFoundryError);
+          const rillError: RuntimeError | RuntimeHaltSignal =
+            error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+              ? error
+              : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:error',
             subsystem: 'extension:foundry',
-            error: rillError.message,
+            error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
             duration,
           });
           throw rillError;
@@ -1342,7 +1377,7 @@ export async function createFoundryExtension(
   const usageFn: RillFunction = {
     params: [],
     fn: (_args, _ctx): RillValue => {
-      assertNotDisposed();
+      assertNotDisposed(_ctx as RuntimeContext);
       return {
         input_tokens: usageInputTokens,
         output_tokens: usageOutputTokens,
