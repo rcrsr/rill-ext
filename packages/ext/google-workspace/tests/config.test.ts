@@ -43,6 +43,42 @@ describe('validateConfig', () => {
         expect((caught as RuntimeError).errorId).toBe('RILL-R001');
         expect((caught as RuntimeError).message).toBe('google: auth.tokenVar is required');
     });
+
+    it('throws RILL-R001 when oauth-refresh client_id is empty', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
+            auth: { type: 'oauth-refresh', client_id: '', client_secret: 'csec', refresh_token: 'rtok' },
+          });
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+        expect((caught as RuntimeError).message).toBe('google: auth.client_id is required');
+    });
+
+    it('throws RILL-R001 when oauth-refresh client_secret is empty', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
+            auth: { type: 'oauth-refresh', client_id: 'cid', client_secret: '', refresh_token: 'rtok' },
+          });
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+        expect((caught as RuntimeError).message).toBe('google: auth.client_secret is required');
+    });
+
+    it('throws RILL-R001 when oauth-refresh refresh_token is empty', () => {
+        let caught: unknown;
+        try {
+          validateConfig({
+            auth: { type: 'oauth-refresh', client_id: 'cid', client_secret: 'csec', refresh_token: '' },
+          });
+        } catch (e) { caught = e; }
+        expect(caught).toBeInstanceOf(RuntimeError);
+        expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+        expect((caught as RuntimeError).message).toBe('google: auth.refresh_token is required');
+    });
   });
 
   // ============================================================
@@ -243,6 +279,19 @@ expect((caught as RuntimeError).message).toBe(
       });
       expect(() =>
         validateConfig({ auth: { type: 'service-account', keyJson } })
+      ).not.toThrow();
+    });
+
+    it('accepts a fully valid oauth-refresh config', () => {
+      expect(() =>
+        validateConfig({
+          auth: {
+            type: 'oauth-refresh',
+            client_id: 'my-client-id.apps.googleusercontent.com',
+            client_secret: 'GOCSPX-abc123',
+            refresh_token: '1//refresh-token-value',
+          },
+        })
       ).not.toThrow();
     });
 

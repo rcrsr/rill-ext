@@ -13,11 +13,12 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const JWT_BEARER_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
 
 /**
- * Result of a successful JWT-bearer token exchange.
- * Internal shape used by resolveToken (Task 2.2) to compute cache TTL.
- * Cache TTL = expires_in - 300 (BC-6/BC-7).
+ * Result of a successful Google OAuth2 token exchange.
+ * Shared by the JWT-bearer (`exchangeJwtForToken`) and refresh-token
+ * (`exchangeRefreshToken`) flows. Internal shape used by `resolveToken`
+ * to compute the cache TTL = `expires_in - 300` (BC-6/BC-7).
  */
-export interface JwtTokenResult {
+export interface TokenExchangeResult {
   readonly accessToken: string;
   readonly expiresIn: number;
 }
@@ -38,7 +39,7 @@ export async function exchangeJwtForToken(
   ctx: RuntimeContext,
   assertion: string,
   signal: AbortSignal,
-): Promise<JwtTokenResult> {
+): Promise<TokenExchangeResult> {
   const body = new URLSearchParams({
     grant_type: JWT_BEARER_GRANT_TYPE,
     assertion,
@@ -98,7 +99,7 @@ export async function exchangeRefreshToken(
   refreshToken: string,
   ctx: RuntimeContext,
   signal: AbortSignal,
-): Promise<JwtTokenResult> {
+): Promise<TokenExchangeResult> {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     client_id: clientId,
