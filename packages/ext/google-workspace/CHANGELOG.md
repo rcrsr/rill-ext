@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-28
+
+### Added
+
+- `auth.type: "oauth-refresh"` variant accepting `client_id`, `client_secret`, and `refresh_token`. Exchanges the refresh token at the Google OAuth2 token endpoint and caches the access token with TTL = `expires_in - 300` seconds, refreshing transparently on expiry. Resolves the friction documented in `FEATURE-google-workspace-auth-refresh.md` for Desktop OAuth clients and personal Gmail/Drive/Calendar accounts
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

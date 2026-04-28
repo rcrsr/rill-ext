@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-04-28
+
+### Added
+
+- `@rcrsr/rill-ext-google-workspace` adds `auth.type: "oauth-refresh"` variant accepting `client_id`, `client_secret`, and `refresh_token`. The extension exchanges the refresh token for an access token and caches it with the same TTL pattern as `service-account` (cache miss/hit/expiry). Documented in `packages/ext/google-workspace/docs/auth.md` with `gws auth export` and OAuth 2.0 Playground setup steps
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

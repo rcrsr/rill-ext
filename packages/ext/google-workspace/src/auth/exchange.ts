@@ -13,11 +13,12 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const JWT_BEARER_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
 
 /**
- * Result of a successful JWT-bearer token exchange.
- * Internal shape used by resolveToken (Task 2.2) to compute cache TTL.
- * Cache TTL = expires_in - 300 (BC-6/BC-7).
+ * Result of a successful Google OAuth2 token exchange.
+ * Shared by the JWT-bearer (`exchangeJwtForToken`) and refresh-token
+ * (`exchangeRefreshToken`) flows. Internal shape used by `resolveToken`
+ * to compute the cache TTL = `expires_in - 300` (BC-6/BC-7).
  */
-export interface JwtTokenResult {
+export interface TokenExchangeResult {
   readonly accessToken: string;
   readonly expiresIn: number;
 }
@@ -38,7 +39,7 @@ export async function exchangeJwtForToken(
   ctx: RuntimeContext,
   assertion: string,
   signal: AbortSignal,
-): Promise<JwtTokenResult> {
+): Promise<TokenExchangeResult> {
   const body = new URLSearchParams({
     grant_type: JWT_BEARER_GRANT_TYPE,
     assertion,
@@ -78,4 +79,53 @@ export async function exchangeJwtForAccessToken(
 ): Promise<string> {
   const result = await exchangeJwtForToken(ctx, assertion, signal);
   return result.accessToken;
+}
+
+/**
+ * Exchange an OAuth2 refresh token for a Google access token.
+ *
+ * Returns both the access token and expires_in so the caller can compute
+ * the cache TTL as expires_in - 300 (BC-6/BC-7).
+ *
+ * On non-OK HTTP response throws an invalid RillValue carrying `#AUTH`
+ * with `meta.raw.kind = 'token_refresh_failed'`. Neither clientSecret nor
+ * refreshToken appears in any error message (security constraint).
+ *
+ * Network errors propagate to caller for `mapFetchError` to handle.
+ */
+export async function exchangeRefreshToken(
+  clientId: string,
+  clientSecret: string,
+  refreshToken: string,
+  ctx: RuntimeContext,
+  signal: AbortSignal,
+): Promise<TokenExchangeResult> {
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+    signal,
+  });
+
+  if (!response.ok) {
+    failAuth(
+      ctx,
+      'token_refresh_failed',
+      `google: token exchange failed: ${response.status}`,
+      { status: response.status },
+    );
+  }
+
+  const json = (await response.json()) as { access_token: string; expires_in: number };
+  return {
+    accessToken: json.access_token,
+    expiresIn: json.expires_in,
+  };
 }

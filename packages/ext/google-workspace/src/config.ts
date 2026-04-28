@@ -125,11 +125,12 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
   if (
     authType !== 'bearer' &&
     authType !== 'session' &&
-    authType !== 'service-account'
+    authType !== 'service-account' &&
+    authType !== 'oauth-refresh'
   ) {
     throw new RuntimeError(
       'RILL-R001',
-      "google: auth.type must be 'bearer', 'session', or 'service-account'"
+      "google: auth.type must be 'bearer', 'session', 'service-account', or 'oauth-refresh'"
     );
   }
 
@@ -150,6 +151,19 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
   // EC-3: Service account requires valid keyJson
   if (config.auth.type === 'service-account') {
     parseServiceAccountKey(config.auth.keyJson);
+  }
+
+  // EC-1: oauth-refresh requires client_id, client_secret, and refresh_token
+  if (config.auth.type === 'oauth-refresh') {
+    if (!config.auth.client_id || config.auth.client_id === '') {
+      throw new RuntimeError('RILL-R001', 'google: auth.client_id is required');
+    }
+    if (!config.auth.client_secret || config.auth.client_secret === '') {
+      throw new RuntimeError('RILL-R001', 'google: auth.client_secret is required');
+    }
+    if (!config.auth.refresh_token || config.auth.refresh_token === '') {
+      throw new RuntimeError('RILL-R001', 'google: auth.refresh_token is required');
+    }
   }
 
   // EC-4: gmail.maxResults range 1-500

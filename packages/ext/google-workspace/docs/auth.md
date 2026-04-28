@@ -1,6 +1,6 @@
 # Authentication — google-workspace Extension
 
-This document covers all three authentication variants, when to use each, GCP service account setup, and domain-wide delegation configuration.
+This document covers all four authentication variants, when to use each, GCP service account setup, and domain-wide delegation configuration.
 
 ## Contents
 
@@ -9,6 +9,7 @@ This document covers all three authentication variants, when to use each, GCP se
 - [Bearer Token](#bearer-token)
 - [Session Token](#session-token)
 - [Service Account](#service-account)
+- [OAuth Refresh Token](#oauth-refresh-token)
 - [GCP Project & Scopes Reference](#gcp-project--scopes-reference)
 - [Security Notes](#security-notes)
 
@@ -25,14 +26,14 @@ Pipe the resulting token into the extension config as `${GOOGLE_TOKEN}` (bearer)
 
 ## Variant Comparison
 
-| | bearer | session | service-account |
-|--|--------|---------|-----------------|
-| Token source | Config (static) | RuntimeContext (per-call) | GCP key JSON (auto-refreshed) |
-| Token lifetime | Until expiry | Until expiry | Short-lived JWT (1 hour, cached) |
-| Multi-user support | No | Yes | Yes (via `subject`) |
-| Requires GCP project | No | No | Yes |
-| Requires OAuth consent | Yes (manual) | Yes (per user) | No |
-| Best for | Scripts, CI pipelines | Per-user web flows | Server automation, service accounts |
+| | bearer | session | service-account | oauth-refresh |
+|--|--------|---------|-----------------|---------------|
+| Token source | Config (static) | RuntimeContext (per-call) | GCP key JSON (auto-refreshed) | OAuth refresh token (auto-refreshed) |
+| Token lifetime | Until expiry | Until expiry | Short-lived JWT (1 hour, cached) | Short-lived access token (1 hour, cached) |
+| Multi-user support | No | Yes | Yes (via `subject`) | No |
+| Requires GCP project | No | No | Yes | Yes (OAuth client only) |
+| Requires OAuth consent | Yes (manual) | Yes (per user) | No | Yes (once, via installed-app flow) |
+| Best for | Scripts, CI pipelines | Per-user web flows | Server automation, service accounts | Desktop apps, personal Gmail/Drive/Calendar |
 
 ## Bearer Token
 
@@ -126,6 +127,48 @@ With domain-wide delegation to act on behalf of a specific user:
 **When to use:** Automated server workflows, background jobs, or any scenario where no human user is involved and you want automatic token refresh.
 
 **Required JSON fields:** The `keyJson` must be a valid JSON object containing `client_email`, `private_key`, and `token_uri`. Missing fields produce a `RuntimeError RILL-R001` at factory creation time.
+
+## OAuth Refresh Token
+
+Supply a GCP OAuth client ID, client secret, and long-lived refresh token obtained from the installed-app OAuth flow. The extension exchanges the refresh token for an access token automatically and caches it for up to 1 hour.
+
+```json
+{
+  "auth": {
+    "type": "oauth-refresh",
+    "client_id": "${GOOGLE_CLIENT_ID}",
+    "client_secret": "${GOOGLE_CLIENT_SECRET}",
+    "refresh_token": "${GOOGLE_REFRESH_TOKEN}"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | string | Yes | Must be `"oauth-refresh"`. |
+| `client_id` | string | Yes | GCP OAuth client ID. Must be non-empty. |
+| `client_secret` | string | Yes | GCP OAuth client secret. Must be non-empty. |
+| `refresh_token` | string | Yes | Long-lived OAuth refresh token from the installed-app consent flow. Must be non-empty. |
+
+**When to use:** Personal Gmail, Drive, or Calendar access from a Desktop OAuth client. Run the OAuth consent flow once (e.g., `gws auth login`) to obtain the three values, then configure the extension and leave it running — no manual token rotation.
+
+**Obtaining credentials with the `gws` CLI:**
+
+```bash
+gws auth login --scopes=https://www.googleapis.com/auth/gmail.readonly
+gws auth export --unmasked
+# Outputs client_id, client_secret, refresh_token — paste into config
+```
+
+**Obtaining credentials from the OAuth 2.0 Playground:**
+1. Go to [OAuth 2.0 Playground](https://developers.google.com/oauthplayground) and click the gear icon to select "Use your own OAuth credentials".
+2. Enter your Desktop app's `client_id` and `client_secret`.
+3. Select the required scopes and complete the consent flow.
+4. Exchange the authorization code — the response includes `refresh_token`.
+
+**Token lifetime:** Access tokens are cached for `expires_in - 300` seconds (typically 55 minutes). The extension refreshes automatically on the next call after expiry. The `refresh_token` itself does not expire unless revoked.
+
+**Limitations:** Single-user only. Each extension instance holds one cached token. For multi-user flows use `session` auth instead.
 
 ## GCP Project & Scopes Reference
 

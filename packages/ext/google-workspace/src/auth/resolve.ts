@@ -7,7 +7,7 @@ import type { RuntimeContext } from '@rcrsr/rill';
 import type { GoogleAuth, ServiceAccountKey } from '../types.js';
 import { failAuth } from '../errors.js';
 import { signServiceAccountJwt } from './jwt.js';
-import { exchangeJwtForToken } from './exchange.js';
+import { exchangeJwtForToken, exchangeRefreshToken } from './exchange.js';
 
 // ============================================================
 // TOKEN CACHE
@@ -58,6 +58,8 @@ export function clearTokenCache(cache: TokenCache): void {
  * - session: reads auth.tokenVar from RuntimeContext parent chain (EC-21)
  * - service-account: uses TTL cache; on miss/expiry signs JWT and exchanges
  *   for an access token, caching with TTL = expires_in - 300 s (AC-10, BC-6, BC-7)
+ * - oauth-refresh: uses TTL cache; on miss/expiry exchanges refresh token for
+ *   an access token, caching with TTL = expires_in - 300 s (AC-10, BC-6, BC-7)
  *
  * IR-21 specifies the public shape as (auth, ctx) => Promise<string>.
  * The additional `cache`, `scopes`, and `signal` parameters are required
@@ -109,27 +111,51 @@ export async function resolveToken(
   }
 
   // --- service-account: check TTL cache, sign JWT and exchange on miss ---
+  if (auth.type === 'service-account') {
+    // BC-6: cache hit within TTL — reuse without signing or exchange
+    if (cache.slot !== null && cache.slot.expiresAtMs > Date.now()) {
+      return cache.slot.accessToken;
+    }
 
-  // BC-6: cache hit within TTL — reuse without signing or exchange
+    // BC-7: cache miss or TTL expired — re-sign and re-exchange
+    let key: ServiceAccountKey;
+    try {
+      key = JSON.parse(auth.keyJson) as ServiceAccountKey;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      failAuth(
+        ctx,
+        'service_account_key_invalid',
+        `google: service account key parse failed: ${reason}`,
+      );
+    }
+
+    const assertion = signServiceAccountJwt(ctx, key, scopes, auth.subject);
+    const { accessToken, expiresIn } = await exchangeJwtForToken(ctx, assertion, signal);
+
+    // AC-10: cache with TTL = expires_in - 300 seconds
+    cache.slot = {
+      accessToken,
+      expiresAtMs: Date.now() + (expiresIn - 300) * 1000,
+    };
+
+    return accessToken;
+  }
+
+  // --- oauth-refresh: check TTL cache, exchange refresh token on miss ---
+  // BC-6: cache hit within TTL — reuse without exchange
   if (cache.slot !== null && cache.slot.expiresAtMs > Date.now()) {
     return cache.slot.accessToken;
   }
 
-  // BC-7: cache miss or TTL expired — re-sign and re-exchange
-  let key: ServiceAccountKey;
-  try {
-    key = JSON.parse(auth.keyJson) as ServiceAccountKey;
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    failAuth(
-      ctx,
-      'service_account_key_invalid',
-      `google: service account key parse failed: ${reason}`,
-    );
-  }
-
-  const assertion = signServiceAccountJwt(ctx, key, scopes, auth.subject);
-  const { accessToken, expiresIn } = await exchangeJwtForToken(ctx, assertion, signal);
+  // BC-7: cache miss or TTL expired — exchange refresh token
+  const { accessToken, expiresIn } = await exchangeRefreshToken(
+    auth.client_id,
+    auth.client_secret,
+    auth.refresh_token,
+    ctx,
+    signal,
+  );
 
   // AC-10: cache with TTL = expires_in - 300 seconds
   cache.slot = {
