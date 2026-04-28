@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-28
+
+### Fixed
+
+- `generate()` JSON Schema now sets `additionalProperties: false` on every emitted object, including untyped `dict` parameters. Foundry inherits the fix from `@rcrsr/rill-ext-llm-shared`. Required for OpenAI strict-mode-compliant providers reached through the OpenAI-compatible endpoint.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

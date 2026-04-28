@@ -900,6 +900,7 @@ describe('executeToolLoop', () => {
       });
       expect(descriptor.input_schema.properties['dict_param']).toEqual({
         type: 'object',
+        additionalProperties: false,
       });
       expect(descriptor.input_schema.required).toEqual([
         'str_param',
