@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-04-28
+
 ### Fixed
 
-- `@rcrsr/rill-ext-llm-shared` `buildJsonSchemaFromStructuralType` now sets `additionalProperties: false` on every emitted object, including untyped `dict` parameters. Previously, untyped `dict` produced bare `{ type: "object" }`, which fails OpenAI strict-mode validation and caused `400 invalid_request_error` on Groq `openai/gpt-oss-120b` and any other provider that enforces strict mode. The fix ships in all four consumers — `@rcrsr/rill-ext-openai`, `@rcrsr/rill-ext-foundry`, `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-gemini` — each bumped to `0.19.1`. All providers that previously worked continue to work.
+- `@rcrsr/rill-ext-llm-shared` `buildJsonSchemaFromStructuralType` now sets `additionalProperties: false` on every emitted object, including untyped `dict` parameters and the `vector`/`shape` kinds that map to `"object"`. Previously, those branches produced bare `{ type: "object" }`, which fails OpenAI strict-mode validation and caused `400 invalid_request_error` on Groq `openai/gpt-oss-120b` and any other provider that enforces strict mode. The fix ships in all four consumers — `@rcrsr/rill-ext-openai`, `@rcrsr/rill-ext-foundry`, `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-gemini` — each bumped to `0.19.1`. All providers that previously worked continue to work.
 
 ## [0.19.1] - 2026-04-28
 
