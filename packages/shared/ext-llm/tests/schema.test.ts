@@ -102,6 +102,24 @@ describe('buildJsonSchemaFromStructuralType', () => {
       expect(result.required).toContain('meta');
     });
 
+    it('strict mode: vector param produces type "object" with additionalProperties: false', () => {
+      const result = buildJsonSchemaFromStructuralType({
+        kind: 'closure',
+        params: [{ name: 'embedding', type: { kind: 'vector' } }],
+      });
+      expect(result.properties['embedding']?.type).toBe('object');
+      expect(result.properties['embedding']?.additionalProperties).toBe(false);
+    });
+
+    it('strict mode: shape param produces type "object" with additionalProperties: false', () => {
+      const result = buildJsonSchemaFromStructuralType({
+        kind: 'closure',
+        params: [{ name: 'geom', type: { kind: 'shape' } }],
+      });
+      expect(result.properties['geom']?.type).toBe('object');
+      expect(result.properties['geom']?.additionalProperties).toBe(false);
+    });
+
     it('param with defaultValue !== undefined is optional (not in required)', () => {
       const params: RillParam[] = [
         {

@@ -113,7 +113,12 @@ function buildPropertyFromStructuralType(rillType: TypeStructure): JsonSchemaPro
   }
 
   // string, number, bool, vector, shape — map through RILL_TYPE_MAP; unsupported types throw
-  return { type: mapRillType(rillType.kind) };
+  const jsonType = mapRillType(rillType.kind);
+  const property: JsonSchemaProperty = { type: jsonType };
+  if (jsonType === 'object') {
+    property.additionalProperties = false;
+  }
+  return property;
 }
 
 /**
