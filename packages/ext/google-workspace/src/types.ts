@@ -41,8 +41,22 @@ export interface GoogleAuthServiceAccount {
   readonly subject?: string | undefined;
 }
 
+/**
+ * OAuth refresh token authentication.
+ * Exchanges a long-lived refresh token for access tokens at call time.
+ */
+export interface GoogleAuthOauthRefresh {
+  readonly type: 'oauth-refresh';
+  /** GCP OAuth client ID. */
+  readonly client_id: string;
+  /** GCP OAuth client secret. */
+  readonly client_secret: string;
+  /** Long-lived OAuth refresh token. */
+  readonly refresh_token: string;
+}
+
 /** Authentication configuration for Google Workspace extension (discriminated union on `type`). */
-export type GoogleAuth = GoogleAuthBearer | GoogleAuthSession | GoogleAuthServiceAccount;
+export type GoogleAuth = GoogleAuthBearer | GoogleAuthSession | GoogleAuthServiceAccount | GoogleAuthOauthRefresh;
 
 // ============================================================
 // CAPABILITIES

@@ -15,20 +15,23 @@ vi.mock('../src/auth/jwt.js', () => ({
 vi.mock('../src/auth/exchange.js', () => ({
   exchangeJwtForToken: vi.fn(),
   exchangeJwtForAccessToken: vi.fn(),
+  exchangeRefreshToken: vi.fn(),
 }));
 
 import { resolveToken, createTokenCache, clearTokenCache } from '../src/auth/resolve.js';
 import { signServiceAccountJwt } from '../src/auth/jwt.js';
-import { exchangeJwtForToken } from '../src/auth/exchange.js';
+import { exchangeJwtForToken, exchangeRefreshToken } from '../src/auth/exchange.js';
 import type { TokenCache } from '../src/auth/resolve.js';
 
 const mockSign = vi.mocked(signServiceAccountJwt);
 const mockExchange = vi.mocked(exchangeJwtForToken);
+const mockRefresh = vi.mocked(exchangeRefreshToken);
 
 // Reset all mocks before every test to prevent cross-test bleed
 beforeEach(() => {
   mockSign.mockReset();
   mockExchange.mockReset();
+  mockRefresh.mockReset();
 });
 
 // A valid service account keyJson
@@ -355,5 +358,86 @@ describe('resolveToken — service-account', () => {
     expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
     expect(getStatus(caught as RillValue).message).toContain('google: service account key parse failed');
     expect(getStatus(caught as RillValue).message).not.toContain('-----BEGIN PRIVATE KEY-----');
+  });
+});
+
+// ============================================================
+// resolveToken — oauth-refresh branch (BC-6, BC-7, AC-10)
+// ============================================================
+
+const OAUTH_REFRESH_AUTH = { type: 'oauth-refresh' as const, client_id: 'cid', client_secret: 'csec', refresh_token: 'rtok' };
+
+describe('resolveToken — oauth-refresh', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('calls exchangeRefreshToken and returns token on cache miss (BC-7)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+
+    mockRefresh.mockResolvedValue({ accessToken: 'refresh-access-token', expiresIn: 3600 });
+
+    const cache = createTokenCache();
+    const ctx = createRuntimeContext();
+
+    const result = await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
+
+    expect(result).toBe('refresh-access-token');
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).toHaveBeenCalledWith('cid', 'csec', 'rtok', ctx, SIGNAL);
+  });
+
+  it('populates cache with expiresAtMs = Date.now() + (expiresIn - 300) * 1000 (BC-7, AC-10)', async () => {
+    vi.useFakeTimers();
+    const now = 1_000_000_000_000;
+    vi.setSystemTime(now);
+
+    mockRefresh.mockResolvedValue({ accessToken: 'refresh-cached-token', expiresIn: 3600 });
+
+    const cache = createTokenCache();
+    const ctx = createRuntimeContext();
+
+    await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
+
+    expect(cache.slot).not.toBeNull();
+    expect(cache.slot!.accessToken).toBe('refresh-cached-token');
+    expect(cache.slot!.expiresAtMs).toBe(now + (3600 - 300) * 1000);
+  });
+
+  it('returns cached token on cache hit without calling exchange (BC-6)', async () => {
+    vi.useFakeTimers();
+    const now = 1_000_000_000_000;
+    vi.setSystemTime(now);
+
+    const futureExpiry = now + 1000;
+    const cache: TokenCache = {
+      slot: { accessToken: 'refresh-hit-token', expiresAtMs: futureExpiry },
+    };
+    const ctx = createRuntimeContext();
+
+    const result = await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
+
+    expect(result).toBe('refresh-hit-token');
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it('does not use expired cache: re-exchanges when expiresAtMs <= Date.now() (BC-6)', async () => {
+    vi.useFakeTimers();
+    const now = 1_000_000_000_000;
+    vi.setSystemTime(now);
+
+    // Slot with expiresAtMs exactly equal to now — not strictly greater, so expired
+    const cache: TokenCache = {
+      slot: { accessToken: 'stale-refresh-token', expiresAtMs: now },
+    };
+    const ctx = createRuntimeContext();
+
+    mockRefresh.mockResolvedValue({ accessToken: 'new-refresh-token', expiresIn: 3600 });
+
+    const result = await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
+
+    expect(result).toBe('new-refresh-token');
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 });

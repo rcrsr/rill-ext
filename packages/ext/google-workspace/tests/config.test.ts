@@ -60,7 +60,7 @@ describe('validateConfig', () => {
           expect(caught).toBeInstanceOf(RuntimeError);
           expect((caught as RuntimeError).errorId).toBe('RILL-R001');
 expect((caught as RuntimeError).message).toBe(
-        "google: auth.type must be 'bearer', 'session', or 'service-account'"
+        "google: auth.type must be 'bearer', 'session', 'service-account', or 'oauth-refresh'"
       );
     });
   });
