@@ -207,7 +207,7 @@ $gws.gmail_search("label:INBOX", [maxResults: 10]) => $result
 |-------|------|-------------|
 | `messages` | list | List of message summary dicts. Each has `id` and `threadId`. Use `gmail_read` for body content. |
 
-Requires capability: `gmail.read` and `gmail.search` (both default `true`).
+Requires capability: `gmail.search` (default `true`).
 
 ---
 
