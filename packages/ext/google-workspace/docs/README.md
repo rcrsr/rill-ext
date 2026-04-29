@@ -205,10 +205,9 @@ $gws.gmail_search("label:INBOX", [maxResults: 10]) => $result
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `messages` | list | List of message summary dicts. Each has `id`, `threadId`, `snippet`. |
-| `count` | number | Number of messages returned. |
+| `messages` | list | List of message summary dicts. Each has `id` and `threadId`. Use `gmail_read` for body content. |
 
-Requires capability: `gmail.read` and `gmail.search` (both default `true`).
+Requires capability: `gmail.search` (default `true`).
 
 ---
 
@@ -369,8 +368,7 @@ $gws.drive_list("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs") => $result
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `files` | list | List of file metadata dicts. Each has `id`, `name`, `mimeType`, `size`, `modifiedTime`. |
-| `count` | number | Number of files returned. |
+| `files` | list | List of file metadata dicts. Each has `id`, `name`, `mimeType`, `size`, `owners`, `createdTime`, `modifiedTime`. |
 
 Requires capability: `drive.list` (default `true`).
 
@@ -517,8 +515,7 @@ $result.events -> log
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `events` | list | List of calendar event dicts. Each has `id`, `title`, `start`, `end`, `location`, `attendees`. |
-| `count` | number | Number of events returned. |
+| `events` | list | List of calendar event dicts. Each has `id`, `summary`, `start`, `end`, `attendees`, `description`, `location`, `status`. |
 
 Requires capability: `calendar.read` (default `true`).
 
@@ -541,8 +538,7 @@ $result.events -> log
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `events` | list | List of today's calendar event dicts. |
-| `count` | number | Number of events returned. |
+| `events` | list | List of today's calendar event dicts. Each has `id`, `summary`, `start`, `end`, `attendees`, `description`, `location`, `status`. |
 
 Requires capability: `calendar.read` (default `true`).
 
