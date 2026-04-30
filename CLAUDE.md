@@ -78,7 +78,17 @@ Extensions use semver with two rules:
 
 ## Release Process
 
-Each extension tracks its own version in its `package.json`. Run `./scripts/release.sh` to publish extensions independently. The script validates build, tests, and lint before creating a release tag.
+Releases are tag-driven. Each extension tracks its own version in its `package.json`; the root `package.json` carries an aggregate version that the release tag matches.
+
+To release:
+
+1. On a `release/vX.Y.Z` branch, bump the root `package.json` to `X.Y.Z` and stamp the `[Unreleased]` section of root `CHANGELOG.md` as `[X.Y.Z] - <date>`.
+2. Open a PR, merge to `main`.
+3. From `main`: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+The `release.yml` workflow triggers on the tag push, builds, tests, then publishes every non-private `packages/ext/*` whose `name@version` is not yet on npm (already-published versions are skipped). It then creates a GitHub Release with auto-generated notes.
+
+Per-extension version bumps (and per-package `CHANGELOG.md` entries) happen on the feature/fix PR that introduces the change, not on the release PR.
 
 ## Architecture
 
