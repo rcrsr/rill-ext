@@ -30,9 +30,9 @@ export function makeDriveGetMetadata(deps: DriveGetMetadataDeps): (
     ctx: RuntimeContext,
     controller: AbortController
   ): Promise<RillValue> => {
-    const fileId = args['fileId'];
+    const fileId = args['file_id'];
     if (typeof fileId !== 'string' || fileId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: fileId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: file_id must be a non-empty string');
     }
     const path = `/files/${encodeURIComponent(fileId)}?fields=${encodeURIComponent(METADATA_FIELDS)}`;
     const response = await googleFetch(
@@ -63,14 +63,14 @@ export function makeDriveGetMetadata(deps: DriveGetMetadataDeps): (
     return {
       id: data?.id ?? '',
       name: data?.name ?? '',
-      mimeType: data?.mimeType ?? '',
+      mime_type: data?.mimeType ?? '',
       size: data?.size !== undefined ? Number(data.size) : null,
       owners: (data?.owners ?? []).map((o) => ({
-        displayName: o.displayName ?? '',
-        emailAddress: o.emailAddress ?? '',
+        display_name: o.displayName ?? '',
+        email_address: o.emailAddress ?? '',
       })),
-      createdTime: data?.createdTime ?? '',
-      modifiedTime: data?.modifiedTime ?? '',
+      created_time: data?.createdTime ?? '',
+      modified_time: data?.modifiedTime ?? '',
     } as unknown as RillValue;
   };
 }

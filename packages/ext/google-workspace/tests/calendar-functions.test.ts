@@ -146,7 +146,7 @@ describe('AC-4: capability gating', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_events').fn(
-        { startDate: '2026-04-01', endDate: '2026-04-30' },
+        { start_date: '2026-04-01', end_date: '2026-04-30' },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -179,7 +179,7 @@ describe('AC-4: capability gating', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Meeting', startTime: START_Z, endTime: END_Z },
+        { title: 'Meeting', start_time: START_Z, end_time: END_Z },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -197,7 +197,7 @@ describe('AC-4: capability gating', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
+        { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -221,7 +221,7 @@ describe('BC-3: start equals end returns empty without fetch', () => {
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_events').fn(
-      { startDate: '2026-04-26', endDate: '2026-04-26' },
+      { start_date: '2026-04-26', end_date: '2026-04-26' },
       ctx
     ) as { events: unknown[] };
 
@@ -237,7 +237,7 @@ describe('BC-3: start equals end returns empty without fetch', () => {
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_events').fn(
-      { startDate: '2026-04-26T10:00:00Z', endDate: '2026-04-26T10:00:00Z' },
+      { start_date: '2026-04-26T10:00:00Z', end_date: '2026-04-26T10:00:00Z' },
       ctx
     ) as { events: unknown[] };
 
@@ -259,7 +259,7 @@ describe('BC-4: empty emails list rejected before fetch', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: [], startTime: START_Z, endTime: END_Z },
+        { emails: [], start_time: START_Z, end_time: END_Z },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -275,7 +275,7 @@ expect(mockFetch).not.toHaveBeenCalled();
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: 'a@x.com', startTime: START_Z, endTime: END_Z },
+        { emails: 'a@x.com', start_time: START_Z, end_time: END_Z },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -297,7 +297,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_events').fn(
-        { startDate: '2026-04-01', endDate: '2026-04-30', options: { calendarId: 'other-cal' } },
+        { start_date: '2026-04-01', end_date: '2026-04-30', options: { calendar_id: 'other-cal' } },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -314,7 +314,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_events').fn(
-      { startDate: '2026-04-01', endDate: '2026-04-30', options: { calendarId: 'primary' } },
+      { start_date: '2026-04-01', end_date: '2026-04-30', options: { calendar_id: 'primary' } },
       ctx
     ) as { events: unknown[] };
 
@@ -331,7 +331,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
 
     // No calendarId in options — defaults to 'primary'
     const result = await getCallable(ext, 'calendar_events').fn(
-      { startDate: '2026-04-01', endDate: '2026-04-30' },
+      { start_date: '2026-04-01', end_date: '2026-04-30' },
       ctx
     ) as { events: unknown[] };
 
@@ -347,7 +347,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_today').fn(
-        { options: { calendarId: 'other-cal' } },
+        { options: { calendar_id: 'other-cal' } },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -366,9 +366,9 @@ describe('EC-11: allowedCalendarIds restriction', () => {
       const caught = (await getCallable(ext, 'calendar_create_event').fn(
         {
           title: 'Meeting',
-          startTime: START_Z,
-          endTime: END_Z,
-          options: { calendarId: 'other-cal' },
+          start_time: START_Z,
+          end_time: END_Z,
+          options: { calendar_id: 'other-cal' },
         },
         ctx
       )) as RillValue;
@@ -392,7 +392,7 @@ describe('EC-12/EC-13: denyAllDay blocks all-day events', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Holiday', startTime: START_Z, endTime: END_Z, options: { allDay: true } },
+        { title: 'Holiday', start_time: START_Z, end_time: END_Z, options: { all_day: true } },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -415,7 +415,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Meeting', startTime: START_NAIVE, endTime: END_Z },
+        { title: 'Meeting', start_time: START_NAIVE, end_time: END_Z },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -432,7 +432,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Meeting', startTime: START_Z, endTime: END_NAIVE },
+        { title: 'Meeting', start_time: START_Z, end_time: END_NAIVE },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -449,7 +449,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_create_event').fn(
-      { title: 'Meeting', startTime: START_Z, endTime: END_Z },
+      { title: 'Meeting', start_time: START_Z, end_time: END_Z },
       ctx
     );
 
@@ -465,7 +465,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_create_event').fn(
-      { title: 'Meeting', startTime: START_PLUS, endTime: END_PLUS },
+      { title: 'Meeting', start_time: START_PLUS, end_time: END_PLUS },
       ctx
     );
 
@@ -481,7 +481,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com'], startTime: START_NAIVE, endTime: END_Z },
+        { emails: ['a@x.com'], start_time: START_NAIVE, end_time: END_Z },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -498,7 +498,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com'], startTime: START_Z, endTime: END_NAIVE },
+        { emails: ['a@x.com'], start_time: START_Z, end_time: END_NAIVE },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -515,7 +515,7 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     const ctx = createRuntimeContext();
 
     const result = await getCallable(ext, 'calendar_events').fn(
-      { startDate: '2026-04-01', endDate: '2026-04-30' },
+      { start_date: '2026-04-01', end_date: '2026-04-30' },
       ctx
     ) as { events: unknown[] };
 
@@ -539,7 +539,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_events').fn(
-        { startDate: '2026-04-01', endDate: '2026-04-30' },
+        { start_date: '2026-04-01', end_date: '2026-04-30' },
         ctx
       ) as { events: Array<Record<string, unknown>> };
 
@@ -564,7 +564,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_events').fn(
-        { startDate: '2026-04-01', endDate: '2026-04-30' },
+        { start_date: '2026-04-01', end_date: '2026-04-30' },
         ctx
       );
 
@@ -583,7 +583,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_events').fn(
-        { startDate: '2026-04-01', endDate: '2026-04-30' },
+        { start_date: '2026-04-01', end_date: '2026-04-30' },
         ctx
       );
 
@@ -600,7 +600,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_events').fn(
-        { startDate: '2026-04-01', endDate: '2026-04-30' },
+        { start_date: '2026-04-01', end_date: '2026-04-30' },
         ctx
       ) as { events: unknown[] };
 
@@ -658,7 +658,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Team Meeting', startTime: START_Z, endTime: END_Z },
+        { title: 'Team Meeting', start_time: START_Z, end_time: END_Z },
         ctx
       );
 
@@ -673,7 +673,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Meeting', startTime: START_Z, endTime: END_Z },
+        { title: 'Meeting', start_time: START_Z, end_time: END_Z },
         ctx
       );
 
@@ -691,7 +691,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Meeting', startTime: START_Z, endTime: END_Z },
+        { title: 'Meeting', start_time: START_Z, end_time: END_Z },
         ctx
       );
 
@@ -708,7 +708,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Meeting', startTime: START_Z, endTime: END_Z },
+        { title: 'Meeting', start_time: START_Z, end_time: END_Z },
         ctx
       );
 
@@ -724,7 +724,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Meeting', startTime: START_Z, endTime: END_Z },
+        { title: 'Meeting', start_time: START_Z, end_time: END_Z },
         ctx
       );
 
@@ -748,7 +748,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
+        { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
         ctx
       ) as Record<string, { busy: Array<{ start: string; end: string }> }>;
 
@@ -766,7 +766,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
+        { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
         ctx
       );
 
@@ -784,7 +784,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
+        { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
         ctx
       );
 
@@ -800,7 +800,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
+        { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
         ctx
       ) as Record<string, { busy: unknown[] }>;
 
@@ -819,7 +819,7 @@ describe('success cases', () => {
       const ctx = createRuntimeContext();
 
       const result = await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com', 'b@x.com'], startTime: START_Z, endTime: END_Z },
+        { emails: ['a@x.com', 'b@x.com'], start_time: START_Z, end_time: END_Z },
         ctx
       ) as Record<string, unknown>;
 
@@ -841,7 +841,7 @@ describe('AC-13: calendar events include subsystem field', () => {
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_events').fn(
-      { startDate: '2026-04-01', endDate: '2026-04-30' },
+      { start_date: '2026-04-01', end_date: '2026-04-30' },
       ctx
     );
 
@@ -859,7 +859,7 @@ describe('AC-13: calendar events include subsystem field', () => {
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_create_event').fn(
-      { title: 'Meeting', startTime: START_Z, endTime: END_Z },
+      { title: 'Meeting', start_time: START_Z, end_time: END_Z },
       ctx
     );
 
@@ -874,7 +874,7 @@ describe('AC-13: calendar events include subsystem field', () => {
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_free_busy').fn(
-      { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
+      { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
       ctx
     );
 
@@ -944,7 +944,7 @@ describe('AC-11: calendar callables pass AbortSignal to fetch', () => {
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'calendar_free_busy').fn(
-      { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
+      { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
       ctx
     );
 
@@ -965,7 +965,7 @@ describe('HTTP error mapping for calendar operations', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_events').fn(
-        { startDate: '2026-04-01', endDate: '2026-04-30' },
+        { start_date: '2026-04-01', end_date: '2026-04-30' },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -980,7 +980,7 @@ describe('HTTP error mapping for calendar operations', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_create_event').fn(
-        { title: 'Meeting', startTime: START_Z, endTime: END_Z },
+        { title: 'Meeting', start_time: START_Z, end_time: END_Z },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -1008,7 +1008,7 @@ describe('HTTP error mapping for calendar operations', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'calendar_free_busy').fn(
-        { emails: ['a@x.com'], startTime: START_Z, endTime: END_Z },
+        { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);

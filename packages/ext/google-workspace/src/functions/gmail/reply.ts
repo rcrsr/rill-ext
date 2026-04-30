@@ -46,9 +46,9 @@ export function makeGmailReply(deps: GmailReplyDeps): (
     ctx: RuntimeContext,
     controller: AbortController
   ): Promise<RillValue> => {
-    const messageId = args['messageId'];
+    const messageId = args['message_id'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: messageId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: message_id must be a non-empty string');
     }
     const body = args['body'];
     if (typeof body !== 'string') {

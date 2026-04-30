@@ -101,9 +101,9 @@ export function makeGmailRead(deps: GmailReadDeps): (
     ctx: RuntimeContext,
     controller: AbortController
   ): Promise<RillValue> => {
-    const messageId = args['messageId'];
+    const messageId = args['message_id'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: messageId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: message_id must be a non-empty string');
     }
     const path = `/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`;
     const response = await googleFetch(
@@ -143,7 +143,7 @@ export function makeGmailRead(deps: GmailReadDeps): (
     const attachments = extractAttachments(payload?.parts);
     return {
       id: msg?.id ?? messageId,
-      threadId: msg?.threadId ?? '',
+      thread_id: msg?.threadId ?? '',
       headers,
       body,
       attachments,

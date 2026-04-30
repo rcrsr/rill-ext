@@ -227,7 +227,7 @@ describe('createGoogleWorkspaceExtension', () => {
       const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
         const caught = (await getCallable(ext, 'calendar_create_event').fn(
-          { title: 'Meeting', startTime: '09:00', endTime: '10:00' },
+          { title: 'Meeting', start_time: '09:00', end_time: '10:00' },
           ctx
         )) as RillValue;
       expect(isInvalid(caught)).toBe(true);
@@ -387,7 +387,7 @@ describe('createGoogleWorkspaceExtension', () => {
       await ext.dispose();
 
       let caught: unknown;
-      const result = (await getCallable(ext, 'gmail_read').fn({ messageId: 'abc' }, ctx)) as RillValue;
+      const result = (await getCallable(ext, 'gmail_read').fn({ message_id: 'abc' }, ctx)) as RillValue;
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('DISPOSED');
       const msg = getStatus(result).message;

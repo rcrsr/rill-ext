@@ -32,7 +32,7 @@ export function makeDriveList(deps: DriveListDeps): (
     ctx: RuntimeContext,
     controller: AbortController
   ): Promise<RillValue> => {
-    const folderId = args['folderId'];
+    const folderId = args['folder_id'];
     const folderIdStr =
       folderId !== undefined && folderId !== null && typeof folderId === 'string'
         ? folderId
@@ -81,14 +81,14 @@ export function makeDriveList(deps: DriveListDeps): (
     const files = rawFiles.map((f) => ({
       id: f.id ?? '',
       name: f.name ?? '',
-      mimeType: f.mimeType ?? '',
+      mime_type: f.mimeType ?? '',
       size: f.size !== undefined ? Number(f.size) : null,
       owners: (f.owners ?? []).map((o) => ({
-        displayName: o.displayName ?? '',
-        emailAddress: o.emailAddress ?? '',
+        display_name: o.displayName ?? '',
+        email_address: o.emailAddress ?? '',
       })),
-      createdTime: f.createdTime ?? '',
-      modifiedTime: f.modifiedTime ?? '',
+      created_time: f.createdTime ?? '',
+      modified_time: f.modifiedTime ?? '',
     }));
     return { files } as unknown as RillValue;
   };

@@ -52,7 +52,7 @@ export function makeCalendarToday(deps: CalendarTodayDeps): (
     let calendarId = 'primary';
 
     if (options !== undefined && options !== null && isDict(options)) {
-      const rawCalId = options['calendarId'];
+      const rawCalId = options['calendar_id'];
       if (typeof rawCalId === 'string' && rawCalId.trim() !== '') {
         calendarId = rawCalId;
       }

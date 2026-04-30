@@ -52,7 +52,7 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
     if (typeof filename !== 'string' || filename.trim() === '') {
       failInput(ctx, 'invalid_arg', 'google: filename must be a non-empty string');
     }
-    const folderId = args['folderId'];
+    const folderId = args['folder_id'];
     const folderIdStr =
       folderId !== undefined && folderId !== null && typeof folderId === 'string'
         ? folderId
@@ -61,7 +61,7 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
     const options = args['options'];
     let mimeType = DEFAULT_MIME_TYPE;
     if (options !== undefined && options !== null && isDict(options)) {
-      const rawMime = options['mimeType'];
+      const rawMime = options['mime_type'];
       if (typeof rawMime === 'string' && rawMime.trim() !== '') {
         mimeType = rawMime;
       }
@@ -162,7 +162,7 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
     return {
       id: data.id ?? '',
       name: data.name ?? filename,
-      mimeType: data.mimeType ?? mimeType,
+      mime_type: data.mimeType ?? mimeType,
       size: data.size !== undefined ? Number(data.size) : byteLength,
       owner:
         data.owners?.[0]?.emailAddress ??

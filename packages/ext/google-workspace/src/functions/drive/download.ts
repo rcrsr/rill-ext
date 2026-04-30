@@ -35,9 +35,9 @@ export function makeDriveDownload(deps: DriveDownloadDeps): (
     ctx: RuntimeContext,
     controller: AbortController
   ): Promise<RillValue> => {
-    const fileId = args['fileId'];
+    const fileId = args['file_id'];
     if (typeof fileId !== 'string' || fileId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: fileId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: file_id must be a non-empty string');
     }
     // AC-11: compose lifecycle (ctx.signal), caller signal, and 30s hard timeout
     const signals: AbortSignal[] = [
