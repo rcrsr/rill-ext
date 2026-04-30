@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `@rcrsr/rill-ext-prompt-md` bumped to `0.19.1`. The dist now bundles `yaml` inline and injects a `createRequire(import.meta.url)` banner so the extension loads as pure ESM. Downstream re-bundlers (e.g., `rill-build`) previously inlined yaml's CJS source verbatim, producing dynamic `require("process")` calls that broke compiled extension bundles with `ExtensionLoadError: Dynamic require of "process" is not supported`. Source-mode runs were unaffected.
+- `@rcrsr/rill-ext-prompt-md` bumped to `0.19.1`. Two fixes ship in this version:
+  - The dist now bundles `yaml` inline and injects a `createRequire(import.meta.url)` banner so the extension loads as pure ESM. Downstream re-bundlers (e.g., `rill-build`) previously inlined yaml's CJS source verbatim, producing dynamic `require("process")` calls that broke compiled extension bundles with `ExtensionLoadError: Dynamic require of "process" is not supported`. Source-mode runs were unaffected.
+  - Resolution names derived from `*.prompt.md` filenames now replace hyphens with underscores so the callable is invocable from rill scripts. Previously a file named `summarize-email.prompt.md` registered without error but `$prompt.summarize_email(...)` halted at runtime because the runtime cannot resolve a callable whose key contains `-`. Hyphens convert across all path segments.
 
 ## [0.19.2] - 2026-04-28
 
