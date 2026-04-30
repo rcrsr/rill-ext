@@ -112,6 +112,60 @@ Research: {topic}
   });
 });
 
+// ── resolution name: hyphens converted to underscores ───────────────────────
+
+describe('resolution name: hyphens converted to underscores', () => {
+  it('converts hyphens in filenames and directory names to underscores', async () => {
+    const dir = await tempDir();
+
+    await writePrompt(
+      dir,
+      'summarize-email.prompt.md',
+      `---
+description: Test prompt
+params: []
+output: string
+---
+body
+`,
+    );
+
+    await writePrompt(
+      dir,
+      'daily-tasks/morning-brief.prompt.md',
+      `---
+description: Test prompt
+params: []
+output: string
+---
+body
+`,
+    );
+
+    await writePrompt(
+      dir,
+      'plain.prompt.md',
+      `---
+description: Test prompt
+params: []
+output: string
+---
+body
+`,
+    );
+
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const dict = asDict(ext.value);
+    const keys = Object.keys(dict).sort();
+
+    expect(keys).toContain('summarize_email');
+    expect(keys).toContain('daily_tasks.morning_brief');
+    expect(keys).toContain('plain');
+
+    expect(keys.every((k) => !k.includes('-'))).toBe(true);
+  });
+});
+
 // ── AC-2: output:string closure interpolates ─────────────────────────────────
 
 describe('AC-2: output:string closure with 2 params returns interpolated body', () => {
@@ -431,7 +485,7 @@ Some context here.
 
     const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
     const dict = asDict(ext.value);
-    const result = await dict['with-heading']!.fn({}, {} as never);
+    const result = await dict['with_heading']!.fn({}, {} as never);
 
     expect(Array.isArray(result)).toBe(true);
     const messages = result as Array<Record<string, unknown>>;
@@ -468,7 +522,7 @@ Result: {data}
     const dict = asDict(ext.value);
 
     // Dict should not throw — it formats via rill's formatValue
-    const result = await dict['dict-param']!.fn({ data: { key: 'val' } }, {} as never);
+    const result = await dict['dict_param']!.fn({ data: { key: 'val' } }, {} as never);
     expect(typeof result).toBe('string');
     expect(result as string).toContain('Result:');
   });
@@ -492,7 +546,7 @@ Items: {items}
     const dict = asDict(ext.value);
 
     // List should not throw — it formats via rill's formatValue
-    const result = await dict['list-param']!.fn({ items: ['a', 'b'] }, {} as never);
+    const result = await dict['list_param']!.fn({ items: ['a', 'b'] }, {} as never);
     expect(typeof result).toBe('string');
     expect(result as string).toContain('Items:');
   });

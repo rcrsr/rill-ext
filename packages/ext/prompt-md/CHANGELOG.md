@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.2] - 2026-04-30
+
+### Fixed
+
+- Resolution names derived from `*.prompt.md` filenames now replace hyphens (`-`) with underscores (`_`) so the callable is invocable from rill scripts. Previously a file named `summarize-email.prompt.md` registered without error but `$prompt.summarize_email(...)` halted at runtime because the runtime cannot resolve a callable whose key contains `-`. Hyphens convert across all path segments, so `daily-tasks/morning-brief.prompt.md` registers as `daily_tasks.morning_brief`.
+
 ## [0.19.1] - 2026-04-30
 
 ### Fixed

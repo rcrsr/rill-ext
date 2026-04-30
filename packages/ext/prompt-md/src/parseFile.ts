@@ -36,7 +36,7 @@ interface PromptFrontmatter {
 
 /** Fully parsed and validated prompt file. */
 export interface ParsedPrompt {
-  /** Resolution name: relativePath with `.prompt.md` stripped and `/` replaced with `.`. */
+  /** Resolution name: relativePath with `.prompt.md` stripped, `/` replaced with `.`, and `-` replaced with `_`. */
   name: string;
   /** Human-readable description from frontmatter. */
   description: string;
@@ -61,17 +61,21 @@ export interface ParsedPrompt {
 /**
  * Derives a resolution name from a relative file path.
  *
- * Strips the `.prompt.md` suffix and replaces `/` (and `\` on Windows) with
- * `.`. Returns null when the resulting name contains a `..` segment.
+ * Strips the `.prompt.md` suffix, replaces `/` (and `\` on Windows) with `.`,
+ * and replaces hyphens (`-`) with underscores (`_`) so the name is a valid
+ * rill identifier. Returns null when the resulting name contains a `..` segment.
  *
  * @example
- *   deriveResolutionName('agents/research.prompt.md') // => 'agents.research'
+ *   deriveResolutionName('agents/research.prompt.md')      // => 'agents.research'
+ *   deriveResolutionName('summarize-email.prompt.md')      // => 'summarize_email'
  */
 function deriveResolutionName(relativePath: string): string | null {
   // Strip .prompt.md suffix
   const withoutSuffix = relativePath.replace(/\.prompt\.md$/, '');
   // Normalise path separators to `.`
-  const name = withoutSuffix.replace(/[/\\]/g, '.');
+  const withDots = withoutSuffix.replace(/[/\\]/g, '.');
+  // Convert hyphens to underscores for valid rill identifiers
+  const name = withDots.replace(/-/g, '_');
   // Security: reject names containing `..` segments
   const segments = name.split('.');
   if (segments.includes('..')) {

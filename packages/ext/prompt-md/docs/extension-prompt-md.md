@@ -101,14 +101,19 @@ The extension derives a resolution name from the file path relative to `basePath
 
 - Strip the `.prompt.md` suffix.
 - Replace each `/` path separator with `.`.
+- Replace each hyphen (`-`) with an underscore (`_`).
 
 | File path (relative to basePath) | Resolution name |
 |-----------------------------------|----------------|
 | `summarize.prompt.md` | `summarize` |
 | `agents/research.prompt.md` | `agents.research` |
 | `tasks/write/email.prompt.md` | `tasks.write.email` |
+| `summarize-email.prompt.md` | `summarize_email` |
+| `daily-tasks/morning-brief.prompt.md` | `daily_tasks.morning_brief` |
 
 Resolution names become callable keys in the extension's namespace. Access them via `prompt.summarize(...)`, `prompt.agents_research(...)`, etc. The rill runtime converts `.` to `_` in callable names within a namespace.
+
+Hyphens in filenames or directory names convert to underscores so the derived name is a valid rill identifier. A file named `summarize-email.prompt.md` registers as `summarize_email` and is invoked as `prompt.summarize_email(...)`.
 
 ## `@@ role` Convention
 
