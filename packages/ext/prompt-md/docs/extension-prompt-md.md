@@ -113,7 +113,7 @@ The extension derives a resolution name from the file path relative to `basePath
 
 Resolution names become callable keys in the extension's namespace. Access them via `prompt.summarize(...)`, `prompt.agents_research(...)`, etc. The rill runtime converts `.` to `_` in callable names within a namespace.
 
-Hyphens in filenames or directory names convert to underscores so the derived name is a valid rill identifier. A file named `summarize-email.prompt.md` registers as `summarize_email` and is invoked as `prompt.summarize_email(...)`.
+Hyphens in filenames or directory names convert to underscores so the derived name is invocable from rill scripts. The resolution name itself can still contain `.` for nested paths (e.g. `daily_tasks.morning_brief`); the rill runtime maps `.` to `_` when resolving callable keys within a namespace. A file named `summarize-email.prompt.md` registers as `summarize_email` and is invoked as `prompt.summarize_email(...)`.
 
 ## `@@ role` Convention
 
