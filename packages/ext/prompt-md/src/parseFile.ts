@@ -36,7 +36,7 @@ interface PromptFrontmatter {
 
 /** Fully parsed and validated prompt file. */
 export interface ParsedPrompt {
-  /** Resolution name: relativePath with `.prompt.md` stripped and `/` replaced with `.`. */
+  /** Resolution name: relativePath with `.prompt.md` stripped, `/` replaced with `.`, and `-` replaced with `_`. */
   name: string;
   /** Human-readable description from frontmatter. */
   description: string;
@@ -61,23 +61,26 @@ export interface ParsedPrompt {
 /**
  * Derives a resolution name from a relative file path.
  *
- * Strips the `.prompt.md` suffix and replaces `/` (and `\` on Windows) with
- * `.`. Returns null when the resulting name contains a `..` segment.
+ * Strips the `.prompt.md` suffix, replaces `/` (and `\` on Windows) with `.`,
+ * and replaces hyphens (`-`) with underscores (`_`) so the name is invocable
+ * from rill scripts. The returned name may still contain `.` segments for
+ * nested paths; the rill runtime maps `.` to `_` when resolving callable keys
+ * within a namespace.
+ *
+ * Path-traversal guard lives in `traversePromptFiles`, which rejects any
+ * relative path with a `..` segment before it ever reaches this function.
  *
  * @example
- *   deriveResolutionName('agents/research.prompt.md') // => 'agents.research'
+ *   deriveResolutionName('agents/research.prompt.md')      // => 'agents.research'
+ *   deriveResolutionName('summarize-email.prompt.md')      // => 'summarize_email'
  */
-function deriveResolutionName(relativePath: string): string | null {
+function deriveResolutionName(relativePath: string): string {
   // Strip .prompt.md suffix
   const withoutSuffix = relativePath.replace(/\.prompt\.md$/, '');
   // Normalise path separators to `.`
-  const name = withoutSuffix.replace(/[/\\]/g, '.');
-  // Security: reject names containing `..` segments
-  const segments = name.split('.');
-  if (segments.includes('..')) {
-    return null;
-  }
-  return name;
+  const withDots = withoutSuffix.replace(/[/\\]/g, '.');
+  // Convert hyphens to underscores so the name is invocable from rill scripts
+  return withDots.replace(/-/g, '_');
 }
 
 // ============================================================
@@ -107,11 +110,6 @@ export async function parseFile(
 ): Promise<ParsedPrompt> {
   // ── Derive resolution name ──────────────────────────────────────────────
   const name = deriveResolutionName(relativePath);
-  if (name === null) {
-    throw new RuntimeError('RILL-R001', `resolution name derived from "${relativePath}" contains ".." segments`, undefined, {
-      path: absolutePath,
-    });
-  }
 
   // ── Read source ─────────────────────────────────────────────────────────
   const source = await readFile(absolutePath, 'utf-8');
