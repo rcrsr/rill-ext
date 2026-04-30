@@ -164,7 +164,7 @@ describe('exec extension factory', () => {
 
       try {
         const result = await promise;
-        expect(result).toMatchObject({ exitCode: expect.not.toBe(0) });
+        expect(result).toMatchObject({ exit_code: expect.not.toBe(0) });
       } catch {
         // AbortError is acceptable
       }
