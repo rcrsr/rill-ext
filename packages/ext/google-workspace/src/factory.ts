@@ -24,6 +24,7 @@ import {
   type CallableFn,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
+  type RillParam,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -390,6 +391,16 @@ export function createGoogleWorkspaceExtension(
   const stringReturnType = structureToTypeValue({ kind: 'string' });
   const boolReturnType = structureToTypeValue({ kind: 'bool' });
 
+  // drive_list and drive_upload treat folder_id as optional (root when absent),
+  // but p.str('folder_id') would mark it required. Define a custom RillParam
+  // with an empty-string defaultValue so callers may omit it.
+  const folderIdOptionalParam: RillParam = {
+    name: 'folder_id',
+    type: { kind: 'string' },
+    defaultValue: '',
+    annotations: { description: 'Drive folder ID; empty selects the root.' },
+  };
+
   const callableDict = {
     // Gmail (7)
     gmail_search: toCallable({
@@ -448,7 +459,7 @@ export function createGoogleWorkspaceExtension(
     drive_list: toCallable({
       fn: driveListWrapped as CallableFn,
       params: [
-        p.str('folder_id'),
+        folderIdOptionalParam,
         p.dict('options', undefined, {}),
       ],
       returnType: dictReturnType,
@@ -458,7 +469,7 @@ export function createGoogleWorkspaceExtension(
       params: [
         p.str('content'),
         p.str('filename'),
-        p.str('folder_id'),
+        folderIdOptionalParam,
         p.dict('options', undefined, {}),
       ],
       returnType: dictReturnType,

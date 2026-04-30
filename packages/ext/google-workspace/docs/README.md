@@ -486,9 +486,9 @@ $meta.name -> log
 | `name` | string | File name. |
 | `mime_type` | string | MIME type. |
 | `size` | number | File size in bytes. |
+| `owners` | list | Owner records as `{display_name, email_address}` dicts. |
 | `created_time` | string | Creation timestamp as ISO 8601 string. |
 | `modified_time` | string | Last modification timestamp as ISO 8601 string. |
-| `webViewLink` | string | URL to view the file in a browser. |
 
 Requires capability: `drive.read` (default `true`).
 
@@ -507,8 +507,8 @@ $result.events -> log
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `start_date` | string | — | Start of range as ISO 8601 with timezone (required). |
-| `end_date` | string | — | End of range as ISO 8601 with timezone (required). |
+| `start_date` | string | — | Start of range. Accepts either date-only `YYYY-MM-DD` or ISO 8601 with timezone. Both bounds must use the same form. (required) |
+| `end_date` | string | — | End of range. Accepts either date-only `YYYY-MM-DD` or ISO 8601 with timezone. Both bounds must use the same form. (required) |
 | `options` | dict | `{}` | Optional: `calendar_id` (string, default `"primary"`), `max_results` (number). |
 
 **Result Dict:**
