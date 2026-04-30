@@ -110,24 +110,24 @@ export function spawnClaudeCli(
       const code = (error as Error & { code?: string }).code;
 
       if (code === 'ENOENT') {
-        throw new SpawnError('binary_missing', 'claude binary not found', { binaryPath });
+        throw new SpawnError('binary_missing', 'claude binary not found', { binary_path: binaryPath });
       }
 
       if (code === 'EACCES') {
-        throw new SpawnError('binary_eacces', 'Permission denied: claude', { binaryPath });
+        throw new SpawnError('binary_eacces', 'Permission denied: claude', { binary_path: binaryPath });
       }
 
       throw new SpawnError(
         'spawn_failed',
         `Failed to spawn claude binary: ${error.message}`,
-        { binaryPath, originalError: error.message },
+        { binary_path: binaryPath, original_error: error.message },
       );
     }
 
     throw new SpawnError(
       'spawn_failed',
       'Failed to spawn claude binary: Unknown error',
-      { binaryPath },
+      { binary_path: binaryPath },
     );
   }
 
@@ -139,7 +139,7 @@ export function spawnClaudeCli(
         ptyProcess.kill();
         rejectExit(
           new SpawnError('cli_timeout', `Claude CLI timeout after ${timeoutMs}ms`, {
-            timeoutMs,
+            timeout_ms: timeoutMs,
           }),
         );
       }
@@ -160,7 +160,7 @@ export function spawnClaudeCli(
       if (code !== 0) {
         rejectExit(
           new SpawnError('exit_nonzero', `Claude CLI exited with code ${code}`, {
-            exitCode: code,
+            exit_code: code,
           }),
         );
       } else {

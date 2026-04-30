@@ -16,7 +16,7 @@ import type {
  * Accumulates token counts across assistant messages and extracts cost/duration from final result message.
  *
  * @param messages - Parsed stream messages (ClaudeMessage[])
- * @returns Complete result dict with text, tokens, cost, and exitCode
+ * @returns Complete result dict with text, tokens, cost, and exit_code
  */
 export function extractResult(
   messages: readonly ClaudeMessage[]
@@ -24,15 +24,15 @@ export function extractResult(
   // Initialize accumulation state
   const tokens: TokenCounts = {
     prompt: 0,
-    cacheWrite5m: 0,
-    cacheWrite1h: 0,
-    cacheRead: 0,
+    cache_write_5m: 0,
+    cache_write_1h: 0,
+    cache_read: 0,
     output: 0,
   };
   const textParts: string[] = [];
   let cost = 0;
   let duration = 0;
-  let exitCode = 0;
+  let exit_code = 0;
 
   // Iterate messages and accumulate
   for (const msg of messages) {
@@ -52,7 +52,7 @@ export function extractResult(
       // Extract cost and duration from final result message
       cost = msg.cost_usd;
       duration = msg.duration_ms;
-      exitCode = msg.is_error ? 1 : 0;
+      exit_code = msg.is_error ? 1 : 0;
 
       // Include final usage from result message
       accumulateTokens(tokens, msg.usage);
@@ -63,7 +63,7 @@ export function extractResult(
     result: textParts.join(''),
     tokens,
     cost,
-    exitCode,
+    exit_code,
     duration,
   };
 }
@@ -73,9 +73,9 @@ export function extractResult(
  * Maps usage fields to TokenCounts fields:
  * - input_tokens -> prompt
  * - output_tokens -> output
- * - cache_creation.ephemeral_5m_input_tokens -> cacheWrite5m
- * - cache_creation.ephemeral_1h_input_tokens -> cacheWrite1h
- * - cache_read_input_tokens -> cacheRead
+ * - cache_creation.ephemeral_5m_input_tokens -> cache_write_5m
+ * - cache_creation.ephemeral_1h_input_tokens -> cache_write_1h
+ * - cache_read_input_tokens -> cache_read
  *
  * @param tokens - TokenCounts accumulator (mutated)
  * @param usage - TokenUsage from assistant message or result message
@@ -93,19 +93,19 @@ function accumulateTokens(tokens: TokenCounts, usage: TokenUsage): void {
 
   // Accumulate cache write tokens (5-minute)
   if (usage.cache_creation?.ephemeral_5m_input_tokens !== undefined) {
-    (tokens as { cacheWrite5m: number }).cacheWrite5m +=
+    (tokens as { cache_write_5m: number }).cache_write_5m +=
       usage.cache_creation.ephemeral_5m_input_tokens;
   }
 
   // Accumulate cache write tokens (1-hour)
   if (usage.cache_creation?.ephemeral_1h_input_tokens !== undefined) {
-    (tokens as { cacheWrite1h: number }).cacheWrite1h +=
+    (tokens as { cache_write_1h: number }).cache_write_1h +=
       usage.cache_creation.ephemeral_1h_input_tokens;
   }
 
   // Accumulate cache read tokens
   if (usage.cache_read_input_tokens !== undefined) {
-    (tokens as { cacheRead: number }).cacheRead +=
+    (tokens as { cache_read: number }).cache_read +=
       usage.cache_read_input_tokens;
   }
 }

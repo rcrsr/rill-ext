@@ -67,9 +67,9 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Hello!',
-        tokens: { prompt: 10, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 8 },
+        tokens: { prompt: 10, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 8 },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 1200,
       });
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -94,9 +94,9 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Skill done',
-        tokens: { prompt: 5, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 3 },
+        tokens: { prompt: 5, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 3 },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -121,9 +121,9 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Command done',
-        tokens: { prompt: 5, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 3 },
+        tokens: { prompt: 5, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 3 },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -151,9 +151,9 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Hello!',
-        tokens: { prompt: 10, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 8 },
+        tokens: { prompt: 10, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 8 },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 1200,
       });
 
@@ -192,9 +192,9 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
     });
   });
 
-  // AC-12: Claude Code stream resolution dict contains result, tokens, cost, exitCode, duration
+  // AC-12: Claude Code stream resolution dict contains result, tokens, cost, exit_code, duration
   describe('AC-12: Stream resolution dict contains required fields', () => {
-    it('resolves with result, tokens, cost, exitCode, duration', async () => {
+    it('resolves with result, tokens, cost, exit_code, duration', async () => {
       const { spawnClaudeCli } = await import('../src/process.js');
       const { createStreamParser } = await import('../src/stream-parser.js');
       const { extractResult } = await import('../src/result.js');
@@ -202,9 +202,9 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Hello! How can I help?',
-        tokens: { prompt: 10, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 8 },
+        tokens: { prompt: 10, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 8 },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 1200,
       });
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -222,13 +222,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       // AC-12: Verify all required resolution fields are present
       expect(result['result']).toBe('Hello! How can I help?');
       expect(result['cost']).toBe(0.001);
-      expect(result['exitCode']).toBe(0);
+      expect(result["exit_code"]).toBe(0);
       expect(result['duration']).toBe(1200);
       expect(result['tokens']).toBeDefined();
     });
   });
 
-  describe('AC-1: Basic prompt returns result dict with text, tokens, cost, exitCode 0', () => {
+  describe('AC-1: Basic prompt returns result dict with text, tokens, cost, exit_code 0', () => {
     it('returns complete ClaudeCodeResult structure via stream resolve', async () => {
       // Import mocked modules
       const { spawnClaudeCli } = await import('../src/process.js');
@@ -247,13 +247,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         result: 'Hello! How can I help?',
         tokens: {
           prompt: 10,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 8,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 1200,
       });
 
@@ -287,7 +287,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       expect(result.tokens.prompt).toBe(10);
       expect(result.tokens.output).toBe(8);
       expect(result.cost).toBe(0.001);
-      expect(result.exitCode).toBe(0);
+      expect(result.exit_code).toBe(0);
       expect(result.duration).toBe(1200);
     });
   });
@@ -307,13 +307,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         result: 'Skill executed',
         tokens: {
           prompt: 15,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 5,
         },
         cost: 0.002,
-        exitCode: 0,
+        exit_code: 0,
         duration: 800,
       });
 
@@ -351,7 +351,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
 
       const result = await resolveStream(stream) as Record<string, unknown>;
       expect(result['result']).toBe('Skill executed');
-      expect(result['exitCode']).toBe(0);
+      expect(result["exit_code"]).toBe(0);
     });
   });
 
@@ -370,13 +370,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
 
@@ -418,13 +418,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
 
@@ -469,13 +469,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         result: 'Response',
         tokens: {
           prompt: 20,
-          cacheWrite5m: 5,
-          cacheWrite1h: 8,
-          cacheRead: 3,
+          cache_write_5m: 5,
+          cache_write_1h: 8,
+          cache_read: 3,
           output: 10,
         },
         cost: 0.002,
-        exitCode: 0,
+        exit_code: 0,
         duration: 1000,
       });
 
@@ -501,9 +501,9 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
 
       // Verify all 5 token fields present
       expect(result.tokens.prompt).toBe(20);
-      expect(result.tokens.cacheWrite5m).toBe(5);
-      expect(result.tokens.cacheWrite1h).toBe(8);
-      expect(result.tokens.cacheRead).toBe(3);
+      expect(result.tokens.cache_write_5m).toBe(5);
+      expect(result.tokens.cache_write_1h).toBe(8);
+      expect(result.tokens.cache_read).toBe(3);
       expect(result.tokens.output).toBe(10);
     });
   });
@@ -524,13 +524,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.00456,
-        exitCode: 0,
+        exit_code: 0,
         duration: 800,
       });
 
@@ -575,13 +575,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         result: '',
         tokens: {
           prompt: 0,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 0,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
 
@@ -626,13 +626,13 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         result: 'Response',
         tokens: {
           prompt: 0,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 0,
         },
         cost: 0.0,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
 
@@ -658,9 +658,9 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
 
       // Verify all zeros
       expect(result.tokens.prompt).toBe(0);
-      expect(result.tokens.cacheWrite5m).toBe(0);
-      expect(result.tokens.cacheWrite1h).toBe(0);
-      expect(result.tokens.cacheRead).toBe(0);
+      expect(result.tokens.cache_write_5m).toBe(0);
+      expect(result.tokens.cache_write_1h).toBe(0);
+      expect(result.tokens.cache_read).toBe(0);
       expect(result.tokens.output).toBe(0);
     });
   });
@@ -768,9 +768,9 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
 
       vi.mocked(extractResult).mockReturnValue({
         result: '',
-        tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+        tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
         cost: 0,
-        exitCode: 0,
+        exit_code: 0,
         duration: 0,
       });
 
@@ -812,16 +812,16 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
 
       vi.mocked(extractResult).mockReturnValue({
         result: 'partial output',
-        tokens: { prompt: 5, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 2 },
+        tokens: { prompt: 5, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 2 },
         cost: 0.0005,
-        exitCode: 1,
+        exit_code: 1,
         duration: 300,
       });
 
       let onDataCallback: ((chunk: string) => void) | undefined;
 
       const exitError = new SpawnError('exit_nonzero', 'Claude CLI exited with code 1', {
-        exitCode: 1,
+        exit_code: 1,
       });
 
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -934,9 +934,9 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
         vi.mocked(extractResult).mockReturnValue({
           result: 'Task completed successfully.',
-          tokens: { prompt: 12, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 5, output: 9 },
+          tokens: { prompt: 12, cache_write_5m: 0, cache_write_1h: 0, cache_read: 5, output: 9 },
           cost: 0.0025,
-          exitCode: 0,
+          exit_code: 0,
           duration: 950,
         });
         vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -957,8 +957,8 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         expect(result['tokens']).toBeDefined();
         expect(typeof result['cost']).toBe('number');
         expect(result['cost']).toBe(0.0025);
-        expect(typeof result['exitCode']).toBe('number');
-        expect(result['exitCode']).toBe(0);
+        expect(typeof result["exit_code"]).toBe('number');
+        expect(result["exit_code"]).toBe(0);
         expect(typeof result['duration']).toBe('number');
         expect(result['duration']).toBe(950);
       });
@@ -977,9 +977,9 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
         vi.mocked(extractResult).mockReturnValue({
           result: 'Done',
-          tokens: { prompt: 5, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 3 },
+          tokens: { prompt: 5, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 3 },
           cost: 0.001,
-          exitCode: 0,
+          exit_code: 0,
           duration: 200,
         });
         vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -1034,9 +1034,9 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
         vi.mocked(extractResult).mockReturnValue({
           result: '',
-          tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+          tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
           cost: 0,
-          exitCode: 0,
+          exit_code: 0,
           duration: 0,
         });
 
@@ -1062,7 +1062,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         expect(typeof result['result']).toBe('string');
         expect(result['tokens']).toBeDefined();
         expect(typeof result['cost']).toBe('number');
-        expect(typeof result['exitCode']).toBe('number');
+        expect(typeof result["exit_code"]).toBe('number');
         expect(typeof result['duration']).toBe('number');
       });
     });
@@ -1079,9 +1079,9 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
         vi.mocked(extractResult).mockReturnValue({
           result: 'Done',
-          tokens: { prompt: 5, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 3 },
+          tokens: { prompt: 5, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 3 },
           cost: 0.001,
-          exitCode: 0,
+          exit_code: 0,
           duration: 200,
         });
         vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -1121,9 +1121,9 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
         vi.mocked(extractResult).mockReturnValue({
           result: 'Done',
-          tokens: { prompt: 5, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 3 },
+          tokens: { prompt: 5, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 3 },
           cost: 0.001,
-          exitCode: 0,
+          exit_code: 0,
           duration: 200,
         });
         vi.mocked(spawnClaudeCli).mockReturnValue({

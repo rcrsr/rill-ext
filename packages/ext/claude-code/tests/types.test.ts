@@ -21,41 +21,41 @@ describe('types module', () => {
     it('has all 5 required fields', () => {
       const counts: TokenCounts = {
         prompt: 100,
-        cacheWrite5m: 50,
-        cacheWrite1h: 25,
-        cacheRead: 75,
+        cache_write_5m: 50,
+        cache_write_1h: 25,
+        cache_read: 75,
         output: 200,
       };
 
       expect(counts.prompt).toBe(100);
-      expect(counts.cacheWrite5m).toBe(50);
-      expect(counts.cacheWrite1h).toBe(25);
-      expect(counts.cacheRead).toBe(75);
+      expect(counts.cache_write_5m).toBe(50);
+      expect(counts.cache_write_1h).toBe(25);
+      expect(counts.cache_read).toBe(75);
       expect(counts.output).toBe(200);
     });
 
     it('accepts zero-token boundary case', () => {
       const counts: TokenCounts = {
         prompt: 0,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 0,
       };
 
       expect(counts.prompt).toBe(0);
-      expect(counts.cacheWrite5m).toBe(0);
-      expect(counts.cacheWrite1h).toBe(0);
-      expect(counts.cacheRead).toBe(0);
+      expect(counts.cache_write_5m).toBe(0);
+      expect(counts.cache_write_1h).toBe(0);
+      expect(counts.cache_read).toBe(0);
       expect(counts.output).toBe(0);
     });
 
     it('enforces readonly properties at compile time', () => {
       const counts: TokenCounts = {
         prompt: 100,
-        cacheWrite5m: 50,
-        cacheWrite1h: 25,
-        cacheRead: 75,
+        cache_write_5m: 50,
+        cache_write_1h: 25,
+        cache_read: 75,
         output: 200,
       };
 
@@ -308,20 +308,20 @@ describe('types module', () => {
         result: 'Combined assistant response',
         tokens: {
           prompt: 100,
-          cacheWrite5m: 50,
-          cacheWrite1h: 25,
-          cacheRead: 75,
+          cache_write_5m: 50,
+          cache_write_1h: 25,
+          cache_read: 75,
           output: 200,
         },
         cost: 0.0123,
-        exitCode: 0,
+        exit_code: 0,
         duration: 5432,
       };
 
       expect(result.result).toBe('Combined assistant response');
       expect(result.tokens.prompt).toBe(100);
       expect(result.cost).toBe(0.0123);
-      expect(result.exitCode).toBe(0);
+      expect(result.exit_code).toBe(0);
       expect(result.duration).toBe(5432);
     });
 
@@ -330,17 +330,17 @@ describe('types module', () => {
         result: '',
         tokens: {
           prompt: 0,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 0,
         },
         cost: 0,
-        exitCode: 1,
+        exit_code: 1,
         duration: 100,
       };
 
-      expect(result.exitCode).toBe(1);
+      expect(result.exit_code).toBe(1);
       expect(result.result).toBe('');
     });
 
@@ -349,13 +349,13 @@ describe('types module', () => {
         result: 'Text',
         tokens: {
           prompt: 100,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 50,
         },
         cost: 0.01,
-        exitCode: 0,
+        exit_code: 0,
         duration: 1000,
       };
 

@@ -20,13 +20,13 @@ const EXPECTED_RETURN_TYPE = structureToTypeValue({
       result: { type: { kind: 'string' } },
       tokens: { type: { kind: 'dict', fields: {
         prompt: { type: { kind: 'number' } },
-        cacheWrite5m: { type: { kind: 'number' } },
-        cacheWrite1h: { type: { kind: 'number' } },
-        cacheRead: { type: { kind: 'number' } },
+        cache_write_5m: { type: { kind: 'number' } },
+        cache_write_1h: { type: { kind: 'number' } },
+        cache_read: { type: { kind: 'number' } },
         output: { type: { kind: 'number' } },
       } } },
       cost: { type: { kind: 'number' } },
-      exitCode: { type: { kind: 'number' } },
+      exit_code: { type: { kind: 'number' } },
       duration: { type: { kind: 'number' } },
     },
   },
@@ -144,13 +144,13 @@ describe('IR-1: Factory result has correct value shape', () => {
       result: 'Success',
       tokens: {
         prompt: 10,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 5,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
@@ -181,7 +181,7 @@ describe('IR-1: Factory result has correct value shape', () => {
 
     // Verify execution succeeded
     expect(result).toBeDefined();
-    expect(result.exitCode).toBe(0);
+    expect(result.exit_code).toBe(0);
   });
 });
 
@@ -226,13 +226,13 @@ describe('IR-5: dispose terminates active child processes', () => {
       result: 'Test',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
@@ -296,13 +296,13 @@ describe('IR-5: dispose terminates active child processes', () => {
       result: 'Test',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
@@ -388,13 +388,13 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
       result: 'Test',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
@@ -455,13 +455,13 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
       result: 'Test',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
@@ -542,13 +542,13 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
       result: 'Test',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
@@ -608,13 +608,13 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
       result: 'Test',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
@@ -680,13 +680,13 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
       result: 'Test',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
@@ -785,13 +785,13 @@ describe('IR-1: Factory creation is idempotent', () => {
       result: 'Test',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     });
 
