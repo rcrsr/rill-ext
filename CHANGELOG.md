@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Breaking)
+
+- Snake_case migration at the rill host-function boundary across 4 extensions. Authoritative rule added to root `CLAUDE.md` §Boundary Key Naming: param names declared via `p.*`, keys read from `args`, keys in returned dict literals, and field names in `returnType` / `retType` declarations MUST be snake_case. Vendor SDK shapes and JS-side internals stay camelCase; map at the boundary.
+  - `@rcrsr/rill-ext-google-workspace` bumped to `0.19.2`. Param renames: `messageId`→`message_id`, `fileId`→`file_id`, `folderId`→`folder_id`, `labelName`→`label_name`, `startDate`→`start_date`, `endDate`→`end_date`, `startTime`→`start_time`, `endTime`→`end_time`. Options keys: `maxResults`, `mimeType`, `calendarId`, `allDay`, `sendUpdates` → snake_case. Return keys: `threadId`, `mimeType`, `displayName`, `emailAddress`, `createdTime`, `modifiedTime`, `responseStatus` → snake_case.
+  - `@rcrsr/rill-ext-outlook` bumped to `0.19.1`. Param: `messageId`→`message_id`. Event payload keys: `messageCount`, `messageId`, `eventCount`, `resultCount` → snake_case.
+  - `@rcrsr/rill-ext-claude-code` bumped to `0.19.1`. Result dict: `exitCode`→`exit_code`, `tokens.cacheRead`/`cacheWrite5m`/`cacheWrite1h` → `cache_read`/`cache_write_5m`/`cache_write_1h`. Error `meta.raw` keys: `binaryPath`, `timeoutMs`, `exitCode`, `originalError` → snake_case.
+  - `@rcrsr/rill-ext-exec` bumped to `0.19.1`. Result dict: `exitCode`→`exit_code`.
+
 ### Fixed
 
 - `@rcrsr/rill-ext-prompt-md` bumped to `0.19.1`. The dist now bundles `yaml` inline and injects a `createRequire(import.meta.url)` banner so the extension loads as pure ESM. Downstream re-bundlers (e.g., `rill-build`) previously inlined yaml's CJS source verbatim, producing dynamic `require("process")` calls that broke compiled extension bundles with `ExtensionLoadError: Dynamic require of "process" is not supported`. Source-mode runs were unaffected.
