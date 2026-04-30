@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-04-30
+
 ### Changed (Breaking)
 
 - Snake_case migration at the rill host-function boundary across 4 extensions. Authoritative rule added to root `CLAUDE.md` §Boundary Key Naming: param names declared via `p.*`, keys read from `args`, keys in returned dict literals, and field names in `returnType` / `retType` declarations MUST be snake_case. Vendor SDK shapes and JS-side internals stay camelCase; map at the boundary.
