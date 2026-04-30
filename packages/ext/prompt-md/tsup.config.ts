@@ -7,6 +7,6 @@ export default defineConfig({
   clean: true,
   noExternal: ['@rcrsr/rill-ext-prompt-shared', '@rcrsr/rill-ext-param-shared', 'yaml'],
   banner: {
-    js: "import { createRequire as __createRequire } from 'module';\nconst require = __createRequire(import.meta.url);",
+    js: "import { createRequire as __createRequire } from 'node:module';\nconst require = __createRequire(import.meta.url);",
   },
 });
