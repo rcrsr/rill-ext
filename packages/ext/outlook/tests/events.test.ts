@@ -155,7 +155,7 @@ describe('reply() host function', () => {
     const caught = (await getCallable(ext, 'reply').fn({ message_id: '', body: 'Hello' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('message_id is required');
+    expect(getStatus(caught).message).toContain('message_id is required');
   });
 
   // EC-6: empty body throws #INVALID_INPUT
@@ -166,7 +166,7 @@ describe('reply() host function', () => {
     const caught = (await getCallable(ext, 'reply').fn({ message_id: 'msg-001', body: '' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('body is required');
+    expect(getStatus(caught).message).toContain('body is required');
   });
 });
 
@@ -236,7 +236,7 @@ describe('flag() host function', () => {
     const caught = (await getCallable(ext, 'flag').fn({ message_id: '' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('message_id is required');
+    expect(getStatus(caught).message).toContain('message_id is required');
   });
 });
 
@@ -309,7 +309,7 @@ describe('events() host function', () => {
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('start must be before end');
+    expect(getStatus(caught).message).toContain('start must be before end');
   });
 
   // AC-19: events emits outlook:calendar:read event
@@ -407,7 +407,7 @@ describe('free_busy() host function', () => {
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('attendees is required');
+    expect(getStatus(caught).message).toContain('attendees is required');
   });
 
   // EC-8: start > end throws #INVALID_INPUT
@@ -421,7 +421,7 @@ describe('free_busy() host function', () => {
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('start must be before end');
+    expect(getStatus(caught).message).toContain('start must be before end');
   });
 
   // AC-19: free_busy emits outlook:calendar:read event
@@ -499,7 +499,7 @@ describe('create_event() host function', () => {
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('title is required');
+    expect(getStatus(caught).message).toContain('title is required');
   });
 
   // EC-10: start > end throws #INVALID_INPUT
@@ -513,7 +513,7 @@ describe('create_event() host function', () => {
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('start must be before end');
+    expect(getStatus(caught).message).toContain('start must be before end');
   });
 
   // EC-10: calendar.create disabled emits #FORBIDDEN
@@ -526,7 +526,7 @@ describe('create_event() host function', () => {
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
-  expect(getStatus(caught).message).toContain('calendar.create');
+    expect(getStatus(caught).message).toContain('calendar.create');
   });
 
   // AC-19: create_event emits outlook:calendar:create event

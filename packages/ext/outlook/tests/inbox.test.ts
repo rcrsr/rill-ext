@@ -314,7 +314,7 @@ describe('inbox() host function', () => {
       const caught = (await getCallable(ext, 'inbox').fn({ folder: 'drafts' }, ctx)) as RillValue;
       expect(isInvalid(caught)).toBe(true);
       expect(getStatus(caught).code.name).toBe('FORBIDDEN');
-  expect(getStatus(caught).message).toContain("folder 'drafts' not accessible");
+    expect(getStatus(caught).message).toContain("folder 'drafts' not accessible");
     });
 
     it('does not call fetch when folder is not in allowlist', async () => {
@@ -402,7 +402,7 @@ describe('read() host function', () => {
     const caught = (await getCallable(ext, 'read').fn({ message_id: '' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('message_id is required');
+    expect(getStatus(caught).message).toContain('message_id is required');
   });
 
   it('emits outlook:mail:read event on success [AC-19]', async () => {
