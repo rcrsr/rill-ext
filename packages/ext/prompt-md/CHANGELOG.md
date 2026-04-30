@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Fixed
+
+- `dist/index.js` now bundles the `yaml` dependency inline and ships a `createRequire(import.meta.url)` banner so the extension loads as pure ESM. Previously, downstream re-bundlers (e.g., `rill-build`) inlined yaml's CJS dist verbatim, producing dynamic `require("process")` calls that ESM cannot execute, surfacing as `ExtensionLoadError: Dynamic require of "process" is not supported` when running compiled extension bundles. Source-mode (`rill-run`) was unaffected.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

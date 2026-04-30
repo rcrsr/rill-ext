@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `@rcrsr/rill-ext-prompt-md` bumped to `0.19.1`. The dist now bundles `yaml` inline and injects a `createRequire(import.meta.url)` banner so the extension loads as pure ESM. Downstream re-bundlers (e.g., `rill-build`) previously inlined yaml's CJS source verbatim, producing dynamic `require("process")` calls that broke compiled extension bundles with `ExtensionLoadError: Dynamic require of "process" is not supported`. Source-mode runs were unaffected.
+
 ## [0.19.2] - 2026-04-28
 
 ### Fixed
