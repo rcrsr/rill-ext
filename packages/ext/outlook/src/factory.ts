@@ -225,7 +225,7 @@ export function createOutlookExtension(
       return {
         event: `${PROVIDER}:mail:read`,
         folder: (dict['folder'] ?? 'inbox') as RillValue,
-        messageCount: (messages?.length ?? 0) as RillValue,
+        message_count: (messages?.length ?? 0) as RillValue,
       };
     },
     inbox
@@ -240,7 +240,7 @@ export function createOutlookExtension(
       return {
         event: `${PROVIDER}:mail:read`,
         folder: 'from' as RillValue,
-        messageCount: (messages?.length ?? 0) as RillValue,
+        message_count: (messages?.length ?? 0) as RillValue,
       };
     },
     fromFn
@@ -258,7 +258,7 @@ export function createOutlookExtension(
       return {
         event: `${PROVIDER}:mail:search`,
         query: (dict['query'] ?? '') as RillValue,
-        resultCount: (messages?.length ?? 0) as RillValue,
+        result_count: (messages?.length ?? 0) as RillValue,
       };
     },
     search
@@ -272,7 +272,7 @@ export function createOutlookExtension(
       return {
         event: `${PROVIDER}:mail:read`,
         folder: (dict['folder'] ?? 'inbox') as RillValue,
-        messageCount: 1 as RillValue,
+        message_count: 1 as RillValue,
       };
     },
     read
@@ -327,7 +327,7 @@ export function createOutlookExtension(
       const dict = result as Record<string, RillValue>;
       return {
         event: `${PROVIDER}:mail:flag`,
-        messageId: (dict['id'] ?? '') as RillValue,
+        message_id: (dict['id'] ?? '') as RillValue,
       };
     },
     flag
@@ -341,7 +341,7 @@ export function createOutlookExtension(
       const eventsArr = dict['events'] as RillValue[] | undefined;
       return {
         event: `${PROVIDER}:calendar:read`,
-        eventCount: (eventsArr?.length ?? 0) as RillValue,
+        event_count: (eventsArr?.length ?? 0) as RillValue,
         range: (dict['range'] ?? '') as RillValue,
       };
     },
@@ -356,7 +356,7 @@ export function createOutlookExtension(
       const eventsArr = dict['events'] as RillValue[] | undefined;
       return {
         event: `${PROVIDER}:calendar:read`,
-        eventCount: (eventsArr?.length ?? 0) as RillValue,
+        event_count: (eventsArr?.length ?? 0) as RillValue,
         range: 'today' as RillValue,
       };
     },
@@ -371,7 +371,7 @@ export function createOutlookExtension(
       const schedules = dict['schedules'] as RillValue[] | undefined;
       return {
         event: `${PROVIDER}:calendar:read`,
-        eventCount: (schedules?.length ?? 0) as RillValue,
+        event_count: (schedules?.length ?? 0) as RillValue,
         range: (dict['range'] ?? '') as RillValue,
       };
     },
@@ -438,7 +438,7 @@ export function createOutlookExtension(
     }),
     read: toCallable({
       fn: readWrapped as CallableFn,
-      params: [p.str('messageId')],
+      params: [p.str('message_id')],
       returnType: dictReturnType,
     }),
     send: toCallable({
@@ -453,12 +453,12 @@ export function createOutlookExtension(
     }),
     reply: toCallable({
       fn: replyWrapped as CallableFn,
-      params: [p.str('messageId'), p.str('body')],
+      params: [p.str('message_id'), p.str('body')],
       returnType: dictReturnType,
     }),
     flag: toCallable({
       fn: flagWrapped as CallableFn,
-      params: [p.str('messageId')],
+      params: [p.str('message_id')],
       returnType: dictReturnType,
     }),
     events: toCallable({

@@ -116,7 +116,7 @@ describe('reply() host function', () => {
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'reply').fn(
-      { messageId: 'msg-001', body: 'Thanks for your message.' },
+      { message_id: 'msg-001', body: 'Thanks for your message.' },
       ctx
     )) as Record<string, unknown>;
 
@@ -135,7 +135,7 @@ describe('reply() host function', () => {
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'reply').fn(
-      { messageId: 'msg-001', body: 'Reply body.' },
+      { message_id: 'msg-001', body: 'Reply body.' },
       ctx
     );
 
@@ -147,15 +147,15 @@ describe('reply() host function', () => {
     );
   });
 
-  // EC-6: empty messageId throws #INVALID_INPUT
-  it('throws #INVALID_INPUT for empty messageId [EC-6]', async () => {
+  // EC-6: empty message_id throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty message_id [EC-6]', async () => {
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'reply').fn({ messageId: '', body: 'Hello' }, ctx)) as RillValue;
+    const caught = (await getCallable(ext, 'reply').fn({ message_id: '', body: 'Hello' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('messageId is required');
+  expect(getStatus(caught).message).toContain('message_id is required');
   });
 
   // EC-6: empty body throws #INVALID_INPUT
@@ -163,7 +163,7 @@ describe('reply() host function', () => {
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'reply').fn({ messageId: 'msg-001', body: '' }, ctx)) as RillValue;
+    const caught = (await getCallable(ext, 'reply').fn({ message_id: 'msg-001', body: '' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
   expect(getStatus(caught).message).toContain('body is required');
@@ -197,7 +197,7 @@ describe('flag() host function', () => {
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'flag').fn(
-      { messageId: 'msg-001' },
+      { message_id: 'msg-001' },
       ctx
     )) as Record<string, unknown>;
 
@@ -218,7 +218,7 @@ describe('flag() host function', () => {
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
 
-    await getCallable(ext, 'flag').fn({ messageId: 'msg-001' }, ctx);
+    await getCallable(ext, 'flag').fn({ message_id: 'msg-001' }, ctx);
 
     expect(onLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -228,15 +228,15 @@ describe('flag() host function', () => {
     );
   });
 
-  // EC-6: empty messageId throws #INVALID_INPUT
-  it('throws #INVALID_INPUT for empty messageId [EC-6]', async () => {
+  // EC-6: empty message_id throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty message_id [EC-6]', async () => {
     const ext = createOutlookExtension(FLAG_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'flag').fn({ messageId: '' }, ctx)) as RillValue;
+    const caught = (await getCallable(ext, 'flag').fn({ message_id: '' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('messageId is required');
+  expect(getStatus(caught).message).toContain('message_id is required');
   });
 });
 

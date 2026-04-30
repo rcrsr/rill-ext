@@ -361,7 +361,7 @@ describe('createOutlookExtension', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await expect(
-        getCallable(ext, 'flag').fn({ messageId: 'msg-1' }, ctx)
+        getCallable(ext, 'flag').fn({ message_id: 'msg-1' }, ctx)
       ).resolves.toBeDefined();
     });
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- Boundary keys renamed to snake_case per root `CLAUDE.md` §Boundary Key Naming. Param: `messageId` → `message_id` on `read`, `reply`, `flag`. Event payload fields: `messageCount` → `message_count`, `messageId` → `message_id`, `eventCount` → `event_count`, `resultCount` → `result_count`. Host scripts calling `read({ messageId: ... })` etc. must update.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

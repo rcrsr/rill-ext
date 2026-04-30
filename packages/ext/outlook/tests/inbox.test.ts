@@ -363,13 +363,13 @@ describe('read() host function', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns single MailMessageDict by messageId [AC-5]', async () => {
+  it('returns single MailMessageDict by message_id [AC-5]', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     const result = (await getCallable(ext, 'read').fn(
-      { messageId: 'msg-001' },
+      { message_id: 'msg-001' },
       ctx
     )) as Record<string, unknown>;
 
@@ -383,26 +383,26 @@ describe('read() host function', () => {
     expect(result).toHaveProperty('hasAttachments');
   });
 
-  it('sends GET to messages/{messageId} path', async () => {
+  it('sends GET to messages/{message_id} path', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_MESSAGE);
     globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    await getCallable(ext, 'read').fn({ messageId: 'msg-001' }, ctx);
+    await getCallable(ext, 'read').fn({ message_id: 'msg-001' }, ctx);
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('messages/msg-001');
   });
 
-  it('throws #INVALID_INPUT for empty messageId [EC-3]', async () => {
+  it('throws #INVALID_INPUT for empty message_id [EC-3]', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'read').fn({ messageId: '' }, ctx)) as RillValue;
+    const caught = (await getCallable(ext, 'read').fn({ message_id: '' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-  expect(getStatus(caught).message).toContain('messageId is required');
+  expect(getStatus(caught).message).toContain('message_id is required');
   });
 
   it('emits outlook:mail:read event on success [AC-19]', async () => {
@@ -412,7 +412,7 @@ describe('read() host function', () => {
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
 
-    await getCallable(ext, 'read').fn({ messageId: 'msg-001' }, ctx);
+    await getCallable(ext, 'read').fn({ message_id: 'msg-001' }, ctx);
 
     expect(onLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({

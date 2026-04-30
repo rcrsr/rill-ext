@@ -21,9 +21,9 @@ export async function reply(
   controller: AbortController,
   config: ResolvedConfig
 ): Promise<RillValue> {
-  const messageId = (args['messageId'] as string | undefined) ?? '';
+  const messageId = (args['message_id'] as string | undefined) ?? '';
   if (messageId.trim() === '') {
-    failInput(ctx, 'missing_message_id', 'outlook: messageId is required');
+    failInput(ctx, 'missing_message_id', 'outlook: message_id is required');
   }
 
   const body = (args['body'] as string | undefined) ?? '';

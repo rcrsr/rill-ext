@@ -137,8 +137,8 @@ describe('today() host function', () => {
     );
   });
 
-  // AC-19: today event includes eventCount
-  it('emits event with correct eventCount [AC-19]', async () => {
+  // AC-19: today event includes event_count
+  it('emits event with correct event_count [AC-19]', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -154,7 +154,7 @@ describe('today() host function', () => {
     expect(onLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'outlook:calendar:read',
-        eventCount: 1,
+        event_count: 1,
         range: 'today',
       })
     );
