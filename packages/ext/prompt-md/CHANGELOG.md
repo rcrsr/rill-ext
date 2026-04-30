@@ -1,16 +1,11 @@
 # Changelog
 
-## [0.19.2] - 2026-04-30
-
-### Fixed
-
-- Resolution names derived from `*.prompt.md` filenames now replace hyphens (`-`) with underscores (`_`) so the callable is invocable from rill scripts. Previously a file named `summarize-email.prompt.md` registered without error but `$prompt.summarize_email(...)` halted at runtime because the runtime cannot resolve a callable whose key contains `-`. Hyphens convert across all path segments, so `daily-tasks/morning-brief.prompt.md` registers as `daily_tasks.morning_brief`.
-
 ## [0.19.1] - 2026-04-30
 
 ### Fixed
 
 - `dist/index.js` now bundles the `yaml` dependency inline and ships a `createRequire(import.meta.url)` banner so the extension loads as pure ESM. Previously, downstream re-bundlers (e.g., `rill-build`) inlined yaml's CJS dist verbatim, producing dynamic `require("process")` calls that ESM cannot execute, surfacing as `ExtensionLoadError: Dynamic require of "process" is not supported` when running compiled extension bundles. Source-mode (`rill-run`) was unaffected.
+- Resolution names derived from `*.prompt.md` filenames now replace hyphens (`-`) with underscores (`_`) so the callable is invocable from rill scripts. Previously a file named `summarize-email.prompt.md` registered without error but `$prompt.summarize_email(...)` halted at runtime because the runtime cannot resolve a callable whose key contains `-`. Hyphens convert across all path segments, so `daily-tasks/morning-brief.prompt.md` registers as `daily_tasks.morning_brief`.
 
 ## [0.19.0] - 2026-04-28
 
