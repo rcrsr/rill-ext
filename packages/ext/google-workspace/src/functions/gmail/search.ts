@@ -44,7 +44,7 @@ export function makeGmailSearch(deps: GmailSearchDeps): (
     let maxResults = ceiling;
     const options = args['options'];
     if (options !== undefined && options !== null && isDict(options)) {
-      const rawMax = options['maxResults'];
+      const rawMax = options['max_results'];
       if (typeof rawMax === 'number' && rawMax > 0) {
         maxResults = Math.min(rawMax, ceiling);
       }
@@ -66,12 +66,12 @@ export function makeGmailSearch(deps: GmailSearchDeps): (
       undefined,
       undefined
     );
-    // Project response to { messages: [{ id, threadId }, ...] } per AC-12
+    // Project response to { messages: [{ id, thread_id }, ...] } per AC-12
     const data = response as { messages?: Array<{ id?: string; threadId?: string }> } | null;
     const rawMessages = data?.messages ?? [];
     const messages = rawMessages.map((m) => ({
       id: m.id ?? '',
-      threadId: m.threadId ?? '',
+      thread_id: m.threadId ?? '',
     }));
     return { messages } as unknown as RillValue;
   };

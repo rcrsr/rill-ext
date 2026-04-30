@@ -42,20 +42,20 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
     controller: AbortController
   ): Promise<RillValue> => {
     const title = args['title'];
-    const startTime = args['startTime'];
-    const endTime = args['endTime'];
+    const startTime = args['start_time'];
+    const endTime = args['end_time'];
     if (typeof title !== 'string' || title.trim() === '') {
       failInput(ctx, 'invalid_arg', 'google: title must be a non-empty string');
     }
     if (typeof startTime !== 'string' || startTime.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: startTime must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: start_time must be a non-empty string');
     }
     if (typeof endTime !== 'string' || endTime.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: endTime must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: end_time must be a non-empty string');
     }
     // EC-13: Reject naive ISO timestamps
-    assertIsoTimestamp(ctx, startTime, 'startTime');
-    assertIsoTimestamp(ctx, endTime, 'endTime');
+    assertIsoTimestamp(ctx, startTime, 'start_time');
+    assertIsoTimestamp(ctx, endTime, 'end_time');
     // Extract options
     const options = args['options'];
     let calendarId = 'primary';
@@ -64,15 +64,15 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
     let attendees: Array<{ email: string }> | undefined;
     let description: string | undefined;
     if (options !== undefined && options !== null && isDict(options)) {
-      const rawCalId = options['calendarId'];
+      const rawCalId = options['calendar_id'];
       if (typeof rawCalId === 'string' && rawCalId.trim() !== '') {
         calendarId = rawCalId;
       }
-      const rawAllDay = options['allDay'];
+      const rawAllDay = options['all_day'];
       if (typeof rawAllDay === 'boolean') {
         isAllDay = rawAllDay;
       }
-      const rawSendUpdates = options['sendUpdates'];
+      const rawSendUpdates = options['send_updates'];
       if (typeof rawSendUpdates === 'string' && VALID_SEND_UPDATES.has(rawSendUpdates)) {
         sendUpdates = rawSendUpdates;
       }

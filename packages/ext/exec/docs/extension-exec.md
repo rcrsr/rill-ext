@@ -83,7 +83,7 @@ $exec.echo(["hello", "world"]) -> log
 | `args` | list | `[]` | Command arguments |
 | `stdin` | string | `""` | Standard input data |
 
-**Returns:** dict with `stdout`, `stderr`, `exitCode`
+**Returns:** dict with `stdout`, `stderr`, `exit_code`
 
 ### commands
 

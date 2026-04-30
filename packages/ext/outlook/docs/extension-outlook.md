@@ -185,7 +185,7 @@ $message.body -> log
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `messageId` | string | Graph API message ID (required). |
+| `message_id` | string | Graph API message ID (required). |
 
 **Result Dict:** Single message dict (see shape below).
 
@@ -244,7 +244,7 @@ $mail.reply("AAMkAGI2...", "Thanks for the update.") => $result
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `messageId` | string | ID of the message to reply to (required). |
+| `message_id` | string | ID of the message to reply to (required). |
 | `body` | string | Reply body as plain text (required). |
 
 **Result Dict:**
@@ -288,7 +288,7 @@ $mail.flag("AAMkAGI2...") => $result
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `messageId` | string | ID of the message to flag (required). |
+| `message_id` | string | ID of the message to flag (required). |
 
 **Result Dict:**
 
@@ -454,17 +454,17 @@ The extension emits runtime events for observability. Listen with `ctx.on()` in 
 
 | Event | Fields |
 |-------|--------|
-| `outlook:mail:read` | `duration` (ms), `folder` (string), `messageCount` (number) |
-| `outlook:mail:search` | `duration` (ms), `query` (string), `resultCount` (number) |
+| `outlook:mail:read` | `duration` (ms), `folder` (string), `message_count` (number) |
+| `outlook:mail:search` | `duration` (ms), `query` (string), `result_count` (number) |
 | `outlook:mail:send` | `duration` (ms), `to` (string), `subject` (string) |
 | `outlook:mail:draft` | `duration` (ms), `to` (string), `subject` (string) |
-| `outlook:mail:flag` | `duration` (ms), `messageId` (string) |
+| `outlook:mail:flag` | `duration` (ms), `message_id` (string) |
 
 **Calendar events:**
 
 | Event | Fields |
 |-------|--------|
-| `outlook:calendar:read` | `duration` (ms), `eventCount` (number), `range` (string) |
+| `outlook:calendar:read` | `duration` (ms), `event_count` (number), `range` (string) |
 | `outlook:calendar:create` | `duration` (ms), `title` (string) |
 
 **Error events** (emitted when any request fails):

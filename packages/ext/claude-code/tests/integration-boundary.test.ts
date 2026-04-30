@@ -113,13 +113,13 @@ describe('AC-14: 10K line output parses without memory growth', () => {
       result: 'Processed 10000 lines successfully',
       tokens: {
         prompt: 100,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 50,
       },
       cost: 0.01,
-      exitCode: 0,
+      exit_code: 0,
       duration: 5000,
     });
 
@@ -189,7 +189,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
 
     // Verify result extracted correctly
     expect(result['result']).toBe('Processed 10000 lines successfully');
-    expect(result['exitCode']).toBe(0);
+    expect(result["exit_code"]).toBe(0);
 
     // Verify parser processed all chunks
     expect(mockParser.processChunk).toHaveBeenCalled();
@@ -229,13 +229,13 @@ describe('AC-14: 10K line output parses without memory growth', () => {
       result: 'Mixed content processed',
       tokens: {
         prompt: 200,
-        cacheWrite5m: 10,
-        cacheWrite1h: 5,
-        cacheRead: 15,
+        cache_write_5m: 10,
+        cache_write_1h: 5,
+        cache_read: 15,
         output: 100,
       },
       cost: 0.02,
-      exitCode: 0,
+      exit_code: 0,
       duration: 6000,
     });
 
@@ -295,7 +295,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     const result = await resolveStream(stream);
 
     expect(result['result']).toBe('Mixed content processed');
-    expect(result['exitCode']).toBe(0);
+    expect(result["exit_code"]).toBe(0);
     expect(mockParser.processChunk).toHaveBeenCalledTimes(100);
   });
 });
@@ -378,13 +378,13 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
         result: `Response from call ${callNum}`,
         tokens: {
           prompt: 10 + callNum,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 5 + callNum,
         },
         cost: 0.001 * (callNum + 1),
-        exitCode: 0,
+        exit_code: 0,
         duration: 100 + callNum * 10,
       };
     });
@@ -417,9 +417,9 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     // Verify each has unique result (10 unique results)
     expect(resultTexts.size).toBe(10);
 
-    // Verify all have exitCode 0
+    // Verify all have exit_code 0
     results.forEach((result) => {
-      expect(result['exitCode']).toBe(0);
+      expect(result["exit_code"]).toBe(0);
       expect((result['result'] as string)).toMatch(/^Response from call \d+$/);
     });
 
@@ -490,13 +490,13 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       result: `Response ${extractCallCount++}`,
       tokens: {
         prompt: 10,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 5,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     }));
 
@@ -523,7 +523,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     expect(results).toHaveLength(10);
     results.forEach((result, i) => {
       expect(result['result']).toBe(`Response ${i}`);
-      expect(result['exitCode']).toBe(0);
+      expect(result["exit_code"]).toBe(0);
     });
 
     expect(spawnClaudeCli).toHaveBeenCalledTimes(10);
@@ -562,7 +562,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
             if (shouldFail) {
               reject(
                 new SpawnError('exit_nonzero', `Claude CLI exited with code 1`, {
-                  exitCode: 1,
+                  exit_code: 1,
                 }),
               );
             } else {
@@ -599,13 +599,13 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       result: `Success ${extractCallCount++}`,
       tokens: {
         prompt: 10,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 5,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 100,
     }));
 
@@ -704,13 +704,13 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       result: 'OK',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 50,
     });
 
@@ -726,7 +726,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       const result = await resolveStream(stream);
 
       expect(result['result']).toBe('OK');
-      expect(result['exitCode']).toBe(0);
+      expect(result["exit_code"]).toBe(0);
 
       // Verify no process leaks (at most 1 active at a time for sequential)
       expect(activeProcesses).toBeLessThanOrEqual(1);
@@ -812,13 +812,13 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       result: 'Varying size response',
       tokens: {
         prompt: Math.floor(Math.random() * 100),
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: Math.floor(Math.random() * 50),
       },
       cost: Math.random() * 0.01,
-      exitCode: 0,
+      exit_code: 0,
       duration: Math.floor(Math.random() * 200),
     }));
 
@@ -833,7 +833,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       );
       const result = await resolveStream(stream);
 
-      expect(result['exitCode']).toBe(0);
+      expect(result["exit_code"]).toBe(0);
       expect(activeProcesses).toBeLessThanOrEqual(1);
     }
 
@@ -911,13 +911,13 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       result: 'OK',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 50,
     });
 

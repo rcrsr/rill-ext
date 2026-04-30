@@ -77,13 +77,13 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         result: 'Test response',
         tokens: {
           prompt: 10,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 8,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 1200,
       });
 
@@ -138,13 +138,13 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         result: 'Response',
         tokens: {
           prompt: 10,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 5,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
 
@@ -194,13 +194,13 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         result: 'Skill result',
         tokens: {
           prompt: 15,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 10,
         },
         cost: 0.002,
-        exitCode: 0,
+        exit_code: 0,
         duration: 800,
       });
 
@@ -254,13 +254,13 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         result: 'Skill result',
         tokens: {
           prompt: 10,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 5,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
 
@@ -308,13 +308,13 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         result: 'Command result',
         tokens: {
           prompt: 12,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 7,
         },
         cost: 0.0015,
-        exitCode: 0,
+        exit_code: 0,
         duration: 600,
       });
 
@@ -546,13 +546,13 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
 
@@ -604,13 +604,13 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
 

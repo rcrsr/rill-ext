@@ -77,13 +77,13 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -156,13 +156,13 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -205,13 +205,13 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -252,13 +252,13 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
         result: 'Response',
         tokens: {
           prompt: 5,
-          cacheWrite5m: 0,
-          cacheWrite1h: 0,
-          cacheRead: 0,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
           output: 3,
         },
         cost: 0.001,
-        exitCode: 0,
+        exit_code: 0,
         duration: 500,
       });
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -306,13 +306,13 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
       result: 'Response',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 500,
     });
     vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -353,13 +353,13 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
       result: 'Skill result',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 500,
     });
     vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -400,13 +400,13 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
       result: 'Command result',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 500,
     });
     vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -447,13 +447,13 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
       result: 'Response',
       tokens: {
         prompt: 5,
-        cacheWrite5m: 0,
-        cacheWrite1h: 0,
-        cacheRead: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
         output: 3,
       },
       cost: 0.001,
-      exitCode: 0,
+      exit_code: 0,
       duration: 500,
     });
     vi.mocked(spawnClaudeCli).mockReturnValue({

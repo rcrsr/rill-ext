@@ -148,6 +148,19 @@ rill 0.19 removed `RILL-R004` from `ERROR_REGISTRY`. Extensions emit failures as
 
 Provider-specific failures decompose into `(generic atom, meta.provider, meta.raw.kind)`. Example: Tavily 432 → `{ code: 'QUOTA_EXCEEDED', provider: 'tavily', raw: { kind: 'plan_limit_exceeded', status: 432 } }`. Host scripts match coarsely (`guard #QUOTA_EXCEEDED`) or finely (`guard #QUOTA_EXCEEDED && raw.kind == 'plan_limit_exceeded'`).
 
+### Boundary Key Naming
+
+Dict keys exposed at the rill host-function boundary MUST be snake_case. The boundary covers four surfaces:
+
+1. Param names declared via `p.*` helpers (e.g., `p.str('message_id')`, not `p.str('messageId')`).
+2. Keys read from the `args` dict inside host functions (`args['file_id']`, not `args['fileId']`).
+3. Keys in returned dict object literals (`{ result_count, exit_code }`, not `{ resultCount, exitCode }`).
+4. Field names in `returnType` / `retType` structure declarations passed to the runtime.
+
+Internal TypeScript variables, vendor SDK request/response shapes, and JS-side helper types remain camelCase per JS convention. Map vendor camelCase to/from snake_case at the boundary; do not let it leak into the rill dict.
+
+When in doubt: if a host script written in rill ever sees the key, it is snake_case.
+
 ### Build Toolchain
 
 - **tsup**: Bundles each package to ESM (`dist/index.js`)

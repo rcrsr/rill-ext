@@ -193,19 +193,19 @@ $result.messages -> log
 With options:
 
 ```rill
-$gws.gmail_search("label:INBOX", [maxResults: 10]) => $result
+$gws.gmail_search("label:INBOX", [max_results: 10]) => $result
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `query` | string | — | Gmail query string, e.g. `"from:bob subject:invoice"` (required). |
-| `options` | dict | `{}` | Optional overrides: `maxResults` (number). |
+| `options` | dict | `{}` | Optional overrides: `max_results` (number). |
 
 **Result Dict:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `messages` | list | List of message summary dicts. Each has `id` and `threadId`. Use `gmail_read` for body content. |
+| `messages` | list | List of message summary dicts. Each has `id` and `thread_id`. Use `gmail_read` for body content. |
 
 Requires capability: `gmail.search` (default `true`).
 
@@ -222,14 +222,14 @@ $message.body -> log
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `messageId` | string | Gmail message ID (required). |
+| `message_id` | string | Gmail message ID (required). |
 
 **Result Dict:**
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Gmail message ID. |
-| `threadId` | string | Thread ID. |
+| `thread_id` | string | Thread ID. |
 | `subject` | string | Message subject. |
 | `from` | string | Sender email address. |
 | `to` | string | Primary recipient email address. |
@@ -247,7 +247,7 @@ Requires capability: `gmail.read` (default `true`).
 Send a Gmail message.
 
 ```rill
-$gws.gmail_send("bob@example.com", "Hello", "Message body") => $messageId
+$gws.gmail_send("bob@example.com", "Hello", "Message body") => $message_id
 ```
 
 | Parameter | Type | Default | Description |
@@ -289,12 +289,12 @@ Requires capability: `gmail.draft` (default `true`).
 Reply to an existing Gmail message.
 
 ```rill
-$gws.gmail_reply("17abc123def456", "Thanks for the update.") => $messageId
+$gws.gmail_reply("17abc123def456", "Thanks for the update.") => $message_id
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `messageId` | string | — | ID of the message to reply to (required). |
+| `message_id` | string | — | ID of the message to reply to (required). |
 | `body` | string | — | Reply body as plain text (required). |
 | `options` | dict | `{}` | Optional: `cc` (string), `bcc` (string). |
 
@@ -314,7 +314,7 @@ $gws.gmail_flag("17abc123def456", true) => $ok
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `messageId` | string | Gmail message ID (required). |
+| `message_id` | string | Gmail message ID (required). |
 | `flagged` | boolean | `true` to star; `false` to unstar (required). |
 
 Returns `true` on success.
@@ -333,8 +333,8 @@ $gws.gmail_label("17abc123def456", "INBOX") => $ok
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `messageId` | string | Gmail message ID (required). |
-| `labelName` | string | Name of the label to apply (required). |
+| `message_id` | string | Gmail message ID (required). |
+| `label_name` | string | Name of the label to apply (required). |
 
 Returns `true` on success. Subject to `allowedLabels` and `deniedLabels` enforcement.
 
@@ -361,14 +361,14 @@ $gws.drive_list("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs") => $result
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `folderId` | string | — | Folder ID to scope listing (optional). |
+| `folder_id` | string | — | Folder ID to scope listing (optional). |
 | `options` | dict | `{}` | Optional: `pageSize` (number), `query` (string). |
 
 **Result Dict:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `files` | list | List of file metadata dicts. Each has `id`, `name`, `mimeType`, `size`, `owners`, `createdTime`, `modifiedTime`. |
+| `files` | list | List of file metadata dicts. Each has `id`, `name`, `mime_type`, `size`, `owners`, `created_time`, `modified_time`. |
 
 Requires capability: `drive.list` (default `true`).
 
@@ -393,8 +393,8 @@ $gws.drive_upload($content, "report.csv", "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs") =
 |-----------|------|---------|-------------|
 | `content` | string | — | File content as a string (required). |
 | `filename` | string | — | Name of the file to create (required). |
-| `folderId` | string | — | Parent folder ID (optional). Uses Drive root when absent. |
-| `options` | dict | `{}` | Optional: `mimeType` (string). |
+| `folder_id` | string | — | Parent folder ID (optional). Uses Drive root when absent. |
+| `options` | dict | `{}` | Optional: `mime_type` (string). |
 
 **Result Dict:**
 
@@ -402,7 +402,7 @@ $gws.drive_upload($content, "report.csv", "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs") =
 |-------|------|-------------|
 | `id` | string | Drive file ID of the created file. |
 | `name` | string | File name. |
-| `mimeType` | string | MIME type of the created file. |
+| `mime_type` | string | MIME type of the created file. |
 
 Requires capability: `drive.upload` (default `false` — must be explicitly enabled).
 
@@ -419,7 +419,7 @@ $content -> log
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `fileId` | string | Drive file ID (required). |
+| `file_id` | string | Drive file ID (required). |
 
 Returns the file content as a string.
 
@@ -437,7 +437,7 @@ $gws.drive_share("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs", "alice@example.com", "writ
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `fileId` | string | — | Drive file ID (required). |
+| `file_id` | string | — | Drive file ID (required). |
 | `email` | string | — | Email address of the user to share with (required). |
 | `role` | string | `"reader"` | Permission role: `"reader"`, `"commenter"`, or `"writer"`. |
 
@@ -457,7 +457,7 @@ $gws.drive_delete("1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs") => $ok
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `fileId` | string | Drive file ID (required). |
+| `file_id` | string | Drive file ID (required). |
 
 Returns `true` on success. This operation is irreversible.
 
@@ -476,7 +476,7 @@ $meta.name -> log
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `fileId` | string | Drive file ID (required). |
+| `file_id` | string | Drive file ID (required). |
 
 **Result Dict:**
 
@@ -484,11 +484,11 @@ $meta.name -> log
 |-------|------|-------------|
 | `id` | string | Drive file ID. |
 | `name` | string | File name. |
-| `mimeType` | string | MIME type. |
+| `mime_type` | string | MIME type. |
 | `size` | number | File size in bytes. |
-| `createdTime` | string | Creation timestamp as ISO 8601 string. |
-| `modifiedTime` | string | Last modification timestamp as ISO 8601 string. |
-| `webViewLink` | string | URL to view the file in a browser. |
+| `owners` | list | Owner records as `{display_name, email_address}` dicts. |
+| `created_time` | string | Creation timestamp as ISO 8601 string. |
+| `modified_time` | string | Last modification timestamp as ISO 8601 string. |
 
 Requires capability: `drive.read` (default `true`).
 
@@ -507,9 +507,9 @@ $result.events -> log
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `startDate` | string | — | Start of range as ISO 8601 with timezone (required). |
-| `endDate` | string | — | End of range as ISO 8601 with timezone (required). |
-| `options` | dict | `{}` | Optional: `calendarId` (string, default `"primary"`), `maxResults` (number). |
+| `start_date` | string | — | Start of range. Accepts either date-only `YYYY-MM-DD` or ISO 8601 with timezone. Both bounds must use the same form. (required) |
+| `end_date` | string | — | End of range. Accepts either date-only `YYYY-MM-DD` or ISO 8601 with timezone. Both bounds must use the same form. (required) |
+| `options` | dict | `{}` | Optional: `calendar_id` (string, default `"primary"`), `max_results` (number). |
 
 **Result Dict:**
 
@@ -532,7 +532,7 @@ $result.events -> log
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `options` | dict | `{}` | Optional: `calendarId` (string, default `"primary"`). |
+| `options` | dict | `{}` | Optional: `calendar_id` (string, default `"primary"`). |
 
 **Result Dict:**
 
@@ -570,9 +570,9 @@ $gws.calendar_create_event(
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `title` | string | — | Event title (required). |
-| `startTime` | string | — | Start time as ISO 8601 with timezone (required). |
-| `endTime` | string | — | End time as ISO 8601 with timezone (required). |
-| `options` | dict | `{}` | Optional: `calendarId` (string), `location` (string), `attendees` (list of strings), `description` (string). |
+| `start_time` | string | — | Start time as ISO 8601 with timezone (required). |
+| `end_time` | string | — | End time as ISO 8601 with timezone (required). |
+| `options` | dict | `{}` | Optional: `calendar_id` (string), `location` (string), `attendees` (list of strings), `description` (string). |
 
 Returns the created event ID as a string.
 
@@ -596,8 +596,8 @@ $result.schedules -> log
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `emails` | list | List of email addresses to check (required). |
-| `startTime` | string | Start of range as ISO 8601 with timezone (required). |
-| `endTime` | string | End of range as ISO 8601 with timezone (required). |
+| `start_time` | string | Start of range as ISO 8601 with timezone (required). |
+| `end_time` | string | End of range as ISO 8601 with timezone (required). |
 
 **Result Dict:**
 

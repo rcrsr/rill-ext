@@ -12,7 +12,7 @@ import type { CommandConfig } from '../src/types.js';
 import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 describe('command execution', () => {
-  it('executes command and returns stdout, stderr, exitCode', async () => {
+  it('executes command and returns stdout, stderr, exit_code', async () => {
     const ext = createExecExtension({
       commands: { echo: { binary: 'echo' } },
     }, makeFactoryCtx());
@@ -22,7 +22,7 @@ describe('command execution', () => {
     expect(result).toMatchObject({
       stdout: expect.stringContaining('hello world'),
       stderr: '',
-      exitCode: 0,
+      exit_code: 0,
     });
   });
 
@@ -36,7 +36,7 @@ describe('command execution', () => {
     expect(result).toMatchObject({
       stdout: expect.any(String),
       stderr: '',
-      exitCode: 0,
+      exit_code: 0,
     });
   });
 
@@ -48,7 +48,7 @@ describe('command execution', () => {
     const result = await ext.value.echo.fn({ args: [123, 456, true] }, makeRuntimeCtx());
     expect(result).toMatchObject({
       stdout: expect.stringContaining('123'),
-      exitCode: 0,
+      exit_code: 0,
     });
   });
 

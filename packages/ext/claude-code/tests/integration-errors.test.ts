@@ -184,7 +184,7 @@ describe('EC-4, AC-6: Binary not found at spawn (ENOENT)', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new SpawnError('binary_missing', 'claude binary not found', { binaryPath: 'claude' });
+      throw new SpawnError('binary_missing', 'claude binary not found', { binary_path: 'claude' });
     });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -210,7 +210,7 @@ describe('EC-5, AC-7: Permission denied (EACCES)', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
       throw new SpawnError('binary_eacces', 'Permission denied: claude', {
-        binaryPath: '/usr/bin/claude',
+        binary_path: '/usr/bin/claude',
       });
     });
 
@@ -237,7 +237,7 @@ describe('EC-6: Generic spawn failure', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
       throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: Unknown spawn error', {
-        binaryPath: 'claude',
+        binary_path: 'claude',
       });
     });
 
@@ -267,9 +267,9 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
     vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
       cost: 0,
-      exitCode: 1,
+      exit_code: 1,
       duration: 0,
     });
 
@@ -281,7 +281,7 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('cli_timeout', 'Claude CLI timeout after 5000ms', { timeoutMs: 5000 }),
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 5000ms', { timeout_ms: 5000 }),
       ),
       dispose: vi.fn(),
     });
@@ -312,9 +312,9 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
       cost: 0,
-      exitCode: 1,
+      exit_code: 1,
       duration: 0,
     });
 
@@ -326,7 +326,7 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('exit_nonzero', 'Claude CLI exited with code 1', { exitCode: 1 }),
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 1', { exit_code: 1 }),
       ),
       dispose: vi.fn(),
     });
@@ -356,9 +356,9 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
       cost: 0,
-      exitCode: 127,
+      exit_code: 127,
       duration: 0,
     });
 
@@ -370,7 +370,7 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('exit_nonzero', 'Claude CLI exited with code 127', { exitCode: 127 }),
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 127', { exit_code: 127 }),
       ),
       dispose: vi.fn(),
     });
@@ -436,9 +436,9 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
     vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
       cost: 0,
-      exitCode: 2,
+      exit_code: 2,
       duration: 0,
     });
 
@@ -450,7 +450,7 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('exit_nonzero', 'Claude CLI exited with code 2', { exitCode: 2 }),
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 2', { exit_code: 2 }),
       ),
       dispose: vi.fn(),
     });
@@ -483,7 +483,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
       throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: test error', {
-        binaryPath: 'claude',
+        binary_path: 'claude',
       });
     });
 
@@ -507,9 +507,9 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
       cost: 0,
-      exitCode: 1,
+      exit_code: 1,
       duration: 0,
     });
 
@@ -521,7 +521,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('cli_timeout', 'Claude CLI timeout after 10000ms', { timeoutMs: 10000 }),
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 10000ms', { timeout_ms: 10000 }),
       ),
       dispose: vi.fn(),
     });
@@ -585,9 +585,9 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
     vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
       cost: 0,
-      exitCode: 3,
+      exit_code: 3,
       duration: 0,
     });
 
@@ -599,7 +599,7 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('exit_nonzero', 'Claude CLI exited with code 3', { exitCode: 3 }),
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 3', { exit_code: 3 }),
       ),
       dispose: vi.fn(),
     });
@@ -630,7 +630,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new SpawnError('binary_missing', 'claude binary not found', { binaryPath: 'claude' });
+      throw new SpawnError('binary_missing', 'claude binary not found', { binary_path: 'claude' });
     });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -653,9 +653,9 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 },
+      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
       cost: 0,
-      exitCode: 1,
+      exit_code: 1,
       duration: 0,
     });
 
@@ -667,7 +667,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('cli_timeout', 'Claude CLI timeout after 15000ms', { timeoutMs: 15000 }),
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 15000ms', { timeout_ms: 15000 }),
       ),
       dispose: vi.fn(),
     });
@@ -689,7 +689,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
       throw new SpawnError('binary_eacces', 'Permission denied: claude', {
-        binaryPath: '/usr/bin/claude',
+        binary_path: '/usr/bin/claude',
       });
     });
 

@@ -32,8 +32,8 @@ export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
     controller: AbortController
   ): Promise<RillValue> => {
     const emails = args['emails'];
-    const startTime = args['startTime'];
-    const endTime = args['endTime'];
+    const startTime = args['start_time'];
+    const endTime = args['end_time'];
     // BC-4: Validate emails before fetch
     if (!Array.isArray(emails) || emails.length === 0) {
       failInput(ctx, 'invalid_arg', 'google: calendar.free_busy: emails must be non-empty');
@@ -45,14 +45,14 @@ export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
       failInput(ctx, 'invalid_arg', 'google: calendar.free_busy: emails must be non-empty');
     }
     if (typeof startTime !== 'string' || startTime.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: startTime must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: start_time must be a non-empty string');
     }
     if (typeof endTime !== 'string' || endTime.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: endTime must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: end_time must be a non-empty string');
     }
     // EC-13: Reject naive ISO timestamps
-    assertIsoTimestamp(ctx, startTime, 'startTime');
-    assertIsoTimestamp(ctx, endTime, 'endTime');
+    assertIsoTimestamp(ctx, startTime, 'start_time');
+    assertIsoTimestamp(ctx, endTime, 'end_time');
     const body = {
       timeMin: startTime,
       timeMax: endTime,

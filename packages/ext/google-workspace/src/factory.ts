@@ -24,6 +24,7 @@ import {
   type CallableFn,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
+  type RillParam,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -390,6 +391,16 @@ export function createGoogleWorkspaceExtension(
   const stringReturnType = structureToTypeValue({ kind: 'string' });
   const boolReturnType = structureToTypeValue({ kind: 'bool' });
 
+  // drive_list and drive_upload treat folder_id as optional (root when absent),
+  // but p.str('folder_id') would mark it required. Define a custom RillParam
+  // with an empty-string defaultValue so callers may omit it.
+  const folderIdOptionalParam: RillParam = {
+    name: 'folder_id',
+    type: { kind: 'string' },
+    defaultValue: '',
+    annotations: { description: 'Drive folder ID; empty selects the root.' },
+  };
+
   const callableDict = {
     // Gmail (7)
     gmail_search: toCallable({
@@ -402,7 +413,7 @@ export function createGoogleWorkspaceExtension(
     }),
     gmail_read: toCallable({
       fn: gmailReadWrapped as CallableFn,
-      params: [p.str('messageId')],
+      params: [p.str('message_id')],
       returnType: dictReturnType,
     }),
     gmail_send: toCallable({
@@ -428,7 +439,7 @@ export function createGoogleWorkspaceExtension(
     gmail_reply: toCallable({
       fn: gmailReplyWrapped as CallableFn,
       params: [
-        p.str('messageId'),
+        p.str('message_id'),
         p.str('body'),
         p.dict('options', undefined, {}),
       ],
@@ -436,19 +447,19 @@ export function createGoogleWorkspaceExtension(
     }),
     gmail_flag: toCallable({
       fn: gmailFlagWrapped as CallableFn,
-      params: [p.str('messageId'), p.bool('flagged')],
+      params: [p.str('message_id'), p.bool('flagged')],
       returnType: boolReturnType,
     }),
     gmail_label: toCallable({
       fn: gmailLabelWrapped as CallableFn,
-      params: [p.str('messageId'), p.str('labelName')],
+      params: [p.str('message_id'), p.str('label_name')],
       returnType: boolReturnType,
     }),
     // Drive (6)
     drive_list: toCallable({
       fn: driveListWrapped as CallableFn,
       params: [
-        p.str('folderId'),
+        folderIdOptionalParam,
         p.dict('options', undefined, {}),
       ],
       returnType: dictReturnType,
@@ -458,20 +469,20 @@ export function createGoogleWorkspaceExtension(
       params: [
         p.str('content'),
         p.str('filename'),
-        p.str('folderId'),
+        folderIdOptionalParam,
         p.dict('options', undefined, {}),
       ],
       returnType: dictReturnType,
     }),
     drive_download: toCallable({
       fn: driveDownloadWrapped as CallableFn,
-      params: [p.str('fileId')],
+      params: [p.str('file_id')],
       returnType: stringReturnType,
     }),
     drive_share: toCallable({
       fn: driveShareWrapped as CallableFn,
       params: [
-        p.str('fileId'),
+        p.str('file_id'),
         p.str('email'),
         p.str('role'),
       ],
@@ -479,20 +490,20 @@ export function createGoogleWorkspaceExtension(
     }),
     drive_delete: toCallable({
       fn: driveDeleteWrapped as CallableFn,
-      params: [p.str('fileId')],
+      params: [p.str('file_id')],
       returnType: boolReturnType,
     }),
     drive_get_metadata: toCallable({
       fn: driveGetMetadataWrapped as CallableFn,
-      params: [p.str('fileId')],
+      params: [p.str('file_id')],
       returnType: dictReturnType,
     }),
     // Calendar (4)
     calendar_events: toCallable({
       fn: calendarEventsWrapped as CallableFn,
       params: [
-        p.str('startDate'),
-        p.str('endDate'),
+        p.str('start_date'),
+        p.str('end_date'),
         p.dict('options', undefined, {}),
       ],
       returnType: dictReturnType,
@@ -506,8 +517,8 @@ export function createGoogleWorkspaceExtension(
       fn: calendarCreateEventWrapped as CallableFn,
       params: [
         p.str('title'),
-        p.str('startTime'),
-        p.str('endTime'),
+        p.str('start_time'),
+        p.str('end_time'),
         p.dict('options', undefined, {}),
       ],
       returnType: stringReturnType,
@@ -516,8 +527,8 @@ export function createGoogleWorkspaceExtension(
       fn: calendarFreeBusyWrapped as CallableFn,
       params: [
         p.list('emails', { kind: 'string' }),
-        p.str('startTime'),
-        p.str('endTime'),
+        p.str('start_time'),
+        p.str('end_time'),
       ],
       returnType: dictReturnType,
     }),

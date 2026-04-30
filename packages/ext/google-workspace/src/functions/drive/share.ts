@@ -32,9 +32,9 @@ export function makeDriveShare(deps: DriveShareDeps): (
     ctx: RuntimeContext,
     controller: AbortController
   ): Promise<RillValue> => {
-    const fileId = args['fileId'];
+    const fileId = args['file_id'];
     if (typeof fileId !== 'string' || fileId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: fileId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: file_id must be a non-empty string');
     }
     const email = args['email'];
     if (typeof email !== 'string' || email.trim() === '') {

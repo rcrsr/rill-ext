@@ -159,7 +159,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'gmail_reply').fn(
-        { messageId: 'm1', body: 'ok' },
+        { message_id: 'm1', body: 'ok' },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -175,7 +175,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'gmail_flag').fn(
-        { messageId: 'm1', flagged: true },
+        { message_id: 'm1', flagged: true },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -191,7 +191,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'gmail_label').fn(
-        { messageId: 'm1', labelName: 'Important' },
+        { message_id: 'm1', label_name: 'Important' },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -219,7 +219,7 @@ describe('capability gating [AC-4, EC-3]', () => {
     const ext = createGoogleWorkspaceExtension(makeNoCapConfig(), makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-      const caught = (await getCallable(ext, 'gmail_read').fn({ messageId: 'm1' }, ctx)) as RillValue;
+      const caught = (await getCallable(ext, 'gmail_read').fn({ message_id: 'm1' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
   expect(getStatus(caught).message).toContain('gmail.read');
@@ -249,7 +249,7 @@ describe('gmail_search success [AC-12, AC-13]', () => {
     expect(Array.isArray(messages)).toBe(true);
     expect(messages).toHaveLength(1);
     expect(messages[0]!['id']).toBe('m1');
-    expect(messages[0]!['threadId']).toBe('t1');
+    expect(messages[0]!['thread_id']).toBe('t1');
   });
 
   it('emits google:gmail:search event with duration [AC-13]', async () => {
@@ -302,7 +302,7 @@ describe('gmail_read success [AC-12, AC-13]', () => {
         { name: 'Subject', value: 'Hello World' },
         { name: 'Date', value: 'Mon, 01 Jan 2024 00:00:00 +0000' },
       ],
-      mimeType: 'text/plain',
+      mime_type: 'text/plain',
       body: {
         data: Buffer.from('Hello from Alice!').toString('base64'),
       },
@@ -318,11 +318,11 @@ describe('gmail_read success [AC-12, AC-13]', () => {
     const result = (await callGmail(
       createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_read',
-      { messageId: 'msg-1' }
+      { message_id: 'msg-1' }
     )) as Record<string, unknown>;
 
     expect(result['id']).toBe('msg-1');
-    expect(result['threadId']).toBe('thread-1');
+    expect(result['thread_id']).toBe('thread-1');
     expect(typeof result['body']).toBe('string');
     expect(Array.isArray(result['attachments'])).toBe(true);
 
@@ -343,7 +343,7 @@ describe('gmail_read success [AC-12, AC-13]', () => {
     const onLogEvent = vi.fn();
     ctx.callbacks.onLogEvent = onLogEvent;
 
-    await getCallable(ext, 'gmail_read').fn({ messageId: 'msg-1' }, ctx);
+    await getCallable(ext, 'gmail_read').fn({ message_id: 'msg-1' }, ctx);
 
     expect(onLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'google:gmail:read' })
@@ -460,7 +460,7 @@ describe('gmail_reply success [AC-12, AC-13]', () => {
     const result = await callGmail(
       createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_reply',
-      { messageId: 'original-msg', body: 'Reply here' }
+      { message_id: 'original-msg', body: 'Reply here' }
     );
 
     expect(result).toBe('reply-sent-id');
@@ -472,7 +472,7 @@ describe('gmail_reply success [AC-12, AC-13]', () => {
     await callGmail(
       createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_reply',
-      { messageId: 'original-msg', body: 'Reply here' }
+      { message_id: 'original-msg', body: 'Reply here' }
     );
 
     expect(mockFetchImpl.mock.calls).toHaveLength(2);
@@ -491,7 +491,7 @@ describe('gmail_reply success [AC-12, AC-13]', () => {
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'gmail_reply').fn(
-      { messageId: 'original-msg', body: 'Reply here' },
+      { message_id: 'original-msg', body: 'Reply here' },
       ctx
     );
 
@@ -512,7 +512,7 @@ describe('gmail_flag success [AC-12, AC-13]', () => {
     const result = await callGmail(
       createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_flag',
-      { messageId: 'm1', flagged: true }
+      { message_id: 'm1', flagged: true }
     );
 
     expect(result).toBe(true);
@@ -526,7 +526,7 @@ describe('gmail_flag success [AC-12, AC-13]', () => {
     const result = await callGmail(
       createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_flag',
-      { messageId: 'm1', flagged: false }
+      { message_id: 'm1', flagged: false }
     );
 
     expect(result).toBe(true);
@@ -543,7 +543,7 @@ describe('gmail_flag success [AC-12, AC-13]', () => {
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'gmail_flag').fn(
-      { messageId: 'm1', flagged: true },
+      { message_id: 'm1', flagged: true },
       ctx
     );
 
@@ -573,7 +573,7 @@ describe('gmail_label success [AC-12, AC-13]', () => {
     const result = await callGmail(
       createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx()),
       'gmail_label',
-      { messageId: 'm1', labelName: 'Important' }
+      { message_id: 'm1', label_name: 'Important' }
     );
 
     expect(result).toBe(true);
@@ -588,7 +588,7 @@ describe('gmail_label success [AC-12, AC-13]', () => {
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'gmail_label').fn(
-      { messageId: 'm1', labelName: 'Important' },
+      { message_id: 'm1', label_name: 'Important' },
       ctx
     );
 
@@ -617,7 +617,7 @@ describe('BC-1: gmail_search maxResults truncation', () => {
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'gmail_search').fn(
-      { query: 'test', options: { maxResults: 50 } },
+      { query: 'test', options: { max_results: 50 } },
       ctx
     );
 
@@ -640,7 +640,7 @@ describe('BC-1: gmail_search maxResults truncation', () => {
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'gmail_search').fn(
-      { query: 'test', options: { maxResults: 10 } },
+      { query: 'test', options: { max_results: 10 } },
       ctx
     );
 
@@ -667,8 +667,8 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
 
     const ext = createGoogleWorkspaceExtension(ALL_GMAIL_CONFIG, makeFactoryCtx());
     const result = await callGmail(ext, 'gmail_label', {
-      messageId: 'm1',
-      labelName: 'AnyLabel',
+      message_id: 'm1',
+      label_name: 'AnyLabel',
     });
 
     expect(result).toBe(true);
@@ -687,7 +687,7 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'gmail_label').fn(
-        { messageId: 'm1', labelName: 'Spam' },
+        { message_id: 'm1', label_name: 'Spam' },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -706,7 +706,7 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'gmail_label').fn(
-        { messageId: 'm1', labelName: 'Spam' },
+        { message_id: 'm1', label_name: 'Spam' },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -731,8 +731,8 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     }, makeFactoryCtx());
 
     const result = await callGmail(ext, 'gmail_label', {
-      messageId: 'm1',
-      labelName: 'IMPORTANT',
+      message_id: 'm1',
+      label_name: 'IMPORTANT',
     });
 
     expect(result).toBe(true);
@@ -747,7 +747,7 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     const ctx = createRuntimeContext();
 
       const caught = (await getCallable(ext, 'gmail_label').fn(
-        { messageId: 'm1', labelName: 'Important' },
+        { message_id: 'm1', label_name: 'Important' },
         ctx
       )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
@@ -852,7 +852,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
         { name: 'Subject', value: 'Session Token Test' },
         { name: 'Date', value: 'Mon, 01 Jan 2024 00:00:00 +0000' },
       ],
-      mimeType: 'text/plain',
+      mime_type: 'text/plain',
       body: { data: Buffer.from('Session body').toString('base64') },
       parts: [],
     },
@@ -884,7 +884,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
     ctx.variables.set('google_token', 'session-resolved-token');
 
     const result = (await getCallable(ext, 'gmail_read').fn(
-      { messageId: 'msg-session' },
+      { message_id: 'msg-session' },
       ctx
     )) as Record<string, unknown>;
 
@@ -896,7 +896,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
 
     // Verify rill primitive return shape [AC-12]
     expect(result['id']).toBe('msg-session');
-    expect(result['threadId']).toBe('thread-session');
+    expect(result['thread_id']).toBe('thread-session');
     expect(typeof result['body']).toBe('string');
     expect(Array.isArray(result['attachments'])).toBe(true);
   });
@@ -923,7 +923,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
     const ctx = createRuntimeContext();
     // Intentionally do not set 'missing_token' in ctx.variables
 
-    const caught = (await getCallable(ext, 'gmail_read').fn({ messageId: 'msg-x' }, ctx)) as RillValue;
+    const caught = (await getCallable(ext, 'gmail_read').fn({ message_id: 'msg-x' }, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('AUTH');
     expect(getStatus(caught).message).toContain("session token 'missing_token' not found");
@@ -1124,8 +1124,8 @@ describe('AC-3: callable params are valid RillParam objects', () => {
     const ext = createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx());
     const callable = (ext.value as Record<string, ApplicationCallable>)['gmail_label']!;
 
-    expect(callable.params[0]!.name).toBe('messageId');
-    expect(callable.params[1]!.name).toBe('labelName');
+    expect(callable.params[0]!.name).toBe('message_id');
+    expect(callable.params[1]!.name).toBe('label_name');
     expect((callable.params[0]!.type as { kind: string }).kind).toBe('string');
     expect((callable.params[1]!.type as { kind: string }).kind).toBe('string');
   });

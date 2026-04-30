@@ -195,7 +195,7 @@ describe('capability gates', () => {
       const ext = createOutlookExtension(configWith({ mailRead: false }), makeFactoryCtx());
       const ctx = createRuntimeContext();
       await expectForbidden(
-        getCallable(ext, 'read').fn({ messageId: 'msg-1' }, ctx),
+        getCallable(ext, 'read').fn({ message_id: 'msg-1' }, ctx),
         'outlook: mail.read not enabled',
       );
     });
@@ -224,7 +224,7 @@ describe('capability gates', () => {
       const ext = createOutlookExtension(configWith({ mailSend: false }), makeFactoryCtx());
       const ctx = createRuntimeContext();
       await expectForbidden(
-        getCallable(ext, 'reply').fn({ messageId: 'm', body: 'b' }, ctx),
+        getCallable(ext, 'reply').fn({ message_id: 'm', body: 'b' }, ctx),
         'outlook: mail.send not enabled',
       );
     });
@@ -246,7 +246,7 @@ describe('capability gates', () => {
       const ext = createOutlookExtension(configWith({ mailFlag: false }), makeFactoryCtx());
       const ctx = createRuntimeContext();
       await expectForbidden(
-        getCallable(ext, 'flag').fn({ messageId: 'm' }, ctx),
+        getCallable(ext, 'flag').fn({ message_id: 'm' }, ctx),
         'outlook: mail.flag not enabled',
       );
     });

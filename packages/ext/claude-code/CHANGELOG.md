@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- Result dict keys now use snake_case at the rill boundary, aligning with the rule documented in root `CLAUDE.md` §Boundary Key Naming. Renames: `exitCode` → `exit_code`, `tokens.cacheRead` → `tokens.cache_read`, `tokens.cacheWrite5m` → `tokens.cache_write_5m`, `tokens.cacheWrite1h` → `tokens.cache_write_1h`. Error metadata under `meta.raw` also renamed: `binaryPath` → `binary_path`, `timeoutMs` → `timeout_ms`, `exitCode` → `exit_code`, `originalError` → `original_error`. Host scripts reading any of these fields must update.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

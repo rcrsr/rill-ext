@@ -102,7 +102,7 @@ claude_code::prompt("Explain TCP handshakes")() => $result
 $result.result       # Response text
 $result.tokens       # Token usage breakdown
 $result.cost         # Cost in USD
-$result.exitCode     # CLI exit code
+$result.exit_code    # CLI exit code
 $result.duration     # Execution time in ms
 ```
 
@@ -173,12 +173,12 @@ All 3 functions resolve to the same structure:
 | `result` | string | Combined text output |
 | `tokens` | dict | Token usage breakdown |
 | `tokens.prompt` | number | Non-cached prompt tokens |
-| `tokens.cacheWrite5m` | number | 5-minute cache write tokens |
-| `tokens.cacheWrite1h` | number | 1-hour cache write tokens |
-| `tokens.cacheRead` | number | Cache read tokens |
+| `tokens.cache_write_5m` | number | 5-minute cache write tokens |
+| `tokens.cache_write_1h` | number | 1-hour cache write tokens |
+| `tokens.cache_read` | number | Cache read tokens |
 | `tokens.output` | number | Output tokens |
 | `cost` | number | Total cost in USD |
-| `exitCode` | number | CLI exit code (0 = success) |
+| `exit_code` | number | CLI exit code (0 = success) |
 | `duration` | number | Execution time in ms |
 
 ## Error Behavior

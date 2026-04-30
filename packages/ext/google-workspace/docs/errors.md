@@ -76,12 +76,12 @@ These errors return invalid values when Calendar calls violate date format, all-
 
 | Condition | Atom | `meta.raw.kind` | Message |
 |-----------|------|---|---------|
-| `startDate` / `endDate` not ISO 8601 with timezone | `#INVALID_INPUT` | `invalid_input` | `google: <field> must be ISO 8601 with timezone` |
-| `startTime` / `endTime` not ISO 8601 with timezone | `#INVALID_INPUT` | `invalid_input` | `google: <field> must be ISO 8601 with timezone` |
+| `start_date` / `end_date` not ISO 8601 with timezone | `#INVALID_INPUT` | `invalid_input` | `google: <field> must be ISO 8601 with timezone` |
+| `start_time` / `end_time` not ISO 8601 with timezone | `#INVALID_INPUT` | `invalid_input` | `google: <field> must be ISO 8601 with timezone` |
 | `denyAllDay: true` and event is all-day | `#FORBIDDEN` | `all_day_denied` | `google: all-day events not permitted` |
 | Calendar ID not in `allowedCalendarIds` | `#FORBIDDEN` | `calendar_not_allowed` | `google: calendar '<id>' not in allowed set` |
 
-Where `<field>` is the parameter name (e.g. `startDate`, `startTime`) and `<id>` is the calendar ID.
+Where `<field>` is the parameter name (e.g. `start_date`, `start_time`) and `<id>` is the calendar ID.
 
 A naive ISO 8601 string without a timezone suffix (e.g. `"2026-04-26T09:00:00"` without `Z` or `+HH:MM`) is considered invalid.
 

@@ -15,11 +15,11 @@ export interface TokenCounts {
   /** Non-cached prompt tokens */
   readonly prompt: number;
   /** Tokens written to 5-minute cache */
-  readonly cacheWrite5m: number;
+  readonly cache_write_5m: number;
   /** Tokens written to 1-hour cache */
-  readonly cacheWrite1h: number;
+  readonly cache_write_1h: number;
   /** Tokens read from cache */
-  readonly cacheRead: number;
+  readonly cache_read: number;
   /** Output tokens generated */
   readonly output: number;
 }
@@ -186,7 +186,7 @@ export interface ClaudeCodeResult {
   /** Total cost in USD */
   readonly cost: number;
   /** Exit code from CLI process (0 = success) */
-  readonly exitCode: number;
+  readonly exit_code: number;
   /** Total execution duration in milliseconds */
   readonly duration: number;
 }

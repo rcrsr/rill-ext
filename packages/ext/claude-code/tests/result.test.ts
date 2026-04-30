@@ -14,7 +14,7 @@ import type {
 
 describe('extractResult', () => {
   describe('basic extraction', () => {
-    // AC-1: Basic prompt returns result dict with text, tokens, cost, exitCode 0
+    // AC-1: Basic prompt returns result dict with text, tokens, cost, exit_code 0
     it('extracts complete result dict from single assistant message', () => {
       const messages: ClaudeMessage[] = [
         {
@@ -43,10 +43,10 @@ describe('extractResult', () => {
       expect(result.tokens.output).toBe(5);
       expect(result.cost).toBe(0.001);
       expect(result.duration).toBe(1500);
-      expect(result.exitCode).toBe(0);
+      expect(result.exit_code).toBe(0);
     });
 
-    it('sets exitCode to 1 when result is_error is true', () => {
+    it('sets exit_code to 1 when result is_error is true', () => {
       const messages: ClaudeMessage[] = [
         {
           type: 'result',
@@ -59,7 +59,7 @@ describe('extractResult', () => {
 
       const result = extractResult(messages);
 
-      expect(result.exitCode).toBe(1);
+      expect(result.exit_code).toBe(1);
     });
   });
 
@@ -237,9 +237,9 @@ describe('extractResult', () => {
 
       expect(result.tokens.prompt).toBe(100);
       expect(result.tokens.output).toBe(50);
-      expect(result.tokens.cacheRead).toBe(20);
-      expect(result.tokens.cacheWrite5m).toBe(30);
-      expect(result.tokens.cacheWrite1h).toBe(10);
+      expect(result.tokens.cache_read).toBe(20);
+      expect(result.tokens.cache_write_5m).toBe(30);
+      expect(result.tokens.cache_write_1h).toBe(10);
     });
 
     // AC-4: Multiple usage fields accumulated correctly
@@ -279,7 +279,7 @@ describe('extractResult', () => {
 
       expect(result.tokens.prompt).toBe(300); // 100 + 200
       expect(result.tokens.output).toBe(125); // 50 + 75
-      expect(result.tokens.cacheRead).toBe(30);
+      expect(result.tokens.cache_read).toBe(30);
     });
 
     it('accumulates cache write tokens across messages', () => {
@@ -319,8 +319,8 @@ describe('extractResult', () => {
 
       const result = extractResult(messages);
 
-      expect(result.tokens.cacheWrite5m).toBe(250); // 100 + 150
-      expect(result.tokens.cacheWrite1h).toBe(125); // 50 + 75
+      expect(result.tokens.cache_write_5m).toBe(250); // 100 + 150
+      expect(result.tokens.cache_write_1h).toBe(125); // 50 + 75
     });
 
     it('includes usage tokens from result message', () => {
@@ -374,9 +374,9 @@ describe('extractResult', () => {
       const result = extractResult(messages);
 
       expect(result.tokens.prompt).toBe(0);
-      expect(result.tokens.cacheWrite5m).toBe(0);
-      expect(result.tokens.cacheWrite1h).toBe(0);
-      expect(result.tokens.cacheRead).toBe(0);
+      expect(result.tokens.cache_write_5m).toBe(0);
+      expect(result.tokens.cache_write_1h).toBe(0);
+      expect(result.tokens.cache_read).toBe(0);
       expect(result.tokens.output).toBe(0);
     });
 
@@ -409,8 +409,8 @@ describe('extractResult', () => {
 
       expect(result.tokens.prompt).toBe(100);
       expect(result.tokens.output).toBe(0);
-      expect(result.tokens.cacheWrite5m).toBe(20);
-      expect(result.tokens.cacheWrite1h).toBe(0);
+      expect(result.tokens.cache_write_5m).toBe(20);
+      expect(result.tokens.cache_write_1h).toBe(0);
     });
   });
 
@@ -521,13 +521,13 @@ describe('extractResult', () => {
 
       expect(result.result).toBe('');
       expect(result.tokens.prompt).toBe(0);
-      expect(result.tokens.cacheWrite5m).toBe(0);
-      expect(result.tokens.cacheWrite1h).toBe(0);
-      expect(result.tokens.cacheRead).toBe(0);
+      expect(result.tokens.cache_write_5m).toBe(0);
+      expect(result.tokens.cache_write_1h).toBe(0);
+      expect(result.tokens.cache_read).toBe(0);
       expect(result.tokens.output).toBe(0);
       expect(result.cost).toBe(0);
       expect(result.duration).toBe(0);
-      expect(result.exitCode).toBe(0);
+      expect(result.exit_code).toBe(0);
     });
   });
 });

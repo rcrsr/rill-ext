@@ -95,7 +95,7 @@ export function createExecExtension(
         return {
           stdout: cmdResult.stdout,
           stderr: cmdResult.stderr,
-          exitCode: cmdResult.exitCode,
+          exit_code: cmdResult.exitCode,
         };
       } finally {
         const index = abortControllers.indexOf(controller);

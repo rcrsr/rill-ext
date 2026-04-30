@@ -112,7 +112,7 @@ describe('AC-4: capability gating', () => {
 
   it('drive_download with download:false → #FORBIDDEN "google: drive.download not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
-      const caught = (await callDrive(ext, 'drive_download', { fileId: 'f1' })) as RillValue;
+      const caught = (await callDrive(ext, 'drive_download', { file_id: 'f1' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
   expect(getStatus(caught).message).toBe('google: drive.download not enabled');
@@ -121,7 +121,7 @@ describe('AC-4: capability gating', () => {
 
   it('drive_share with share:false → #FORBIDDEN "google: drive.share not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
-      const caught = (await callDrive(ext, 'drive_share', { fileId: 'f1', email: 'a@b.com', role: 'reader' })) as RillValue;
+      const caught = (await callDrive(ext, 'drive_share', { file_id: 'f1', email: 'a@b.com', role: 'reader' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
   expect(getStatus(caught).message).toBe('google: drive.share not enabled');
@@ -130,7 +130,7 @@ describe('AC-4: capability gating', () => {
 
   it('drive_delete with delete:false → #FORBIDDEN "google: drive.delete not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
-      const caught = (await callDrive(ext, 'drive_delete', { fileId: 'f1' })) as RillValue;
+      const caught = (await callDrive(ext, 'drive_delete', { file_id: 'f1' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
   expect(getStatus(caught).message).toBe('google: drive.delete not enabled');
@@ -139,7 +139,7 @@ describe('AC-4: capability gating', () => {
 
   it('drive_get_metadata with read:false → #FORBIDDEN "google: drive.read not enabled"; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(NO_CAPS_CONFIG, makeFactoryCtx());
-      const caught = (await callDrive(ext, 'drive_get_metadata', { fileId: 'f1' })) as RillValue;
+      const caught = (await callDrive(ext, 'drive_get_metadata', { file_id: 'f1' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
   expect(getStatus(caught).message).toBe('google: drive.read not enabled');
@@ -180,7 +180,7 @@ describe('drive_list success cases', () => {
     const file = result.files[0] as Record<string, unknown>;
     expect(file['id']).toBe('f1');
     expect(file['name']).toBe('doc.txt');
-    expect(file['mimeType']).toBe('text/plain');
+    expect(file['mime_type']).toBe('text/plain');
     expect(file['size']).toBe(100);
   });
 
@@ -247,7 +247,7 @@ describe('drive_upload success cases', () => {
 
     expect(result['id']).toBe('u1');
     expect(result['name']).toBe('file.txt');
-    expect(result['mimeType']).toBe('text/plain');
+    expect(result['mime_type']).toBe('text/plain');
     expect(result['size']).toBe(100);
     expect(result['owner']).toBe('owner@example.com');
 
@@ -306,7 +306,7 @@ describe('drive_download success cases', () => {
       arrayBuffer: () => Promise.resolve(arrayBuf),
     }) as typeof fetch;
 
-    const result = await callDrive(ext, 'drive_download', { fileId: 'f1' });
+    const result = await callDrive(ext, 'drive_download', { file_id: 'f1' });
 
     expect(typeof result).toBe('string');
     const decoded = Buffer.from(result as string, 'base64').toString('utf8');
@@ -327,7 +327,7 @@ describe('drive_download success cases', () => {
     }) as typeof fetch;
 
     await getCallable(ext, 'drive_download').fn(
-      { fileId: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
+      { file_id: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
       ctx
     );
 
@@ -350,7 +350,7 @@ describe('drive_share success cases', () => {
     }) as typeof fetch;
 
     const result = await callDrive(ext, 'drive_share', {
-      fileId: 'f1',
+      file_id: 'f1',
       email: 'user@example.com',
       role: 'reader',
     });
@@ -371,7 +371,7 @@ describe('drive_share success cases', () => {
     }) as typeof fetch;
 
     await getCallable(ext, 'drive_share').fn(
-      { fileId: 'f1', email: 'u@example.com', role: 'writer' } as Record<string, import('@rcrsr/rill').RillValue>,
+      { file_id: 'f1', email: 'u@example.com', role: 'writer' } as Record<string, import('@rcrsr/rill').RillValue>,
       ctx
     );
 
@@ -392,7 +392,7 @@ describe('drive_delete success cases', () => {
       status: 204,
     }) as typeof fetch;
 
-    const result = await callDrive(ext, 'drive_delete', { fileId: 'f1' });
+    const result = await callDrive(ext, 'drive_delete', { file_id: 'f1' });
 
     expect(result).toBe(true);
   });
@@ -409,7 +409,7 @@ describe('drive_delete success cases', () => {
     }) as typeof fetch;
 
     await getCallable(ext, 'drive_delete').fn(
-      { fileId: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
+      { file_id: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
       ctx
     );
 
@@ -441,17 +441,17 @@ describe('drive_get_metadata success cases', () => {
       json: () => Promise.resolve(metadata),
     }) as typeof fetch;
 
-    const result = await callDrive(ext, 'drive_get_metadata', { fileId: 'f1' }) as Record<string, unknown>;
+    const result = await callDrive(ext, 'drive_get_metadata', { file_id: 'f1' }) as Record<string, unknown>;
 
     expect(result['id']).toBe('f1');
     expect(result['name']).toBe('report.pdf');
-    expect(result['mimeType']).toBe('application/pdf');
+    expect(result['mime_type']).toBe('application/pdf');
     expect(result['size']).toBe(2048);
     expect(Array.isArray(result['owners'])).toBe(true);
     const owners = result['owners'] as Array<Record<string, string>>;
-    expect(owners[0]!['emailAddress']).toBe('bob@example.com');
-    expect(result['createdTime']).toBe('2024-01-01T00:00:00Z');
-    expect(result['modifiedTime']).toBe('2024-01-15T12:00:00Z');
+    expect(owners[0]!['email_address']).toBe('bob@example.com');
+    expect(result['created_time']).toBe('2024-01-01T00:00:00Z');
+    expect(result['modified_time']).toBe('2024-01-15T12:00:00Z');
   });
 
   it('AC-13: emits "google:drive:get_metadata" event on success', async () => {
@@ -467,7 +467,7 @@ describe('drive_get_metadata success cases', () => {
     }) as typeof fetch;
 
     await getCallable(ext, 'drive_get_metadata').fn(
-      { fileId: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
+      { file_id: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
       ctx
     );
 
@@ -494,7 +494,7 @@ describe('EC-7: allowedFolderIds restriction', () => {
 
   it('drive_list with folderId not in allowedFolderIds → #FORBIDDEN; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(config, makeFactoryCtx());
-      const caught = (await callDrive(ext, 'drive_list', { folderId: 'F2' })) as RillValue;
+      const caught = (await callDrive(ext, 'drive_list', { folder_id: 'F2' })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
   expect(getStatus(caught).message).toBe("google: folder 'F2' not in allowed set");
@@ -510,7 +510,7 @@ describe('EC-7: allowedFolderIds restriction', () => {
       json: () => Promise.resolve({ files: [] }),
     }) as typeof fetch;
 
-    const result = await callDrive(ext, 'drive_list', { folderId: 'F1' }) as { files: unknown[] };
+    const result = await callDrive(ext, 'drive_list', { folder_id: 'F1' }) as { files: unknown[] };
     expect(result.files).toHaveLength(0);
     expect(globalThis.fetch).toHaveBeenCalledOnce();
   });
@@ -534,7 +534,7 @@ describe('EC-7: allowedFolderIds restriction', () => {
       const caught = (await callDrive(ext, 'drive_upload', {
         content: BASE64_100,
         filename: 'file.txt',
-        folderId: 'F2',
+        folder_id: 'F2',
       })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
@@ -561,7 +561,7 @@ describe('EC-8: deniedMimeTypes restriction', () => {
       const caught = (await callDrive(ext, 'drive_upload', {
         content: BASE64_100,
         filename: 'evil.bin',
-        options: { mimeType: 'application/x-evil' },
+        options: { mime_type: 'application/x-evil' },
       })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
@@ -625,7 +625,7 @@ describe('EC-10: invalid role for drive_share', () => {
   it('drive_share with role="invalid-role" → #INVALID_INPUT with role message; no fetch', async () => {
     const ext = createGoogleWorkspaceExtension(DRIVE_ALL_CONFIG, makeFactoryCtx());
       const caught = (await callDrive(ext, 'drive_share', {
-        fileId: 'f1',
+        file_id: 'f1',
         email: 'user@example.com',
         role: 'invalid-role',
       })) as RillValue;
@@ -716,7 +716,7 @@ describe('AC-11: drive callables pass AbortSignal to fetch', () => {
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'drive_download').fn(
-      { fileId: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
+      { file_id: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
       ctx
     );
 

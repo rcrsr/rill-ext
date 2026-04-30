@@ -41,13 +41,13 @@ export function makeCalendarEvents(deps: CalendarEventsDeps): (
     ctx: RuntimeContext,
     controller: AbortController
   ): Promise<RillValue> => {
-    const startDate = args['startDate'];
-    const endDate = args['endDate'];
+    const startDate = args['start_date'];
+    const endDate = args['end_date'];
     if (typeof startDate !== 'string' || startDate.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: startDate must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: start_date must be a non-empty string');
     }
     if (typeof endDate !== 'string' || endDate.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: endDate must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: end_date must be a non-empty string');
     }
     // Determine if date-only or datetime, and derive timeMin/timeMax
     const startIsDateOnly = DATE_ONLY_RE.test(startDate);
@@ -60,13 +60,13 @@ export function makeCalendarEvents(deps: CalendarEventsDeps): (
       timeMax = `${endDate}T00:00:00Z`;
     } else if (!startIsDateOnly && !endIsDateOnly) {
       // Both must be ISO datetimes with timezone [EC-13]
-      assertIsoTimestamp(ctx, startDate, 'startDate');
-      assertIsoTimestamp(ctx, endDate, 'endDate');
+      assertIsoTimestamp(ctx, startDate, 'start_date');
+      assertIsoTimestamp(ctx, endDate, 'end_date');
       timeMin = startDate;
       timeMax = endDate;
     } else {
       // Mixed: one date-only, one datetime — reject
-      failInput(ctx, 'invalid_arg', 'google: startDate and endDate must both be date-only or both be ISO 8601 with timezone');
+      failInput(ctx, 'invalid_arg', 'google: start_date and end_date must both be date-only or both be ISO 8601 with timezone');
     }
     // BC-3: start equal to end → empty result, no fetch
     if (timeMin === timeMax) {
@@ -76,7 +76,7 @@ export function makeCalendarEvents(deps: CalendarEventsDeps): (
     const options = args['options'];
     let calendarId = 'primary';
     if (options !== undefined && options !== null && isDict(options)) {
-      const rawCalId = options['calendarId'];
+      const rawCalId = options['calendar_id'];
       if (typeof rawCalId === 'string' && rawCalId.trim() !== '') {
         calendarId = rawCalId;
       }
@@ -125,8 +125,8 @@ export function makeCalendarEvents(deps: CalendarEventsDeps): (
       end: item.end ?? {},
       attendees: (item.attendees ?? []).map((a) => ({
         email: a.email ?? '',
-        displayName: a.displayName ?? '',
-        responseStatus: a.responseStatus ?? '',
+        display_name: a.displayName ?? '',
+        response_status: a.responseStatus ?? '',
       })),
       description: item.description ?? '',
       location: item.location ?? '',

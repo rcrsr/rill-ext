@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- Per-command callables now return `exit_code` (snake_case) instead of `exitCode` in the result dict. Aligns with the rill convention that all dict keys exposed at the host-function boundary use snake_case (see root `CLAUDE.md` §Boundary Key Naming). Host scripts reading `result.exitCode` must update to `result.exit_code`.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

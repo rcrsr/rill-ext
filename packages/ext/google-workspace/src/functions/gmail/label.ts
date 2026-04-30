@@ -68,13 +68,13 @@ export function makeGmailLabel(deps: GmailLabelDeps): (
     ctx: RuntimeContext,
     controller: AbortController
   ): Promise<RillValue> => {
-    const messageId = args['messageId'];
+    const messageId = args['message_id'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: messageId must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: message_id must be a non-empty string');
     }
-    const labelName = args['labelName'];
+    const labelName = args['label_name'];
     if (typeof labelName !== 'string' || labelName.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: labelName must be a non-empty string');
+      failInput(ctx, 'invalid_arg', 'google: label_name must be a non-empty string');
     }
     // EC-6/EC-12/BC-9/BC-10: Validate before any API call
     validateLabelAccess(ctx, labelName, deps.gmailConfig);
