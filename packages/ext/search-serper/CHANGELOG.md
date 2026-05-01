@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- All 3 host-function callables (`search`, `news`, `images`) declare concrete `returnType` shapes per `.claude/policies/policy-domain-ext.md` §EXT.8. `search` returns `dict(search_parameters, organic: list, answer_box, knowledge_graph, people_also_ask: list, related_searches: list)`; `news` returns `dict(news: list)`; `images` returns `dict(images: list)`. Inner vendor result objects remain typed as `any` because the extension forwards Serper's JSON without reshaping. Scripts introspecting the callable's `returnType` property previously saw `dict`; they now see the precise top-level field set. Note: image result element fields (`imageUrl`, `thumbnailUrl`, `imageWidth`, `imageHeight`) retain Serper's camelCase per the current pass-through; mapping those to snake_case is tracked as a separate boundary fix.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)
