@@ -5,7 +5,7 @@
 ### Changed (Breaking)
 
 - The `output:` frontmatter field is removed. Output mode is inferred from body content: the presence of one or more `@@ role` marker lines yields `output: list`, absence yields `output: string`. Existing files with stale `output:` keys parse without error (the field is ignored), so this is breaking only for files that depended on the previous validation error paths (EC-10 dict-reserved, EC-11 unknown-output, EC-14 list-without-marker). The `^output` annotation continues to expose `"string"` or `"list"`.
-- Closure `returnType` is now concrete instead of `any`. `output: 'string'` prompts return type `string`; `output: 'list'` prompts return type `list(dict(role: string, content: string))`. Scripts that introspected `^returnType` previously saw `any`; they now see the precise shape.
+- Closure `returnType` is now concrete instead of `any`. `output: 'string'` prompts return type `string`; `output: 'list'` prompts return type `list(dict(role: string, content: string))`. Scripts that introspected the callable's `returnType` property previously saw `any`; they now see the precise shape.
 
 ### Removed
 

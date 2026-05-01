@@ -1,9 +1,10 @@
 /**
  * AC-6 integration test: list-output closure feeds all three LLM providers.
  *
- * Verifies that a rill list produced by a prompt-md closure (output inferred
- * can be passed directly to messages() of Anthropic, OpenAI, and Gemini
- * without any per-provider adaptation branch.
+ * Verifies that a rill list produced by a prompt-md closure (output mode
+ * inferred from `@@ role` markers in the body) can be passed directly to
+ * messages() of Anthropic, OpenAI, and Gemini without any per-provider
+ * adaptation branch.
  *
  * Covers: FR-PROMPT-5, NFR-PROMPT-3.
  */
