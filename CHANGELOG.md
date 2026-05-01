@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `@rcrsr/rill-ext-qdrant` bumped to `0.19.1`. `QdrantClient` is now constructed with `checkCompatibility: false`, suppressing the auto-issued server-version GET on construction. The unawaited rejection from that fetch (when no qdrant server is reachable) could leak past vitest worker teardown and surface as `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending`. The flake caused release CI for `v0.19.4` to fail at the test step even though all 75 tests passed; PR CI passed minutes earlier on the same commit because the rejection happened to resolve before teardown.
+
 ## [0.19.4] - 2026-04-30
 
 ### Changed (Breaking)
