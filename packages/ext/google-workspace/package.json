@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-google-workspace",
-  "version": "0.19.2",
+  "version": "0.19.3",
   "description": "rill extension for Google Workspace (Gmail, Drive, Calendar) integration",
   "license": "MIT",
   "author": "Andre Bremer",
@@ -37,7 +37,8 @@
     "undici-types": "^8.0.2"
   },
   "files": [
-    "dist"
+    "dist",
+    "docs"
   ],
   "repository": {
     "type": "git",

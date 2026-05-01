@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- `@rcrsr/rill-ext-google-workspace` bumped to `0.19.3`. The package now ships `docs/` (README.md, auth.md, capabilities.md, errors.md) in the npm tarball via `package.files`, so relative `docs/...` links from the package README resolve on npm and the Gmail/Drive/Calendar response-shape reference is published alongside `dist/index.d.ts` (which exposes callables as opaque `ApplicationCallable`). README enumerates all four auth modes (`bearer`, `session`, `service-account`, `oauth-refresh`); `docs/README.md` Top-Level Parameters table adds `auth.client_id`, `auth.client_secret`, and `auth.refresh_token` rows; stale "all three auth variants" wording corrected to "all four".
+
 ## [0.19.3] - 2026-04-30
 
 ### Changed (Breaking)
