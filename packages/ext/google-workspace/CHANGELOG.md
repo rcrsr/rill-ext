@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.3] - 2026-04-30
+
+### Changed
+
+- `docs/` (README.md, auth.md, capabilities.md, errors.md) now ships in the npm tarball via `package.files`. Relative `docs/...` links in the package README resolve on npm, and the response-shape reference for Gmail/Drive/Calendar dicts is published alongside `dist/index.d.ts` (the `.d.ts` exposes callables as opaque `ApplicationCallable`, so the markdown is the response-shape source of truth).
+
+### Documentation
+
+- README lists all four auth modes (`bearer`, `session`, `service-account`, `oauth-refresh`), matching the type declarations.
+- `docs/README.md` Top-Level Parameters table adds the three `oauth-refresh` field rows (`auth.client_id`, `auth.client_secret`, `auth.refresh_token`).
+- Corrected the stale "all three auth variants" wording in `docs/README.md` to "all four".
+
 ## [0.19.2] - 2026-04-30
 
 ### Changed (Breaking)

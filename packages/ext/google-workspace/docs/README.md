@@ -26,7 +26,7 @@ gws auth setup    # one-time project + OAuth client setup
 gws auth login    # OAuth consent flow, prints an access token
 ```
 
-See [auth.md](auth.md) for full details on all three auth variants.
+See [auth.md](auth.md) for full details on all four auth variants.
 
 **Bearer token (static OAuth token):**
 
@@ -141,11 +141,14 @@ $today.events -> log
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `auth` | object | — | Authentication configuration (required). |
-| `auth.type` | string | — | `"bearer"`, `"session"`, or `"service-account"` (required). |
+| `auth.type` | string | — | `"bearer"`, `"session"`, `"service-account"`, or `"oauth-refresh"` (required). |
 | `auth.token` | string | — | Static Bearer token. Required when `auth.type` is `"bearer"`. |
 | `auth.tokenVar` | string | — | RuntimeContext variable name holding the Bearer token. Required when `auth.type` is `"session"`. |
 | `auth.keyJson` | string | — | GCP service account key JSON string. Required when `auth.type` is `"service-account"`. |
 | `auth.subject` | string | — | Email to impersonate via domain-wide delegation. Optional; `service-account` only. |
+| `auth.client_id` | string | — | GCP OAuth client ID. Required when `auth.type` is `"oauth-refresh"`. |
+| `auth.client_secret` | string | — | GCP OAuth client secret. Required when `auth.type` is `"oauth-refresh"`. |
+| `auth.refresh_token` | string | — | Long-lived OAuth refresh token. Required when `auth.type` is `"oauth-refresh"`. |
 | `capabilities` | object | See defaults | Operation permission flags. Partial overrides merged with defaults. |
 | `gmail` | object | — | Gmail query constraints (optional). |
 | `drive` | object | — | Drive query constraints (optional). |
