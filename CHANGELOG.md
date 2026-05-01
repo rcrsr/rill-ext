@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.4] - 2026-04-30
+
 ### Changed (Breaking)
 
 - Rich `returnType` shapes declared across 12 extensions per the new policy `.claude/policies/policy-domain-ext.md` §EXT.8. Every host-function callable that returns a known-schema response now exposes the precise `dict(fields:)` or `list(element:)` shape via `structureToTypeValue`, replacing the previous shapeless `dict` / `list`. `anyTypeValue` is retained only for the four §EXT.8.3 cases (user-stored values, externally-supplied tool schemas, untyped HTTP bodies, heterogeneous runtime state). Scripts introspecting any updated callable's `returnType` property now see the precise shape instead of bare `dict` / `list` / `any`.
@@ -26,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- `@rcrsr/rill-ext-google-workspace` bumped to `0.19.3`. The package now ships `docs/` (README.md, auth.md, capabilities.md, errors.md) in the npm tarball via `package.files`, so relative `docs/...` links from the package README resolve on npm and the Gmail/Drive/Calendar response-shape reference is published alongside `dist/index.d.ts` (which exposes callables as opaque `ApplicationCallable`). README enumerates all four auth modes (`bearer`, `session`, `service-account`, `oauth-refresh`); `docs/README.md` Top-Level Parameters table adds `auth.client_id`, `auth.client_secret`, and `auth.refresh_token` rows; stale "all three auth variants" wording corrected to "all four".
+- `@rcrsr/rill-ext-google-workspace` (shipping at `0.19.4` after the rich-shapes bump above) now ships `docs/` (README.md, auth.md, capabilities.md, errors.md) in the npm tarball via `package.files`, so relative `docs/...` links from the package README resolve on npm and the Gmail/Drive/Calendar response-shape reference is published alongside `dist/index.d.ts` (which exposes callables as opaque `ApplicationCallable`). README enumerates all four auth modes (`bearer`, `session`, `service-account`, `oauth-refresh`); `docs/README.md` Top-Level Parameters table adds `auth.client_id`, `auth.client_secret`, and `auth.refresh_token` rows; stale "all three auth variants" wording corrected to "all four".
 
 ## [0.19.3] - 2026-04-30
 
