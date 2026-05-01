@@ -46,8 +46,16 @@ export function createQdrantExtension(
   assertRequired(config.url, 'url');
   assertRequired(config.collection, 'collection');
 
-  const clientConfig: { url: string; apiKey?: string; timeout?: number } = {
+  // `checkCompatibility: false` suppresses the QdrantClient's auto-issued
+  // GET to obtain the server version on construction. The check is best-effort
+  // (the SDK proceeds either way), and the unawaited rejection it produces
+  // when the server is unreachable can leak past vitest's worker teardown,
+  // surfacing as `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog"
+  // was pending` and failing release CI even when every test passes. Real
+  // version mismatches still surface at the first API call.
+  const clientConfig: { url: string; apiKey?: string; timeout?: number; checkCompatibility: boolean } = {
     url: config.url,
+    checkCompatibility: false,
   };
   if (config.apiKey !== undefined) clientConfig.apiKey = config.apiKey;
   if (config.timeout !== undefined) clientConfig.timeout = config.timeout;
