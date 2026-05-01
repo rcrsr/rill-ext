@@ -852,7 +852,17 @@ export async function createLocalFsExtension(
       params: [],
       fn: mountsList,
       annotations: { description: 'List configured mounts' },
-      returnType: structureToTypeValue({ kind: 'list' }),
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: {
+          kind: 'dict',
+          fields: {
+            name: { type: { kind: 'string' } },
+            mode: { type: { kind: 'string' } },
+            glob: { type: { kind: 'string' } },
+          },
+        },
+      }),
     },
   };
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.2] - 2026-04-30
+
+### Changed (Breaking)
+
+- Per-command callables (configured via `config.commands`) declare `returnType` as `dict(stdout: string, stderr: string, exit_code: number)` instead of shapeless `dict`, per `.claude/policies/policy-domain-ext.md` §EXT.8. The `commands` introspection callable declares `returnType` as `list(dict(name: string, description: string))` instead of shapeless `list`. Scripts introspecting the callable's `returnType` property previously saw bare `dict` / `list`; they now see the precise shape.
+
 ## [0.19.1] - 2026-04-30
 
 ### Changed (Breaking)

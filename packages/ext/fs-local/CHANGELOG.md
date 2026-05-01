@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- The `mounts` introspection callable now declares `returnType` as `list(dict(name: string, mode: string, glob: string))` instead of shapeless `list`, per `.claude/policies/policy-domain-ext.md` §EXT.8. Other callables (`list`, `find`, `stat`) already declared rich shapes; unchanged. Scripts introspecting the callable's `returnType` property previously saw bare `list`; they now see the precise element shape.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

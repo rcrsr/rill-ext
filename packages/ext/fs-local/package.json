@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-fs-local",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "description": "rill extension for local filesystem operations with mount-based sandboxing",
   "license": "MIT",
   "author": "Andre Bremer",
