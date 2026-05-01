@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { structureToTypeValue } from '@rcrsr/rill';
+import { anyTypeValue } from '@rcrsr/rill';
 import {
   extractTemplateVariables,
   createReadResourceFunction,
@@ -91,7 +91,7 @@ describe('createReadResourceFunction', () => {
       },
     ]);
     expect(func.annotations?.description).toBe('Read an MCP resource by URI');
-    expect(func.returnType).toEqual(structureToTypeValue({ kind: 'dict' }));
+    expect(func.returnType).toEqual(anyTypeValue);
   });
 
   it('calls MCP readResource with provided URI', async () => {
@@ -309,7 +309,7 @@ describe('generateResourceTemplateFunctions', () => {
       },
     ]);
     expect(func.annotations?.description).toBe('Access database table');
-    expect(func.returnType).toEqual(structureToTypeValue({ kind: 'dict' }));
+    expect(func.returnType).toEqual(anyTypeValue);
   });
 
   it('generates function for multi-variable template (IR-4)', () => {

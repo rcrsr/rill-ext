@@ -9,10 +9,10 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeContext } from '@rcrsr/rill';
 import {
+  anyTypeValue,
   emitExtensionEvent,
   getStatus,
   isInvalid,
-  structureToTypeValue,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import {
@@ -211,7 +211,10 @@ export function createReadResourceFunction(
     params: [p.str('uri', 'Resource URI to read')],
     fn,
     annotations: { description: 'Read an MCP resource by URI' },
-    returnType: structureToTypeValue({ kind: 'dict' }),
+    // parseResourceContent returns string, dict, or other structured content
+    // depending on the resource's content blocks; the schema is set by the
+    // MCP server at runtime per §EXT.8.3 case 4 (heterogeneous runtime state).
+    returnType: anyTypeValue,
   };
 }
 
@@ -301,7 +304,9 @@ function createStaticResourceFunction(
     params: [],
     fn,
     annotations: { description },
-    returnType: structureToTypeValue({ kind: 'dict' }),
+    // parseResourceContent returns string, dict, or other structured content
+    // depending on the resource's content blocks (§EXT.8.3 case 4).
+    returnType: anyTypeValue,
   };
 }
 
@@ -453,7 +458,9 @@ function createResourceTemplateFunction(
     ...(template.description !== undefined && {
       annotations: { description: template.description },
     }),
-    returnType: structureToTypeValue({ kind: 'dict' }),
+    // parseResourceContent returns string, dict, or other structured content
+    // depending on the expanded URI's content blocks (§EXT.8.3 case 4).
+    returnType: anyTypeValue,
   };
 }
 
