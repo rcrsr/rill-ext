@@ -18,12 +18,13 @@ description: Summarize a passage in a bounded word count.
 params:
   - "passage: string"
   - "max_words: number = 200"
-output: string
 ---
 Summarize the following passage in {max_words} words or fewer.
 
 {passage}
 ```
+
+The output mode is inferred from body content. Bodies that contain `@@ role` markers return `list(dict(role: string, content: string))`; everything else returns a plain `string`.
 
 **rill-config.json**
 

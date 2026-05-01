@@ -20,7 +20,6 @@ description: One-sentence summary of what this prompt does.
 params:
   - "question: string"
   - "max_words: number = 200"
-output: string
 ---
 Answer the following question in {max_words} words or fewer.
 
@@ -33,9 +32,8 @@ Question: {question}
 |-------|------|----------|-------------|
 | `description` | string | yes | Human-readable summary. Appears in `^description` annotation. |
 | `params` | list[string] | yes | Parameter declarations. See grammar below. |
-| `output` | string | yes | `string` or `list`. The value `dict` is reserved and rejected in v0. |
 
-The frontmatter block starts and ends with `---` on its own line. The template body starts on the line after the closing `---`.
+The frontmatter block starts and ends with `---` on its own line. The template body starts on the line after the closing `---`. The output mode is inferred from body content (see [Output Inference](#output-inference) below); no `output:` field is required or read.
 
 ### Params Grammar
 
@@ -85,15 +83,16 @@ params:
 
 A param without a default is required. A param with a default is optional at call time. Missing required params at invocation are rejected by the rill runtime before the closure runs (this extension does not synthesize defaults at call time).
 
-### Output Values
+### Output Inference
 
-| Value | Callable returns |
-|-------|-----------------|
-| `string` | Interpolated body as a single string |
-| `list` | List of `{ role, content }` dicts, one per `@@ role` section |
-| `dict` | Reserved. Rejected at load time with `RuntimeError RILL-R001`. |
+The output shape is inferred from body content at load time. There is no `output:` frontmatter field.
 
-Use `output: string` for single-turn completions. Use `output: list` for multi-turn or structured conversation prompts.
+| Body content | Inferred output | Callable return type |
+|--------------|----------------|----------------------|
+| Contains at least one `@@ role` marker line | `list` | `list(dict(role: string, content: string))` |
+| No `@@ role` markers | `string` | `string` |
+
+The callable's `^output` annotation reflects the inferred mode (`"string"` or `"list"`), and `returnType` carries the corresponding rill type structure. Use `@@ role` markers when you want a multi-turn conversation list ready for `messages()`. Omit them for single-turn completions.
 
 ## Resolution Names
 
@@ -117,16 +116,15 @@ Hyphens in filenames or directory names convert to underscores so the derived na
 
 ## `@@ role` Convention
 
-> **Custom convention:** The `@@ role` marker is specific to this loader. It has no precedent in CommonMark, YAML frontmatter specifications, or any other Markdown standard. It works only in files loaded by `@rcrsr/rill-ext-prompt-md` with `output: list`.
+> **Custom convention:** The `@@ role` marker is specific to this loader. It has no precedent in CommonMark, YAML frontmatter specifications, or any other Markdown standard. It works only in files loaded by `@rcrsr/rill-ext-prompt-md`.
 
-Use `@@ role` lines to split a single file body into multiple conversation turns. The loader splits on lines that match exactly `^@@ <word>$` (with optional surrounding whitespace).
+Use `@@ role` lines to split a single file body into multiple conversation turns. The loader splits on lines that match exactly `^@@ <word>$` (with optional surrounding whitespace). The mere presence of one or more `@@ role` markers switches the prompt's inferred output mode to `list`.
 
 ```
 ---
 description: Research assistant prompt.
 params:
   - "question: string"
-output: list
 ---
 @@ system
 You are a research assistant. Answer questions with accurate, cited information.
@@ -141,7 +139,7 @@ Rules for `@@ role`:
 - Any text before the first `@@ role` line belongs to a default section with role `user`.
 - The role name is arbitrary. Common values: `system`, `user`, `assistant`.
 - `## headings` inside a section stay as body text. They do not create new role entries.
-- `@@ role` applies only when `output: list`. In `output: string` files the marker lines appear verbatim in the output.
+- A body with at least one `@@ role` marker yields `output: list`. A body with none yields `output: string` and never splits.
 
 ### Role Output Shape
 
@@ -188,13 +186,15 @@ Every callable loaded by this extension carries annotations on its closure objec
 | `^hash` | string | Hex SHA-256 of `(canonical params grammar) + "\n" + output + "\n" + body` |
 | `^description` | string | `description` field from frontmatter, verbatim |
 | `^input` | list[dict] | Ordered `[{ name, type }]` from the parsed params list |
-| `^output` | string | `"string"` or `"list"` |
+| `^output` | string | `"string"` or `"list"`, inferred from the body's `@@ role` markers |
+
+The callable's `returnType` is set concretely: `string` for `^output: "string"` prompts and `list(dict(role: string, content: string))` for `^output: "list"` prompts. It is never `any`.
 
 Use `^hash` to detect when a prompt file changes between runs. Use `^input` to introspect parameter names and types at runtime.
 
 ## Runnable Example
 
-This example loads a research prompt with `output: list` and passes the result directly into `llm-anthropic`'s `messages()` function.
+This example loads a research prompt whose body uses `@@ role` markers, so the inferred output is a message list ready for `llm-anthropic`'s `messages()` call.
 
 ### Prompt file: `agents/research.prompt.md`
 
@@ -203,7 +203,6 @@ This example loads a research prompt with `output: list` and passes the result d
 description: Answers a research question with a cited response.
 params:
   - "question: string"
-output: list
 ---
 @@ system
 You are a research assistant. Provide accurate, well-cited answers.
@@ -272,7 +271,8 @@ use<ext:prompt> => $prompt
 
 # Invoke the prompt closure with the question param.
 # Args are positional and bind to params in declaration order.
-# The closure returns list[{ role, content }] because output is "list".
+# The closure returns list(dict(role: string, content: string)) because the
+# body contains @@ role markers (inferred output is "list").
 $prompt.agents_research("What caused the 2008 financial crisis?") => $messages
 
 # Pass the message list directly into messages().
@@ -300,11 +300,9 @@ match coarsely (`guard #PROTOCOL`) or finely
 | `basePath` does not exist or is not a directory (EC-7) | `RILL-R001` |
 | Frontmatter fence missing or malformed (EC-8) | `RILL-R001` |
 | Frontmatter is not a YAML mapping or fails YAML parse (EC-9) | `RILL-R001` |
-| Missing / invalid `description`, `params`, or `output` (EC-10) | `RILL-R001` |
-| `output: dict` reserved, or unrecognized `output` value (EC-11) | `RILL-R001` |
+| Missing / invalid `description` or `params` (EC-10) | `RILL-R001` |
 | Param entry not a string, or grammar parse failure (EC-12) | `RILL-R001` |
 | Template `{name}` references a param not declared in `params` (EC-13) | `RILL-R001` |
-| `output: list` body has no `@@ role` marker (EC-14) | `RILL-R001` |
 | Multiple files resolve to the same prompt name (EC-15) | `RILL-R001` |
 
 **Host-fn errors** (during closure invocation):
