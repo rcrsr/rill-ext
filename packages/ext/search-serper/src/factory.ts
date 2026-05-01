@@ -216,15 +216,17 @@ export function createSerperExtension(
   // boundary. Note: serper image objects retain camelCase fields (`imageUrl`,
   // `thumbnailUrl`, `imageWidth`, `imageHeight`) per the current pass-through;
   // mapping those to snake_case is tracked as a separate boundary fix.
+  // Optional fields are marked via non-undefined `defaultValue` so introspection
+  // tooling treats `field.defaultValue !== undefined` as "optional".
   const SEARCH_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
       search_parameters: { type: { kind: 'any' } },
       organic:           { type: { kind: 'list', element: { kind: 'any' } } },
-      answer_box:        { type: { kind: 'any' } },         // optional
-      knowledge_graph:   { type: { kind: 'any' } },         // optional
-      people_also_ask:   { type: { kind: 'list', element: { kind: 'any' } } },  // optional
-      related_searches:  { type: { kind: 'list', element: { kind: 'any' } } },  // optional
+      answer_box:        { type: { kind: 'any' }, defaultValue: null },                          // optional
+      knowledge_graph:   { type: { kind: 'any' }, defaultValue: null },                          // optional
+      people_also_ask:   { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+      related_searches:  { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
     },
   });
   const NEWS_RT = structureToTypeValue({

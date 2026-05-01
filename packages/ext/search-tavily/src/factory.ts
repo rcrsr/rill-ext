@@ -171,14 +171,16 @@ export function createTavilyExtension(
   // Rich return-type shapes per §EXT.8. Inner result and image entries are
   // vendor-shaped pass-throughs; their elements are typed as `any`. Top-level
   // field sets are concrete since we own those keys.
+  // Optional fields are marked via non-undefined `defaultValue` so introspection
+  // tooling treats `field.defaultValue !== undefined` as "optional".
   const SEARCH_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
       query:         { type: { kind: 'string' } },
       results:       { type: { kind: 'list', element: { kind: 'any' } } },
       response_time: { type: { kind: 'number' } },
-      answer:        { type: { kind: 'string' } },                              // optional: include_answer flag
-      images:        { type: { kind: 'list', element: { kind: 'any' } } },      // optional: include_images flag
+      answer:        { type: { kind: 'string' }, defaultValue: '' },                              // optional: include_answer flag
+      images:        { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },      // optional: include_images flag
     },
   });
   const EXTRACT_RT = structureToTypeValue({

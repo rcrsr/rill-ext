@@ -264,19 +264,21 @@ export function createExaExtension(
   // Rich return-type shapes per §EXT.8. Inner result objects (Exa's `results`,
   // `statuses`, `citations` elements) are vendor-shaped and forwarded without
   // reshaping; their elements are typed as `any`. `search` and `find_similar`
-  // share an identical top-level shape.
+  // share an identical top-level shape. Optional fields are marked via
+  // non-undefined `defaultValue` so introspection tooling treats
+  // `field.defaultValue !== undefined` as "optional".
   const SEARCH_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
       results:    { type: { kind: 'list', element: { kind: 'any' } } },
-      request_id: { type: { kind: 'string' } },  // optional: present when API returns requestId
+      request_id: { type: { kind: 'string' }, defaultValue: '' },  // optional: present when API returns requestId
     },
   });
   const CONTENTS_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
       results:  { type: { kind: 'list', element: { kind: 'any' } } },
-      statuses: { type: { kind: 'list', element: { kind: 'any' } } },  // optional: present when API returns statuses
+      statuses: { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional: present when API returns statuses
     },
   });
   const ANSWER_RT = structureToTypeValue({
