@@ -233,13 +233,9 @@ $message.body -> log
 |-------|------|-------------|
 | `id` | string | Gmail message ID. |
 | `thread_id` | string | Thread ID. |
-| `subject` | string | Message subject. |
-| `from` | string | Sender email address. |
-| `to` | string | Primary recipient email address. |
-| `date` | string | Message date as ISO 8601 string. |
+| `headers` | dict(from: string, to: string, subject: string, date: string) | Well-known message headers. `date` is the raw RFC 2822 string from the message header (e.g., `"Mon, 01 Jan 2024 00:00:00 +0000"`), not ISO 8601. |
 | `body` | string | Decoded message body (plain text preferred). |
-| `snippet` | string | Short preview excerpt. |
-| `labels` | list | List of label name strings. |
+| `attachments` | list(dict(filename: string, mime_type: string, size: number)) | Attachment metadata; empty list when none. |
 
 Requires capability: `gmail.read` (default `true`).
 
@@ -406,6 +402,8 @@ $gws.drive_upload($content, "report.csv", "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs") =
 | `id` | string | Drive file ID of the created file. |
 | `name` | string | File name. |
 | `mime_type` | string | MIME type of the created file. |
+| `size` | number | File size in bytes. |
+| `owner` | string \| null | Email of the first listed owner; `null` when no owner is returned. |
 
 Requires capability: `drive.upload` (default `false` — must be explicitly enabled).
 
@@ -518,7 +516,20 @@ $result.events -> log
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `events` | list | List of calendar event dicts. Each has `id`, `summary`, `start`, `end`, `attendees`, `description`, `location`, `status`. |
+| `events` | list(dict(id, summary, start, end, attendees, description, location, status)) | List of calendar event dicts. See **Event Dict Shape** below. |
+
+**Event Dict Shape:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Google Calendar event ID. |
+| `summary` | string | Event title. |
+| `start` | dict | Forwarded Google Calendar `start` block; carries `dateTime` (ISO 8601 with timezone) for timed events or `date` (`YYYY-MM-DD`) for all-day events, plus optional `timeZone`. The keys remain camelCase per the Google API; snake_case remapping is tracked as a separate boundary fix. |
+| `end` | dict | Same shape as `start`. |
+| `attendees` | list(dict(email: string, display_name: string, response_status: string)) | Attendee list. |
+| `description` | string | Event description. |
+| `location` | string | Event location. |
+| `status` | string | Event status (`confirmed`, `tentative`, `cancelled`). |
 
 Requires capability: `calendar.read` (default `true`).
 
@@ -541,7 +552,7 @@ $result.events -> log
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `events` | list | List of today's calendar event dicts. Each has `id`, `summary`, `start`, `end`, `attendees`, `description`, `location`, `status`. |
+| `events` | list(dict(id, summary, start, end, attendees, description, location, status)) | List of today's calendar event dicts; identical shape to `calendar_events`. See **Event Dict Shape** above. |
 
 Requires capability: `calendar.read` (default `true`).
 
@@ -593,7 +604,7 @@ $gws.calendar_free_busy(
   "2026-04-26T09:00:00Z",
   "2026-04-26T17:00:00Z"
 ) => $result
-$result.schedules -> log
+$result["alice@example.com"].busy -> log
 ```
 
 | Parameter | Type | Description |
@@ -604,9 +615,11 @@ $result.schedules -> log
 
 **Result Dict:**
 
+The result is a flat dict keyed by the email addresses passed in. Each value carries one `busy` field listing busy intervals for that user.
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `schedules` | dict | Map of email address to availability dict. Each availability dict has `busy` (list of `{start, end}` intervals). |
+| `<email>` | dict(busy: list(dict(start: string, end: string))) | One entry per requested email. `start` and `end` are ISO 8601 timestamps. |
 
 Requires capability: `calendar.freeBusy` (default `true`).
 

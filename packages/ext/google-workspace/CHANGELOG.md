@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.19.4] - 2026-04-30
+
+### Changed (Breaking)
+
+- All 8 dict-returning callables (`gmail_search`, `gmail_read`, `drive_list`, `drive_upload`, `drive_get_metadata`, `calendar_events`, `calendar_today`, `calendar_free_busy`) declare concrete `returnType` shapes per `.claude/policies/policy-domain-ext.md` §EXT.8. Drive file metadata fields are shared between `drive_list` (each `files` element) and `drive_get_metadata` (top-level dict); calendar event fields are shared between `calendar_events` and `calendar_today`. `calendar_free_busy` types as a homogeneous email-keyed dict (`dict(string: dict(busy: list(dict(start, end))))`). Inner Google calendar `start` / `end` blocks remain typed as `any` because the host fn forwards them without reshaping (they retain Google's camelCase `dateTime` / `timeZone` keys). Scripts introspecting any callable's `returnType` property previously saw `dict`; they now see the precise top-level field set.
+
+### Fixed
+
+- `calendar_today` previously emitted `displayName` and `responseStatus` (camelCase) inside attendee dicts, violating the snake_case boundary rule in root `CLAUDE.md` §Boundary Key Naming. The keys are now `display_name` and `response_status`, matching `calendar_events`.
+- `gmail_read` attachment dicts previously emitted `mimeType` (camelCase). The key is now `mime_type`. Both fixes are noted as breaking for scripts that read those fields.
+
+### Documentation
+
+- `docs/README.md` updated to reflect the actual response shapes returned by code (per `.claude/policies/policy-domain-ext.md` §EXT.8.4 documentation parity):
+  - `gmail_read` table replaces the previous flat `subject`/`from`/`to`/`date` rows with a nested `headers` dict and adds the `attachments` row. `snippet` and `labels` rows removed because the implementation does not return them.
+  - `drive_upload` table adds `size` (number) and `owner` (string \| null) rows.
+  - `calendar_events` and `calendar_today` tables expand the event element shape and explicitly note that `start` / `end` carry Google's camelCase keys.
+  - `calendar_free_busy` table replaces the previous `{schedules: dict}` claim with the actual flat email-keyed dict.
+
 ## [0.19.3] - 2026-04-30
 
 ### Changed
