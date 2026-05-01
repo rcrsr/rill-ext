@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Breaking)
+
+- `@rcrsr/rill-ext-prompt-md` bumped to `0.19.2`. The `output:` frontmatter field is removed; output mode is now inferred from body content (presence of `@@ role` markers → `list`, absence → `string`). Stale `output:` keys are ignored. Closure `returnType` is concrete: `string` for `string`-mode prompts and `list(dict(role: string, content: string))` for `list`-mode prompts (previously `any`). Factory-time error paths EC-10 (dict reserved), EC-11 (unknown output), and EC-14 (list without marker) are removed because inference makes them impossible.
+
 ### Documentation
 
 - `@rcrsr/rill-ext-google-workspace` bumped to `0.19.3`. The package now ships `docs/` (README.md, auth.md, capabilities.md, errors.md) in the npm tarball via `package.files`, so relative `docs/...` links from the package README resolve on npm and the Gmail/Drive/Calendar response-shape reference is published alongside `dist/index.d.ts` (which exposes callables as opaque `ApplicationCallable`). README enumerates all four auth modes (`bearer`, `session`, `service-account`, `oauth-refresh`); `docs/README.md` Top-Level Parameters table adds `auth.client_id`, `auth.client_secret`, and `auth.refresh_token` rows; stale "all three auth variants" wording corrected to "all four".

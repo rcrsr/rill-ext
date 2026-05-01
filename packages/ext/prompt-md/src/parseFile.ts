@@ -2,12 +2,12 @@
  * Per-file parser for *.prompt.md files.
  *
  * Reads a single prompt file, splits the frontmatter fence, parses YAML,
- * validates required fields, parses param grammar entries, validates output
- * type, checks template references against declared params, verifies role
- * markers for list output, and computes the content hash.
+ * validates required fields, parses param grammar entries, checks template
+ * references against declared params, infers the output mode from the
+ * presence of `@@` role markers in the body, and computes the content hash.
  *
  * All errors thrown are `RuntimeError('RILL-R001', ...)` with path context
- * attached. EC-8 through EC-14.
+ * attached. EC-8, EC-9, EC-12, EC-13.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -24,14 +24,13 @@ import {
 // TYPES
 // ============================================================
 
-/** Supported output types accepted in v0 (dict is reserved and rejected). */
+/** Output mode inferred from body content. `list` when `@@ role` markers are present, `string` otherwise. */
 export type PromptOutput = 'string' | 'list';
 
 /** Raw YAML frontmatter shape expected in a .prompt.md file. */
 interface PromptFrontmatter {
   description?: unknown;
   params?: unknown;
-  output?: unknown;
 }
 
 /** Fully parsed and validated prompt file. */
@@ -42,7 +41,7 @@ export interface ParsedPrompt {
   description: string;
   /** Parsed and typed param list in declaration order. */
   params: RillParam[];
-  /** Accepted output mode. */
+  /** Inferred output mode: `list` when body contains `@@ role` markers, `string` otherwise. */
   output: PromptOutput;
   /** Template body text (everything after the closing `---` fence). */
   body: string;
@@ -176,36 +175,9 @@ export async function parseFile(
       field: 'params',
     });
   }
-  if (raw['output'] === undefined || raw['output'] === null) {
-    throw new RuntimeError('RILL-R001', `missing required field "output"`, undefined, {
-      path: absolutePath,
-      field: 'output',
-    });
-  }
 
   const description = raw['description'];
   const rawParamEntries = raw['params'] as unknown[];
-  const rawOutput = raw['output'];
-
-  // ── Validate output value (EC-10, EC-11) ───────────────────────────────
-  if (rawOutput === 'dict') {
-    // EC-10: dict is reserved in v0
-    throw new RuntimeError('RILL-R001', `output type "dict" is reserved and not implemented in v0`, undefined, {
-      path: absolutePath,
-      field: 'output',
-      value: 'dict',
-    });
-  }
-  if (rawOutput !== 'string' && rawOutput !== 'list') {
-    // EC-11: unrecognized output value
-    throw new RuntimeError(
-      'RILL-R001',
-      `unrecognized output value "${String(rawOutput)}" — accepted values: string, list`,
-      undefined,
-      { path: absolutePath, field: 'output', value: String(rawOutput) },
-    );
-  }
-  const output: PromptOutput = rawOutput;
 
   // ── Parse param grammar entries (EC-12) ────────────────────────────────
   const params: RillParam[] = [];
@@ -249,12 +221,11 @@ export async function parseFile(
     }
   }
 
-  // ── Validate role markers for list output (EC-14) ──────────────────────
-  if (output === 'list' && !ROLE_MARKER_RE.test(body)) {
-    throw new RuntimeError('RILL-R001', `output type "list" requires at least one @@ role marker in the body`, undefined, {
-      path: absolutePath,
-    });
-  }
+  // ── Infer output mode from body ────────────────────────────────────────
+  // `list` when at least one `@@ role` marker is present, `string` otherwise.
+  // The output mode is no longer declared in frontmatter — it derives entirely
+  // from body content so the file can never disagree with itself.
+  const output: PromptOutput = ROLE_MARKER_RE.test(body) ? 'list' : 'string';
 
   // ── Compute content hash ────────────────────────────────────────────────
   // Canonical params string: raw param entries joined by newline.

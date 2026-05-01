@@ -1,9 +1,10 @@
 /**
  * AC-6 integration test: list-output closure feeds all three LLM providers.
  *
- * Verifies that a rill list produced by a prompt-md closure with output:list
- * can be passed directly to messages() of Anthropic, OpenAI, and Gemini
- * without any per-provider adaptation branch.
+ * Verifies that a rill list produced by a prompt-md closure (output mode
+ * inferred from `@@ role` markers in the body) can be passed directly to
+ * messages() of Anthropic, OpenAI, and Gemini without any per-provider
+ * adaptation branch.
  *
  * Covers: FR-PROMPT-5, NFR-PROMPT-3.
  */
@@ -119,12 +120,12 @@ import { createGeminiExtension } from '@rcrsr/rill-ext-gemini';
 /**
  * Chat prompt with user + assistant sections.
  * Uses only user and assistant roles, which all three providers accept.
+ * Output mode (`list`) is inferred from the presence of `@@ role` markers.
  */
 const CHAT_PROMPT_CONTENT = `---
 description: Multi-turn chat prompt
 params:
   - "query: string"
-output: list
 ---
 @@ user
 {query}

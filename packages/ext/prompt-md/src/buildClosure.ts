@@ -9,7 +9,7 @@
  * Covers IR-9, AC-4, AC-14, EC-17.
  */
 
-import { anyTypeValue, formatValue, RuntimeError, toCallable, type ApplicationCallable, type CallableFn, type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import { formatValue, RuntimeError, structureToTypeValue, toCallable, type ApplicationCallable, type CallableFn, type RillTypeValue, type RillValue, type RuntimeContext } from '@rcrsr/rill';
 import {
   interpolate,
   splitRoleMessages,
@@ -20,6 +20,30 @@ import {
   ANNOTATION_KEY_DESCRIPTION,
 } from '@rcrsr/rill-ext-prompt-shared';
 import type { ParsedPrompt } from './parseFile.js';
+
+// ============================================================
+// RETURN TYPES
+// ============================================================
+
+/** Return type for `output: 'string'` prompts: a plain rill string. */
+const STRING_RETURN_TYPE: RillTypeValue = structureToTypeValue({ kind: 'string' });
+
+/**
+ * Return type for `output: 'list'` prompts: `list(dict(role: string, content: string))`.
+ *
+ * Matches the shape produced by `splitRoleMessages` and accepted by every LLM
+ * extension's `messages()` call.
+ */
+const MESSAGE_LIST_RETURN_TYPE: RillTypeValue = structureToTypeValue({
+  kind: 'list',
+  element: {
+    kind: 'dict',
+    fields: {
+      role: { type: { kind: 'string' } },
+      content: { type: { kind: 'string' } },
+    },
+  },
+});
 
 // ============================================================
 // BUILD CLOSURE
@@ -110,10 +134,12 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
   };
 
   // ── Assemble RillFunction and wrap via toCallable ─────────────────────────
+  // returnType is concrete: `string` for plain prompts, `list(dict(role, content))`
+  // for prompts whose body contains `@@ role` markers. No longer `any`.
   return toCallable({
     params: parsed.params,
     fn,
     annotations,
-    returnType: anyTypeValue,
+    returnType: parsed.output === 'list' ? MESSAGE_LIST_RETURN_TYPE : STRING_RETURN_TYPE,
   });
 }

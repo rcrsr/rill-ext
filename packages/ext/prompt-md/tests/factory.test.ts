@@ -176,11 +176,11 @@ describe('AC-9 / EC-15: resolution name collision', () => {
 });
 
 describe('AC-10 / EC-9: missing required fields', () => {
-  it('throws RILL-R001 for missing output field', async () => {
+  it('does NOT throw when output field is omitted (output is now inferred from body)', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
-      'missing-output.prompt.md',
+      'no-output.prompt.md',
       `---
 description: Test
 params: []
@@ -188,16 +188,9 @@ params: []
 body
 `,
     );
-    let caught: unknown;
-    try {
-      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R001');
-    expect(re.context?.['field']).toBe('output');
+    await expect(
+      createPromptMdExtension({ basePath: dir }, makeFactoryCtx()),
+    ).resolves.toBeDefined();
   });
 
   it('throws RILL-R001 for missing description field', async () => {
@@ -249,12 +242,12 @@ body
   });
 });
 
-describe('AC-11 / EC-10: output: dict reserved', () => {
-  it('throws RILL-R001 with field and value in context', async () => {
+describe('output field is no longer parsed from frontmatter', () => {
+  it('ignores stale output: dict — body without @@ markers infers output: string', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
-      'dict-output.prompt.md',
+      'stale-output.prompt.md',
       `---
 description: Test
 params: []
@@ -263,22 +256,12 @@ output: dict
 body
 `,
     );
-    let caught: unknown;
-    try {
-      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R001');
-    expect(re.context?.['field']).toBe('output');
-    expect(re.context?.['value']).toBe('dict');
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const dict = ext.value as Record<string, { annotations: Record<string, unknown> }>;
+    expect(dict['stale_output']!.annotations['^output']).toBe('string');
   });
-});
 
-describe('EC-11: unrecognized output value', () => {
-  it('throws RILL-R001 for output: json', async () => {
+  it('ignores stale output: json — body without @@ markers infers output: string', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
@@ -291,16 +274,9 @@ output: json
 body
 `,
     );
-    let caught: unknown;
-    try {
-      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R001');
-    expect(re.context?.['value']).toBe('json');
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const dict = ext.value as Record<string, { annotations: Record<string, unknown> }>;
+    expect(dict['unknown_output']!.annotations['^output']).toBe('string');
   });
 });
 
@@ -333,29 +309,42 @@ body
   });
 });
 
-describe('EC-14: output:list with no @@ marker', () => {
-  it('throws RILL-R001 when output is list but body has no role markers', async () => {
+describe('output inference from body content', () => {
+  it('body without @@ markers → output: string', async () => {
     const dir = await tempDir();
     await writePrompt(
       dir,
-      'list-no-marker.prompt.md',
+      'plain.prompt.md',
       `---
 description: Test
 params: []
-output: list
 ---
 No role markers here.
 `,
     );
-    let caught: unknown;
-    try {
-      await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    const re = caught as RuntimeError;
-    expect(re.errorId).toBe('RILL-R001');
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const dict = ext.value as Record<string, { annotations: Record<string, unknown> }>;
+    expect(dict['plain']!.annotations['^output']).toBe('string');
+  });
+
+  it('body with @@ markers → output: list', async () => {
+    const dir = await tempDir();
+    await writePrompt(
+      dir,
+      'chat.prompt.md',
+      `---
+description: Test
+params: []
+---
+@@ system
+You are a helper.
+@@ user
+Hello.
+`,
+    );
+    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const dict = ext.value as Record<string, { annotations: Record<string, unknown> }>;
+    expect(dict['chat']!.annotations['^output']).toBe('list');
   });
 });
 
@@ -364,12 +353,11 @@ describe('AC-13: single malformed file among valid ones surfaces error', () => {
     const dir = await tempDir();
     // One valid file
     await writePrompt(dir, 'valid.prompt.md', VALID_PROMPT);
-    // One broken file (missing output)
+    // One broken file (missing description)
     await writePrompt(
       dir,
       'broken.prompt.md',
       `---
-description: Broken prompt
 params: []
 ---
 body
