@@ -71,8 +71,8 @@ describe('today() host function', () => {
     expect(eventsArr).toHaveLength(1);
     expect(eventsArr[0]!['id']).toBe('today-event-001');
     expect(eventsArr[0]!['title']).toBe('Daily Sync');
-    expect(eventsArr[0]!['isOnline']).toBe(true);
-    expect(eventsArr[0]!['onlineUrl']).toBe('https://teams.microsoft.com/join/abc');
+    expect(eventsArr[0]!['is_online']).toBe(true);
+    expect(eventsArr[0]!['online_url']).toBe('https://teams.microsoft.com/join/abc');
   });
 
   // AC-11: returns empty list when no events today

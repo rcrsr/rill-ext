@@ -92,7 +92,7 @@ describe('inbox() host function', () => {
       expect(msg).toHaveProperty('date');
       expect(msg).toHaveProperty('unread');
       expect(msg).toHaveProperty('flagged');
-      expect(msg).toHaveProperty('hasAttachments');
+      expect(msg).toHaveProperty('has_attachments');
     });
 
     it('normalizes field values from Graph response', async () => {
@@ -111,7 +111,7 @@ describe('inbox() host function', () => {
       expect(typeof msg['date']).toBe('number');
       expect(msg['unread']).toBe(true);
       expect(msg['flagged']).toBe(false);
-      expect(msg['hasAttachments']).toBe(false);
+      expect(msg['has_attachments']).toBe(false);
     });
   });
 
@@ -380,7 +380,7 @@ describe('read() host function', () => {
     expect(result).toHaveProperty('date');
     expect(result).toHaveProperty('unread');
     expect(result).toHaveProperty('flagged');
-    expect(result).toHaveProperty('hasAttachments');
+    expect(result).toHaveProperty('has_attachments');
   });
 
   it('sends GET to messages/{message_id} path', async () => {

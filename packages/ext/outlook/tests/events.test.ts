@@ -372,7 +372,7 @@ describe('free_busy() host function', () => {
     expect(Array.isArray(result['schedules'])).toBe(true);
     const schedules = result['schedules'] as Record<string, unknown>[];
     expect(schedules).toHaveLength(1);
-    expect(schedules[0]!['scheduleId']).toBe('alice@example.com');
+    expect(schedules[0]!['schedule_id']).toBe('alice@example.com');
     expect(schedules[0]!['availability']).toBe('FFFF');
     expect(typeof result['range']).toBe('string');
   });

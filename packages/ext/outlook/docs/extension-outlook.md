@@ -292,10 +292,7 @@ $mail.flag("AAMkAGI2...") => $result
 
 **Result Dict:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Message ID that was flagged. |
-| `flagged` | boolean | Always `true` when successful. |
+Returns the full message dict (see [Message Dict Shape](#message-dict-shape) below) with `flagged` set to `true`.
 
 ### Calendar — Read
 
@@ -317,7 +314,7 @@ $result.events -> log
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `events` | list | List of calendar event dicts. |
+| `events` | list(dict) | List of calendar event dicts. See [Calendar Event Dict Shape](#calendar-event-dict-shape) below. |
 | `range` | string | ISO 8601 interval string (`start/end`). |
 
 #### today
@@ -335,7 +332,7 @@ No parameters.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `events` | list | List of today's calendar event dicts. |
+| `events` | list(dict) | List of today's calendar event dicts. See [Calendar Event Dict Shape](#calendar-event-dict-shape) below. |
 
 #### free_busy
 
@@ -356,7 +353,7 @@ $result.schedules -> log
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schedules` | list | List of schedule availability dicts per attendee. |
+| `schedules` | list(dict(schedule_id: string, availability: string, items: list(dict(status, subject, start: number, end: number)))) | List of schedule availability dicts per attendee. |
 | `range` | string | ISO 8601 interval string (`start/end`). |
 
 ### Calendar — Write
@@ -382,16 +379,26 @@ $mail.create_event("Team Sync", 1743897600000, 1743901200000, [location: "Confer
 |--------|------|-------------|
 | `location` | string | Event location display name. |
 | `attendees` | list | List of attendee email addresses. |
-| `isOnline` | boolean | When `true`, creates an online meeting link. |
+| `is_online` | boolean | When `true`, creates an online meeting link. |
 
 **Result Dict:**
 
+Returns a [Calendar Event Dict](#calendar-event-dict-shape).
+
+### Calendar Event Dict Shape
+
+All calendar read and write functions return event dicts with this shape:
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Graph API ID of the created event. |
+| `id` | string | Graph API ID of the event. |
 | `title` | string | Event subject. |
 | `start` | number | Start time as epoch milliseconds. |
 | `end` | number | End time as epoch milliseconds. |
+| `location` | string | Display name of the event location, or empty string. |
+| `attendees` | list(string) | List of attendee email addresses. |
+| `is_online` | boolean | Whether the event is an online meeting. |
+| `online_url` | string | Join URL for the online meeting, or empty string. |
 
 ### Message Dict Shape
 
@@ -403,11 +410,11 @@ All mail read functions return message dicts with this shape:
 | `subject` | string | Message subject. |
 | `preview` | string | Short body preview text. |
 | `from` | string | Sender email address. |
-| `to` | list | List of recipient email addresses. |
+| `to` | list(string) | List of recipient email addresses. |
 | `date` | number | Received timestamp as epoch milliseconds. |
 | `unread` | boolean | Whether the message has not been read. |
 | `flagged` | boolean | Whether the message is flagged for follow-up. |
-| `hasAttachments` | boolean | Whether the message has attachments. |
+| `has_attachments` | boolean | Whether the message has attachments. |
 
 ## Error Behavior
 
