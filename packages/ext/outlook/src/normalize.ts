@@ -89,7 +89,7 @@ export interface MailMessageDict {
   readonly date: number;
   readonly unread: boolean;
   readonly flagged: boolean;
-  readonly hasAttachments: boolean;
+  readonly has_attachments: boolean;
 }
 
 /**
@@ -116,7 +116,7 @@ export function normalizeMessage(graphMsg: unknown): MailMessageDict {
     date: isoToEpochMs(msg.receivedDateTime),
     unread: msg.isRead !== undefined ? !msg.isRead : false,
     flagged: msg.flag?.flagStatus === 'flagged',
-    hasAttachments: msg.hasAttachments ?? false,
+    has_attachments: msg.hasAttachments ?? false,
   };
 }
 
@@ -136,8 +136,8 @@ export interface CalendarEventDict {
   readonly end: number;
   readonly location: string;
   readonly attendees: readonly string[];
-  readonly isOnline: boolean;
-  readonly onlineUrl: string;
+  readonly is_online: boolean;
+  readonly online_url: string;
 }
 
 /**
@@ -162,8 +162,8 @@ export function normalizeEvent(graphEvent: unknown): CalendarEventDict {
     end: isoToEpochMs(ev.end?.dateTime),
     location: ev.location?.displayName ?? '',
     attendees,
-    isOnline: ev.isOnlineMeeting ?? false,
-    onlineUrl: ev.onlineMeeting?.joinUrl ?? '',
+    is_online: ev.isOnlineMeeting ?? false,
+    online_url: ev.onlineMeeting?.joinUrl ?? '',
   };
 }
 
@@ -187,7 +187,7 @@ export interface ScheduleItemDict {
  * items is a list of ScheduleItemDict objects.
  */
 export interface FreeBusyScheduleDict {
-  readonly scheduleId: string;
+  readonly schedule_id: string;
   readonly availability: string;
   readonly items: readonly ScheduleItemDict[];
 }
@@ -221,7 +221,7 @@ export function normalizeSchedule(graphSchedule: unknown): FreeBusyScheduleDict 
   const items = sch.scheduleItems?.map(normalizeScheduleItem) ?? [];
 
   return {
-    scheduleId: sch.scheduleId ?? '',
+    schedule_id: sch.scheduleId ?? '',
     availability: sch.availabilityView ?? '',
     items,
   };

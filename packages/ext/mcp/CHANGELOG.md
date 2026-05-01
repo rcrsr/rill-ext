@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- The three resource read callables (`read_resource`, generated static resource functions, and generated resource template functions) declare `returnType` as `anyTypeValue` instead of shapeless `dict`, per `.claude/policies/policy-domain-ext.md` §EXT.8. `parseResourceContent` returns string, dict, or other structured content depending on the resource's content blocks; the schema is determined at runtime by the MCP server (§EXT.8.3 case 4 — heterogeneous runtime state). Tool callables (with `outputSchema`) and prompt callables already declared concrete shapes; unchanged. Scripts introspecting these callables' `returnType` previously saw bare `dict`; they now see `any`, which more accurately reflects the dynamic shape.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

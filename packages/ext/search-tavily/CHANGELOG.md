@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- Both host-function callables (`search`, `extract`) declare concrete `returnType` shapes per `.claude/policies/policy-domain-ext.md` §EXT.8. `search` returns `dict(query: string, results: list, response_time: number, answer: string, images: list)` (last two optional, present when `include_answer` / `include_images` are set). `extract` returns `dict(results: list, failed_results: list)`. Inner vendor result objects remain typed as `any` because the extension forwards Tavily's JSON without reshaping. Scripts introspecting the callable's `returnType` property previously saw `dict`; they now see the precise top-level field set.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

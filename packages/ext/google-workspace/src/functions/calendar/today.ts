@@ -106,8 +106,8 @@ export function makeCalendarToday(deps: CalendarTodayDeps): (
       end: item.end ?? {},
       attendees: (item.attendees ?? []).map((a) => ({
         email: a.email ?? '',
-        displayName: a.displayName ?? '',
-        responseStatus: a.responseStatus ?? '',
+        display_name: a.displayName ?? '',
+        response_status: a.responseStatus ?? '',
       })),
       description: item.description ?? '',
       location: item.location ?? '',

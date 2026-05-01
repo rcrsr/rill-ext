@@ -222,9 +222,20 @@ export function createFetchExtension(
       };
     });
 
+    // Rich return-type shapes per §EXT.8. With `responseShape: 'full'`, the
+    // host fn returns `dict(status: number, headers: dict(string: string), body: any)`.
+    // With `responseShape: 'body'`, the body shape is determined by the
+    // user-configured endpoint and stays `any` per §EXT.8.3 case 3.
     const returnTypeValue =
       (endpointConfig.responseShape ?? defaultResponseShape) === 'full'
-        ? structureToTypeValue({ kind: 'dict' })
+        ? structureToTypeValue({
+            kind: 'dict',
+            fields: {
+              status:  { type: { kind: 'number' } },
+              headers: { type: { kind: 'dict', valueType: { kind: 'string' } } },
+              body:    { type: { kind: 'any' } },
+            },
+          })
         : structureToTypeValue({ kind: 'any' });
 
     const hostFunctionDef: RillFunction = {
@@ -262,7 +273,18 @@ export function createFetchExtension(
     params: [],
     fn: endpointsFn,
     annotations: { description: 'List configured endpoints' },
-    returnType: structureToTypeValue({ kind: 'list' }),
+    returnType: structureToTypeValue({
+      kind: 'list',
+      element: {
+        kind: 'dict',
+        fields: {
+          name:        { type: { kind: 'string' } },
+          method:      { type: { kind: 'string' } },
+          path:        { type: { kind: 'string' } },
+          description: { type: { kind: 'string' } },
+        },
+      },
+    }),
   };
 
   // ============================================================

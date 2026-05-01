@@ -70,14 +70,14 @@ function extractBody(part: MessagePart | undefined): string {
 /**
  * Collect attachment metadata from MIME parts.
  */
-function extractAttachments(parts: MessagePart[] | undefined): Array<{ filename: string; mimeType: string; size: number }> {
+function extractAttachments(parts: MessagePart[] | undefined): Array<{ filename: string; mime_type: string; size: number }> {
   if (!Array.isArray(parts)) return [];
-  const results: Array<{ filename: string; mimeType: string; size: number }> = [];
+  const results: Array<{ filename: string; mime_type: string; size: number }> = [];
   for (const part of parts) {
     if (part.filename && part.filename !== '') {
       results.push({
         filename: part.filename,
-        mimeType: part.mimeType ?? '',
+        mime_type: part.mimeType ?? '',
         size: part.body?.size ?? 0,
       });
     }

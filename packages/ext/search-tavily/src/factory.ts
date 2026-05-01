@@ -168,13 +168,34 @@ export function createTavilyExtension(
     await dispose(disposalState);
   };
 
-  const dictReturnType = structureToTypeValue({ kind: 'dict' });
+  // Rich return-type shapes per §EXT.8. Inner result and image entries are
+  // vendor-shaped pass-throughs; their elements are typed as `any`. Top-level
+  // field sets are concrete since we own those keys.
+  // Optional fields are marked via non-undefined `defaultValue` so introspection
+  // tooling treats `field.defaultValue !== undefined` as "optional".
+  const SEARCH_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      query:         { type: { kind: 'string' } },
+      results:       { type: { kind: 'list', element: { kind: 'any' } } },
+      response_time: { type: { kind: 'number' } },
+      answer:        { type: { kind: 'string' }, defaultValue: '' },                              // optional: include_answer flag
+      images:        { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },      // optional: include_images flag
+    },
+  });
+  const EXTRACT_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      results:        { type: { kind: 'list', element: { kind: 'any' } } },
+      failed_results: { type: { kind: 'list', element: { kind: 'any' } } },
+    },
+  });
 
   const callableDict = {
     search: toCallable({
       fn: search as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: SEARCH_RT,
     }),
     extract: toCallable({
       fn: extract as CallableFn,
@@ -182,7 +203,7 @@ export function createTavilyExtension(
         { name: 'urls', type: { kind: 'tuple' as const }, defaultValue: undefined, annotations: {} },
         p.dict('options', undefined, {}),
       ],
-      returnType: dictReturnType,
+      returnType: EXTRACT_RT,
     }),
   } satisfies TavilyExtensionContract;
 

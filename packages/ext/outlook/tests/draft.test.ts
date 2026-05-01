@@ -89,7 +89,7 @@ describe('draft() host function', () => {
     expect(result).toHaveProperty('date');
     expect(result).toHaveProperty('unread');
     expect(result).toHaveProperty('flagged');
-    expect(result).toHaveProperty('hasAttachments');
+    expect(result).toHaveProperty('has_attachments');
   });
 
   it('returns all 9 MailMessageDict fields [AC-7]', async () => {
@@ -99,7 +99,7 @@ describe('draft() host function', () => {
 
     const result = (await getCallable(ext, 'draft').fn(DRAFT_ARGS, ctx)) as Record<string, unknown>;
 
-    const requiredFields = ['id', 'subject', 'preview', 'from', 'to', 'date', 'unread', 'flagged', 'hasAttachments'];
+    const requiredFields = ['id', 'subject', 'preview', 'from', 'to', 'date', 'unread', 'flagged', 'has_attachments'];
     for (const field of requiredFields) {
       expect(result).toHaveProperty(field);
     }

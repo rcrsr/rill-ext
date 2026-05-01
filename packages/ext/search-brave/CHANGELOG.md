@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- All 3 host-function callables (`search`, `news`, `summarize`) declare concrete `returnType` shapes per `.claude/policies/policy-domain-ext.md` §EXT.8. `search` returns `dict(query, web)`, `news` returns `dict(results: list)`, `summarize` returns `dict(summary, title, followups: list, context: list)`. Inner vendor objects (Brave's `query` / `web` / individual result entries) remain typed as `any` because the extension forwards the JSON without reshaping. Scripts introspecting the callable's `returnType` property previously saw `dict`; they now see the precise top-level field set.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- Configured endpoint callables with `responseShape: 'full'` now declare `returnType` as `dict(status: number, headers: dict(string: string), body: any)` instead of shapeless `dict`, per `.claude/policies/policy-domain-ext.md` §EXT.8. With `responseShape: 'body'`, the return remains `any` because the body shape is determined by the user-configured endpoint (§EXT.8.3 case 3).
+- The `endpoints` introspection callable now declares `returnType` as `list(dict(name: string, method: string, path: string, description: string))` instead of shapeless `list`. Scripts introspecting the callable's `returnType` property previously saw bare `list` / `dict`; they now see the precise shape.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

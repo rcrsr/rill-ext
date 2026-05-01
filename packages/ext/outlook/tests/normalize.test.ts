@@ -97,7 +97,7 @@ describe('normalizeMessage', () => {
       expect(result).toHaveProperty('date');
       expect(result).toHaveProperty('unread');
       expect(result).toHaveProperty('flagged');
-      expect(result).toHaveProperty('hasAttachments');
+      expect(result).toHaveProperty('has_attachments');
     });
 
     it('maps id correctly', () => {
@@ -143,9 +143,9 @@ describe('normalizeMessage', () => {
       expect(result.flagged).toBe(true);
     });
 
-    it('maps hasAttachments correctly', () => {
+    it('maps has_attachments correctly', () => {
       const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(result.hasAttachments).toBe(true);
+      expect(result.has_attachments).toBe(true);
     });
   });
 
@@ -223,9 +223,9 @@ describe('normalizeMessage', () => {
       expect(result.flagged).toBe(false);
     });
 
-    it('hasAttachments defaults to false when absent', () => {
+    it('has_attachments defaults to false when absent', () => {
       const result = normalizeMessage({});
-      expect(result.hasAttachments).toBe(false);
+      expect(result.has_attachments).toBe(false);
     });
 
     it('to excludes recipients with missing address', () => {
@@ -262,8 +262,8 @@ describe('normalizeEvent', () => {
       expect(result).toHaveProperty('end');
       expect(result).toHaveProperty('location');
       expect(result).toHaveProperty('attendees');
-      expect(result).toHaveProperty('isOnline');
-      expect(result).toHaveProperty('onlineUrl');
+      expect(result).toHaveProperty('is_online');
+      expect(result).toHaveProperty('online_url');
     });
 
     it('maps id correctly', () => {
@@ -299,14 +299,14 @@ describe('normalizeEvent', () => {
       expect(result.attendees).toEqual(['alice@example.com', 'bob@example.com']);
     });
 
-    it('maps isOnline from isOnlineMeeting', () => {
+    it('maps is_online from isOnlineMeeting', () => {
       const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(result.isOnline).toBe(true);
+      expect(result.is_online).toBe(true);
     });
 
-    it('maps onlineUrl from onlineMeeting.joinUrl', () => {
+    it('maps online_url from onlineMeeting.joinUrl', () => {
       const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(result.onlineUrl).toBe('https://teams.microsoft.com/meet/123');
+      expect(result.online_url).toBe('https://teams.microsoft.com/meet/123');
     });
   });
 
@@ -335,12 +335,12 @@ describe('normalizeEvent', () => {
       expect(normalizeEvent({}).attendees).toEqual([]);
     });
 
-    it('isOnline defaults to false', () => {
-      expect(normalizeEvent({}).isOnline).toBe(false);
+    it('is_online defaults to false', () => {
+      expect(normalizeEvent({}).is_online).toBe(false);
     });
 
-    it('onlineUrl defaults to empty string', () => {
-      expect(normalizeEvent({}).onlineUrl).toBe('');
+    it('online_url defaults to empty string', () => {
+      expect(normalizeEvent({}).online_url).toBe('');
     });
 
     it('attendees excludes recipients with missing address', () => {
@@ -398,9 +398,9 @@ describe('normalizeScheduleItem', () => {
 
 describe('normalizeSchedule', () => {
   describe('full Graph schedule', () => {
-    it('maps scheduleId', () => {
+    it('maps schedule_id', () => {
       const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.scheduleId).toBe('alice@example.com');
+      expect(result.schedule_id).toBe('alice@example.com');
     });
 
     it('maps availability from availabilityView', () => {
@@ -446,8 +446,8 @@ describe('normalizeSchedule', () => {
   });
 
   describe('null/absent field defaults', () => {
-    it('scheduleId defaults to empty string', () => {
-      expect(normalizeSchedule({}).scheduleId).toBe('');
+    it('schedule_id defaults to empty string', () => {
+      expect(normalizeSchedule({}).schedule_id).toBe('');
     });
 
     it('availability defaults to empty string', () => {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- `getAll` callable's `returnType` is now the homogeneous-value form `dict(string: any)` instead of shapeless `dict`, per `.claude/policies/policy-domain-ext.md` §EXT.8. Values remain `any` because they are user-stored under caller-defined schemas (§EXT.8.3 case 1). `get` and `get_or` continue to return `any` for the same reason. `schema` and `mounts` already declare rich `list(dict(...))` shapes; unchanged. Scripts introspecting the callable's `returnType` property previously saw bare `dict`; they now see `dict(string: any)`.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

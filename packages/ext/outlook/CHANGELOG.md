@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.2] - 2026-04-30
+
+### Changed (Breaking)
+
+- All 12 host-function callables declare concrete `returnType` shapes per `.claude/policies/policy-domain-ext.md` §EXT.8. `MailMessageDict` (9 fields) is shared across `inbox`, `from`, `search`, `read`, `draft`, `flag`. `CalendarEventDict` (8 fields) is shared across `events`, `today`, `create_event`. `FreeBusyScheduleDict` (3 fields with nested `items` list) is used by `free_busy`. `send` and `reply` return `dict(sent: bool, to: list(string), subject: string)`. Scripts introspecting the callable's `returnType` property previously saw `dict`; they now see the precise top-level field set.
+- Snake_case boundary fixes folded in (root `CLAUDE.md` §Boundary Key Naming): `MailMessageDict.hasAttachments` → `has_attachments`; `CalendarEventDict.isOnline` → `is_online`; `CalendarEventDict.onlineUrl` → `online_url`; `FreeBusyScheduleDict.scheduleId` → `schedule_id`. The `create_event` options dict's `isOnline` flag is now `is_online`. Scripts reading those fields must update.
+
+### Documentation
+
+- `docs/extension-outlook.md` updated to reflect the actual response shapes (per §EXT.8.4 documentation parity):
+  - The `flag` Result Dict section previously claimed `{ id: string, flagged: boolean }`; the implementation returns the full message dict with `flagged` set to `true`. Section rewritten to cross-reference the Message Dict Shape.
+  - New "Calendar Event Dict Shape" section documents the 8-field event dict; cross-references added from `events`, `today`, and `create_event` Result Dicts.
+  - Snake_case field renames reflected throughout (Message Dict Shape, Calendar Event Dict Shape, free_busy schedules, create_event options).
+
 ## [0.19.1] - 2026-04-30
 
 ### Changed (Breaking)

@@ -25,7 +25,10 @@ import { createStore, type KvStore } from './store.js';
 const anyReturn = structureToTypeValue({ kind: 'any' });
 const boolReturn = structureToTypeValue({ kind: 'bool' });
 const listReturn = structureToTypeValue({ kind: 'list' });
-const dictReturn = structureToTypeValue({ kind: 'dict' });
+// getAll returns a homogeneous-value dict per §EXT.8.2: keys are arbitrary
+// user-chosen strings; values are user-stored RillValues whose schema is set
+// by the caller (§EXT.8.3 case 1), so the value type is `any`.
+const getAllReturn = structureToTypeValue({ kind: 'dict', valueType: { kind: 'any' } });
 
 const PROVIDER = 'kv-file';
 
@@ -373,7 +376,7 @@ export function createFileKvExtension(
       params: [p.str('mount', 'Mount name')],
       fn: getAll,
       annotations: { description: 'Get all entries as dict' },
-      returnType: dictReturn,
+      returnType: getAllReturn,
     } satisfies RillFunction,
     schema: {
       params: [p.str('mount', 'Mount name')],

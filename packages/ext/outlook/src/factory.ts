@@ -22,6 +22,7 @@ import {
   type ExtensionFactoryResult,
   type RillValue,
   type RuntimeContext,
+  type TypeStructure,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import {
@@ -418,63 +419,163 @@ export function createOutlookExtension(
   // CALLABLE DICT  [AC-1]
   // ============================================================
 
-  const dictReturnType = structureToTypeValue({ kind: 'dict' });
+  // Rich return-type shapes per .claude/policies/policy-domain-ext.md §EXT.8.
+  // Shared element shapes mirror the normalize.ts dict types: MailMessageDict
+  // (9 fields), CalendarEventDict (8 fields), FreeBusyScheduleDict (3 fields).
+  const MAIL_MESSAGE_DICT: TypeStructure = {
+    kind: 'dict',
+    fields: {
+      id:               { type: { kind: 'string' } },
+      subject:          { type: { kind: 'string' } },
+      preview:          { type: { kind: 'string' } },
+      from:             { type: { kind: 'string' } },
+      to:               { type: { kind: 'list', element: { kind: 'string' } } },
+      date:             { type: { kind: 'number' } },
+      unread:           { type: { kind: 'bool' } },
+      flagged:          { type: { kind: 'bool' } },
+      has_attachments:  { type: { kind: 'bool' } },
+    },
+  };
+  const CALENDAR_EVENT_DICT: TypeStructure = {
+    kind: 'dict',
+    fields: {
+      id:         { type: { kind: 'string' } },
+      title:      { type: { kind: 'string' } },
+      start:      { type: { kind: 'number' } },
+      end:        { type: { kind: 'number' } },
+      location:   { type: { kind: 'string' } },
+      attendees:  { type: { kind: 'list', element: { kind: 'string' } } },
+      is_online:  { type: { kind: 'bool' } },
+      online_url: { type: { kind: 'string' } },
+    },
+  };
+  const FREE_BUSY_SCHEDULE_DICT: TypeStructure = {
+    kind: 'dict',
+    fields: {
+      schedule_id:  { type: { kind: 'string' } },
+      availability: { type: { kind: 'string' } },
+      items: {
+        type: {
+          kind: 'list',
+          element: {
+            kind: 'dict',
+            fields: {
+              status:  { type: { kind: 'string' } },
+              subject: { type: { kind: 'string' } },
+              start:   { type: { kind: 'number' } },
+              end:     { type: { kind: 'number' } },
+            },
+          },
+        },
+      },
+    },
+  };
+  const MAIL_MESSAGE_RT = structureToTypeValue(MAIL_MESSAGE_DICT);
+  const CALENDAR_EVENT_RT = structureToTypeValue(CALENDAR_EVENT_DICT);
+  const INBOX_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      messages: { type: { kind: 'list', element: MAIL_MESSAGE_DICT } },
+      folder:   { type: { kind: 'string' } },
+    },
+  });
+  const FROM_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      messages: { type: { kind: 'list', element: MAIL_MESSAGE_DICT } },
+    },
+  });
+  const SEARCH_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      messages: { type: { kind: 'list', element: MAIL_MESSAGE_DICT } },
+      query:    { type: { kind: 'string' } },
+    },
+  });
+  const SEND_REPLY_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      sent:    { type: { kind: 'bool' } },
+      to:      { type: { kind: 'list', element: { kind: 'string' } } },
+      subject: { type: { kind: 'string' } },
+    },
+  });
+  const EVENTS_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      events: { type: { kind: 'list', element: CALENDAR_EVENT_DICT } },
+      range:  { type: { kind: 'string' } },
+    },
+  });
+  const TODAY_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      events: { type: { kind: 'list', element: CALENDAR_EVENT_DICT } },
+    },
+  });
+  const FREE_BUSY_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      schedules: { type: { kind: 'list', element: FREE_BUSY_SCHEDULE_DICT } },
+      range:     { type: { kind: 'string' } },
+    },
+  });
 
   const callableDict = {
     inbox: toCallable({
       fn: inboxWrapped as CallableFn,
       params: [p.num('top', undefined, DEFAULT_MAX_RESULTS), p.bool('unread'), p.str('folder')],
-      returnType: dictReturnType,
+      returnType: INBOX_RT,
     }),
     from: toCallable({
       fn: fromWrapped as CallableFn,
       params: [p.str('address'), p.num('top', undefined, DEFAULT_MAX_RESULTS)],
-      returnType: dictReturnType,
+      returnType: FROM_RT,
     }),
     search: toCallable({
       fn: searchWrapped as CallableFn,
       params: [p.str('query'), p.num('top', undefined, DEFAULT_MAX_RESULTS)],
-      returnType: dictReturnType,
+      returnType: SEARCH_RT,
     }),
     read: toCallable({
       fn: readWrapped as CallableFn,
       params: [p.str('message_id')],
-      returnType: dictReturnType,
+      returnType: MAIL_MESSAGE_RT,
     }),
     send: toCallable({
       fn: sendWrapped as CallableFn,
       params: [p.list('to'), p.str('subject'), p.str('body')],
-      returnType: dictReturnType,
+      returnType: SEND_REPLY_RT,
     }),
     draft: toCallable({
       fn: draftWrapped as CallableFn,
       params: [p.list('to'), p.str('subject'), p.str('body')],
-      returnType: dictReturnType,
+      returnType: MAIL_MESSAGE_RT,
     }),
     reply: toCallable({
       fn: replyWrapped as CallableFn,
       params: [p.str('message_id'), p.str('body')],
-      returnType: dictReturnType,
+      returnType: SEND_REPLY_RT,
     }),
     flag: toCallable({
       fn: flagWrapped as CallableFn,
       params: [p.str('message_id')],
-      returnType: dictReturnType,
+      returnType: MAIL_MESSAGE_RT,
     }),
     events: toCallable({
       fn: eventsWrapped as CallableFn,
       params: [p.num('start'), p.num('end')],
-      returnType: dictReturnType,
+      returnType: EVENTS_RT,
     }),
     today: toCallable({
       fn: todayWrapped as CallableFn,
       params: [],
-      returnType: dictReturnType,
+      returnType: TODAY_RT,
     }),
     free_busy: toCallable({
       fn: freeBusyWrapped as CallableFn,
       params: [p.num('start'), p.num('end'), p.list('attendees')],
-      returnType: dictReturnType,
+      returnType: FREE_BUSY_RT,
     }),
     create_event: toCallable({
       fn: createEventWrapped as CallableFn,
@@ -484,7 +585,7 @@ export function createOutlookExtension(
         p.num('end'),
         p.dict('options', undefined, {}),
       ],
-      returnType: dictReturnType,
+      returnType: CALENDAR_EVENT_RT,
     }),
   } satisfies OutlookExtensionContract;
 

@@ -27,6 +27,7 @@ import {
   type RillParam,
   type RillValue,
   type RuntimeContext,
+  type TypeStructure,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import { validateConfig, mergeCapabilities } from './config.js';
@@ -387,9 +388,168 @@ export function createGoogleWorkspaceExtension(
   // CALLABLE DICT  [AC-1]
   // ============================================================
 
-  const dictReturnType = structureToTypeValue({ kind: 'dict' });
   const stringReturnType = structureToTypeValue({ kind: 'string' });
   const boolReturnType = structureToTypeValue({ kind: 'bool' });
+
+  // Rich return-type shapes per .claude/policies/policy-domain-ext.md §EXT.8.
+  // Where the host fn forwards a vendor object without reshaping (e.g. Google
+  // calendar's `start` / `end` blocks which retain camelCase `dateTime` /
+  // `timeZone`), the inner shape is typed as `any` to avoid encoding the
+  // boundary violation in the type contract.
+  const GMAIL_SEARCH_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      messages: {
+        type: {
+          kind: 'list',
+          element: {
+            kind: 'dict',
+            fields: {
+              id:        { type: { kind: 'string' } },
+              thread_id: { type: { kind: 'string' } },
+            },
+          },
+        },
+      },
+    },
+  });
+  const GMAIL_READ_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      id:        { type: { kind: 'string' } },
+      thread_id: { type: { kind: 'string' } },
+      headers: {
+        type: {
+          kind: 'dict',
+          fields: {
+            from:    { type: { kind: 'string' } },
+            to:      { type: { kind: 'string' } },
+            subject: { type: { kind: 'string' } },
+            date:    { type: { kind: 'string' } },
+          },
+        },
+      },
+      body: { type: { kind: 'string' } },
+      attachments: {
+        type: {
+          kind: 'list',
+          element: {
+            kind: 'dict',
+            fields: {
+              filename:  { type: { kind: 'string' } },
+              mime_type: { type: { kind: 'string' } },
+              size:      { type: { kind: 'number' } },
+            },
+          },
+        },
+      },
+    },
+  });
+  // Drive file metadata shape, shared between drive_list (each element of `files`)
+  // and drive_get_metadata (top-level dict).
+  const DRIVE_FILE_FIELDS: Record<string, { type: TypeStructure }> = {
+    id:            { type: { kind: 'string' } },
+    name:          { type: { kind: 'string' } },
+    mime_type:     { type: { kind: 'string' } },
+    size:          { type: { kind: 'any' } },  // number | null
+    owners: {
+      type: {
+        kind: 'list',
+        element: {
+          kind: 'dict',
+          fields: {
+            display_name:  { type: { kind: 'string' } },
+            email_address: { type: { kind: 'string' } },
+          },
+        },
+      },
+    },
+    created_time:  { type: { kind: 'string' } },
+    modified_time: { type: { kind: 'string' } },
+  };
+  const DRIVE_LIST_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      files: {
+        type: {
+          kind: 'list',
+          element: { kind: 'dict', fields: DRIVE_FILE_FIELDS },
+        },
+      },
+    },
+  });
+  const DRIVE_GET_METADATA_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: DRIVE_FILE_FIELDS,
+  });
+  const DRIVE_UPLOAD_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      id:        { type: { kind: 'string' } },
+      name:      { type: { kind: 'string' } },
+      mime_type: { type: { kind: 'string' } },
+      size:      { type: { kind: 'number' } },
+      owner:     { type: { kind: 'any' } },  // string | null
+    },
+  });
+  // Calendar event shape, shared between calendar_events and calendar_today.
+  // start / end are forwarded vendor objects (Google's { dateTime, date,
+  // timeZone }) with camelCase keys; typed as `any` to avoid encoding the
+  // boundary violation. Snake_case remapping is a separate boundary fix.
+  const CALENDAR_EVENT_FIELDS: Record<string, { type: TypeStructure }> = {
+    id:          { type: { kind: 'string' } },
+    summary:     { type: { kind: 'string' } },
+    start:       { type: { kind: 'any' } },
+    end:         { type: { kind: 'any' } },
+    attendees: {
+      type: {
+        kind: 'list',
+        element: {
+          kind: 'dict',
+          fields: {
+            email:           { type: { kind: 'string' } },
+            display_name:    { type: { kind: 'string' } },
+            response_status: { type: { kind: 'string' } },
+          },
+        },
+      },
+    },
+    description: { type: { kind: 'string' } },
+    location:    { type: { kind: 'string' } },
+    status:      { type: { kind: 'string' } },
+  };
+  const CALENDAR_EVENTS_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      events: {
+        type: {
+          kind: 'list',
+          element: { kind: 'dict', fields: CALENDAR_EVENT_FIELDS },
+        },
+      },
+    },
+  });
+  // calendar_free_busy returns a flat email-keyed dict (homogeneous-value).
+  const CALENDAR_FREE_BUSY_RT = structureToTypeValue({
+    kind: 'dict',
+    valueType: {
+      kind: 'dict',
+      fields: {
+        busy: {
+          type: {
+            kind: 'list',
+            element: {
+              kind: 'dict',
+              fields: {
+                start: { type: { kind: 'string' } },
+                end:   { type: { kind: 'string' } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
 
   // drive_list and drive_upload treat folder_id as optional (root when absent),
   // but p.str('folder_id') would mark it required. Define a custom RillParam
@@ -409,12 +569,12 @@ export function createGoogleWorkspaceExtension(
         p.str('query'),
         p.dict('options', undefined, {}),
       ],
-      returnType: dictReturnType,
+      returnType: GMAIL_SEARCH_RT,
     }),
     gmail_read: toCallable({
       fn: gmailReadWrapped as CallableFn,
       params: [p.str('message_id')],
-      returnType: dictReturnType,
+      returnType: GMAIL_READ_RT,
     }),
     gmail_send: toCallable({
       fn: gmailSendWrapped as CallableFn,
@@ -462,7 +622,7 @@ export function createGoogleWorkspaceExtension(
         folderIdOptionalParam,
         p.dict('options', undefined, {}),
       ],
-      returnType: dictReturnType,
+      returnType: DRIVE_LIST_RT,
     }),
     drive_upload: toCallable({
       fn: driveUploadWrapped as CallableFn,
@@ -472,7 +632,7 @@ export function createGoogleWorkspaceExtension(
         folderIdOptionalParam,
         p.dict('options', undefined, {}),
       ],
-      returnType: dictReturnType,
+      returnType: DRIVE_UPLOAD_RT,
     }),
     drive_download: toCallable({
       fn: driveDownloadWrapped as CallableFn,
@@ -496,7 +656,7 @@ export function createGoogleWorkspaceExtension(
     drive_get_metadata: toCallable({
       fn: driveGetMetadataWrapped as CallableFn,
       params: [p.str('file_id')],
-      returnType: dictReturnType,
+      returnType: DRIVE_GET_METADATA_RT,
     }),
     // Calendar (4)
     calendar_events: toCallable({
@@ -506,12 +666,12 @@ export function createGoogleWorkspaceExtension(
         p.str('end_date'),
         p.dict('options', undefined, {}),
       ],
-      returnType: dictReturnType,
+      returnType: CALENDAR_EVENTS_RT,
     }),
     calendar_today: toCallable({
       fn: calendarTodayWrapped as CallableFn,
       params: [p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: CALENDAR_EVENTS_RT,
     }),
     calendar_create_event: toCallable({
       fn: calendarCreateEventWrapped as CallableFn,
@@ -530,7 +690,7 @@ export function createGoogleWorkspaceExtension(
         p.str('start_time'),
         p.str('end_time'),
       ],
-      returnType: dictReturnType,
+      returnType: CALENDAR_FREE_BUSY_RT,
     }),
   } satisfies GoogleWorkspaceExtensionContract;
 

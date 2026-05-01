@@ -609,7 +609,10 @@ export function createSqliteKvExtension(
       params: [p.str('mount', 'Mount name')],
       fn: getAll,
       annotations: { description: 'Get all entries as dict' },
-      returnType: structureToTypeValue({ kind: 'dict' }),
+      // Homogeneous-value dict per §EXT.8.2: keys are arbitrary user-chosen
+      // strings; values are user-stored RillValues whose schema is set by the
+      // caller (§EXT.8.3 case 1), so the value type is `any`.
+      returnType: structureToTypeValue({ kind: 'dict', valueType: { kind: 'any' } }),
     },
     schema: {
       params: [p.str('mount', 'Mount name')],

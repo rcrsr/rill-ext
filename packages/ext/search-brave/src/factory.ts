@@ -255,23 +255,49 @@ export function createBraveExtension(
     await dispose(disposalState);
   };
 
-  const dictReturnType = structureToTypeValue({ kind: 'dict' });
+  // Rich return-type shapes per §EXT.8. Brave's vendor-side response shapes
+  // for `query` / `web` containers and individual result objects are opaque
+  // pass-throughs (we forward the JSON without reshaping); their inner
+  // fields are typed as `any` to reflect that our code does not constrain
+  // them. Top-level field sets are concrete because we own those keys.
+  const SEARCH_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      query: { type: { kind: 'any' } },
+      web:   { type: { kind: 'any' } },
+    },
+  });
+  const NEWS_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      results: { type: { kind: 'list', element: { kind: 'any' } } },
+    },
+  });
+  const SUMMARIZE_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      summary:   { type: { kind: 'any' } },  // string | null
+      title:     { type: { kind: 'any' } },  // string | null
+      followups: { type: { kind: 'list', element: { kind: 'any' } } },
+      context:   { type: { kind: 'list', element: { kind: 'any' } } },
+    },
+  });
 
   const callableDict = {
     search: toCallable({
       fn: search as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: SEARCH_RT,
     }),
     news: toCallable({
       fn: news as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: NEWS_RT,
     }),
     summarize: toCallable({
       fn: summarize as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: SUMMARIZE_RT,
     }),
   } satisfies BraveExtensionContract;
 

@@ -193,18 +193,43 @@ export async function createSearxngExtension(
     await dispose(disposalState);
   };
 
-  const dictReturnType = structureToTypeValue({ kind: 'dict' });
+  // Rich return-type shapes per §EXT.8. Inner result/suggestion/answer/etc.
+  // entries are vendor-shaped pass-throughs; their elements are typed as
+  // `any`. Top-level field sets are concrete since we own those keys.
+  // Optional fields are marked via non-undefined `defaultValue` so introspection
+  // tooling treats `field.defaultValue !== undefined` as "optional".
+  const SEARCH_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      query:             { type: { kind: 'string' } },
+      number_of_results: { type: { kind: 'number' } },
+      results:           { type: { kind: 'list', element: { kind: 'any' } } },
+      suggestions:       { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+      answers:           { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+      infoboxes:         { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+      corrections:       { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+    },
+  });
+  const CONFIG_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      categories: { type: { kind: 'any' } },
+      engines:    { type: { kind: 'any' } },
+      plugins:    { type: { kind: 'any' } },
+      locales:    { type: { kind: 'any' } },
+    },
+  });
 
   const callableDict = {
     search: toCallable({
       fn: search as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: SEARCH_RT,
     }),
     config: toCallable({
       fn: configFn as CallableFn,
       params: [],
-      returnType: dictReturnType,
+      returnType: CONFIG_RT,
     }),
   } satisfies SearxngExtensionContract;
 

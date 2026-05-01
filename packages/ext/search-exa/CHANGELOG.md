@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1] - 2026-04-30
+
+### Changed (Breaking)
+
+- All 4 host-function callables (`search`, `contents`, `find_similar`, `answer`) declare concrete `returnType` shapes per `.claude/policies/policy-domain-ext.md` §EXT.8. `search` and `find_similar` share `dict(results: list, request_id)`; `contents` returns `dict(results: list, statuses: list)`; `answer` returns `dict(answer: string, citations: list)`. Inner vendor result objects remain typed as `any` because the extension forwards the JSON without reshaping. Scripts introspecting the callable's `returnType` property previously saw `dict`; they now see the precise top-level field set.
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

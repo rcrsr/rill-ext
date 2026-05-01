@@ -209,23 +209,54 @@ export function createSerperExtension(
     await dispose(disposalState);
   };
 
-  const dictReturnType = structureToTypeValue({ kind: 'dict' });
+  // Rich return-type shapes per §EXT.8. Vendor result objects (organic, news,
+  // images list elements, knowledge_graph, etc.) forward Serper's JSON without
+  // reshaping; their inner fields are typed as `any`. Top-level field sets are
+  // concrete because we own those keys and apply snake_case mapping at the
+  // boundary. Note: serper image objects retain camelCase fields (`imageUrl`,
+  // `thumbnailUrl`, `imageWidth`, `imageHeight`) per the current pass-through;
+  // mapping those to snake_case is tracked as a separate boundary fix.
+  // Optional fields are marked via non-undefined `defaultValue` so introspection
+  // tooling treats `field.defaultValue !== undefined` as "optional".
+  const SEARCH_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      search_parameters: { type: { kind: 'any' } },
+      organic:           { type: { kind: 'list', element: { kind: 'any' } } },
+      answer_box:        { type: { kind: 'any' }, defaultValue: null },                          // optional
+      knowledge_graph:   { type: { kind: 'any' }, defaultValue: null },                          // optional
+      people_also_ask:   { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+      related_searches:  { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+    },
+  });
+  const NEWS_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      news: { type: { kind: 'list', element: { kind: 'any' } } },
+    },
+  });
+  const IMAGES_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      images: { type: { kind: 'list', element: { kind: 'any' } } },
+    },
+  });
 
   const callableDict = {
     search: toCallable({
       fn: search as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: SEARCH_RT,
     }),
     news: toCallable({
       fn: news as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: NEWS_RT,
     }),
     images: toCallable({
       fn: images as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: IMAGES_RT,
     }),
   } satisfies SerperExtensionContract;
 

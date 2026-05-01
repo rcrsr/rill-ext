@@ -123,7 +123,16 @@ export function createExecExtension(
         description:
           commandConfig.description ?? `Execute ${commandName} command`,
       },
-      returnType: structureToTypeValue({ kind: 'dict' }),
+      // Per-command callable returns the captured stdout / stderr / exit_code
+      // dict per §EXT.8. See lines 95-99 above for the dict literal.
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        fields: {
+          stdout:    { type: { kind: 'string' } },
+          stderr:    { type: { kind: 'string' } },
+          exit_code: { type: { kind: 'number' } },
+        },
+      }),
     };
   }
 
@@ -143,7 +152,16 @@ export function createExecExtension(
     params: [],
     fn: commands,
     annotations: { description: 'List all configured commands' },
-    returnType: structureToTypeValue({ kind: 'list' }),
+    returnType: structureToTypeValue({
+      kind: 'list',
+      element: {
+        kind: 'dict',
+        fields: {
+          name:        { type: { kind: 'string' } },
+          description: { type: { kind: 'string' } },
+        },
+      },
+    }),
   };
 
   // ----------------------------------------------------------

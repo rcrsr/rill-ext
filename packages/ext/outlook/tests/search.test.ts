@@ -119,7 +119,7 @@ describe('search() host function', () => {
     expect(msg).toHaveProperty('date');
     expect(msg).toHaveProperty('unread');
     expect(msg).toHaveProperty('flagged');
-    expect(msg).toHaveProperty('hasAttachments');
+    expect(msg).toHaveProperty('has_attachments');
   });
 
   it('includes query in return value', async () => {

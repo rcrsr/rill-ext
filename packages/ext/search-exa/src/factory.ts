@@ -261,13 +261,39 @@ export function createExaExtension(
     await dispose(disposalState);
   };
 
-  const dictReturnType = structureToTypeValue({ kind: 'dict' });
+  // Rich return-type shapes per §EXT.8. Inner result objects (Exa's `results`,
+  // `statuses`, `citations` elements) are vendor-shaped and forwarded without
+  // reshaping; their elements are typed as `any`. `search` and `find_similar`
+  // share an identical top-level shape. Optional fields are marked via
+  // non-undefined `defaultValue` so introspection tooling treats
+  // `field.defaultValue !== undefined` as "optional".
+  const SEARCH_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      results:    { type: { kind: 'list', element: { kind: 'any' } } },
+      request_id: { type: { kind: 'string' }, defaultValue: '' },  // optional: present when API returns requestId
+    },
+  });
+  const CONTENTS_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      results:  { type: { kind: 'list', element: { kind: 'any' } } },
+      statuses: { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional: present when API returns statuses
+    },
+  });
+  const ANSWER_RT = structureToTypeValue({
+    kind: 'dict',
+    fields: {
+      answer:    { type: { kind: 'string' } },
+      citations: { type: { kind: 'list', element: { kind: 'any' } } },
+    },
+  });
 
   const callableDict = {
     search: toCallable({
       fn: search as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: SEARCH_RT,
     }),
     contents: toCallable({
       fn: contents as CallableFn,
@@ -275,17 +301,17 @@ export function createExaExtension(
         { name: 'urls', type: { kind: 'tuple' as const }, defaultValue: undefined, annotations: {} },
         p.dict('options', undefined, {}),
       ],
-      returnType: dictReturnType,
+      returnType: CONTENTS_RT,
     }),
     find_similar: toCallable({
       fn: find_similar as CallableFn,
       params: [p.str('url'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: SEARCH_RT,
     }),
     answer: toCallable({
       fn: answer as CallableFn,
       params: [p.str('query'), p.dict('options', undefined, {})],
-      returnType: dictReturnType,
+      returnType: ANSWER_RT,
     }),
   } satisfies ExaExtensionContract;
 
