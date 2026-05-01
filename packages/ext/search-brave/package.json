@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-search-brave",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "description": "rill extension for Brave search API integration",
   "license": "MIT",
   "author": "Andre Bremer",
