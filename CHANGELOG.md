@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.4] - 2026-04-30
+
 ### Changed (Breaking)
 
 - Rich `returnType` shapes declared across 12 extensions per the new policy `.claude/policies/policy-domain-ext.md` §EXT.8. Every host-function callable that returns a known-schema response now exposes the precise `dict(fields:)` or `list(element:)` shape via `structureToTypeValue`, replacing the previous shapeless `dict` / `list`. `anyTypeValue` is retained only for the four §EXT.8.3 cases (user-stored values, externally-supplied tool schemas, untyped HTTP bodies, heterogeneous runtime state). Scripts introspecting any updated callable's `returnType` property now see the precise shape instead of bare `dict` / `list` / `any`.
