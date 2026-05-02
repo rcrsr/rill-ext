@@ -1445,8 +1445,8 @@ describe('executeToolLoop', () => {
       expect(result.response).toBeDefined();
     });
 
-    it('enforces maxTurns limit', async () => {
-      // Multi-turn: Loop stops after maxTurns reached
+    it('enforces maxTurns limit (EC-15: halts with max_turns_exceeded)', async () => {
+      // Multi-turn: Loop halts after maxTurns reached (EC-15)
       const tools = {
         tool: createMockTool(() => 'result'),
       };
@@ -1464,20 +1464,20 @@ describe('executeToolLoop', () => {
         }),
       });
 
-      const result = await executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        tools,
-        3,
-        callbacks,
-        vi.fn(),
-        5 // maxTurns = 5
-      );
+      // EC-15: max_turns exceeded → throw with max_turns_exceeded message
+      await expect(
+        executeToolLoop(
+          [{ role: 'user', content: 'Test' }],
+          tools,
+          3,
+          callbacks,
+          vi.fn(),
+          5 // maxTurns = 5
+        )
+      ).rejects.toThrow('tool_loop exceeded max_turns (5)');
 
       // API should be called exactly 5 times
       expect(mockCallAPI).toHaveBeenCalledTimes(5);
-
-      // Result should indicate max turns reached (response is null)
-      expect(result.response).toBeNull();
     });
 
     it('aggregates tokens across multiple turns', async () => {
@@ -2468,43 +2468,299 @@ describe('executeToolLoop yieldChunk', () => {
 });
 
 // ============================================================
-// BUILD RESPONSE MESSAGES
+// BUILD RESPONSE MESSAGES (IR-7)
 // ============================================================
 
 describe('buildResponseMessages', () => {
-  it('returns array with assistant message appended', () => {
-    const input = [{ role: 'user', content: 'Hello' }];
-    const result = buildResponseMessages(input, 'Hi there');
+  it('returns array with single text part assistant message appended', () => {
+    // IR-7: appends {role:'assistant', parts:[...]} to input list
+    const input = [{ role: 'user' as const, parts: [{ type: 'text' as const, text: 'Hello' }] }];
+    const result = buildResponseMessages(input, [{ type: 'text', text: 'Hi there' }]);
     expect(result).toEqual([
-      { role: 'user', content: 'Hello' },
-      { role: 'assistant', content: 'Hi there' },
+      { role: 'user', parts: [{ type: 'text', text: 'Hello' }] },
+      { role: 'assistant', parts: [{ type: 'text', text: 'Hi there' }] },
     ]);
   });
 
   it('works with empty input messages', () => {
-    const result = buildResponseMessages([], 'Hello');
-    expect(result).toEqual([{ role: 'assistant', content: 'Hello' }]);
+    // IR-7: empty input → single-element array with assistant message
+    const result = buildResponseMessages([], [{ type: 'text', text: 'Hello' }]);
+    expect(result).toEqual([{ role: 'assistant', parts: [{ type: 'text', text: 'Hello' }] }]);
   });
 
   it('does not mutate the input array', () => {
-    const input = [{ role: 'user', content: 'Hello' }];
+    // IR-7: pure function, returns new array
+    const input = [{ role: 'user' as const, parts: [{ type: 'text' as const, text: 'Hello' }] }];
     const inputCopy = [...input];
-    buildResponseMessages(input, 'Hi there');
+    buildResponseMessages(input, [{ type: 'text', text: 'Hi there' }]);
     expect(input).toEqual(inputCopy);
     expect(input).toHaveLength(1);
   });
 
-  it('preserves all input message fields', () => {
+  it('returns a new array instance (does not mutate input)', () => {
+    // IR-7: returned array is a new reference
+    const input = [{ role: 'user' as const, parts: [{ type: 'text' as const, text: 'Hello' }] }];
+    const result = buildResponseMessages(input, [{ type: 'text', text: 'Reply' }]);
+    expect(result).not.toBe(input);
+    expect(result).toHaveLength(2);
+    expect(input).toHaveLength(1);
+  });
+
+  it('preserves all input messages', () => {
     const input = [
-      { role: 'system', content: 'You are a helpful assistant.' },
-      { role: 'user', content: 'Question' },
-      { role: 'assistant', content: 'Answer' },
+      { role: 'system' as const, parts: [{ type: 'text' as const, text: 'You are helpful.' }] },
+      { role: 'user' as const, parts: [{ type: 'text' as const, text: 'Question' }] },
+      { role: 'assistant' as const, parts: [{ type: 'text' as const, text: 'Answer' }] },
     ];
-    const result = buildResponseMessages(input, 'Final answer');
+    const result = buildResponseMessages(input, [{ type: 'text', text: 'Final answer' }]);
     expect(result).toHaveLength(4);
-    expect(result[0]).toEqual({ role: 'system', content: 'You are a helpful assistant.' });
-    expect(result[1]).toEqual({ role: 'user', content: 'Question' });
-    expect(result[2]).toEqual({ role: 'assistant', content: 'Answer' });
-    expect(result[3]).toEqual({ role: 'assistant', content: 'Final answer' });
+    expect(result[0]).toEqual({ role: 'system', parts: [{ type: 'text', text: 'You are helpful.' }] });
+    expect(result[1]).toEqual({ role: 'user', parts: [{ type: 'text', text: 'Question' }] });
+    expect(result[2]).toEqual({ role: 'assistant', parts: [{ type: 'text', text: 'Answer' }] });
+    expect(result[3]).toEqual({ role: 'assistant', parts: [{ type: 'text', text: 'Final answer' }] });
+  });
+
+  it('preserves multi-part assistant (thinking + text + tool_use)', () => {
+    // IR-7: multi-part assistant parts preserved exactly
+    const parts = [
+      { type: 'thinking' as const, text: 'Let me think...' },
+      { type: 'text' as const, text: 'Here is my answer.' },
+      { type: 'tool_use' as const, id: 'call_1', name: 'search', input: { query: 'test' } },
+    ];
+    const result = buildResponseMessages([], parts);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ role: 'assistant', parts });
+  });
+});
+
+// ============================================================
+// MAX_TURNS RESOLUTION (§Defaults & Nullability)
+// ============================================================
+
+describe('executeToolLoop max_turns resolution', () => {
+  // Creates a callbacks that always returns a tool call on turn 1, then stops
+  function createTurnCountingCallbacks(_maxApiCalls = 100) {
+    let apiCalls = 0;
+    return createMockCallbacks({
+      extractToolCalls: vi.fn(() => {
+        apiCalls++;
+        return apiCalls === 1
+          ? [{ id: 'call_1', name: 'tool', input: {} }]
+          : null;
+      }),
+    });
+  }
+
+  // Creates callbacks that always returns a tool call (to keep the loop running)
+  function createInfiniteToolCallbacks() {
+    return createMockCallbacks({
+      extractToolCalls: vi.fn(() => [{ id: 'call_1', name: 'tool', input: {} }]),
+    });
+  }
+
+  it('per-call maxTurns > 0 is used as the limit', async () => {
+    // Resolution: per-call 5 overrides factory default
+    const callbacks = createInfiniteToolCallbacks();
+    const tools = { tool: createMockTool(() => 'ok') };
+
+    await expect(
+      executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn(),
+        5,         // per-call maxTurns = 5
+        undefined,
+        undefined,
+        undefined,
+        10         // factoryMaxTurns = 10 (should NOT be used)
+      )
+    ).rejects.toThrow('tool_loop exceeded max_turns (5)');
+    // extractToolCalls is called 5 times (5 turns)
+    expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(5);
+  });
+
+  it('per-call maxTurns = 0 routes to factoryMaxTurns', async () => {
+    // Resolution: per-call 0 (sentinel) → factory 3
+    const callbacks = createInfiniteToolCallbacks();
+    const tools = { tool: createMockTool(() => 'ok') };
+
+    await expect(
+      executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn(),
+        0,         // per-call sentinel
+        undefined,
+        undefined,
+        undefined,
+        3          // factoryMaxTurns = 3
+      )
+    ).rejects.toThrow('tool_loop exceeded max_turns (3)');
+    expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(3);
+  });
+
+  it('per-call maxTurns = 0 and factoryMaxTurns undefined → unlimited (no early halt)', async () => {
+    // Resolution: 0 + undefined → unlimited; loop completes normally after tool returns no more calls
+    const callbacks = createTurnCountingCallbacks();
+    const tools = { tool: createMockTool(() => 'ok') };
+
+    const result = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      tools,
+      3,
+      callbacks,
+      vi.fn(),
+      0,         // per-call sentinel
+      undefined,
+      undefined,
+      undefined,
+      undefined  // no factoryMaxTurns
+    );
+
+    // Loop should complete: 1 turn with tool call, 1 turn with no tool calls
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls[0]?.result).toBe('ok');
+  });
+
+  it('factoryMaxTurns applies when per-call is 0 and factory is set', async () => {
+    // Resolution: per-call 0, factory 7 → uses 7
+    const callbacks = createInfiniteToolCallbacks();
+    const tools = { tool: createMockTool(() => 'ok') };
+
+    await expect(
+      executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn(),
+        0,         // per-call sentinel
+        undefined,
+        undefined,
+        undefined,
+        7          // factoryMaxTurns = 7
+      )
+    ).rejects.toThrow('tool_loop exceeded max_turns (7)');
+    expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(7);
+  });
+
+  it('negative per-call maxTurns is rejected with INVALID_INPUT', async () => {
+    // Defensive guard: negative per-call value is invalid
+    const callbacks = createMockCallbacks({});
+    const tools = { tool: createMockTool(() => 'ok') };
+
+    await expect(
+      executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn(),
+        -1         // negative per-call
+      )
+    ).rejects.toThrow('max_turns must be >= 0, got -1');
+  });
+});
+
+// ============================================================
+// EC-15: MAX_TURNS_EXCEEDED
+// ============================================================
+
+describe('executeToolLoop EC-15 max_turns_exceeded', () => {
+  it('halts with max_turns_exceeded when turn limit is reached', async () => {
+    const callbacks = createMockCallbacks({
+      extractToolCalls: vi.fn(() => [{ id: 'call_1', name: 'tool', input: {} }]),
+    });
+    const tools = { tool: createMockTool(() => 'ok') };
+
+    await expect(
+      executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn(),
+        2          // limit to 2 turns
+      )
+    ).rejects.toThrow('tool_loop exceeded max_turns (2)');
+  });
+});
+
+// ============================================================
+// EC-16: MAX_ERRORS_EXCEEDED
+// ============================================================
+
+describe('executeToolLoop EC-16 max_errors_exceeded', () => {
+  it('halts with max_errors_exceeded when error threshold is reached', async () => {
+    const tools = {
+      failing_tool: createMockTool(() => { throw new Error('Tool failed'); }),
+    };
+
+    let apiCallCount = 0;
+    const callbacks = createMockCallbacks({
+      extractToolCalls: vi.fn(() => {
+        apiCallCount++;
+        return apiCallCount === 1
+          ? [
+              { id: 'call_1', name: 'failing_tool', input: {} },
+              { id: 'call_2', name: 'failing_tool', input: {} },
+              { id: 'call_3', name: 'failing_tool', input: {} },
+            ]
+          : null;
+      }),
+    });
+
+    await expect(
+      executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn()
+      )
+    ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
+  });
+
+  it('uses default max_errors of 3 when maxErrors param is 0', async () => {
+    // max_errors default: 3 when unset/0
+    let errorCount = 0;
+    const tools = {
+      failing_tool: createMockTool(() => {
+        errorCount++;
+        throw new Error('Tool failed');
+      }),
+    };
+
+    let apiCallCount = 0;
+    const callbacks = createMockCallbacks({
+      extractToolCalls: vi.fn(() => {
+        apiCallCount++;
+        return apiCallCount === 1
+          ? [
+              { id: 'call_1', name: 'failing_tool', input: {} },
+              { id: 'call_2', name: 'failing_tool', input: {} },
+              { id: 'call_3', name: 'failing_tool', input: {} },
+              { id: 'call_4', name: 'failing_tool', input: {} },
+            ]
+          : null;
+      }),
+    });
+
+    await expect(
+      executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        0,         // 0 → defaults to 3 internally
+        callbacks,
+        vi.fn()
+      )
+    ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
+
+    // Should stop at 3 errors (the default)
+    expect(errorCount).toBe(3);
   });
 });

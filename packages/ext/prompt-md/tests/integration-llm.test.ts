@@ -3,10 +3,11 @@
  *
  * Verifies that a rill list produced by a prompt-md closure (output mode
  * inferred from `@@ role` markers in the body) can be passed directly to
- * messages() of Anthropic, OpenAI, and Gemini without any per-provider
- * adaptation branch.
+ * message() of Anthropic, OpenAI, and Gemini as list input without any
+ * per-provider adaptation branch. Downstream LLM extensions accept it via
+ * normalizePrompt sugar expansion inside message().
  *
- * Covers: FR-PROMPT-5, NFR-PROMPT-3.
+ * Covers: FR-PROMPT-5, NFR-PROMPT-3, FR-UNIFY-7.
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -118,8 +119,9 @@ import { createGeminiExtension } from '@rcrsr/rill-ext-gemini';
 // ============================================================
 
 /**
- * Chat prompt with user + assistant sections.
- * Uses only user and assistant roles, which all three providers accept.
+ * Multi-turn chat prompt with system + user turns (user is last).
+ * Ends with a user turn so normalizePrompt's assertNoTrailingAssistant passes.
+ * Uses only system and user roles, which all three providers accept.
  * Output mode (`list`) is inferred from the presence of `@@ role` markers.
  */
 const CHAT_PROMPT_CONTENT = `---
@@ -127,10 +129,10 @@ description: Multi-turn chat prompt
 params:
   - "query: string"
 ---
+@@ system
+You are a helpful rill assistant.
 @@ user
 {query}
-@@ assistant
-I will help you with that.
 `;
 
 /** Create an Anthropic-compatible mock stream resolving with the given text. */
@@ -226,7 +228,7 @@ afterEach(async () => {
 // ============================================================
 
 describe('AC-6: list-output closure result feeds all three LLM providers without adaptation', () => {
-  it('same rill list passes to anthropic, openai, and gemini messages() with no per-provider branching', async () => {
+  it('same rill list passes to anthropic, openai, and gemini message() with no per-provider branching', async () => {
     // ── Arrange: temp dir with chat.prompt.md ─────────────────────────────────
     const dir = await makeTempDir();
     await fs.writeFile(path.join(dir, 'chat.prompt.md'), CHAT_PROMPT_CONTENT, 'utf-8');
@@ -250,22 +252,23 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
     expect(Array.isArray(closureResult)).toBe(true);
     const messages = closureResult as Array<Record<string, unknown>>;
     expect(messages).toHaveLength(2);
-    expect(messages[0]).toMatchObject({ role: 'user', content: expect.stringContaining('rill') as string });
-    expect(messages[1]).toMatchObject({ role: 'assistant', content: expect.any(String) as string });
+    expect(messages[0]).toMatchObject({ role: 'system', content: expect.any(String) as string });
+    expect(messages[1]).toMatchObject({ role: 'user', content: expect.stringContaining('rill') as string });
 
     // ── Assert: same closureResult feeds all three providers without branching ─
     //
-    // The SAME closureResult variable is passed to all three providers below.
-    // No per-provider adaptation branch exists in this calling code — the
-    // rill list of role dicts is structurally identical for all providers.
+    // The SAME closureResult variable is passed to all three providers below
+    // via the unified message() call. No per-provider adaptation branch exists
+    // — the rill list of role dicts feeds message(prompt: list) via normalizePrompt
+    // sugar expansion on all providers (FR-UNIFY-7).
 
     // Provider 1: Anthropic
     const anthropicExt = createAnthropicExtension({
       api_key: 'test-key-anthropic',
       model: 'claude-sonnet-4-5-20250929',
     });
-    const anthropicResult = getCallable(anthropicExt, 'messages').fn(
-      { messages: closureResult },
+    const anthropicResult = getCallable(anthropicExt, 'message').fn(
+      { prompt: closureResult },
       ctx,
     );
     expect(isRillStream(anthropicResult)).toBe(true);
@@ -275,19 +278,19 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
       api_key: 'test-key-openai',
       model: 'gpt-4-turbo',
     });
-    const openaiResult = getCallable(openaiExt, 'messages').fn(
-      { messages: closureResult },
+    const openaiResult = getCallable(openaiExt, 'message').fn(
+      { prompt: closureResult },
       ctx,
     );
     expect(isRillStream(openaiResult)).toBe(true);
 
-    // Provider 3: Gemini (messages() is async, so we await it)
+    // Provider 3: Gemini (message() is async, so we await it)
     const geminiExt = createGeminiExtension({
       api_key: 'test-key-gemini',
       model: 'gemini-2.0-flash',
     });
-    const geminiResult = await getCallable(geminiExt, 'messages').fn(
-      { messages: closureResult },
+    const geminiResult = await getCallable(geminiExt, 'message').fn(
+      { prompt: closureResult },
       ctx,
     );
     expect(isRillStream(geminiResult)).toBe(true);

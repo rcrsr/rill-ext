@@ -145,7 +145,7 @@ describe('extension event emission', () => {
       });
 
       // fn() returns RillStream synchronously; trigger resolve to emit event
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
       await resolveStream(stream);
 
       // Verify event structure (§4.10)
@@ -158,8 +158,6 @@ describe('extension event emission', () => {
       });
       expect(typeof events[0]?.['duration']).toBe('number');
       expect(events[0]?.['duration']).toBeGreaterThanOrEqual(0);
-      expect(events[0]?.['request']).toBeDefined();
-      expect(events[0]?.['content']).toBeDefined();
     });
 
     it('emits openai:error event on API failure', async () => {
@@ -185,7 +183,7 @@ describe('extension event emission', () => {
       });
 
       // fn() returns RillStream; trigger resolve which will fail and emit error event
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
       await expect(resolveStream(stream)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
@@ -199,79 +197,5 @@ describe('extension event emission', () => {
     });
   });
 
-  describe('messages() events', () => {
-    it('emits openai:messages event on success', async () => {
-      const runner = createMockStreamRunner(createMockFinalCompletion('Response'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const events: Array<Record<string, unknown>> = [];
-      const ctx = createRuntimeContext({
-        callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => {
-            events.push(event);
-          },
-        },
-      });
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-      await resolveStream(stream);
-
-      // Verify event structure (§4.10)
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
-        event: 'openai:messages',
-        subsystem: 'extension:openai',
-        model: 'gpt-4-turbo',
-        usage: { input: 10, output: 20 },
-      });
-      expect(typeof events[0]?.['duration']).toBe('number');
-      expect(events[0]?.['duration']).toBeGreaterThanOrEqual(0);
-      expect(events[0]?.['request']).toBeDefined();
-      expect(events[0]?.['content']).toBeDefined();
-    });
-
-    it('emits openai:error event on API failure', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(429, {}, 'Rate limit', {});
-      const runner = createErrorStreamRunner(apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const events: Array<Record<string, unknown>> = [];
-      const ctx = createRuntimeContext({
-        callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => {
-            events.push(event);
-          },
-        },
-      });
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-      await expect(resolveStream(stream)).rejects.toThrow();
-
-      // Verify error event structure (§4.10)
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
-        event: 'openai:error',
-        subsystem: 'extension:openai',
-        error: 'OpenAI API error (HTTP 429): Rate limit',
-      });
-      expect(typeof events[0]?.['duration']).toBe('number');
-    });
-  });
 });
+

@@ -91,6 +91,23 @@ function createGenerateMockResponse(jsonContent: string, model = 'gpt-4o') {
   };
 }
 
+function createGenerateMockResponseWithReasoning(reasoningContent: string, content = '', model = 'gpt-4o') {
+  return {
+    id: 'chatcmpl_123',
+    object: 'chat.completion' as const,
+    created: 1234567890,
+    model,
+    choices: [
+      {
+        index: 0,
+        message: { role: 'assistant' as const, content, reasoning_content: reasoningContent },
+        finish_reason: 'stop' as const,
+      },
+    ],
+    usage: { prompt_tokens: 50, completion_tokens: 20, total_tokens: 70 },
+  };
+}
+
 const baseConfig: OpenAIExtensionConfig = {
   api_key: 'test-key',
   model: 'gpt-4o',
@@ -261,6 +278,59 @@ describe('generate() function', () => {
       expect(errorEvent).toBeDefined();
       expect(typeof errorEvent?.['error']).toBe('string');
       expect(typeof errorEvent?.['duration']).toBe('number');
+    });
+  });
+
+  describe('reasoning_content fallback (extractJson)', () => {
+    // reasoning model: content empty, reasoning_content has pure JSON
+    it('parses JSON from reasoning_content when content is empty', async () => {
+      mockCreate.mockResolvedValue(
+        createGenerateMockResponseWithReasoning('{"name":"Bob"}')
+      );
+
+      const ext = createOpenAIExtension(baseConfig);
+      const ctx = createRuntimeContext();
+
+      const result = (await getCallable(ext, 'generate').fn(
+        { prompt: 'name someone', schema: NAME_SCHEMA, options: {} },
+        ctx
+      )) as Record<string, unknown>;
+
+      expect((result['data'] as Record<string, unknown>)['name']).toBe('Bob');
+    });
+
+    // reasoning model: content empty, reasoning_content has thinking prose + JSON
+    it('strips prose preamble and parses JSON from reasoning_content', async () => {
+      mockCreate.mockResolvedValue(
+        createGenerateMockResponseWithReasoning('Let me think about this carefully. The answer is {"name":"Carol"}')
+      );
+
+      const ext = createOpenAIExtension(baseConfig);
+      const ctx = createRuntimeContext();
+
+      const result = (await getCallable(ext, 'generate').fn(
+        { prompt: 'name someone', schema: NAME_SCHEMA, options: {} },
+        ctx
+      )) as Record<string, unknown>;
+
+      expect((result['data'] as Record<string, unknown>)['name']).toBe('Carol');
+    });
+
+    // content has JSON wrapped in markdown fence
+    it('extracts JSON from markdown-fenced content', async () => {
+      mockCreate.mockResolvedValue(
+        createGenerateMockResponse('```json\n{"name":"Dave"}\n```')
+      );
+
+      const ext = createOpenAIExtension(baseConfig);
+      const ctx = createRuntimeContext();
+
+      const result = (await getCallable(ext, 'generate').fn(
+        { prompt: 'name someone', schema: NAME_SCHEMA, options: {} },
+        ctx
+      )) as Record<string, unknown>;
+
+      expect((result['data'] as Record<string, unknown>)['name']).toBe('Dave');
     });
   });
 });

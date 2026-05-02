@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.19.3] - 2026-05-01
+
+### Changed
+
+- `output: 'list'` prompts now target `message(list)` on LLM extensions instead of the removed
+  `messages()` verb. The returned `list(dict(role, content))` shape is unchanged; downstream LLM
+  extensions accept it via `normalizePrompt` sugar expansion inside `message()`.
+- Role-allowlist enforcement added in `@rcrsr/rill-ext-prompt-shared`: `splitRoleMessages` now
+  rejects unrecognized role markers at parse time, preventing invalid role values from reaching LLM
+  provider APIs.
+
 ## [0.19.2] - 2026-04-30
 
 ### Changed (Breaking)

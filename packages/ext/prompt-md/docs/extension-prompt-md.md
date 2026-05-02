@@ -2,7 +2,7 @@
 
 *Markdown prompt loader for rill scripts*
 
-This extension loads `.prompt.md` files from a directory tree and exposes each file as a typed callable. Scripts invoke prompts by resolution name, pass positional arguments in the order the params are declared in frontmatter, and receive either a rendered string or a list of role-tagged message dicts. The list form passes directly into any LLM extension's `messages()` call.
+This extension loads `.prompt.md` files from a directory tree and exposes each file as a typed callable. Scripts invoke prompts by resolution name, pass positional arguments in the order the params are declared in frontmatter, and receive either a rendered string or a list of role-tagged message dicts. The list form passes directly into any LLM extension's `message()` call as the first argument.
 
 ## Overview
 
@@ -92,7 +92,7 @@ The output shape is inferred from body content at load time. There is no `output
 | Contains at least one `@@ role` marker line | `list` | `list(dict(role: string, content: string))` |
 | No `@@ role` markers | `string` | `string` |
 
-The callable's `^output` annotation reflects the inferred mode (`"string"` or `"list"`), and `returnType` carries the corresponding rill type structure. Use `@@ role` markers when you want a multi-turn conversation list ready for `messages()`. Omit them for single-turn completions.
+The callable's `^output` annotation reflects the inferred mode (`"string"` or `"list"`), and `returnType` carries the corresponding rill type structure. Use `@@ role` markers when you want a multi-turn conversation list ready for `message()`. Omit them for single-turn completions.
 
 ## Resolution Names
 
@@ -137,9 +137,33 @@ Rules for `@@ role`:
 
 - The marker line contains exactly `@@`, one or more spaces, a single word (the role name), and optional trailing whitespace.
 - Any text before the first `@@ role` line belongs to a default section with role `user`.
-- The role name is arbitrary. Common values: `system`, `user`, `assistant`.
+- The role name MUST be one of the three valid roles: `system`, `user`, or `assistant`.
 - `## headings` inside a section stay as body text. They do not create new role entries.
 - A body with at least one `@@ role` marker yields `output: list`. A body with none yields `output: string` and never splits.
+
+### Role Allowlist
+
+Only three roles are accepted: `system`, `user`, and `assistant`. Any other role name (e.g. `tool`, `model`, `foo`) causes a `RuntimeError` when the prompt closure is invoked.
+
+The error message includes the rejected role name and the 1-based line number of the offending marker:
+
+```
+RuntimeError RILL-R001: Invalid role marker '@@ tool' at line 5. Valid roles are: system, user, assistant.
+```
+
+This validation runs at invocation time (call time), not at load time. The extension loads the file successfully if the `@@ role` syntax is present. The role-name check fires when a script calls the prompt closure.
+
+For example, a file containing `@@ tool` at line 5 loads without error. The first script call to that closure throws:
+
+```
+RuntimeError RILL-R001: Invalid role marker '@@ tool' at line 5. Valid roles are: system, user, assistant.
+```
+
+A body with no `@@ role` markers at all throws at invocation time:
+
+```
+RuntimeError RILL-R001: prompt body must contain at least one role marker (@@ role)
+```
 
 ### Role Output Shape
 
@@ -152,7 +176,7 @@ The callable returns a rill list of dicts. Each dict has two string keys.
 ]
 ```
 
-This shape passes directly into `messages()` on any LLM extension without per-provider transformation (see Runnable Example below).
+This shape is `list(dict(role: string, content: string))`. It passes directly into `message()` on any LLM extension as the first argument. All three LLM extensions — `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-openai`, and `@rcrsr/rill-ext-gemini` — accept a list of `{ role, content }` dicts as the first argument to `message()`. See [LLM extension `message()` list input](#consuming-the-message-list-in-llm-extensions) below.
 
 ## Interpolation Rules
 
@@ -192,9 +216,22 @@ The callable's `returnType` is set concretely: `string` for `^output: "string"` 
 
 Use `^hash` to detect when a prompt file changes between runs. Use `^input` to introspect parameter names and types at runtime.
 
+## Consuming the Message List in LLM Extensions
+
+The `list(dict(role: string, content: string))` output produced by a `@@ role` prompt flows directly into `message()` on any LLM extension. Pass the list as the first argument to `message()`. All three LLM extensions — `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-openai`, and `@rcrsr/rill-ext-gemini` — accept either a plain string or a `list(dict(role: string, content: string))` as the first argument to `message()`. Swap the `llm` mount to a different provider and the script works unchanged.
+
+```rill
+$prompt.research("What caused the 2008 financial crisis?") => $messages
+# $messages is list(dict(role: string, content: string))
+# Pass it directly to message() — no reformatting needed.
+$llm.message($messages, [max_tokens: 1024]) => $result
+```
+
+See [llm-anthropic](../llm-anthropic/docs/extension-llm-anthropic.md), [llm-openai](../llm-openai/docs/extension-llm-openai.md), and [llm-gemini](../llm-gemini/docs/extension-llm-gemini.md) for `message()` signature details.
+
 ## Runnable Example
 
-This example loads a research prompt whose body uses `@@ role` markers, so the inferred output is a message list ready for `llm-anthropic`'s `messages()` call.
+This example loads a research prompt whose body uses `@@ role` markers, so the inferred output is a message list ready for any LLM extension's `message()` call.
 
 ### Prompt file: `agents/research.prompt.md`
 
@@ -275,20 +312,22 @@ use<ext:prompt> => $prompt
 # body contains @@ role markers (inferred output is "list").
 $prompt.agents_research("What caused the 2008 financial crisis?") => $messages
 
-# Pass the message list directly into messages().
+# Pass the message list directly into message().
+# message() accepts string or list(dict(role: string, content: string)).
 # No per-provider formatting needed -- the shape is identical for all LLM extensions.
-$llm.messages($messages, [max_tokens: 1024]) => $result
+$llm.message($messages, [max_tokens: 1024]) => $result
 
 $result.content -> log
 ```
 
-The `$messages` value is a list of `{ role, content }` dicts. `messages()` on `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-openai`, and `@rcrsr/rill-ext-gemini` all accept this shape without modification. Swap the `llm` mount to a different provider and the script works unchanged.
+The `$messages` value is a list of `{ role, content }` dicts. `message()` on `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-openai`, and `@rcrsr/rill-ext-gemini` all accept this shape without modification. Swap the `llm` mount to a different provider and the script works unchanged.
 
 ## Error Behavior
 
-The extension surfaces failures in two places: factory-time validation throws
-`RuntimeError RILL-R001` before any host fn runs; closure-runtime failures
-emit invalid `RillValue`s carrying rill core's generic atoms. Host scripts
+The extension surfaces failures in three places: factory-time validation throws
+`RuntimeError RILL-R001` before any host fn runs; parse-time role validation
+throws `RuntimeError RILL-R001` at closure invocation time; other closure-runtime
+failures emit invalid `RillValue`s carrying rill core's generic atoms. Host scripts
 match coarsely (`guard #PROTOCOL`) or finely
 (`guard #PROTOCOL && raw.kind == 'closure_failure'`).
 
@@ -305,7 +344,16 @@ match coarsely (`guard #PROTOCOL`) or finely
 | Template `{name}` references a param not declared in `params` (EC-13) | `RILL-R001` |
 | Multiple files resolve to the same prompt name (EC-15) | `RILL-R001` |
 
-**Host-fn errors** (during closure invocation):
+**Call-time validation** (during closure invocation, `RuntimeError` thrown synchronously):
+
+| Condition | Code | Error message |
+|---|---|---|
+| Body has no `@@ role` markers (EC-5) | `RILL-R001` | `prompt body must contain at least one role marker (@@ role)` |
+| Role marker uses a name not in `{system, user, assistant}` (EC-23) | `RILL-R001` | `Invalid role marker '@@ {role}' at line {N}. Valid roles are: system, user, assistant.` |
+
+The `{role}` and `{N}` placeholders in EC-23 are filled with the actual rejected role name and 1-based line number. Example: `Invalid role marker '@@ tool' at line 5. Valid roles are: system, user, assistant.`
+
+**Host-fn errors** (during closure invocation, invalid `RillValue` emitted):
 
 | Failure | Atom | `meta.raw.kind` |
 |---|---|---|

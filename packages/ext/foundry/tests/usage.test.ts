@@ -169,7 +169,7 @@ describe('usage accumulator', () => {
     >;
 
     // Trigger resolve to run the LLM call and accumulate usage
-    const stream = value['message']!.fn({ text: 'Hi' }, ctx);
+    const stream = value['message']!.fn({ prompt: 'Hi' }, ctx);
     await resolveStream(stream);
 
     const usageFn = value['usage']!;
@@ -194,9 +194,9 @@ describe('usage accumulator', () => {
     >;
 
     // First call
-    await resolveStream(value['message']!.fn({ text: 'First' }, ctx));
+    await resolveStream(value['message']!.fn({ prompt: 'First' }, ctx));
     // Second call
-    await resolveStream(value['message']!.fn({ text: 'Second' }, ctx));
+    await resolveStream(value['message']!.fn({ prompt: 'Second' }, ctx));
 
     const usageFn = value['usage']!;
     const result = usageFn.fn({}, {}) as Record<string, number>;

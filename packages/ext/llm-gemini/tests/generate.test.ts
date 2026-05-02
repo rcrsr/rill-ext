@@ -109,8 +109,8 @@ describe('generate() function', () => {
       expect(Object.keys(data).sort()).toEqual(['age', 'name']);
     });
 
-    // AC-6: Return dict has exactly 6 keys
-    it('returns dict with exactly 6 keys: data, raw, model, usage, stop_reason, id', async () => {
+    // AC-6: Return dict has exactly 7 keys (messages added in factory migration)
+    it('returns dict with exactly 7 keys: data, raw, messages, model, usage, stop_reason, id', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('{"name":"Alice","age":30}')
       );
@@ -119,7 +119,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'describe a person', schema: PERSON_SCHEMA, options: {} },
+        { prompt: 'describe a person', schema: PERSON_SCHEMA },
         ctx
       )) as Record<string, unknown>;
 
@@ -127,12 +127,13 @@ describe('generate() function', () => {
       expect(keys).toEqual([
         'data',
         'id',
+        'messages',
         'model',
         'raw',
         'stop_reason',
         'usage',
       ]);
-      expect(keys).toHaveLength(6);
+      expect(keys).toHaveLength(7);
     });
 
     // AC-7: usage is dict with input: number and output: number
@@ -176,15 +177,15 @@ describe('generate() function', () => {
       expect(typeof result['raw']).toBe('string');
     });
 
-    // AC-9: system option overrides factory default
-    it('uses system option to override factory-configured default', async () => {
+    // AC-9: factory-level system config is sent as systemInstruction
+    it('uses factory-configured system as systemInstruction', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('{"answer":"yes"}')
       );
 
       const configWithSystem: GeminiExtensionConfig = {
         ...baseConfig,
-        system: 'Default system prompt.',
+        system: 'Factory system prompt.',
       };
 
       const ext = createGeminiExtension(configWithSystem);
@@ -194,7 +195,6 @@ describe('generate() function', () => {
         {
           prompt: 'question',
           schema: typeVal({ kind: 'dict', fields: { answer: { type: { kind: 'string' } } } }),
-          options: { system: 'Override system.' },
         },
         ctx
       );
@@ -202,26 +202,30 @@ describe('generate() function', () => {
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
           config: expect.objectContaining({
-            systemInstruction: 'Override system.',
+            systemInstruction: 'Factory system prompt.',
           }),
         })
       );
     });
 
-    // AC-10: max_tokens option caps output tokens
-    it('passes max_tokens option to the API as maxOutputTokens', async () => {
+    // AC-10: factory-level max_tokens caps output tokens
+    it('uses factory-configured max_tokens as maxOutputTokens', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('{"result":"ok"}')
       );
 
-      const ext = createGeminiExtension(baseConfig);
+      const configWithMaxTokens: GeminiExtensionConfig = {
+        ...baseConfig,
+        max_tokens: 512,
+      };
+
+      const ext = createGeminiExtension(configWithMaxTokens);
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
         {
           prompt: 'prompt',
           schema: typeVal({ kind: 'dict', fields: { result: { type: { kind: 'string' } } } }),
-          options: { max_tokens: 512 },
         },
         ctx
       );
@@ -235,8 +239,8 @@ describe('generate() function', () => {
       );
     });
 
-    // AC-11: messages option prepends conversation context
-    it('prepends messages option as conversation context before the prompt', async () => {
+    // AC-11: passing a list as prompt prepends conversation context before the final user turn
+    it('prepends conversation context when prompt is a list of messages', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('{"summary":"brief"}')
       );
@@ -244,16 +248,17 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      const priorMessages = [
+      // Pass full conversation as the prompt list (normalizePrompt accepts list)
+      const promptMessages = [
         { role: 'user', content: 'Context message.' },
         { role: 'assistant', content: 'Acknowledged.' },
+        { role: 'user', content: 'final prompt' },
       ];
 
       await getCallable(ext, 'generate').fn(
         {
-          prompt: 'final prompt',
+          prompt: promptMessages,
           schema: typeVal({ kind: 'dict', fields: { summary: { type: { kind: 'string' } } } }),
-          options: { messages: priorMessages },
         },
         ctx
       );
@@ -269,7 +274,7 @@ describe('generate() function', () => {
         role: 'model',
         parts: [{ text: 'Acknowledged.' }],
       });
-      // Prompt is the last content entry
+      // Final user turn
       const lastContent = callArgs.contents[callArgs.contents.length - 1];
       expect(lastContent).toMatchObject({
         role: 'user',
@@ -277,8 +282,8 @@ describe('generate() function', () => {
       });
     });
 
-    // AC-12: absent system uses factory-configured default
-    it('uses factory system when no system override in options', async () => {
+    // AC-12: factory system config is always applied
+    it('uses factory system as systemInstruction', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('{"value":1}')
       );
@@ -295,7 +300,6 @@ describe('generate() function', () => {
         {
           prompt: 'prompt',
           schema: typeVal({ kind: 'dict', fields: { value: { type: { kind: 'number' } } } }),
-          options: {},
         },
         ctx
       );

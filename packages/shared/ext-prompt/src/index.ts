@@ -19,8 +19,8 @@ export { splitFrontmatter } from './frontmatter.js';
 // ============================================================
 // ROLE MESSAGE SPLITTING
 // ============================================================
-export type { RoleMessage } from './roles.js';
-export { splitRoleMessages } from './roles.js';
+export type { RoleMessage, Role } from './roles.js';
+export { splitRoleMessages, VALID_ROLES } from './roles.js';
 
 // ============================================================
 // PARAM GRAMMAR PARSING

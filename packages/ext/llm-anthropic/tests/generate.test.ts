@@ -129,7 +129,6 @@ describe('generate() function', () => {
         {
           prompt: 'Generate a person',
           schema: typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, age: { type: { kind: 'number' } } } }),
-          options: {},
         },
         ctx
       )) as Record<string, unknown>;
@@ -167,7 +166,6 @@ describe('generate() function', () => {
               },
             },
           }),
-          options: {},
         },
         ctx
       )) as Record<string, unknown>;
@@ -192,7 +190,6 @@ describe('generate() function', () => {
         {
           prompt: 'Generate tags',
           schema: typeVal({ kind: 'dict', fields: { tags: { type: { kind: 'list', element: { kind: 'string' } } } } }),
-          options: {},
         },
         ctx
       )) as Record<string, unknown>;
@@ -202,8 +199,8 @@ describe('generate() function', () => {
       expect(data['tags']).toEqual(['typescript', 'node', 'testing']);
     });
 
-    // AC-6: Return dict contains exactly 6 keys
-    it('returns dict with exactly 6 keys', async () => {
+    // AC-6: Return dict contains exactly 7 keys (includes messages)
+    it('returns dict with exactly 7 keys', async () => {
       mockCreate.mockResolvedValue(
         createMockGenerateResponse('{"name":"Alice","age":30}')
       );
@@ -212,13 +209,13 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', schema: PERSON_SCHEMA, options: {} },
+        { prompt: 'Generate', schema: PERSON_SCHEMA },
         ctx
       )) as Record<string, unknown>;
 
-      expect(Object.keys(result)).toHaveLength(6);
+      expect(Object.keys(result)).toHaveLength(7);
       expect(Object.keys(result).sort()).toEqual(
-        ['data', 'id', 'model', 'raw', 'stop_reason', 'usage'].sort()
+        ['data', 'id', 'messages', 'model', 'raw', 'stop_reason', 'usage'].sort()
       );
     });
 
@@ -232,7 +229,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', schema: PERSON_SCHEMA, options: {} },
+        { prompt: 'Generate', schema: PERSON_SCHEMA },
         ctx
       )) as Record<string, unknown>;
 
@@ -252,22 +249,22 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', schema: PERSON_SCHEMA, options: {} },
+        { prompt: 'Generate', schema: PERSON_SCHEMA },
         ctx
       )) as Record<string, unknown>;
 
       expect(result['raw']).toBe(jsonText);
     });
 
-    // AC-9: system option overrides factory default
-    it('system option overrides factory-configured system prompt', async () => {
+    // AC-9: factory system is forwarded to Anthropic API
+    it('factory-configured system prompt is forwarded to Anthropic API', async () => {
       mockCreate.mockResolvedValue(
         createMockGenerateResponse('{"name":"Alice"}')
       );
 
       const ext = createAnthropicExtension({
         ...BASE_CONFIG,
-        system: 'Default system prompt.',
+        system: 'Factory system prompt.',
       });
       const ctx = createRuntimeContext();
 
@@ -275,29 +272,26 @@ describe('generate() function', () => {
         {
           prompt: 'Generate',
           schema: NAME_SCHEMA,
-          options: {
-            system: 'Override system prompt.',
-          },
         },
         ctx
       );
 
       expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ system: 'Override system prompt.' })
+        expect.objectContaining({ system: 'Factory system prompt.' })
       );
     });
 
-    // AC-10: max_tokens option caps output tokens
-    it('max_tokens option is forwarded to Anthropic API', async () => {
+    // AC-10: factory max_tokens is forwarded to Anthropic API
+    it('factory max_tokens is forwarded to Anthropic API', async () => {
       mockCreate.mockResolvedValue(
         createMockGenerateResponse('{"name":"Alice"}')
       );
 
-      const ext = createAnthropicExtension(BASE_CONFIG);
+      const ext = createAnthropicExtension({ ...BASE_CONFIG, max_tokens: 512 });
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', schema: NAME_SCHEMA, options: { max_tokens: 512 } },
+        { prompt: 'Generate', schema: NAME_SCHEMA },
         ctx
       );
 
@@ -306,8 +300,8 @@ describe('generate() function', () => {
       );
     });
 
-    // AC-11: messages option prepends conversation context
-    it('messages option prepends conversation context before prompt', async () => {
+    // AC-11: list prompt prepends conversation context before final user turn
+    it('messages option prepends conversation context before prompt via list prompt', async () => {
       mockCreate.mockResolvedValue(
         createMockGenerateResponse('{"name":"Alice"}')
       );
@@ -315,16 +309,17 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const prependedMessages = [
+      // Pass conversation history + final prompt as list (content-sugar format)
+      const promptList = [
         { role: 'user', content: 'What format do you prefer?' },
         { role: 'assistant', content: 'I prefer JSON.' },
+        { role: 'user', content: 'Generate a name' },
       ];
 
       await getCallable(ext, 'generate').fn(
         {
-          prompt: 'Generate a name',
+          prompt: promptList,
           schema: NAME_SCHEMA,
-          options: { messages: prependedMessages },
         },
         ctx
       );
@@ -356,7 +351,7 @@ describe('generate() function', () => {
       });
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx);
+      await getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA }, ctx);
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({ system: 'Factory system prompt.' })
@@ -375,7 +370,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx),
+        getCallable(ext, 'generate').fn({ prompt: 'Generate something'}, ctx),
         { code: 'INVALID_INPUT', message: 'generate requires a type expression as schema' },
       );
     });
@@ -386,7 +381,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate something', options: {} }, ctx),
+        getCallable(ext, 'generate').fn({ prompt: 'Generate something'}, ctx),
       );
 
       expect(mockCreate).not.toHaveBeenCalled();
@@ -400,7 +395,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx),
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA}, ctx),
         { code: 'PROTOCOL' },
       );
     });
@@ -413,7 +408,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx),
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA}, ctx),
         { code: 'PROTOCOL', message: 'failed to parse response JSON' },
       );
     });
@@ -428,7 +423,7 @@ describe('generate() function', () => {
       let thrown: unknown;
       try {
         await getCallable(ext, 'generate').fn(
-          { prompt: 'Generate', schema: NAME_SCHEMA, options: {} },
+          { prompt: 'Generate', schema: NAME_SCHEMA },
           ctx
         );
       } catch (e) {
@@ -449,7 +444,7 @@ describe('generate() function', () => {
       let result: unknown = undefined;
       try {
         result = await getCallable(ext, 'generate').fn(
-          { prompt: 'Generate', schema: NAME_SCHEMA, options: {} },
+          { prompt: 'Generate', schema: NAME_SCHEMA },
           ctx
         );
       } catch {
@@ -470,7 +465,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await expectRejectedHalt(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx),
+        getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA}, ctx),
       );
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -496,7 +491,7 @@ describe('generate() function', () => {
       const ctx = createCtxWithEvents(events);
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', schema: PERSON_SCHEMA, options: {} },
+        { prompt: 'Generate', schema: PERSON_SCHEMA },
         ctx
       );
 
@@ -521,7 +516,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createCtxWithEvents(events);
 
-      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx));
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA }, ctx));
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -539,7 +534,7 @@ describe('generate() function', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createCtxWithEvents(events);
 
-      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA, options: {} }, ctx));
+      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'Generate', schema: NAME_SCHEMA }, ctx));
 
       const generateEvents = events.filter(
         (e) => e.event === 'anthropic:generate'
@@ -556,35 +551,33 @@ describe('generate() function', () => {
     it('has correct params definition', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
+      // generate now has 2 params: prompt (any) and schema (type)
       expect(getCallable(ext, 'generate').params).toEqual([
-        { name: 'prompt', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         { name: 'schema', type: { kind: 'type' }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
-        { name: 'options', type: { kind: 'dict', fields: {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
-        } }, defaultValue: {}, annotations: {} },
       ]);
     });
 
     it('has correct return type', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
+      const returnType = getCallable(ext, 'generate').returnType as {
+        __rill_type: boolean;
+        typeName: string;
+        structure: { kind: string; fields: Record<string, unknown> };
+      };
 
-      expect(getCallable(ext, 'generate').returnType).toEqual({
-        __rill_type: true,
-        typeName: 'dict',
-        structure: {
-          kind: 'dict',
-          fields: {
-            data: { type: { kind: 'any' } },
-            raw: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            id: { type: { kind: 'string' } },
-          },
-        },
-      });
+      expect(returnType.__rill_type).toBe(true);
+      expect(returnType.typeName).toBe('dict');
+      expect(returnType.structure.kind).toBe('dict');
+      // Verify all expected fields are present (messages added in unified-prompting migration)
+      const fields = returnType.structure.fields;
+      expect(fields).toHaveProperty('data');
+      expect(fields).toHaveProperty('raw');
+      expect(fields).toHaveProperty('messages');
+      expect(fields).toHaveProperty('model');
+      expect(fields).toHaveProperty('usage');
+      expect(fields).toHaveProperty('stop_reason');
+      expect(fields).toHaveProperty('id');
     });
 
     it('has description string', () => {

@@ -15,7 +15,7 @@ import {
 } from '@rcrsr/rill';
 import { createFoundryExtension } from '../src/factory.js';
 import type { FoundryConfig } from '../src/types.js';
-import { expectThrowHalt } from './_halt-helpers.js';
+import { expectThrowHalt, expectRejectedHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MOCK SETUP
@@ -459,10 +459,10 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      const result = await resolveStream(stream);
-
-      expect(result['stop_reason']).toBe('max_turns');
-      expect(result['turns']).toBe(1);
+      await expectRejectedHalt(resolveStream(stream), {
+        code: 'INVALID_INPUT',
+        message: 'max_turns',
+      });
       expect(mockStream).toHaveBeenCalledTimes(1);
     });
 
@@ -518,7 +518,7 @@ describe('tool_loop() function', () => {
           { prompt: '', tools, options: {} },
           ctx
         );
-      }, { code: 'INVALID_INPUT', message: 'prompt text cannot be empty' });
+      }, { code: 'INVALID_INPUT', message: 'prompt string cannot be empty' });
     });
   });
 });

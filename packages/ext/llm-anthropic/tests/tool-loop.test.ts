@@ -207,7 +207,7 @@ describe('tool_loop() function', () => {
       };
 
       const result = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: {} },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
 
@@ -241,7 +241,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Weather in SF?', tools, options: {} },
+        { prompt: 'Weather in SF?', tools, max_turns: 0 },
         ctx
       );
 
@@ -255,7 +255,7 @@ describe('tool_loop() function', () => {
     });
 
     // AC-9: tool_loop()() resolution dict contains correct fields
-    it('resolution dict has content, model, usage, stop_reason, turns, messages', async () => {
+    it('resolution dict has model, usage, stop_reason, turns, messages', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -277,13 +277,17 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Weather in SF?', tools, options: {} },
+        { prompt: 'Weather in SF?', tools, max_turns: 0 },
         ctx
       );
 
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('The weather in SF is sunny.');
+      // content field removed; text in messages[last].parts[i].text
+      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const lastParts = msgs[msgs.length - 1]!.parts;
+      const lastText = lastParts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      expect(lastText).toBe('The weather in SF is sunny.');
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
       expect(result['usage']).toEqual({ input: 15, output: 35 }); // 10+5, 20+15
       expect(result['stop_reason']).toBe('end_turn');
@@ -311,7 +315,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Give me a result', tools, options: {} },
+        { prompt: 'Give me a result', tools, max_turns: 0 },
         ctx
       );
 
@@ -358,12 +362,15 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'What is the weather in SF?', tools, options: {} },
+        { prompt: 'What is the weather in SF?', tools, max_turns: 0 },
         ctx
       );
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('The weather in SF is sunny.');
+      // content field removed; text in messages[last].parts
+      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      expect(lastText).toBe('The weather in SF is sunny.');
       expect(result['turns']).toBe(2);
       expect(result['stop_reason']).toBe('end_turn');
       expect(result['usage']).toEqual({ input: 15, output: 35 });
@@ -389,18 +396,21 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'What is the answer?', tools, options: {} },
+        { prompt: 'What is the answer?', tools, max_turns: 0 },
         ctx
       );
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('I can answer that directly: 42');
+      // content field removed; verify via messages parts
+      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      expect(lastText).toBe('I can answer that directly: 42');
       expect(result['turns']).toBe(1);
       expect(mockStream).toHaveBeenCalledTimes(1);
     });
 
-    // AC-25: max_turns:1 returns after single LLM response
-    it('respects max_turns limit', async () => {
+    // AC-25: max_turns:1 halts with max_turns_exceeded when tool_use returned (now positional)
+    it('respects max_turns limit (halts when tool_use returned at max)', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -422,14 +432,13 @@ describe('tool_loop() function', () => {
         }),
       };
 
+      // max_turns is now positional (3rd arg); when max_turns reached, the loop halts
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Search for something', tools, options: { max_turns: 1 } },
+        { prompt: 'Search for something', tools, max_turns: 1 },
         ctx
       );
-      const result = await resolveStream(stream);
-
-      expect(result['stop_reason']).toBe('max_turns');
-      expect(result['turns']).toBe(1);
+      // max_turns exceeded is now a halt, not a resolved stop_reason
+      await expectRejectedHalt(resolveStream(stream));
       expect(mockStream).toHaveBeenCalledTimes(1);
     });
   });
@@ -474,7 +483,7 @@ describe('tool_loop() function', () => {
         tool_c: makeConcurrentTool('C'),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Run tools', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Run tools', tools, max_turns: 0 }, ctx);
       await resolveStream(stream);
 
       // All tools should start before any finish (parallel execution)
@@ -496,7 +505,8 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools: {}, options: {} }, ctx), { message: 'prompt text cannot be empty' });
+      const tools = { tool: makeTool(() => 'result', { description: 'Tool' }) };
+      expectThrowHalt(() => getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools, max_turns: 0 }, ctx), { message: 'prompt string cannot be empty' });
     });
 
     // EC-4: Provider streaming API failure throws RuntimeError RILL-R005
@@ -522,7 +532,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: {} },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
 
@@ -530,10 +540,12 @@ describe('tool_loop() function', () => {
     });
 
     // EC-5: Consecutive tool errors exceed max — RuntimeError RILL-R005 with exact message
+    // max_errors is factory-level config; use config.max_errors: 2
     it('throws RuntimeError RILL-R005 for consecutive errors with errorId [EC-5]', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
+        max_errors: 2,
       };
 
       const ext = createAnthropicExtension(config);
@@ -555,7 +567,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: { max_errors: 2 } },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
 
@@ -566,6 +578,7 @@ describe('tool_loop() function', () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
+        max_errors: 1,
       };
 
       const ext = createAnthropicExtension(config);
@@ -584,7 +597,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: { max_errors: 1 } },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
 
@@ -592,16 +605,17 @@ describe('tool_loop() function', () => {
     });
 
     // EC-6: Tool not found in tool map — error includes "Unknown tool: {name}"
+    // max_errors:1 so a single unknown tool triggers the error immediately
     it('throws RuntimeError with Unknown tool message when tool not in map [EC-6]', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
+        max_errors: 1,
       };
 
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      // With max_errors: 1, a single unknown tool call triggers the error immediately
       mockStream.mockReturnValueOnce(createMockMessageStream(
         createMockToolUseResponse([{ name: 'nonexistent_tool', id: 'tool_1', input: {} }])
       ));
@@ -611,7 +625,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: { max_errors: 1 } },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
 
@@ -623,6 +637,7 @@ describe('tool_loop() function', () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
+        max_errors: 3,
       };
 
       const ext = createAnthropicExtension(config);
@@ -645,7 +660,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: { max_errors: 3 } },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
 
@@ -655,9 +670,11 @@ describe('tool_loop() function', () => {
       const toolCallChunks = chunks.filter((c) => c['type'] === 'tool_call');
       expect(toolCallChunks.length).toBeGreaterThan(0);
 
-      // Stream resolves with final content after the tool error
+      // Stream resolves; text in messages[last].parts
       const result = await resolveStream(stream);
-      expect(result['content']).toBe('Recovered from tool error.');
+      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      expect(lastText).toBe('Recovered from tool error.');
     });
 
     // EC-23: Missing tools argument causes error in resolve()
@@ -671,7 +688,7 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} },
+        { prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, max_turns: 0 },
         ctx
       );
       await expectRejectedHalt(resolveStream(stream), { message: 'tools parameter is required' });
@@ -704,19 +721,21 @@ describe('tool_loop() function', () => {
       };
 
       // Should complete without throwing despite unknown tool error
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 0 }, ctx);
       const result = await resolveStream(stream);
 
-      expect(result).toHaveProperty('content');
+      // content field removed; check messages and turns
+      expect(result).toHaveProperty('messages');
       expect(result).toHaveProperty('turns');
       expect(result['turns']).toBe(2); // Two turns: tool error + final response
     });
 
-    // EC-25: max_errors exceeded aborts loop
+    // EC-25: max_errors exceeded aborts loop (factory-level config)
     it('aborts after max consecutive errors', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
+        max_errors: 3,
       };
 
       const ext = createAnthropicExtension(config);
@@ -742,7 +761,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: { max_errors: 3 } },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
       await expectRejectedHalt(resolveStream(stream), { message: 'Tool execution failed: 3 consecutive errors' });
@@ -752,6 +771,7 @@ describe('tool_loop() function', () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
+        max_errors: 3,
       };
 
       const ext = createAnthropicExtension(config);
@@ -787,12 +807,15 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: { max_errors: 3 } },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('Done');
+      // content field removed; verify via messages parts
+      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      expect(lastText).toBe('Done');
       expect(callCount).toBe(3);
     });
 
@@ -820,7 +843,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 0 }, ctx);
       await resolveStream(stream);
 
       // Check second API call (stream call) includes error in tool_result
@@ -837,7 +860,7 @@ describe('tool_loop() function', () => {
   });
 
   describe('message history', () => {
-    it('prepends messages option to conversation', async () => {
+    it('prepends message history via list prompt', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -854,13 +877,15 @@ describe('tool_loop() function', () => {
         tool: makeTool(() => 'result', { description: 'Tool' }),
       };
 
-      const messages = [
+      // Pass conversation history + new prompt as list (content-sugar format)
+      const promptList = [
         { role: 'user', content: 'Previous message 1' },
         { role: 'assistant', content: 'Previous response 1' },
+        { role: 'user', content: 'New prompt' },
       ];
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'New prompt', tools, options: { messages } },
+        { prompt: promptList, tools, max_turns: 0 },
         ctx
       );
       await resolveStream(stream);
@@ -904,14 +929,19 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test prompt', tools, options: {} },
+        { prompt: 'Test prompt', tools, max_turns: 0 },
         ctx
       );
       const result = await resolveStream(stream);
 
-      const msgs = result['messages'] as Array<Record<string, unknown>>;
+      // messages now use canonical shape {role, parts} not {role, content}
+      const msgs = result['messages'] as Array<{ role: string; parts: unknown[] }>;
       expect(msgs.length).toBeGreaterThan(0);
-      expect(msgs[0]).toEqual({ role: 'user', content: 'Test prompt' });
+      expect(msgs[0]!.role).toBe('user');
+      // First message's parts contain the prompt text
+      const firstParts = msgs[0]!.parts as Array<{ type: string; text?: string }>;
+      const firstText = firstParts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      expect(firstText).toBe('Test prompt');
     });
   });
 
@@ -942,7 +972,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, options: {} },
+        { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
       const result = await resolveStream(stream);
@@ -981,7 +1011,7 @@ describe('tool_loop() function', () => {
         }),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 0 }, ctx);
       await resolveStream(stream);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1036,7 +1066,7 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 0 }, ctx);
       await resolveStream(stream);
 
       expect(capturedArgs).toEqual({ param_a: 'value_a', param_b: 42 });
@@ -1064,8 +1094,8 @@ describe('tool_loop() function', () => {
       };
 
       const [stream1, stream2] = [
-        getCallable(ext, 'tool_loop').fn({ prompt: 'Prompt 1', tools, options: {} }, ctx1),
-        getCallable(ext, 'tool_loop').fn({ prompt: 'Prompt 2', tools, options: {} }, ctx2),
+        getCallable(ext, 'tool_loop').fn({ prompt: 'Prompt 1', tools, max_turns: 0 }, ctx1),
+        getCallable(ext, 'tool_loop').fn({ prompt: 'Prompt 2', tools, max_turns: 0 }, ctx2),
       ];
 
       const [result1, result2] = await Promise.all([
@@ -1073,8 +1103,13 @@ describe('tool_loop() function', () => {
         resolveStream(stream2),
       ]);
 
-      expect(result1['content']).toBe('Response 1');
-      expect(result2['content']).toBe('Response 2');
+      // content field removed; verify via messages parts
+      const msgs1 = result1['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const text1 = msgs1[msgs1.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      expect(text1).toBe('Response 1');
+      const msgs2 = result2['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const text2 = msgs2[msgs2.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      expect(text2).toBe('Response 2');
     });
   });
 
@@ -1104,7 +1139,7 @@ describe('tool_loop() function', () => {
         };
 
         const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'What is 6 times 7?', tools, options: {} },
+          { prompt: 'What is 6 times 7?', tools, max_turns: 0 },
           ctx
         );
 
@@ -1136,13 +1171,16 @@ describe('tool_loop() function', () => {
         };
 
         const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'Simple question', tools, options: {} },
+          { prompt: 'Simple question', tools, max_turns: 0 },
           ctx
         );
 
         const result = await resolveStream(stream);
 
-        expect(result['content']).toBe('Direct answer without tools.');
+        // content field removed; verify via messages parts
+        const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+        const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+        expect(lastText).toBe('Direct answer without tools.');
         expect(result['stop_reason']).toBe('end_turn');
         expect(result['turns']).toBe(1);
         expect(mockStream).toHaveBeenCalledTimes(1);
@@ -1174,15 +1212,15 @@ describe('tool_loop() function', () => {
           }),
         };
 
+        // max_turns is now positional (3rd arg)
         const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'Search for something', tools, options: { max_turns: 1 } },
+          { prompt: 'Search for something', tools, max_turns: 1 },
           ctx
         );
 
-        const result = await resolveStream(stream);
-
-        expect(result['stop_reason']).toBe('max_turns');
-        expect(result['turns']).toBe(1);
+        // New factory throws RuntimeHaltSignal (INVALID_INPUT / max_turns_exceeded)
+        // when max_turns is reached instead of resolving with stop_reason: 'max_turns'
+        await expectRejectedHalt(resolveStream(stream), { code: 'INVALID_INPUT' });
         // Only one API call: the LLM turn that triggered maxTurns
         expect(mockStream).toHaveBeenCalledTimes(1);
       });
@@ -1217,15 +1255,15 @@ describe('tool_loop() function', () => {
           search: makeTool(() => 'results', { description: 'Search' }),
         };
 
+        // max_turns is now positional (3rd arg)
         const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'Search for info', tools, options: { max_turns: 1 } },
+          { prompt: 'Search for info', tools, max_turns: 1 },
           ctx
         );
 
-        const result = await resolveStream(stream);
-
-        expect(result['stop_reason']).toBe('max_turns');
-        expect(result['turns']).toBe(1);
+        // New factory throws RuntimeHaltSignal (INVALID_INPUT / max_turns_exceeded)
+        // when max_turns is reached instead of resolving with stop_reason: 'max_turns'
+        await expectRejectedHalt(resolveStream(stream), { code: 'INVALID_INPUT' });
       });
     });
 
@@ -1248,7 +1286,7 @@ describe('tool_loop() function', () => {
         };
 
         const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'Test', tools, options: {} },
+          { prompt: 'Test', tools, max_turns: 0 },
           ctx
         );
 
@@ -1275,7 +1313,7 @@ describe('tool_loop() function', () => {
         };
 
         const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'Test', tools, options: {} },
+          { prompt: 'Test', tools, max_turns: 0 },
           ctx
         );
 

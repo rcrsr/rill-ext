@@ -29,6 +29,8 @@ export const configSchema: ExtensionConfigSchema = {
   max_retries: { type: 'number' },
   system: { type: 'string' },
   embed_model: { type: 'string' },
+  max_turns: { type: 'number' },
+  max_errors: { type: 'number' },
 };
 
 // ============================================================

@@ -150,29 +150,29 @@ describe('validateMessages', () => {
   });
 
   it('throws for message missing content', () => {
-    // EC-7: Message lacks `content` → RuntimeError
+    // EC-7: Message lacks both `parts` and `content` → RuntimeError
     const messages = [{ role: 'user' }];
     expect(() => validateMessages(messages)).toThrow(RuntimeError);
     expect(() => validateMessages(messages)).toThrow(
-      "user message requires 'content'"
+      "user message requires 'parts' or 'content'"
     );
   });
 
   it('throws for message with undefined content', () => {
-    // EC-7: Message has undefined content → RuntimeError
+    // EC-7: Message has undefined content and no parts → RuntimeError
     const messages = [{ role: 'assistant', content: undefined }];
     expect(() => validateMessages(messages)).toThrow(RuntimeError);
     expect(() => validateMessages(messages)).toThrow(
-      "assistant message requires 'content'"
+      "assistant message requires 'parts' or 'content'"
     );
   });
 
   it('throws for message with null content', () => {
-    // EC-7: Message has null content → RuntimeError
+    // EC-7: Message has null content and no parts → RuntimeError
     const messages = [{ role: 'system', content: null }];
     expect(() => validateMessages(messages)).toThrow(RuntimeError);
     expect(() => validateMessages(messages)).toThrow(
-      "system message requires 'content'"
+      "system message requires 'parts' or 'content'"
     );
   });
 
@@ -180,7 +180,7 @@ describe('validateMessages', () => {
     // EC-7: Error message includes role name
     const messages = [{ role: 'custom-role', content: undefined }];
     expect(() => validateMessages(messages)).toThrow(
-      "custom-role message requires 'content'"
+      "custom-role message requires 'parts' or 'content'"
     );
   });
 });

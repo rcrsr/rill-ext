@@ -87,8 +87,14 @@ export function validateTemperature(temperature: number | undefined): void {
 // ============================================================
 
 /**
- * Validates messages array for LLM chat completion.
- * Throws RuntimeError if validation fails.
+ * Validates a parts-shaped messages array for LLM chat completion.
+ * Accepts both canonical parts form `{role, parts:[...]}` and content-sugar
+ * form `{role, content: string}` (either `parts` or `content` key present).
+ *
+ * @deprecated Phase 2 extension factories replace inline calls to this
+ * function with `normalizePrompt()` from `./prompt.js`, which provides
+ * richer validation and ctx-aware error emission. This function is retained
+ * for compile-time compatibility until that migration completes.
  *
  * @param messages - Array of message objects to validate
  * @throws RuntimeError if messages are invalid
@@ -111,14 +117,22 @@ export function validateMessages(
       );
     }
 
-    // EC-7: Message lacks `content` → RuntimeError: "{role} message requires 'content'"
-    if (
-      !('content' in message) ||
-      message['content'] === undefined ||
-      message['content'] === null
-    ) {
+    // EC-7: Message requires either `parts` (canonical) or `content` (sugar).
+    const hasParts =
+      'parts' in message &&
+      message['parts'] !== undefined &&
+      message['parts'] !== null;
+    const hasContent =
+      'content' in message &&
+      message['content'] !== undefined &&
+      message['content'] !== null;
+
+    if (!hasParts && !hasContent) {
       const role = String(message['role']);
-      throw new RuntimeError('RILL-R001', `${role} message requires 'content'`);
+      throw new RuntimeError(
+        'RILL-R001',
+        `${role} message requires 'parts' or 'content'`
+      );
     }
   }
 }

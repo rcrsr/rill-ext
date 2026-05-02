@@ -735,6 +735,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.19.0
         version: 0.19.0
+      '@rcrsr/rill-ext-param-shared':
+        specifier: workspace:*
+        version: link:../ext-param
       '@types/node':
         specifier: ^25.5.2
         version: 25.5.2

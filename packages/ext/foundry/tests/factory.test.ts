@@ -174,16 +174,15 @@ describe('createFoundryExtension', () => {
   // ============================================================
 
   describe('extension result structure', () => {
-    // AC-1: Factory returns 10 host functions + dispose
+    // AC-1: Factory returns 9 host functions + dispose
     it('returns 10 host functions and dispose (AC-1)', async () => {
       const createFoundryExtension = await importFactory();
       const ext = await createFoundryExtension(validConfig());
 
       const value = ext.value as Record<string, unknown>;
 
-      // LLM functions (6)
+      // LLM functions (5)
       expect(value['message']).toBeDefined();
-      expect(value['messages']).toBeDefined();
       expect(value['embed']).toBeDefined();
       expect(value['embed_batch']).toBeDefined();
       expect(value['tool_loop']).toBeDefined();
@@ -199,9 +198,9 @@ describe('createFoundryExtension', () => {
       expect(ext.dispose).toBeDefined();
       expect(typeof ext.dispose).toBe('function');
 
-      // Exactly 10 host functions
+      // Exactly 9 host functions
       const functionKeys = Object.keys(value);
-      expect(functionKeys).toHaveLength(10);
+      expect(functionKeys).toHaveLength(9);
     });
   });
 
@@ -224,7 +223,7 @@ describe('createFoundryExtension', () => {
       const messageFn = value['message']!;
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => messageFn.fn({ text: 'hello' }, ctx), {
+      expectThrowHalt(() => messageFn.fn({ prompt: 'hello' }, ctx), {
         code: 'UNAVAILABLE',
         message: 'foundry: inference not configured',
       });
@@ -244,7 +243,7 @@ describe('createFoundryExtension', () => {
       const messageFn = value['message']!;
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => messageFn.fn({ text: 'hello' }, ctx), {
+      expectThrowHalt(() => messageFn.fn({ prompt: 'hello' }, ctx), {
         code: 'INVALID_INPUT',
         message: 'foundry: model is required',
       });
@@ -264,7 +263,7 @@ describe('createFoundryExtension', () => {
       const messageFn = value['message']!;
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => messageFn.fn({ text: 'hello' }, ctx), {
+      expectThrowHalt(() => messageFn.fn({ prompt: 'hello' }, ctx), {
         code: 'INVALID_INPUT',
         message: 'foundry: inference.apiVersion is required',
       });
@@ -276,19 +275,18 @@ describe('createFoundryExtension', () => {
   // ============================================================
 
   describe('LLM contract namespace swap compatibility (AC-14)', () => {
-    const LLM_CONTRACT_KEYS = ['message', 'messages', 'embed', 'embed_batch', 'tool_loop', 'generate'] as const;
+    const LLM_CONTRACT_KEYS = ['message', 'embed', 'embed_batch', 'tool_loop', 'generate'] as const;
 
     // Expected param names per function — matches llm-openai exactly (NFR-FOUNDRY-2)
     const EXPECTED_PARAMS: Record<typeof LLM_CONTRACT_KEYS[number], string[]> = {
-      message: ['text', 'options'],
-      messages: ['messages', 'options'],
+      message: ['prompt', 'options'],
       embed: ['text'],
       embed_batch: ['texts'],
       tool_loop: ['prompt', 'tools', 'options'],
       generate: ['prompt', 'schema', 'options'],
     };
 
-    it('exports all 6 LLM contract function names (AC-14)', async () => {
+    it('exports all 5 LLM contract function names (AC-14)', async () => {
       const createFoundryExtension = await importFactory();
       const ext = await createFoundryExtension(validConfig());
       const value = ext.value as Record<string, unknown>;
@@ -350,26 +348,12 @@ describe('createFoundryExtension', () => {
       const messageFn = value['message']!;
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => messageFn.fn({ text: 'hello' }, ctx), {
+      expectThrowHalt(() => messageFn.fn({ prompt: 'hello' }, ctx), {
         code: 'DISPOSED',
         message: 'foundry: extension disposed',
       });
     });
 
-    it('messages() halts after dispose (EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
-      const messagesFn = value['messages']!;
-      const ctx = createRuntimeContext();
-
-      expectThrowHalt(() => messagesFn.fn({ messages: [{ role: 'user', content: 'hi' }] }, ctx), {
-        code: 'DISPOSED',
-        message: 'foundry: extension disposed',
-      });
-    });
 
     it('embed() halts after dispose (EC-16)', async () => {
       const createFoundryExtension = await importFactory();
