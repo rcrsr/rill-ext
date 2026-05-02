@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.6] - 2026-05-02
+
 ### Changed (Breaking)
 
 - `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-openai`, and `@rcrsr/rill-ext-gemini` (each bumped to `0.19.2`) accept string or message-list input via a unified `prompt` parameter, return message-list output with role and parts structure, and consolidate per-call options into factory-level `max_turns`, `max_errors`, and `extra` config. `max_turns` and `max_errors` are validated at factory time and reject `0`, negatives, and non-integers via `RILL-R001`.
