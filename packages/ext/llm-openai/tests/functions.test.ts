@@ -200,7 +200,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // RillStream has __rill_stream discriminator
       expect((stream as any).__rill_stream).toBe(true);
@@ -221,18 +221,21 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('Hello from OpenAI!');
+      const messages = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const lastMsg = messages[messages.length - 1]!;
+      const assistantText = lastMsg.parts.filter((p) => p.type === 'text').map((p) => p.text).join('');
+      expect(assistantText).toBe('Hello from OpenAI!');
       expect(result['model']).toBe('gpt-4-turbo');
       expect(result['usage']).toEqual({ input: 10, output: 20 });
       expect(result['stop_reason']).toBe('stop');
       expect(result['id']).toBe('chatcmpl-test123');
-      expect(result['messages']).toEqual([
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hello from OpenAI!' },
-      ]);
+      expect(Array.isArray(messages)).toBe(true);
+      expect(messages.length).toBe(2);
+      expect(messages[0]).toMatchObject({ role: 'user', parts: [{ type: 'text', text: 'Hello' }] });
+      expect(messages[1]).toMatchObject({ role: 'assistant', parts: [{ type: 'text', text: 'Hello from OpenAI!' }] });
     });
 
     // IR-1/AC-3: iterating message() stream yields string chunks
@@ -248,7 +251,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
       const chunks = await collectStreamChunks(stream);
 
       expect(chunks).toEqual(['Hello', ' from', ' OpenAI!']);
@@ -267,7 +270,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      getCallable(ext, 'message').fn({ text: 'What is 2+2?' }, ctx);
+      getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
       expect(mockStream).toHaveBeenCalledWith({
         model: 'gpt-4-turbo',
@@ -292,7 +295,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      getCallable(ext, 'message').fn({ text: 'What is 2+2?' }, ctx);
+      getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
       expect(mockStream).toHaveBeenCalledWith({
         model: 'gpt-4-turbo',
@@ -306,32 +309,7 @@ describe('message() function', () => {
       });
     });
 
-    it('accepts options dict with system override', async () => {
-      const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        system: 'Default system.',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      getCallable(ext, 'message').fn({ text: 'Test', options: { system: 'Override system.' } }, ctx);
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messages: [
-            { role: 'system', content: 'Override system.' },
-            { role: 'user', content: 'Test' },
-          ],
-        })
-      );
-    });
-
-    it('accepts options dict with max_tokens override', async () => {
+    it('uses factory config max_tokens when set', async () => {
       const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
       mockStream.mockReturnValue(runner);
 
@@ -344,11 +322,11 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      getCallable(ext, 'message').fn({ text: 'Test', options: { max_tokens: 2000 } }, ctx);
+      getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
-          max_completion_tokens: 2000,
+          max_completion_tokens: 1000,
         })
       );
     });
@@ -365,7 +343,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -386,7 +364,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '' }, ctx), { message: 'prompt text cannot be empty' });
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '' }, ctx), { message: 'prompt string cannot be empty' });
     });
 
     it('throws RuntimeError for whitespace-only prompt text', () => {
@@ -398,7 +376,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '   ' }, ctx), { message: 'prompt text cannot be empty' });
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '   ' }, ctx), { message: 'prompt string cannot be empty' });
     });
 
     // EC-2: Provider API error during stream — thrown when iterating chunks
@@ -416,7 +394,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 401): Invalid API key' });
     });
@@ -435,7 +413,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 429): Rate limit' });
     });
@@ -454,7 +432,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI error: Request timeout' });
     });
@@ -473,7 +451,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 500): Internal server error' });
     });
@@ -493,7 +471,7 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 503): Service unavailable' });
     });
@@ -512,11 +490,14 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       // resolve() calls finalChatCompletion() which returns partial data even after disconnect
       const result = await resolveStream(stream);
-      expect(result['content']).toBe('Partial response text');
+      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const lastParts = msgs[msgs.length - 1]!.parts;
+      const text = lastParts.filter((p) => p.type === 'text').map((p) => p.text).join('');
+      expect(text).toBe('Partial response text');
       expect(result['model']).toBe('gpt-4-turbo');
     });
 
@@ -535,18 +516,18 @@ describe('message() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(resolveStream(stream));
     });
   });
 });
 
-// ============================================================
-// MESSAGES() TESTS
-// ============================================================
+// NOTE: messages() verb was removed in the unified prompting migration.
+// Multi-turn message history is now passed via the prompt param of message().
 
-describe('messages() function', () => {
+/*
+describe('messages() function (REMOVED)', () => {
   beforeEach(() => {
     mockCreate.mockReset();
     mockStream.mockReset();
@@ -981,6 +962,7 @@ describe('messages() function', () => {
     });
   });
 });
+*/
 
 // ============================================================
 // EMBED() TESTS
@@ -1350,7 +1332,7 @@ describe('tool_loop() function', () => {
         test_tool: makeTool(vi.fn().mockResolvedValue('result'), { description: 'A test tool' }),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools }, ctx);
 
       expect((stream as any).__rill_stream).toBe(true);
       expect((stream as any).done).toBe(false);
@@ -1410,7 +1392,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'What is the weather?', tools, options: {} },
+        { prompt: 'What is the weather?', tools },
         ctx
       );
 
@@ -1449,15 +1431,17 @@ describe('tool_loop() function', () => {
         test_tool: makeTool(vi.fn().mockResolvedValue('result'), { description: 'A test tool' }),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test prompt', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test prompt', tools }, ctx);
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('Final response');
+      const msgs1 = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const last1 = msgs1[msgs1.length - 1]!;
+      const text1 = last1.parts.filter((p) => p.type === 'text').map((p) => p.text).join('');
+      expect(text1).toBe('Final response');
       expect(result['model']).toBe('gpt-4-turbo');
       expect(result['usage']).toEqual({ input: 10, output: 20 });
       expect(result['stop_reason']).toBe('stop');
-      expect(result['turns']).toBe(1);
-      expect(Array.isArray(result['messages'])).toBe(true);
+      expect(Array.isArray(msgs1)).toBe(true);
     });
   });
 
@@ -1499,17 +1483,19 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test prompt', tools, options: {} },
+        { prompt: 'test prompt', tools },
         ctx
       );
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('Final response');
+      const msgs2 = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const last2 = msgs2[msgs2.length - 1]!;
+      const text2 = last2.parts.filter((p) => p.type === 'text').map((p) => p.text).join('');
+      expect(text2).toBe('Final response');
       expect(result['model']).toBe('gpt-4-turbo');
       expect(result['usage']).toEqual({ input: 10, output: 20 });
       expect(result['stop_reason']).toBe('stop');
-      expect(result['turns']).toBe(1);
-      expect(Array.isArray(result['messages'])).toBe(true);
+      expect(Array.isArray(msgs2)).toBe(true);
     });
 
     // AC-25: tool_loop with max_turns:1 stops after 1 turn
@@ -1559,13 +1545,11 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test prompt', tools, options: { max_turns: 1 } },
+        { prompt: 'test prompt', tools, max_turns: 1 },
         ctx
       );
-      const result = await resolveStream(stream);
 
-      expect(result['turns']).toBe(1);
-      expect(result['stop_reason']).toBe('max_turns');
+      await expectRejectedHalt(resolveStream(stream), { message: 'max_turns' });
     });
 
     // AC-26: tool_loop with 0 tool calls
@@ -1602,13 +1586,15 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test prompt', tools, options: {} },
+        { prompt: 'test prompt', tools },
         ctx
       );
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('No tools needed');
-      expect(result['turns']).toBe(1);
+      const msgsNoTool = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const lastNoTool = msgsNoTool[msgsNoTool.length - 1]!;
+      const textNoTool = lastNoTool.parts.filter((p) => p.type === 'text').map((p) => p.text).join('');
+      expect(textNoTool).toBe('No tools needed');
     });
 
     it('executes tool loop with tool calls', async () => {
@@ -1692,13 +1678,15 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'What is the weather?', tools, options: {} },
+        { prompt: 'What is the weather?', tools },
         ctx
       );
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('The weather is sunny');
-      expect(result['turns']).toBe(2);
+      const msgsWeather = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const lastWeather = msgsWeather[msgsWeather.length - 1]!;
+      const textWeather = lastWeather.parts.filter((p) => p.type === 'text').map((p) => p.text).join('');
+      expect(textWeather).toBe('The weather is sunny');
       expect(result['usage']).toEqual({ input: 30, output: 15 });
       expect(mockToolFn).toHaveBeenCalledWith({ location: 'NYC' }, ctx);
     });
@@ -1764,7 +1752,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'What is the weather?', tools, options: {} },
+        { prompt: 'What is the weather?', tools },
         ctx
       );
       await resolveStream(stream);
@@ -1794,7 +1782,8 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'tool_loop').fn({ prompt: '', tools: {}, options: {} }, ctx), { message: 'prompt text cannot be empty' });
+      const tools = { some_tool: makeTool(vi.fn(), { description: 'A test tool' }) };
+      expectThrowHalt(() => getCallable(ext, 'tool_loop').fn({ prompt: '', tools }, ctx), { message: 'prompt string cannot be empty' });
     });
 
     // EC-21: Missing tools argument — thrown during stream iteration (executeToolLoop validates)
@@ -1807,7 +1796,7 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools: undefined, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools: undefined }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), { message: 'tools parameter is required' });
     });
@@ -1861,14 +1850,20 @@ describe('tool_loop() function', () => {
         known_tool: makeTool(vi.fn(), { description: 'A known tool' }),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test prompt', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test prompt', tools }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), { message: 'Tool execution failed: 3 consecutive errors' });
     });
 
-    // EC-4: Streaming API failure — resolve rejects with RILL-R005 and "Provider API error:" prefix
+    // EC-4: Streaming API failure — resolve rejects with a halt containing the API error message
     it('resolve rejects with RILL-R005 on streaming API failure [EC-4]', async () => {
-      mockStream.mockRejectedValue(new Error('API error'));
+      // Use a runner that has .on but fails on finalChatCompletion to simulate API error
+      const failingRunner = {
+        on: vi.fn().mockReturnThis(),
+        finalChatCompletion: vi.fn().mockRejectedValue(new Error('API error')),
+        abort: vi.fn(),
+      };
+      mockStream.mockReturnValue(failingRunner);
 
       const config: OpenAIExtensionConfig = {
         api_key: 'test-key',
@@ -1882,9 +1877,9 @@ describe('tool_loop() function', () => {
         tool: makeTool(vi.fn().mockResolvedValue('result'), { description: 'A test tool' }),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test', tools }, ctx);
 
-      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('Provider API error:') });
+      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('API error') });
     });
 
     // AC-17: Tool execution error mid-loop yields tool_call chunk; stream resolves with final content
@@ -1938,7 +1933,7 @@ describe('tool_loop() function', () => {
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test', tools, options: { max_errors: 3 } },
+        { prompt: 'test', tools },
         ctx
       );
 
@@ -1950,7 +1945,10 @@ describe('tool_loop() function', () => {
 
       // Stream resolves with final content after tool error
       const result = await resolveStream(stream);
-      expect(result['content']).toBe('Recovered from tool error.');
+      const msgsRecov = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const lastRecov = msgsRecov[msgsRecov.length - 1]!;
+      const textRecov = lastRecov.parts.filter((p) => p.type === 'text').map((p) => p.text).join('');
+      expect(textRecov).toBe('Recovered from tool error.');
     });
 
     // EC-23: max_errors exceeded — thrown during stream iteration
@@ -2003,7 +2001,7 @@ describe('tool_loop() function', () => {
         test_tool: makeTool(mockToolFn, { description: 'A test tool' }),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test prompt', tools, options: { max_errors: 3 } }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test prompt', tools }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), { message: 'Tool execution failed: 3 consecutive errors' });
     });
@@ -2056,7 +2054,7 @@ describe('generate() function', () => {
       )) as Record<string, unknown>;
 
       expect(Object.keys(result).sort()).toEqual(
-        ['data', 'id', 'model', 'raw', 'stop_reason', 'usage'].sort()
+        ['data', 'id', 'messages', 'model', 'raw', 'stop_reason', 'usage'].sort()
       );
     });
 
@@ -2092,8 +2090,8 @@ describe('generate() function', () => {
       expect(result['raw']).toBe(jsonContent);
     });
 
-    // AC-9: system option overrides factory default
-    it('uses system option over factory default', async () => {
+    // AC-9: system from factory config is sent as system message
+    it('uses factory system config as system message', async () => {
       const jsonContent = JSON.stringify({ ok: true });
       mockCreate.mockResolvedValue(createGenerateMockResponse(jsonContent));
 
@@ -2104,7 +2102,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { ok: { type: { kind: 'bool' } } } }), options: { system: 'override system' } },
+        { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { ok: { type: { kind: 'bool' } } } }) },
         ctx
       );
 
@@ -2112,19 +2110,19 @@ describe('generate() function', () => {
         messages: Array<{ role: string; content: string }>;
       };
       const systemMsg = callArgs.messages.find((m) => m.role === 'system');
-      expect(systemMsg?.content).toBe('override system');
+      expect(systemMsg?.content).toBe('factory system');
     });
 
-    // AC-10: max_tokens option caps output tokens
-    it('passes max_tokens option to API call', async () => {
+    // AC-10: max_tokens factory config caps output tokens
+    it('uses factory max_tokens config in API call', async () => {
       const jsonContent = JSON.stringify({ result: 'ok' });
       mockCreate.mockResolvedValue(createGenerateMockResponse(jsonContent));
 
-      const ext = createOpenAIExtension(baseConfig);
+      const ext = createOpenAIExtension({ ...baseConfig, max_tokens: 128 });
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { result: { type: { kind: 'string' } } } }), options: { max_tokens: 128 } },
+        { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { result: { type: { kind: 'string' } } } }) },
         ctx
       );
 
@@ -2134,21 +2132,22 @@ describe('generate() function', () => {
       expect(callArgs.max_completion_tokens).toBe(128);
     });
 
-    // AC-11: messages option prepends context
-    it('prepends messages before the prompt', async () => {
+    // AC-11: multi-turn context via message list in prompt
+    it('sends multi-turn message list as conversation context', async () => {
       const jsonContent = JSON.stringify({ answer: 42 });
       mockCreate.mockResolvedValue(createGenerateMockResponse(jsonContent));
 
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      const prependedMessages = [
+      const promptMessages = [
         { role: 'user', content: 'prior question' },
         { role: 'assistant', content: 'prior answer' },
+        { role: 'user', content: 'final prompt' },
       ];
 
       await getCallable(ext, 'generate').fn(
-        { prompt: 'final prompt', schema: typeVal({ kind: 'dict', fields: { answer: { type: { kind: 'number' } } } }), options: { messages: prependedMessages } },
+        { prompt: promptMessages, schema: typeVal({ kind: 'dict', fields: { answer: { type: { kind: 'number' } } } }) },
         ctx
       );
 

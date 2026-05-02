@@ -19,6 +19,7 @@ import {
   type ScriptCallable,
 } from '@rcrsr/rill';
 import type { ToolLoopCallbacks, ToolLoopResult } from './types.js';
+import type { Message, Part } from './prompt.js';
 import { buildJsonSchemaFromStructuralType } from './schema.js';
 import { mapProviderError } from './errors.js';
 
@@ -349,10 +350,11 @@ export async function executeToolLoop(
   maxErrors: number,
   callbacks: ToolLoopCallbacks,
   emitEvent: (event: string, data: Record<string, unknown>) => void,
-  maxTurns = 10,
+  maxTurns = 0,
   context?: RuntimeContextLike,
   yieldChunk?: (chunk: RillValue) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  factoryMaxTurns?: number | undefined
 ): Promise<ToolLoopResult> {
   // Validate tools parameter
   if (tools === undefined) {
@@ -446,6 +448,30 @@ export async function executeToolLoop(
 
   const providerTools = callbacks.buildTools(toolDescriptors);
 
+  // Defensive guard: negative per-call maxTurns is invalid
+  if (maxTurns < 0) {
+    throwToolLoopHalt(
+      context,
+      'INVALID_INPUT',
+      'invalid_max_turns',
+      `max_turns must be >= 0, got ${maxTurns}`
+    );
+  }
+
+  // max_turns resolution rule (single source of truth):
+  //   1. per-call value if > 0
+  //   2. factory max_turns if defined
+  //   3. unlimited (Number.MAX_SAFE_INTEGER)
+  const resolvedMaxTurns: number =
+    maxTurns > 0
+      ? maxTurns
+      : factoryMaxTurns !== undefined && factoryMaxTurns > 0
+        ? factoryMaxTurns
+        : Number.MAX_SAFE_INTEGER;
+
+  // max_errors default: 3 when not explicitly provided
+  const resolvedMaxErrors: number = maxErrors > 0 ? maxErrors : 3;
+
   // Initialize loop state
   let consecutiveErrors = 0;
   let totalInputTokens = 0;
@@ -455,7 +481,7 @@ export async function executeToolLoop(
   let turnCount = 0;
 
   // Multi-turn loop
-  while (turnCount < maxTurns) {
+  while (turnCount < resolvedMaxTurns) {
     // Check cancellation before each turn
     if (signal?.aborted) {
       throwToolLoopHalt(
@@ -648,13 +674,13 @@ export async function executeToolLoop(
           duration,
         });
 
-        // EC-14: Consecutive errors exceed maxErrors
-        if (consecutiveErrors >= maxErrors) {
+        // EC-16: Consecutive errors exceed resolvedMaxErrors
+        if (consecutiveErrors >= resolvedMaxErrors) {
           throwToolLoopHalt(
             context,
             'UNAVAILABLE',
-            'consecutive_tool_errors',
-            `Tool execution failed: ${maxErrors} consecutive errors (last: ${name}: ${originalError})`
+            'max_errors_exceeded',
+            `Tool execution failed: ${resolvedMaxErrors} consecutive errors (last: ${name}: ${originalError})`
           );
         }
       }
@@ -677,13 +703,13 @@ export async function executeToolLoop(
     }
   }
 
-  // Max turns reached - return final response
-  return {
-    response: null,
-    toolCalls: executedToolCalls,
-    totalTokens: { input: totalInputTokens, output: totalOutputTokens },
-    turns: turnCount,
-  };
+  // EC-15: Max turns reached — halt with max_turns_exceeded
+  throwToolLoopHalt(
+    context,
+    'INVALID_INPUT',
+    'max_turns_exceeded',
+    `tool_loop exceeded max_turns (${resolvedMaxTurns})`
+  );
 }
 
 // ============================================================
@@ -694,13 +720,16 @@ export async function executeToolLoop(
  * Build normalized response messages array with assistant reply appended.
  * Used by all LLM extensions to ensure consistent messages field in responses.
  *
- * @param inputMessages - Conversation history (already normalized to {role, content})
- * @param assistantContent - Text content from the assistant response
+ * IR-7: New signature — appends an assistant Message with the given parts.
+ * Pure function; does not mutate the input array.
+ *
+ * @param inputMessages - Conversation history in canonical parts-shaped form
+ * @param assistantParts - Parts constituting the assistant reply
  * @returns New array with assistant message appended
  */
 export function buildResponseMessages(
-  inputMessages: ReadonlyArray<{ role: string; content: string }>,
-  assistantContent: string
-): Array<{ role: string; content: string }> {
-  return [...inputMessages, { role: 'assistant', content: assistantContent }];
+  inputMessages: ReadonlyArray<Message>,
+  assistantParts: ReadonlyArray<Part>
+): Message[] {
+  return [...inputMessages, { role: 'assistant', parts: [...assistantParts] }];
 }

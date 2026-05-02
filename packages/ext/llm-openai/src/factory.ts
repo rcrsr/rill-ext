@@ -1,9 +1,23 @@
 /**
  * Extension factory for OpenAI API integration.
  * Creates extension instance with config validation and SDK lifecycle management.
+ *
+ * Routing: o-series reasoning models (o1, o3, o-mini, o4, etc.) use the Responses API.
+ * Standard models (gpt-*, text-*, etc.) use Chat Completions.
+ * Routing is fixed at factory init per AC-B10.
  */
 
 import OpenAI from 'openai';
+import type {
+  Response as OAIResponse,
+  ResponseInputItem,
+  EasyInputMessage,
+  ResponseFunctionToolCall,
+  ResponseOutputMessage,
+  ResponseReasoningItem,
+  ResponseCreateParamsNonStreaming,
+  ResponseCreateParamsStreaming,
+} from 'openai/resources/responses/responses.js';
 import {
   RuntimeError,
   RuntimeHaltSignal,
@@ -33,8 +47,15 @@ import {
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
   buildResponseMessages,
+  normalizePrompt,
+  validateExtraKeys,
+  validateMaxTurns,
+  RESERVED_KEYS_COMMON,
+  PARTS_LIST_STRUCTURE,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
+  type Message,
+  type Part,
 } from '@rcrsr/rill-ext-llm-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { OpenAIExtensionConfig } from './types.js';
@@ -45,6 +66,29 @@ import type { OpenAIExtensionConfig } from './types.js';
 
 const DEFAULT_MAX_COMPLETION_TOKENS = 4096;
 
+/**
+ * Reserved keys for OpenAI — union of COMMON + Chat Completions + Responses API.
+ * Using the superset so `extra` config remains portable across model upgrades (AC-B10).
+ */
+const RESERVED_KEYS_OPENAI: readonly string[] = [
+  ...RESERVED_KEYS_COMMON,
+  'tools',
+  'tool_choice',
+  'function_call',
+  'functions',
+  'input',
+  'instructions',
+  'previous_response_id',
+  'reasoning',
+];
+
+/**
+ * Regex that matches o-series reasoning model IDs.
+ * Matches: o1, o1-mini, o3, o3-mini, o4-mini, o1-preview, etc.
+ * Does NOT match: gpt-4o, gpt-4o-mini (these start with 'gpt').
+ */
+const O_SERIES_PATTERN = /^o\d/;
+
 // ============================================================
 // ERROR DETECTION
 // ============================================================
@@ -52,9 +96,6 @@ const DEFAULT_MAX_COMPLETION_TOKENS = 4096;
 /**
  * OpenAI-specific error detector for mapProviderError.
  * Extracts status code and message from OpenAI.APIError instances.
- *
- * @param error - Error to detect
- * @returns Status and message if OpenAI error, null otherwise
  */
 const detectOpenAIError: ProviderErrorDetector = (error: unknown) => {
   if (error instanceof OpenAI.APIError) {
@@ -87,6 +128,247 @@ function haltInvalid(
 }
 
 // ============================================================
+// CANONICAL ↔ WIRE TRANSLATORS: Chat Completions
+// ============================================================
+
+/**
+ * Convert canonical Message[] (parts-shaped) to OpenAI Chat Completions wire format.
+ * system messages → { role: 'system', content: string }
+ * user messages → { role: 'user', content: string } (tool_result parts become role:'tool' messages)
+ * assistant messages → { role: 'assistant', content, tool_calls? }
+ */
+function canonicalToCC(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
+  const result: OpenAI.ChatCompletionMessageParam[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      const text = msg.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => (p as { type: 'text'; text: string }).text)
+        .join('');
+      result.push({ role: 'system', content: text });
+      continue;
+    }
+
+    if (msg.role === 'user') {
+      // tool_result parts → role:'tool' messages (before user content)
+      const toolResultParts = msg.parts.filter((p) => p.type === 'tool_result');
+      for (const part of toolResultParts) {
+        const tr = part as { type: 'tool_result'; id: string; parts: Part[] };
+        const resultContent = tr.parts
+          .filter((p) => p.type === 'text')
+          .map((p) => (p as { type: 'text'; text: string }).text)
+          .join('');
+        result.push({
+          role: 'tool',
+          tool_call_id: tr.id,
+          content: resultContent,
+        });
+      }
+
+      const contentParts = msg.parts.filter((p) => p.type !== 'tool_result');
+      if (contentParts.length > 0) {
+        const textContent = contentParts
+          .filter((p) => p.type === 'text')
+          .map((p) => (p as { type: 'text'; text: string }).text)
+          .join('');
+        result.push({ role: 'user', content: textContent });
+      }
+      continue;
+    }
+
+    if (msg.role === 'assistant') {
+      const textParts = msg.parts.filter((p) => p.type === 'text');
+      const toolUseParts = msg.parts.filter((p) => p.type === 'tool_use');
+
+      const content = textParts
+        .map((p) => (p as { type: 'text'; text: string }).text)
+        .join('') || null;
+
+      if (toolUseParts.length > 0) {
+        const toolCalls = toolUseParts.map((p) => {
+          const tu = p as { type: 'tool_use'; id: string; name: string; input: Record<string, RillValue> };
+          return {
+            id: tu.id,
+            type: 'function' as const,
+            function: {
+              name: tu.name,
+              arguments: JSON.stringify(tu.input),
+            },
+          };
+        });
+        result.push({ role: 'assistant', content, tool_calls: toolCalls });
+      } else {
+        result.push({ role: 'assistant', content: content ?? '' });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Convert OpenAI Chat Completions response choice to canonical assistant Message.
+ */
+function ccChoiceToCanonical(
+  choice: OpenAI.Chat.Completions.ChatCompletion['choices'][0],
+): Message {
+  const parts: Part[] = [];
+  const msg = choice.message;
+
+  if (msg.content) {
+    parts.push({ type: 'text', text: msg.content });
+  }
+
+  if (msg.tool_calls) {
+    for (const tc of msg.tool_calls) {
+      // tool_calls items have a .function property on ChatCompletionMessageToolCall
+      const fn = (tc as { type: string; id: string; function: { name: string; arguments: string } }).function;
+      const toolInput = (() => {
+        try {
+          return JSON.parse(fn.arguments) as Record<string, RillValue>;
+        } catch {
+          return {} as Record<string, RillValue>;
+        }
+      })();
+      parts.push({ type: 'tool_use', id: tc.id, name: fn.name, input: toolInput });
+    }
+  }
+
+  return { role: 'assistant', parts };
+}
+
+// ============================================================
+// CANONICAL ↔ WIRE TRANSLATORS: Responses API
+// ============================================================
+
+/**
+ * Convert canonical Message[] to Responses API input items and instructions.
+ */
+function canonicalToResponsesAPI(messages: Message[]): {
+  input: ResponseInputItem[];
+  instructions: string | undefined;
+} {
+  let instructions: string | undefined;
+  const input: ResponseInputItem[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      const text = msg.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => (p as { type: 'text'; text: string }).text)
+        .join('');
+      instructions = text || undefined;
+      continue;
+    }
+
+    if (msg.role === 'user') {
+      // tool_result parts → function_call_output items (use call_id = part.id)
+      const toolResultParts = msg.parts.filter((p) => p.type === 'tool_result');
+      for (const part of toolResultParts) {
+        const tr = part as { type: 'tool_result'; id: string; parts: Part[] };
+        const resultContent = tr.parts
+          .filter((p) => p.type === 'text')
+          .map((p) => (p as { type: 'text'; text: string }).text)
+          .join('');
+        input.push({
+          type: 'function_call_output',
+          call_id: tr.id,
+          output: resultContent,
+        } as ResponseInputItem.FunctionCallOutput);
+      }
+
+      const contentParts = msg.parts.filter((p) => p.type === 'text');
+      if (contentParts.length > 0) {
+        const text = contentParts
+          .map((p) => (p as { type: 'text'; text: string }).text)
+          .join('');
+        input.push({ role: 'user', content: text } as EasyInputMessage as ResponseInputItem);
+      }
+      continue;
+    }
+
+    if (msg.role === 'assistant') {
+      // thinking parts → reasoning items (summary_text format)
+      const thinkingParts = msg.parts.filter((p) => p.type === 'thinking');
+      for (const part of thinkingParts) {
+        const th = part as { type: 'thinking'; text: string };
+        // Responses API ReasoningItem needs an id; use a synthetic one
+        input.push({
+          type: 'reasoning',
+          id: `reasoning_${Date.now()}`,
+          summary: [{ type: 'summary_text', text: th.text }],
+        } as unknown as ResponseInputItem);
+      }
+
+      // tool_use parts → function_call items using call_id
+      const toolUseParts = msg.parts.filter((p) => p.type === 'tool_use');
+      for (const part of toolUseParts) {
+        const tu = part as { type: 'tool_use'; id: string; name: string; input: Record<string, RillValue> };
+        input.push({
+          type: 'function_call',
+          call_id: tu.id,
+          name: tu.name,
+          arguments: JSON.stringify(tu.input),
+        } as unknown as ResponseInputItem);
+      }
+
+      // text parts → assistant message
+      const textParts = msg.parts.filter((p) => p.type === 'text');
+      if (textParts.length > 0) {
+        const text = textParts
+          .map((p) => (p as { type: 'text'; text: string }).text)
+          .join('');
+        input.push({ role: 'assistant', content: text } as EasyInputMessage as ResponseInputItem);
+      }
+    }
+  }
+
+  return { input, instructions };
+}
+
+/**
+ * Convert a Responses API response to canonical assistant Message.
+ * Handles text output items, function_call items, and reasoning items.
+ */
+function responsesAPIToCanonical(response: OAIResponse): Message {
+  const parts: Part[] = [];
+
+  for (const item of response.output) {
+    if (item.type === 'message') {
+      const outputMsg = item as ResponseOutputMessage;
+      for (const contentItem of outputMsg.content) {
+        if (contentItem.type === 'output_text') {
+          parts.push({ type: 'text', text: contentItem.text });
+        }
+      }
+    } else if (item.type === 'function_call') {
+      const fc = item as ResponseFunctionToolCall;
+      const fcInput = (() => {
+        try {
+          return JSON.parse(fc.arguments) as Record<string, RillValue>;
+        } catch {
+          return {} as Record<string, RillValue>;
+        }
+      })();
+      // Responses API uses call_id for tool threading (not id)
+      parts.push({ type: 'tool_use', id: fc.call_id, name: fc.name, input: fcInput });
+    } else if (item.type === 'reasoning') {
+      const ri = item as ResponseReasoningItem;
+      const summaryText = ri.summary
+        .filter((s) => s.type === 'summary_text')
+        .map((s) => (s as { type: 'summary_text'; text: string }).text)
+        .join('');
+      if (summaryText) {
+        parts.push({ type: 'thinking', text: summaryText });
+      }
+    }
+  }
+
+  return { role: 'assistant', parts };
+}
+
+// ============================================================
 // FACTORY
 // ============================================================
 
@@ -94,31 +376,33 @@ function haltInvalid(
  * Create OpenAI extension instance.
  * Validates configuration and returns host functions with cleanup.
  *
- * @param config - Extension configuration
- * @returns ExtensionResult with message, messages, embed, embed_batch, tool_loop and dispose
- * @throws Error for invalid configuration (EC-1 through EC-4)
+ * Model routing:
+ * - o-series (o1, o3, o4-mini, etc.) → Responses API
+ * - Standard models (gpt-*, etc.) → Chat Completions
+ * Routing is fixed for instance lifetime (AC-B10).
  *
- * @example
- * ```typescript
- * const ext = createOpenAIExtension({
- *   api_key: process.env.OPENAI_API_KEY,
- *   model: 'gpt-4-turbo',
- *   temperature: 0.7
- * });
- * // Use with rill runtime...
- * await ext.dispose();
- * ```
+ * @param config - Extension configuration
+ * @returns ExtensionResult with message, embed, embed_batch, tool_loop, generate and dispose
+ * @throws RuntimeError('RILL-R001', ...) for invalid configuration
  */
 export function createOpenAIExtension(
   config: OpenAIExtensionConfig
 ): ExtensionFactoryResult {
-  // Validate required fields (§4.1)
+  // EC-21, EC-22: Validate factory max_turns BEFORE client creation
+  validateMaxTurns(config.max_turns);
+
+  // EC-19, EC-20: Validate extra keys BEFORE client creation
+  validateExtraKeys(config.extra, RESERVED_KEYS_OPENAI);
+
+  // Validate required fields
   validateApiKey(config.api_key);
   validateModel(config.model);
   validateTemperature(config.temperature);
 
-  // Instantiate SDK client at factory time (§4.1)
-  // Note: will be used in tasks 3.3 and 3.4 for actual function implementations
+  // Detect model class at factory init; routing fixed for instance lifetime (AC-B10)
+  const isOSeries = O_SERIES_PATTERN.test(config.model);
+
+  // Instantiate SDK client at factory time
   const client = new OpenAI({
     apiKey: config.api_key,
     baseURL: config.base_url,
@@ -126,24 +410,21 @@ export function createOpenAIExtension(
     timeout: config.timeout,
   });
 
-  // Extract config values for use in functions
+  // Extract config values for closures
   const factoryModel = config.model;
   const factoryTemperature = config.temperature;
   const factoryMaxTokens = config.max_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS;
   const factorySystem = config.system;
   const factoryEmbedModel = config.embed_model;
+  const factoryMaxTurns = config.max_turns;
+  const factoryMaxErrors = config.max_errors;
+  const factoryExtra = config.extra;
 
-  // Suppress unused variable warnings for values used in task 3.4
-  void factoryEmbedModel;
-
-  // AbortController for cancelling pending requests (§4.9, IR-11)
+  // AbortController for cancelling pending requests
   let abortController: AbortController | undefined = new AbortController();
 
-  // Dispose function for cleanup (§4.9)
   const dispose = async (): Promise<void> => {
-    // AC-28: Idempotent cleanup, try-catch each step
     try {
-      // Cancel pending API requests via AbortController (IR-11)
       if (abortController) {
         abortController.abort();
         abortController = undefined;
@@ -152,73 +433,76 @@ export function createOpenAIExtension(
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.warn(`Failed to abort OpenAI requests: ${message}`);
     }
-
-    try {
-      // Cleanup SDK HTTP connections
-      // Note: OpenAI SDK doesn't expose a close() method, but we include
-      // this structure for consistency with extension pattern
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.warn(`Failed to cleanup OpenAI SDK: ${message}`);
-    }
   };
 
-  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
-  const fnDict: { message: RillFunction; messages: RillFunction; embed: RillFunction; embed_batch: RillFunction; tool_loop: RillFunction; generate: RillFunction } = ({
-    // IR-4: openai::message
-    message: {
+  // ============================================================
+  // SHARED RETURN TYPE STRUCTURE
+  // ============================================================
+
+  const VERB_STREAM_RET_TYPE: TypeStructure = {
+    kind: 'dict',
+    fields: {
+      messages: {
+        type: {
+          kind: 'list',
+          element: {
+            kind: 'dict',
+            fields: {
+              role: { type: { kind: 'string' } },
+              parts: { type: PARTS_LIST_STRUCTURE },
+            },
+          },
+        },
+      },
+      model: { type: { kind: 'string' } },
+      usage: {
+        type: {
+          kind: 'dict',
+          fields: {
+            input: { type: { kind: 'number' } },
+            output: { type: { kind: 'number' } },
+          },
+        },
+      },
+      stop_reason: { type: { kind: 'string' } },
+      id: { type: { kind: 'string' } },
+    },
+  };
+
+  // ============================================================
+  // HOST FUNCTION: message (Chat Completions path)
+  // ============================================================
+
+  function makeMessageFnCC(): RillFunction {
+    return {
       params: [
-        p.str('text'),
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
       ],
       fn: (args, ctx): RillValue => {
-        // Extract arguments
-        const text = args['text'] as string;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
+        const rawPrompt = args['prompt'] as RillValue;
 
-        // EC-1: Validate text is non-empty before stream creation
-        if (text.trim().length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
+        // IR-1: Normalize prompt (string or message list) → canonical Message[]
+        const normalizedCC = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        if (!Array.isArray(normalizedCC)) {
+          throw new RuntimeHaltSignal(normalizedCC, true);
         }
+        const normalized = normalizedCC as Message[];
 
-        // Extract options
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
+        const inputMessages: Message[] = factorySystem
+          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized]
+          : normalized;
 
-        // Build messages array (OpenAI uses system as first message, not separate param)
-        const apiMessages: OpenAI.ChatCompletionMessageParam[] = [];
+        const apiMessages = canonicalToCC(inputMessages);
 
-        if (system !== undefined) {
-          apiMessages.push({
-            role: 'system',
-            content: system,
-          });
-        }
-
-        apiMessages.push({
-          role: 'user',
-          content: text,
-        });
-
-        // Start the stream — runner is an AsyncIterable<ChatCompletionChunk>
         const runner = client.chat.completions.stream({
           model: factoryModel,
-          max_completion_tokens: maxTokens,
+          max_completion_tokens: factoryMaxTokens,
           messages: apiMessages,
           stream_options: { include_usage: true },
           ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
-        });
+          ...(factoryExtra ?? {}),
+        } as OpenAI.ChatCompletionCreateParamsStreaming);
 
-        // Async generator yields string text deltas from provider
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
             for await (const chunk of runner) {
@@ -228,20 +512,19 @@ export function createOpenAIExtension(
               }
             }
           } catch (error: unknown) {
-            // EC-2/EC-3: Map provider errors during streaming
             throwProviderHalt(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
           }
         }
 
-        // Resolve callback builds the same dict shape as the pre-streaming return
         const resolve = async (): Promise<RillValue> => {
           const startTime = Date.now();
           try {
             const response = await runner.finalChatCompletion();
-            const content = response.choices[0]?.message?.content ?? '';
+            const assistantMsg = ccChoiceToCanonical(response.choices[0]!);
+            const responseMessages = buildResponseMessages(inputMessages, assistantMsg.parts);
 
             const result = {
-              content,
+              messages: responseMessages as unknown as RillValue,
               model: response.model,
               usage: {
                 input: response.usage?.prompt_tokens ?? 0,
@@ -249,16 +532,8 @@ export function createOpenAIExtension(
               },
               stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
               id: response.id,
-              messages: buildResponseMessages(
-                [
-                  ...(system ? [{ role: 'system', content: system }] : []),
-                  { role: 'user', content: text },
-                ],
-                content
-              ),
             };
 
-            // Emit success event
             const duration = Date.now() - startTime;
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'openai:message',
@@ -266,13 +541,10 @@ export function createOpenAIExtension(
               duration,
               model: response.model,
               usage: result.usage,
-              request: apiMessages,
-              content,
             });
 
             return result as RillValue;
           } catch (error: unknown) {
-            // EC-12: Provider failure during resolution — emit error event
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -294,192 +566,106 @@ export function createOpenAIExtension(
           }
         };
 
-        const retType = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            id: { type: { kind: 'string' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
-        };
-
         return createRillStream({
           chunks: chunks(),
           resolve,
           dispose: () => { runner.abort(); },
           chunkType: { kind: 'string' },
-          retType,
+          retType: VERB_STREAM_RET_TYPE,
         });
       },
-      annotations: { description: 'Send single message to OpenAI API' },
+      annotations: { description: 'Send message to OpenAI Chat Completions API' },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'string' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            id: { type: { kind: 'string' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
+        ret: VERB_STREAM_RET_TYPE,
       }),
-    },
+    };
+  }
 
-    // IR-5: openai::messages
-    messages: {
+  // ============================================================
+  // HOST FUNCTION: message (Responses API path)
+  // ============================================================
+
+  function makeMessageFnResponses(): RillFunction {
+    return {
       params: [
-        p.list('messages', { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } }),
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
       ],
       fn: (args, ctx): RillValue => {
-        // Extract arguments
-        const messages = args['messages'] as Array<Record<string, unknown>>;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
+        const rawPrompt = args['prompt'] as RillValue;
 
-        // AC-23: Empty messages list raises error before stream creation
-        if (messages.length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_messages', 'messages list cannot be empty');
+        const normalizedRaw1 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        if (!Array.isArray(normalizedRaw1)) {
+          throw new RuntimeHaltSignal(normalizedRaw1, true);
         }
+        const normalized1 = normalizedRaw1 as Message[];
 
-        // Extract options
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
+        const inputMessages: Message[] = factorySystem
+          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized1]
+          : normalized1;
 
-        // Build messages array (OpenAI uses system as first message)
-        const apiMessages: OpenAI.ChatCompletionMessageParam[] = [];
+        const { input, instructions } = canonicalToResponsesAPI(inputMessages);
 
-        if (system !== undefined) {
-          apiMessages.push({
-            role: 'system',
-            content: system,
-          });
-        }
-
-        // Validate and transform messages
-        for (let i = 0; i < messages.length; i++) {
-          const msg = messages[i];
-
-          // EC-10: Missing role raises error
-          if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
-          }
-
-          const role = msg['role'];
-
-          // EC-11: Unknown role value raises error
-          if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
-          }
-
-          // EC-12: User message missing content
-          if (role === 'user' || role === 'tool') {
-            if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
-            }
-            apiMessages.push({
-              role: role as 'user',
-              content: msg['content'] as string,
-            });
-          }
-          // EC-13: Assistant missing both content and tool_calls
-          else if (role === 'assistant') {
-            const hasContent = 'content' in msg && msg['content'];
-            const hasToolCalls = 'tool_calls' in msg && msg['tool_calls'];
-
-            if (!hasContent && !hasToolCalls) {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_assistant_message', "assistant message requires 'content' or 'tool_calls'");
-            }
-
-            // For now, we only support content
-            if (hasContent) {
-              apiMessages.push({
-                role: 'assistant',
-                content: msg['content'] as string,
-              });
-            }
-          }
-        }
-
-        // Start the stream — runner is an AsyncIterable<ChatCompletionChunk>
-        const runner = client.chat.completions.stream({
+        const baseParams: Record<string, unknown> = {
           model: factoryModel,
-          max_completion_tokens: maxTokens,
-          messages: apiMessages,
-          stream_options: { include_usage: true },
+          max_output_tokens: factoryMaxTokens,
+          input,
+          ...(instructions !== undefined ? { instructions } : {}),
           ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
-        });
+          ...(factoryExtra ?? {}),
+        };
 
-        // Async generator yields string text deltas from provider
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
-            for await (const chunk of runner) {
-              const delta = chunk.choices[0]?.delta?.content;
-              if (delta) {
-                yield delta as RillValue;
+            const stream = client.responses.stream({
+              ...baseParams,
+              stream: true,
+            } as ResponseCreateParamsStreaming);
+            for await (const event of stream) {
+              const e = event as { type?: string; delta?: string };
+              if (e.type === 'response.output_text.delta' && e.delta) {
+                yield e.delta as RillValue;
               }
             }
           } catch (error: unknown) {
-            // EC-2/EC-3: Map provider errors during streaming
             throwProviderHalt(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
           }
         }
 
-        // Resolve callback builds the same dict shape as the pre-streaming return
         const resolve = async (): Promise<RillValue> => {
           const startTime = Date.now();
           try {
-            const response = await runner.finalChatCompletion();
-            const content = response.choices[0]?.message?.content ?? '';
+            const response = await client.responses.create({
+              ...baseParams,
+              stream: false,
+            } as ResponseCreateParamsNonStreaming);
+
+            const assistantMsg = responsesAPIToCanonical(response);
+            const responseMessages = buildResponseMessages(inputMessages, assistantMsg.parts);
 
             const result = {
-              content,
+              messages: responseMessages as unknown as RillValue,
               model: response.model,
               usage: {
-                input: response.usage?.prompt_tokens ?? 0,
-                output: response.usage?.completion_tokens ?? 0,
+                input: response.usage?.input_tokens ?? 0,
+                output: response.usage?.output_tokens ?? 0,
               },
-              stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
+              stop_reason: response.status ?? 'completed',
               id: response.id,
-              messages: buildResponseMessages(
-                messages.map((m) => ({
-                  role: m['role'] as string,
-                  content: (m['content'] as string) ?? '',
-                })),
-                content
-              ),
             };
 
-            // Emit success event
             const duration = Date.now() - startTime;
             emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'openai:messages',
+              event: 'openai:message',
               subsystem: 'extension:openai',
               duration,
               model: response.model,
               usage: result.usage,
-              request: apiMessages,
-              content,
             });
 
             return result as RillValue;
           } catch (error: unknown) {
-            // EC-12: Provider failure during resolution — emit error event
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -501,312 +687,88 @@ export function createOpenAIExtension(
           }
         };
 
-        const retType = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            id: { type: { kind: 'string' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
-        };
-
         return createRillStream({
           chunks: chunks(),
           resolve,
-          dispose: () => { runner.abort(); },
+          dispose: () => { /* stream aborts via AbortController if needed */ },
           chunkType: { kind: 'string' },
-          retType,
+          retType: VERB_STREAM_RET_TYPE,
         });
       },
-      annotations: { description: 'Send multi-turn conversation to OpenAI API' },
+      annotations: { description: 'Send message to OpenAI Responses API' },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'string' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            id: { type: { kind: 'string' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
+        ret: VERB_STREAM_RET_TYPE,
       }),
-    },
+    };
+  }
 
-    // IR-6: openai::embed
-    embed: {
-      params: [p.str('text')],
-      fn: async (args, ctx): Promise<RillValue> => {
-        const startTime = Date.now();
+  // ============================================================
+  // SHARED: validate tool_loop boundary args
+  // ============================================================
 
-        try {
-          // Extract arguments
-          const text = args['text'] as string;
+  function validateToolLoopArgs(
+    toolsDict: RillValue,
+    perCallMaxTurns: number,
+    ctx: RuntimeContext,
+  ): void {
+    // EC-13: Negative per-call max_turns
+    if (perCallMaxTurns < 0) {
+      throw haltInvalid(ctx, 'INVALID_INPUT', 'invalid_max_turns', 'max_turns must be >= 0');
+    }
 
-          // EC-15: Validate text is non-empty
-          validateEmbedText(text.trim());
+    // EC-14: Empty tools dict
+    if (
+      typeof toolsDict === 'object' &&
+      toolsDict !== null &&
+      !Array.isArray(toolsDict) &&
+      Object.keys(toolsDict as Record<string, unknown>).length === 0
+    ) {
+      throw haltInvalid(ctx, 'INVALID_INPUT', 'empty_tools_dict', 'tools dict cannot be empty');
+    }
+  }
 
-          // EC-16: Validate embed_model is configured
-          validateEmbedModel(factoryEmbedModel);
+  // ============================================================
+  // HOST FUNCTION: tool_loop (Chat Completions path)
+  // ============================================================
 
-          // Call OpenAI embeddings API
-          const response = await client.embeddings.create({
-            model: factoryEmbedModel,
-            input: text,
-            encoding_format: 'float',
-          });
-
-          // Extract embedding data
-          const embeddingData = response.data[0]?.embedding;
-          if (!embeddingData || embeddingData.length === 0) {
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'OpenAI: empty embedding returned');
-          }
-
-          // Convert to Float32Array and create RillVector
-          const float32Data = new Float32Array(embeddingData);
-          const vector = createVector(float32Data, factoryEmbedModel);
-
-          // Emit success event (§4.10)
-          const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'openai:embed',
-            subsystem: 'extension:openai',
-            duration,
-            model: factoryEmbedModel,
-            dimensions: float32Data.length,
-          });
-
-          return vector as RillValue;
-        } catch (error: unknown) {
-          // Map error and emit failure event
-          const duration = Date.now() - startTime;
-
-          if (error instanceof RuntimeHaltSignal) {
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'openai:error',
-              subsystem: 'extension:openai',
-              error: getStatus(error.value).message,
-              duration,
-            });
-            throw error;
-          }
-
-          const invalid = mapProviderError(
-            ctx as RuntimeContext,
-            'OpenAI',
-            error,
-            detectOpenAIError
-          );
-
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'openai:error',
-            subsystem: 'extension:openai',
-            error: getStatus(invalid).message,
-            duration,
-          });
-
-          throw new RuntimeHaltSignal(invalid, true);
-        }
-      },
-      annotations: { description: 'Generate embedding vector for text' },
-      returnType: structureToTypeValue({ kind: 'vector' }),
-    },
-
-    // IR-7: openai::embed_batch
-    embed_batch: {
-      params: [p.list('texts')],
-      fn: async (args, ctx): Promise<RillValue> => {
-        const startTime = Date.now();
-
-        try {
-          // Extract arguments
-          const texts = args['texts'] as Array<RillValue>;
-
-          // AC-24: Empty list returns empty list
-          if (texts.length === 0) {
-            return [] as RillValue;
-          }
-
-          // EC-17: Validate embed_model is configured
-          validateEmbedModel(factoryEmbedModel);
-
-          // EC-18: Validate all elements are strings
-          const stringTexts = validateEmbedBatch(texts);
-
-          // Call OpenAI embeddings API with batch
-          const response = await client.embeddings.create({
-            model: factoryEmbedModel,
-            input: stringTexts,
-            encoding_format: 'float',
-          });
-
-          // Convert embeddings to RillVector list
-          const vectors: RillValue[] = [];
-          for (const embeddingItem of response.data) {
-            const embeddingData = embeddingItem.embedding;
-            if (!embeddingData || embeddingData.length === 0) {
-              throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'OpenAI: empty embedding returned');
-            }
-            const float32Data = new Float32Array(embeddingData);
-            const vector = createVector(float32Data, factoryEmbedModel);
-            vectors.push(vector as RillValue);
-          }
-
-          // Emit success event (§4.10)
-          const duration = Date.now() - startTime;
-          const firstVector = vectors[0];
-          const dimensions =
-            firstVector && isVector(firstVector) ? firstVector.data.length : 0;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'openai:embed_batch',
-            subsystem: 'extension:openai',
-            duration,
-            model: factoryEmbedModel,
-            dimensions,
-            count: vectors.length,
-          });
-
-          return vectors as RillValue;
-        } catch (error: unknown) {
-          // Map error and emit failure event
-          const duration = Date.now() - startTime;
-
-          if (error instanceof RuntimeHaltSignal) {
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'openai:error',
-              subsystem: 'extension:openai',
-              error: getStatus(error.value).message,
-              duration,
-            });
-            throw error;
-          }
-
-          const invalid = mapProviderError(
-            ctx as RuntimeContext,
-            'OpenAI',
-            error,
-            detectOpenAIError
-          );
-
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'openai:error',
-            subsystem: 'extension:openai',
-            error: getStatus(invalid).message,
-            duration,
-          });
-
-          throw new RuntimeHaltSignal(invalid, true);
-        }
-      },
-      annotations: { description: 'Generate embedding vectors for multiple texts' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'vector' } }),
-    },
-
-    // IR-8: openai::tool_loop
-    tool_loop: {
+  function makeToolLoopFnCC(): RillFunction {
+    return {
       params: [
-        p.str('prompt'),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         {
           name: 'tools',
           type: { kind: 'dict', valueType: { kind: 'closure' } },
           defaultValue: undefined,
           annotations: {},
         },
-        p.dict('options', undefined, undefined, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-          max_errors: { type: { kind: 'number' }, defaultValue: 3 },
-          max_turns: { type: { kind: 'number' }, defaultValue: 10 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
-        }),
+        p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
-        // Extract arguments
-        const prompt = args['prompt'] as string;
+        const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
+        const perCallMaxTurns = (args['max_turns'] ?? 0) as number;
 
-        // EC-20: Validate prompt is non-empty before stream creation
-        if (prompt.trim().length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
+        validateToolLoopArgs(toolsDict, perCallMaxTurns, ctx as RuntimeContext);
+
+        const normalizedRaw2 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        if (!Array.isArray(normalizedRaw2)) {
+          throw new RuntimeHaltSignal(normalizedRaw2, true);
         }
+        const normalized2 = normalizedRaw2 as Message[];
 
-        // Extract options
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
-        const maxErrors =
-          typeof options['max_errors'] === 'number'
-            ? options['max_errors']
-            : 3;
-        const maxTurns =
-          typeof options['max_turns'] === 'number'
-            ? options['max_turns']
-            : 10;
+        const inputMessages: Message[] = factorySystem
+          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized2]
+          : normalized2;
 
-        // Initialize conversation with prepended messages if provided
-        const messages: OpenAI.ChatCompletionMessageParam[] = [];
+        const ccMessages = canonicalToCC(inputMessages);
+        const maxErrors = factoryMaxErrors ?? 3;
 
-        if (system !== undefined) {
-          messages.push({
-            role: 'system',
-            content: system,
-          });
-        }
-
-        if ('messages' in options && Array.isArray(options['messages'])) {
-          const prependedMessages = options['messages'] as Array<
-            Record<string, unknown>
-          >;
-
-          for (const msg of prependedMessages) {
-            if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
-            }
-
-            const role = msg['role'];
-            if (role !== 'user' && role !== 'assistant') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
-            }
-
-            if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
-            }
-
-            messages.push({
-              role: role as 'user' | 'assistant',
-              content: msg['content'] as string,
-            });
-          }
-        }
-
-        // Add the prompt as initial user message
-        messages.push({
-          role: 'user',
-          content: prompt,
-        });
-
-        // Define OpenAI-specific callbacks for shared tool loop
         const callbacks: ToolLoopCallbacks = {
-          // Build OpenAI Tool format from tool definitions
-          buildTools: (
-            toolDefs: Array<{
-              name: string;
-              description: string;
-              input_schema: object;
-            }>
-          ): OpenAI.ChatCompletionTool[] => {
+          detectError: detectOpenAIError,
+
+          buildTools: (toolDefs) => {
             return toolDefs.map((def) => ({
               type: 'function' as const,
               function: {
@@ -817,27 +779,18 @@ export function createOpenAIExtension(
             }));
           },
 
-          // Call OpenAI API (non-streaming fallback)
-          callAPI: async (
-            msgs: unknown[],
-            tools: unknown,
-            signal?: AbortSignal
-          ): Promise<unknown> => {
-            const apiParams: OpenAI.ChatCompletionCreateParamsNonStreaming = {
+          callAPI: async (msgs, tools, signal) => {
+            const apiParams = {
               model: factoryModel,
-              max_completion_tokens: maxTokens,
+              max_completion_tokens: factoryMaxTokens,
               messages: msgs as OpenAI.ChatCompletionMessageParam[],
               tools: tools as OpenAI.ChatCompletionTool[],
               tool_choice: 'auto' as const,
-            };
-
-            if (factoryTemperature !== undefined) {
-              apiParams.temperature = factoryTemperature;
-            }
+              ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+              ...(factoryExtra ?? {}),
+            } as OpenAI.ChatCompletionCreateParamsNonStreaming;
 
             const response = await client.chat.completions.create(apiParams, { signal });
-
-            // Normalize response to include usage in expected format
             return {
               ...response,
               usage: {
@@ -847,32 +800,21 @@ export function createOpenAIExtension(
             };
           },
 
-          // Call OpenAI API with streaming — IR-3: callAPIStreaming
-          callAPIStreaming: async (
-            msgs: unknown[],
-            tools: unknown,
-            onTextDelta: (text: string) => void,
-            signal?: AbortSignal
-          ): Promise<unknown> => {
+          callAPIStreaming: async (msgs, tools, onTextDelta, signal) => {
             const streamRunner = client.chat.completions.stream({
               model: factoryModel,
-              max_completion_tokens: maxTokens,
+              max_completion_tokens: factoryMaxTokens,
               messages: msgs as OpenAI.ChatCompletionMessageParam[],
               tools: tools as OpenAI.ChatCompletionTool[],
               tool_choice: 'auto' as const,
               stream_options: { include_usage: true },
               ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
-            }, { signal });
+              ...(factoryExtra ?? {}),
+            } as OpenAI.ChatCompletionCreateParamsStreaming, { signal });
 
-            // Emit text deltas as they arrive
-            streamRunner.on('content', (delta: string) => {
-              onTextDelta(delta);
-            });
+            streamRunner.on('content', (delta: string) => { onTextDelta(delta); });
 
-            // Await the final completion for tool extraction and token tracking
             const response = await streamRunner.finalChatCompletion();
-
-            // Normalize response to include usage in expected format
             return {
               ...response,
               usage: {
@@ -882,133 +824,58 @@ export function createOpenAIExtension(
             };
           },
 
-          // Extract tool calls from OpenAI response
-          extractToolCalls: (
-            response: unknown
-          ): Array<{ id: string; name: string; input: object }> | null => {
-            if (
-              !response ||
-              typeof response !== 'object' ||
-              !('choices' in response)
-            ) {
-              return null;
-            }
-
+          extractToolCalls: (response) => {
+            if (!response || typeof response !== 'object' || !('choices' in response)) return null;
             const choices = (response as { choices: unknown[] }).choices;
-            if (!Array.isArray(choices) || choices.length === 0) {
-              return null;
-            }
+            if (!Array.isArray(choices) || choices.length === 0) return null;
 
             const choice = choices[0];
-            if (
-              !choice ||
-              typeof choice !== 'object' ||
-              !('message' in choice)
-            ) {
-              return null;
-            }
+            if (!choice || typeof choice !== 'object' || !('message' in choice)) return null;
 
             const message = (choice as { message: unknown }).message;
-            if (
-              !message ||
-              typeof message !== 'object' ||
-              !('tool_calls' in message)
-            ) {
-              return null;
-            }
+            if (!message || typeof message !== 'object' || !('tool_calls' in message)) return null;
 
-            const toolCalls = (message as { tool_calls: unknown[] | null })
-              .tool_calls;
-            if (!toolCalls || !Array.isArray(toolCalls)) {
-              return null;
-            }
+            const toolCalls = (message as { tool_calls: unknown[] | null }).tool_calls;
+            if (!toolCalls || !Array.isArray(toolCalls)) return null;
 
-            // Filter for function tool calls and extract relevant data
             const functionToolCalls = toolCalls.filter(
-              (
-                tc
-              ): tc is OpenAI.Chat.Completions.ChatCompletionMessageToolCall =>
+              (tc): tc is { id: string; type: string; function: { name: string; arguments: string } } =>
                 typeof tc === 'object' &&
                 tc !== null &&
                 'type' in tc &&
-                tc.type === 'function'
+                (tc as { type: string }).type === 'function' &&
+                'function' in tc
             );
 
             return functionToolCalls.map((tc) => {
-              // Type assertion safe because we filtered for function type
-              const functionCall =
-                tc as OpenAI.Chat.Completions.ChatCompletionMessageToolCall & {
-                  function: { name: string; arguments: string };
-                };
-              const args = functionCall.function.arguments;
               let parsedArgs: object;
               try {
-                parsedArgs = JSON.parse(args);
+                parsedArgs = JSON.parse(tc.function.arguments) as object;
               } catch {
                 parsedArgs = {};
               }
-
-              return {
-                id: tc.id,
-                name: functionCall.function.name,
-                input: parsedArgs,
-              };
+              return { id: tc.id, name: tc.function.name, input: parsedArgs };
             });
           },
 
-          // Extract assistant message (with tool_calls) from OpenAI response
-          formatAssistantMessage: (response: unknown): unknown => {
-            if (
-              !response ||
-              typeof response !== 'object' ||
-              !('choices' in response)
-            ) {
-              return null;
-            }
-
+          formatAssistantMessage: (response) => {
+            if (!response || typeof response !== 'object' || !('choices' in response)) return null;
             const choices = (response as { choices: unknown[] }).choices;
-            if (!Array.isArray(choices) || choices.length === 0) {
-              return null;
-            }
+            if (!Array.isArray(choices) || choices.length === 0) return null;
 
             const choice = choices[0];
-            if (
-              !choice ||
-              typeof choice !== 'object' ||
-              !('message' in choice)
-            ) {
-              return null;
-            }
+            if (!choice || typeof choice !== 'object' || !('message' in choice)) return null;
 
             const msg = (choice as { message: unknown }).message;
-            if (!msg || typeof msg !== 'object') {
-              return null;
-            }
+            if (!msg || typeof msg !== 'object') return null;
 
             const m = msg as Record<string, unknown>;
-            const clean: Record<string, unknown> = {
-              role: m['role'],
-              content: m['content'],
-            };
-            if (m['tool_calls']) {
-              clean['tool_calls'] = m['tool_calls'];
-            }
+            const clean: Record<string, unknown> = { role: m['role'], content: m['content'] };
+            if (m['tool_calls']) clean['tool_calls'] = m['tool_calls'];
             return clean;
           },
 
-          // Format tool results into OpenAI message format
-          formatToolResult: (
-            toolResults: Array<{
-              id: string;
-              name: string;
-              result: RillValue;
-              error?: string;
-            }>
-          ): unknown => {
-            // For OpenAI, we need to add assistant message with tool calls,
-            // then tool messages with results
-            // Since executeToolLoop already extracted the tool calls, we only
-            // return the tool result messages here
+          formatToolResult: (toolResults) => {
             return toolResults.map((tr) => ({
               role: 'tool' as const,
               tool_call_id: tr.id,
@@ -1021,99 +888,65 @@ export function createOpenAIExtension(
           },
         };
 
-        // Chunk buffer — yieldChunk pushes here; generator yields from here
         const chunkBuffer: RillValue[] = [];
-
-        const yieldChunk = (chunk: RillValue): void => {
-          chunkBuffer.push(chunk);
-        };
-
+        const yieldChunk = (chunk: RillValue): void => { chunkBuffer.push(chunk); };
         const toolLoopAbortController = new AbortController();
 
-        // Start the tool loop as a promise shared by both the generator and resolve
         const loopPromise = executeToolLoop(
-          messages,
+          ccMessages,
           toolsDict,
           maxErrors,
           callbacks,
-          (event: string, data: Record<string, unknown>) => {
-            // Map shared events to OpenAI-specific events
+          (event, data) => {
             const eventMap: Record<string, string> = {
               tool_call: 'openai:tool_call',
               tool_result: 'openai:tool_result',
             };
-
             emitExtensionEvent(ctx as RuntimeContext, {
-              event: eventMap[event] || event,
+              event: eventMap[event] ?? event,
               subsystem: 'extension:openai',
               ...data,
             });
           },
-          maxTurns,
+          perCallMaxTurns,
           ctx,
           yieldChunk,
-          toolLoopAbortController.signal
+          toolLoopAbortController.signal,
+          factoryMaxTurns,
         );
 
-        // Async generator — awaits the tool loop then yields buffered chunks
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
             await loopPromise;
-            for (const chunk of chunkBuffer) {
-              yield chunk;
-            }
+            for (const chunk of chunkBuffer) { yield chunk; }
           } catch (error: unknown) {
             if (error instanceof RuntimeHaltSignal) throw error;
             throwProviderHalt(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
           }
         }
 
-        // Resolve callback — builds the same dict shape as pre-streaming return
         const resolve = async (): Promise<RillValue> => {
           const startTime = Date.now();
           try {
             const loopResult = await loopPromise;
+            const response = loopResult.response as OpenAI.Chat.Completions.ChatCompletion | null;
 
-            // Extract response data
-            const response =
-              loopResult.response as OpenAI.Chat.Completions.ChatCompletion | null;
-            const content = response?.choices[0]?.message?.content ?? '';
-            const stopReason =
-              loopResult.turns >= maxTurns
-                ? 'max_turns'
-                : (response?.choices[0]?.finish_reason ?? 'stop');
-
-            // Build result dict
-            const inputMessages = messages
-              .filter((m) => 'role' in m && (m as unknown as Record<string, unknown>)['role'] !== 'system')
-              .map((m) => {
-                const msg = m as unknown as Record<string, unknown>;
-                return {
-                  role: msg['role'] as string,
-                  content:
-                    msg['content'] == null
-                      ? ''
-                      : typeof msg['content'] === 'string'
-                        ? msg['content']
-                        : JSON.stringify(msg['content']),
-                };
-              });
+            const assistantMsg = response
+              ? ccChoiceToCanonical(response.choices[0]!)
+              : { role: 'assistant' as const, parts: [] as Part[] };
+            const responseMessages = buildResponseMessages(inputMessages, assistantMsg.parts);
 
             const result = {
-              content,
+              messages: responseMessages as unknown as RillValue,
               model: factoryModel,
               usage: {
                 input: loopResult.totalTokens.input,
                 output: loopResult.totalTokens.output,
               },
-              stop_reason: stopReason,
-              turns: loopResult.turns,
-              messages: response
-                ? buildResponseMessages(inputMessages, content)
-                : inputMessages,
+              stop_reason: response?.choices[0]?.finish_reason ?? 'stop',
+              id: response?.id ?? '',
             };
 
-            // Emit success event
             const duration = Date.now() - startTime;
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'openai:tool_loop',
@@ -1121,13 +954,10 @@ export function createOpenAIExtension(
               turns: loopResult.turns,
               total_duration: duration,
               usage: result.usage,
-              request: messages,
-              content,
             });
 
             return result as RillValue;
           } catch (error: unknown) {
-            // EC-12: Provider failure during resolution — emit error event
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -1149,16 +979,234 @@ export function createOpenAIExtension(
           }
         };
 
-        const retType = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            turns: { type: { kind: 'number' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
+        return createRillStream({
+          chunks: chunks(),
+          resolve,
+          dispose: () => { toolLoopAbortController.abort(); },
+          chunkType: { kind: 'dict' },
+          retType: VERB_STREAM_RET_TYPE,
+        });
+      },
+      annotations: { description: 'Execute tool-use loop with OpenAI Chat Completions API' },
+      returnType: structureToTypeValue({
+        kind: 'stream',
+        chunk: { kind: 'dict' },
+        ret: VERB_STREAM_RET_TYPE,
+      }),
+    };
+  }
+
+  // ============================================================
+  // HOST FUNCTION: tool_loop (Responses API path)
+  // ============================================================
+
+  function makeToolLoopFnResponses(): RillFunction {
+    return {
+      params: [
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+        {
+          name: 'tools',
+          type: { kind: 'dict', valueType: { kind: 'closure' } },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        p.num('max_turns', undefined, 0),
+      ],
+      fn: (args, ctx): RillValue => {
+        const rawPrompt = args['prompt'] as RillValue;
+        const toolsDict = args['tools'] as RillValue;
+        const perCallMaxTurns = (args['max_turns'] ?? 0) as number;
+
+        validateToolLoopArgs(toolsDict, perCallMaxTurns, ctx as RuntimeContext);
+
+        const normalizedRaw3 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        if (!Array.isArray(normalizedRaw3)) {
+          throw new RuntimeHaltSignal(normalizedRaw3, true);
+        }
+        const normalized3 = normalizedRaw3 as Message[];
+
+        const inputMessages: Message[] = factorySystem
+          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized3]
+          : normalized3;
+
+        const { input: initialInput, instructions } = canonicalToResponsesAPI(inputMessages);
+        const maxErrors = factoryMaxErrors ?? 3;
+
+        const callbacks: ToolLoopCallbacks = {
+          detectError: detectOpenAIError,
+
+          buildTools: (toolDefs) => {
+            return toolDefs.map((def) => ({
+              type: 'function' as const,
+              name: def.name,
+              description: def.description,
+              parameters: def.input_schema as Record<string, unknown>,
+            }));
           },
+
+          callAPI: async (msgs, tools, signal) => {
+            const apiParams: Record<string, unknown> = {
+              model: factoryModel,
+              max_output_tokens: factoryMaxTokens,
+              input: msgs,
+              tools,
+              tool_choice: 'auto',
+              ...(instructions !== undefined ? { instructions } : {}),
+              ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+              ...(factoryExtra ?? {}),
+            };
+
+            const response = await client.responses.create(
+              apiParams as ResponseCreateParamsNonStreaming,
+              { signal }
+            );
+
+            return {
+              ...response,
+              usage: {
+                input_tokens: response.usage?.input_tokens ?? 0,
+                output_tokens: response.usage?.output_tokens ?? 0,
+              },
+            };
+          },
+
+          extractToolCalls: (response) => {
+            if (!response || typeof response !== 'object' || !('output' in response)) return null;
+            const output = (response as { output: unknown[] }).output;
+            if (!Array.isArray(output)) return null;
+
+            const functionCalls = output.filter(
+              (item): item is { type: string; call_id: string; name: string; arguments: string } =>
+                typeof item === 'object' &&
+                item !== null &&
+                'type' in item &&
+                (item as { type: string }).type === 'function_call' &&
+                'call_id' in item
+            );
+
+            if (functionCalls.length === 0) return null;
+
+            return functionCalls.map((fc) => {
+              let input: object;
+              try {
+                input = JSON.parse(fc.arguments) as object;
+              } catch {
+                input = {};
+              }
+              return { id: fc.call_id, name: fc.name, input };
+            });
+          },
+
+          formatAssistantMessage: (response) => {
+            // Responses API: the output items themselves are appended to next turn input
+            if (!response || typeof response !== 'object' || !('output' in response)) return null;
+            const output = (response as { output: unknown[] }).output;
+            if (!Array.isArray(output) || output.length === 0) return null;
+            return output;
+          },
+
+          formatToolResult: (toolResults) => {
+            return toolResults.map((tr) => ({
+              type: 'function_call_output' as const,
+              call_id: tr.id,
+              output: tr.error
+                ? JSON.stringify({ error: tr.error, code: 'RILL-R001' })
+                : typeof tr.result === 'string'
+                  ? tr.result
+                  : JSON.stringify(tr.result),
+            }));
+          },
+        };
+
+        const chunkBuffer: RillValue[] = [];
+        const yieldChunk = (chunk: RillValue): void => { chunkBuffer.push(chunk); };
+        const toolLoopAbortController = new AbortController();
+
+        const loopPromise = executeToolLoop(
+          initialInput,
+          toolsDict,
+          maxErrors,
+          callbacks,
+          (event, data) => {
+            const eventMap: Record<string, string> = {
+              tool_call: 'openai:tool_call',
+              tool_result: 'openai:tool_result',
+            };
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: eventMap[event] ?? event,
+              subsystem: 'extension:openai',
+              ...data,
+            });
+          },
+          perCallMaxTurns,
+          ctx,
+          yieldChunk,
+          toolLoopAbortController.signal,
+          factoryMaxTurns,
+        );
+
+        async function* chunks(): AsyncGenerator<RillValue> {
+          try {
+            await loopPromise;
+            for (const chunk of chunkBuffer) { yield chunk; }
+          } catch (error: unknown) {
+            if (error instanceof RuntimeHaltSignal) throw error;
+            throwProviderHalt(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+          }
+        }
+
+        const resolve = async (): Promise<RillValue> => {
+          const startTime = Date.now();
+          try {
+            const loopResult = await loopPromise;
+            const response = loopResult.response as OAIResponse | null;
+
+            const assistantMsg = response
+              ? responsesAPIToCanonical(response)
+              : { role: 'assistant' as const, parts: [] as Part[] };
+            const responseMessages = buildResponseMessages(inputMessages, assistantMsg.parts);
+
+            const result = {
+              messages: responseMessages as unknown as RillValue,
+              model: factoryModel,
+              usage: {
+                input: loopResult.totalTokens.input,
+                output: loopResult.totalTokens.output,
+              },
+              stop_reason: response?.status ?? 'completed',
+              id: response?.id ?? '',
+            };
+
+            const duration = Date.now() - startTime;
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: 'openai:tool_loop',
+              subsystem: 'extension:openai',
+              turns: loopResult.turns,
+              total_duration: duration,
+              usage: result.usage,
+            });
+
+            return result as RillValue;
+          } catch (error: unknown) {
+            const duration = Date.now() - startTime;
+            if (error instanceof RuntimeHaltSignal) {
+              emitExtensionEvent(ctx as RuntimeContext, {
+                event: 'openai:error',
+                subsystem: 'extension:openai',
+                error: getStatus(error.value).message,
+                duration,
+              });
+              throw error;
+            }
+            const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            emitExtensionEvent(ctx as RuntimeContext, {
+              event: 'openai:error',
+              subsystem: 'extension:openai',
+              error: getStatus(invalid).message,
+              duration,
+            });
+            throw new RuntimeHaltSignal(invalid, true);
+          }
         };
 
         return createRillStream({
@@ -1166,223 +1214,384 @@ export function createOpenAIExtension(
           resolve,
           dispose: () => { toolLoopAbortController.abort(); },
           chunkType: { kind: 'dict' },
-          retType,
+          retType: VERB_STREAM_RET_TYPE,
         });
       },
-      annotations: { description: 'Execute tool-use loop with OpenAI API' },
+      annotations: { description: 'Execute tool-use loop with OpenAI Responses API' },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'dict' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            turns: { type: { kind: 'number' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
+        ret: VERB_STREAM_RET_TYPE,
       }),
-    },
+    };
+  }
 
-    // IR-3: openai::generate
-    generate: {
-      params: [
-        p.str('prompt'),
-        { name: 'schema', type: { kind: 'type' } as { kind: string }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
-        }),
-      ],
-      fn: async (args, ctx): Promise<RillValue> => {
-        const startTime = Date.now();
+  // ============================================================
+  // HOST FUNCTION: generate (Chat Completions only — structured output)
+  // ============================================================
 
+  function extractJson(content: string, reasoning: string): string {
+    const candidate = content.trim() !== '' ? content : reasoning;
+    try { JSON.parse(candidate); return candidate; } catch {}
+    const m = candidate.match(/\{[\s\S]*\}/);
+    return m ? m[0] : candidate;
+  }
+
+  const generateFn: RillFunction = {
+    params: [
+      { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+      {
+        name: 'schema',
+        type: { kind: 'type' } as { kind: string },
+        defaultValue: undefined,
+        annotations: { description: 'Type expression for structured output schema' },
+      },
+    ],
+    fn: async (args, ctx): Promise<RillValue> => {
+      const startTime = Date.now();
+
+      try {
+        const rawPrompt = args['prompt'] as RillValue;
+        const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
+
+        // EC-17: Validate schema is a rill type expression with dict structure
+        if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema', 'generate requires a type expression as schema');
+        }
+        if (schemaArg.structure.kind !== 'dict') {
+          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema_type', `generate requires a dict type as schema, got ${schemaArg.structure.kind}`);
+        }
+
+        const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
+
+        // IR-1: Normalize prompt
+        const normalizedRaw4 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        if (!Array.isArray(normalizedRaw4)) {
+          throw new RuntimeHaltSignal(normalizedRaw4, true);
+        }
+        const normalized4 = normalizedRaw4 as Message[];
+
+        const inputMessages: Message[] = factorySystem
+          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized4]
+          : normalized4;
+
+        const apiMessages = canonicalToCC(inputMessages);
+
+        const apiParams = {
+          model: factoryModel,
+          max_completion_tokens: factoryMaxTokens,
+          messages: apiMessages,
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: 'output',
+              schema: jsonSchema as unknown as Record<string, unknown>,
+              strict: true,
+            },
+          },
+          ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+          ...(factoryExtra ?? {}),
+        } as OpenAI.ChatCompletionCreateParamsNonStreaming;
+
+        const response = await client.chat.completions.create(apiParams);
+
+        // EC-18: Unexpected finish reason indicates provider-side stream or content filter
+        const finishReason = response.choices[0]?.finish_reason;
+        if (finishReason !== 'stop' && finishReason !== 'length') {
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'PROTOCOL',
+            'unexpected_response_format',
+            `generate: unexpected finish_reason '${finishReason ?? 'unknown'}'`,
+          );
+        }
+
+        // Reasoning-mode models (Nemotron, DeepSeek-R1, Qwen3) may emit the
+        // structured JSON in reasoning_content with content empty, or mix prose
+        // and JSON in either field. extractJson picks the right candidate and
+        // strips any thinking preamble, leaving only the JSON object.
+        const generateMessage = response.choices[0]?.message;
+        const raw = extractJson(
+          generateMessage?.content ?? '',
+          (generateMessage as { reasoning_content?: string } | undefined)?.reasoning_content ?? '',
+        );
+
+        // EC-17: Parse JSON — reject non-JSON response
+        let data: unknown;
         try {
-          // Extract arguments
-          const prompt = args['prompt'] as string;
-          const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
-          const options = (args['options'] ?? {}) as Record<string, unknown>;
+          data = JSON.parse(raw) as unknown;
+        } catch (parseError: unknown) {
+          const detail = parseError instanceof Error ? parseError.message : String(parseError);
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'PROTOCOL',
+            'schema_validation_failed',
+            `generate: failed to parse response JSON: ${detail}`,
+          );
+        }
 
-          // EC-3: Validate schema is a type value with dict structure
-          if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema', 'generate requires a type expression as schema');
-          }
-          if (schemaArg.structure.kind !== 'dict') {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema_type', `generate requires a dict type as schema, got ${schemaArg.structure.kind}`);
-          }
+        // Build canonical messages transcript
+        const assistantParts: Part[] = [{ type: 'text', text: raw }];
+        const responseMessages = buildResponseMessages(inputMessages, assistantParts);
 
-          // EC-4: Build JSON Schema from TypeStructure
-          const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
+        const result = {
+          data,
+          raw,
+          messages: responseMessages as unknown as RillValue,
+          model: response.model,
+          usage: {
+            input: response.usage?.prompt_tokens ?? 0,
+            output: response.usage?.completion_tokens ?? 0,
+          },
+          stop_reason: finishReason ?? 'stop',
+          id: response.id,
+        };
 
-          // Extract options
-          const system =
-            typeof options['system'] === 'string'
-              ? options['system']
-              : factorySystem;
-          const maxTokens =
-            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-              ? options['max_tokens']
-              : factoryMaxTokens;
+        const duration = Date.now() - startTime;
+        emitExtensionEvent(ctx as RuntimeContext, {
+          event: 'openai:generate',
+          subsystem: 'extension:openai',
+          duration,
+          model: response.model,
+          usage: result.usage,
+        });
 
-          // Build messages array: prepend conversation context if provided (AC-11)
-          const apiMessages: OpenAI.ChatCompletionMessageParam[] = [];
-
-          if (system !== undefined) {
-            apiMessages.push({
-              role: 'system',
-              content: system,
-            });
-          }
-
-          if ('messages' in options && Array.isArray(options['messages'])) {
-            const prependedMessages = options['messages'] as Array<
-              Record<string, unknown>
-            >;
-
-            for (const msg of prependedMessages) {
-              if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
-              }
-
-              const role = msg['role'];
-              if (role !== 'user' && role !== 'assistant') {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
-              }
-
-              if (!('content' in msg) || typeof msg['content'] !== 'string') {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
-              }
-
-              apiMessages.push({
-                role: role as 'user' | 'assistant',
-                content: msg['content'] as string,
-              });
-            }
-          }
-
-          // Add the prompt as the final user message
-          apiMessages.push({ role: 'user', content: prompt });
-
-          // Call OpenAI API with native structured output via json_schema response_format
-          const apiParams: OpenAI.ChatCompletionCreateParamsNonStreaming = {
-            model: factoryModel,
-            max_completion_tokens: maxTokens,
-            messages: apiMessages,
-            response_format: {
-              type: 'json_schema',
-              json_schema: {
-                name: 'output',
-                schema: jsonSchema as unknown as Record<string, unknown>,
-                strict: true,
-              },
-            },
-          };
-
-          // Add optional parameters only if defined
-          if (factoryTemperature !== undefined) {
-            apiParams.temperature = factoryTemperature;
-          }
-
-          const response = await client.chat.completions.create(apiParams);
-
-          // Extract JSON string from response (IR-5)
-          const raw = response.choices[0]?.message?.content ?? '';
-
-          // EC-5: Parse JSON, throw on failure with original error detail
-          let data: unknown;
-          try {
-            data = JSON.parse(raw) as unknown;
-          } catch (parseError: unknown) {
-            const detail =
-              parseError instanceof Error
-                ? parseError.message
-                : String(parseError);
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'json_parse_failed', `generate: failed to parse response JSON: ${detail}`);
-          }
-
-          // Build 6-key response dict (AC-6, AC-7, AC-8)
-          const result = {
-            data,
-            raw,
-            model: response.model,
-            usage: {
-              input: response.usage?.prompt_tokens ?? 0,
-              output: response.usage?.completion_tokens ?? 0,
-            },
-            stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
-            id: response.id,
-          };
-
-          // Emit success event (AC-33)
-          const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'openai:generate',
-            subsystem: 'extension:openai',
-            duration,
-            model: response.model,
-            usage: result.usage,
-            request: apiMessages,
-            content: raw,
-          });
-
-          return result as RillValue;
-        } catch (error: unknown) {
-          const duration = Date.now() - startTime;
-          if (error instanceof RuntimeError) {
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'openai:error',
-              subsystem: 'extension:openai',
-              error: error.message,
-              duration,
-            });
-            throw error;
-          }
-          if (error instanceof RuntimeHaltSignal) {
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'openai:error',
-              subsystem: 'extension:openai',
-              error: getStatus(error.value).message,
-              duration,
-            });
-            throw error;
-          }
-          const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+        return result as RillValue;
+      } catch (error: unknown) {
+        const duration = Date.now() - startTime;
+        if (error instanceof RuntimeError) {
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'openai:error',
             subsystem: 'extension:openai',
-            error: getStatus(invalid).message,
+            error: error.message,
             duration,
           });
-          throw new RuntimeHaltSignal(invalid, true);
+          throw error;
         }
-      },
-      annotations: { description: 'Generate structured output from OpenAI API' },
-      returnType: structureToTypeValue({
-        kind: 'dict',
-        fields: {
-          data: { type: { kind: 'any' } },
-          raw: { type: { kind: 'string' } },
-          model: { type: { kind: 'string' } },
-          usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-          stop_reason: { type: { kind: 'string' } },
-          id: { type: { kind: 'string' } },
-        },
-      }),
+        if (error instanceof RuntimeHaltSignal) {
+          emitExtensionEvent(ctx as RuntimeContext, {
+            event: 'openai:error',
+            subsystem: 'extension:openai',
+            error: getStatus(error.value).message,
+            duration,
+          });
+          throw error;
+        }
+        const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+        emitExtensionEvent(ctx as RuntimeContext, {
+          event: 'openai:error',
+          subsystem: 'extension:openai',
+          error: getStatus(invalid).message,
+          duration,
+        });
+        throw new RuntimeHaltSignal(invalid, true);
+      }
     },
-  });
+    annotations: { description: 'Generate structured output from OpenAI API' },
+    returnType: structureToTypeValue({
+      kind: 'dict',
+      fields: {
+        data: { type: { kind: 'any' } },
+        raw: { type: { kind: 'string' } },
+        messages: {
+          type: {
+            kind: 'list',
+            element: {
+              kind: 'dict',
+              fields: {
+                role: { type: { kind: 'string' } },
+                parts: { type: PARTS_LIST_STRUCTURE },
+              },
+            },
+          },
+        },
+        model: { type: { kind: 'string' } },
+        usage: {
+          type: {
+            kind: 'dict',
+            fields: {
+              input: { type: { kind: 'number' } },
+              output: { type: { kind: 'number' } },
+            },
+          },
+        },
+        stop_reason: { type: { kind: 'string' } },
+        id: { type: { kind: 'string' } },
+      },
+    }),
+  };
+
+  // ============================================================
+  // HOST FUNCTION: embed
+  // ============================================================
+
+  const embedFn: RillFunction = {
+    params: [p.str('text')],
+    fn: async (args, ctx): Promise<RillValue> => {
+      const startTime = Date.now();
+
+      try {
+        const text = args['text'] as string;
+
+        validateEmbedText(text.trim());
+        validateEmbedModel(factoryEmbedModel);
+
+        const response = await client.embeddings.create({
+          model: factoryEmbedModel,
+          input: text,
+          encoding_format: 'float',
+        });
+
+        const embeddingData = response.data[0]?.embedding;
+        if (!embeddingData || embeddingData.length === 0) {
+          throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'OpenAI: empty embedding returned');
+        }
+
+        const float32Data = new Float32Array(embeddingData);
+        const vector = createVector(float32Data, factoryEmbedModel);
+
+        const duration = Date.now() - startTime;
+        emitExtensionEvent(ctx as RuntimeContext, {
+          event: 'openai:embed',
+          subsystem: 'extension:openai',
+          duration,
+          model: factoryEmbedModel,
+          dimensions: float32Data.length,
+        });
+
+        return vector as RillValue;
+      } catch (error: unknown) {
+        const duration = Date.now() - startTime;
+
+        if (error instanceof RuntimeHaltSignal) {
+          emitExtensionEvent(ctx as RuntimeContext, {
+            event: 'openai:error',
+            subsystem: 'extension:openai',
+            error: getStatus(error.value).message,
+            duration,
+          });
+          throw error;
+        }
+
+        const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+        emitExtensionEvent(ctx as RuntimeContext, {
+          event: 'openai:error',
+          subsystem: 'extension:openai',
+          error: getStatus(invalid).message,
+          duration,
+        });
+        throw new RuntimeHaltSignal(invalid, true);
+      }
+    },
+    annotations: { description: 'Generate embedding vector for text' },
+    returnType: structureToTypeValue({ kind: 'vector' }),
+  };
+
+  // ============================================================
+  // HOST FUNCTION: embed_batch
+  // ============================================================
+
+  const embedBatchFn: RillFunction = {
+    params: [p.list('texts')],
+    fn: async (args, ctx): Promise<RillValue> => {
+      const startTime = Date.now();
+
+      try {
+        const texts = args['texts'] as Array<RillValue>;
+
+        if (texts.length === 0) {
+          return [] as RillValue;
+        }
+
+        validateEmbedModel(factoryEmbedModel);
+
+        const stringTexts = validateEmbedBatch(texts);
+
+        const response = await client.embeddings.create({
+          model: factoryEmbedModel,
+          input: stringTexts,
+          encoding_format: 'float',
+        });
+
+        const vectors: RillValue[] = [];
+        for (const embeddingItem of response.data) {
+          const embeddingData = embeddingItem.embedding;
+          if (!embeddingData || embeddingData.length === 0) {
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'OpenAI: empty embedding returned');
+          }
+          const float32Data = new Float32Array(embeddingData);
+          vectors.push(createVector(float32Data, factoryEmbedModel) as RillValue);
+        }
+
+        const duration = Date.now() - startTime;
+        const firstVector = vectors[0];
+        const dimensions = firstVector && isVector(firstVector) ? firstVector.data.length : 0;
+        emitExtensionEvent(ctx as RuntimeContext, {
+          event: 'openai:embed_batch',
+          subsystem: 'extension:openai',
+          duration,
+          model: factoryEmbedModel,
+          dimensions,
+          count: vectors.length,
+        });
+
+        return vectors as RillValue;
+      } catch (error: unknown) {
+        const duration = Date.now() - startTime;
+
+        if (error instanceof RuntimeHaltSignal) {
+          emitExtensionEvent(ctx as RuntimeContext, {
+            event: 'openai:error',
+            subsystem: 'extension:openai',
+            error: getStatus(error.value).message,
+            duration,
+          });
+          throw error;
+        }
+
+        const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+        emitExtensionEvent(ctx as RuntimeContext, {
+          event: 'openai:error',
+          subsystem: 'extension:openai',
+          error: getStatus(invalid).message,
+          duration,
+        });
+        throw new RuntimeHaltSignal(invalid, true);
+      }
+    },
+    annotations: { description: 'Generate embedding vectors for multiple texts' },
+    returnType: structureToTypeValue({ kind: 'list', element: { kind: 'vector' } }),
+  };
+
+  // ============================================================
+  // ASSEMBLE RESULT
+  // ============================================================
+
+  // Select routing implementations based on model class (fixed at factory init)
+  const messageFn = isOSeries ? makeMessageFnResponses() : makeMessageFnCC();
+  const toolLoopFn = isOSeries ? makeToolLoopFnResponses() : makeToolLoopFnCC();
+
+  const fnDict: {
+    message: RillFunction;
+    embed: RillFunction;
+    embed_batch: RillFunction;
+    tool_loop: RillFunction;
+    generate: RillFunction;
+  } = {
+    message: messageFn,
+    embed: embedFn,
+    embed_batch: embedBatchFn,
+    tool_loop: toolLoopFn,
+    generate: generateFn,
+  };
 
   const callableDict = {
     message: toCallable(fnDict.message),
-    messages: toCallable(fnDict.messages),
     embed: toCallable(fnDict.embed),
     embed_batch: toCallable(fnDict.embed_batch),
     tool_loop: toCallable(fnDict.tool_loop),
     generate: toCallable(fnDict.generate),
   } satisfies LlmExtensionContract;
 
-  return { value: callableDict as unknown as RillValue, dispose };
+  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
 }

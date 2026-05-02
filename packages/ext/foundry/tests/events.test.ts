@@ -163,7 +163,7 @@ describe('extension event emission', () => {
         },
       });
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hi' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hi' }, ctx);
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
@@ -196,7 +196,7 @@ describe('extension event emission', () => {
         },
       });
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hi' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hi' }, ctx);
       await expect(resolveStream(stream)).rejects.toThrow();
 
       expect(events).toHaveLength(1);
@@ -224,7 +224,7 @@ describe('extension event emission', () => {
         },
       });
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
       await resolveStream(stream);
 
       expect(events[0]?.['duration']).toBeGreaterThanOrEqual(0);
@@ -246,7 +246,7 @@ describe('extension event emission', () => {
         },
       });
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
       await resolveStream(stream);
 
       expect(events[0]?.['model']).toBe('gpt-4o');

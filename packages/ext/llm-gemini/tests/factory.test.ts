@@ -125,9 +125,9 @@ describe('createGeminiExtension', () => {
     });
   });
 
-  // AC-1: Factory returns ExtensionFactoryResult with 6 callables
+  // AC-1: Factory returns ExtensionFactoryResult with 5 callables
   describe('extension result structure', () => {
-    it('returns object with 6 function definitions', () => {
+    it('returns object with 5 function definitions', () => {
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
         model: 'gemini-2.0-flash',
@@ -136,13 +136,15 @@ describe('createGeminiExtension', () => {
       const result = createGeminiExtension(config);
       const value = result.value as Record<string, unknown>;
 
-      // Verify all 6 functions exist in the value dict
+      // Verify all 5 functions exist in the value dict
       expect(value['message']).toBeDefined();
-      expect(value['messages']).toBeDefined();
       expect(value['embed']).toBeDefined();
       expect(value['embed_batch']).toBeDefined();
       expect(value['tool_loop']).toBeDefined();
       expect(value['generate']).toBeDefined();
+
+      // messages verb was removed in the factory migration
+      expect(value['messages']).toBeUndefined();
 
       // Verify dispose exists on the factory result
       expect(result.dispose).toBeDefined();
@@ -159,28 +161,7 @@ describe('createGeminiExtension', () => {
 
       expect(value['message']).toMatchObject({
         params: [
-          { name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { kind: 'dict' }, defaultValue: {}, annotations: {} },
-        ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'stream' },
-      });
-    });
-
-    it('messages callable has correct structure', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const result = createGeminiExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['messages']).toMatchObject({
-        params: [
-          { name: 'messages', type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { kind: 'dict' }, defaultValue: {}, annotations: {} },
+          { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
@@ -233,13 +214,33 @@ describe('createGeminiExtension', () => {
 
       expect(value['tool_loop']).toMatchObject({
         params: [
-          { name: 'prompt', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
+          { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
           { name: 'tools', type: { kind: 'dict', valueType: { kind: 'closure' } }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { kind: 'dict' }, defaultValue: undefined, annotations: {} },
+          { name: 'max_turns', type: { kind: 'number' }, defaultValue: 0, annotations: {} },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
         returnType: { typeName: 'stream' },
+      });
+    });
+
+    it('generate callable has correct structure', () => {
+      const config: GeminiExtensionConfig = {
+        api_key: 'test-key',
+        model: 'gemini-2.0-flash',
+      };
+
+      const result = createGeminiExtension(config);
+      const value = result.value as Record<string, Record<string, unknown>>;
+
+      expect(value['generate']).toMatchObject({
+        params: [
+          { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+          { name: 'schema', type: { kind: 'type' }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
+        ],
+        fn: expect.any(Function),
+        annotations: { description: expect.any(String) },
+        returnType: { typeName: 'dict' },
       });
     });
   });

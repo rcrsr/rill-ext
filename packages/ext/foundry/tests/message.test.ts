@@ -174,7 +174,7 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+    const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
     expect((stream as Record<string, unknown>)['__rill_stream']).toBe(true);
     expect((stream as Record<string, unknown>)['done']).toBe(false);
@@ -191,7 +191,7 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+    const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
     const result = await resolveStream(stream);
 
     expect(result['content']).toBe('Hello from Foundry!');
@@ -212,7 +212,7 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    const stream = getCallable(ext, 'message').fn({ text: 'What is 2+2?' }, ctx);
+    const stream = getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
     const result = await resolveStream(stream);
 
     const messages = result['messages'] as Array<Record<string, unknown>>;
@@ -222,8 +222,10 @@ describe('message() function', () => {
     const assistantMsg = messages.find((m) => m['role'] === 'assistant');
     expect(userMsg).toBeDefined();
     expect(assistantMsg).toBeDefined();
-    expect(userMsg?.['content']).toBe('What is 2+2?');
-    expect(assistantMsg?.['content']).toBe('Response');
+    const userParts = userMsg?.['parts'] as Array<Record<string, unknown>>;
+    const assistantParts = assistantMsg?.['parts'] as Array<Record<string, unknown>>;
+    expect(userParts?.[0]?.['text']).toBe('What is 2+2?');
+    expect(assistantParts?.[0]?.['text']).toBe('Response');
   });
 
   // AC-2: iterating the stream yields string chunks
@@ -237,7 +239,7 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+    const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
     const chunks = await collectStreamChunks(stream);
 
     expect(chunks).toEqual(['Hello', ' from', ' Foundry!']);
@@ -251,7 +253,7 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    getCallable(ext, 'message').fn({ text: 'What is 2+2?' }, ctx);
+    getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
     expect(mockStream).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -279,7 +281,7 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(config);
     const ctx = createRuntimeContext();
 
-    getCallable(ext, 'message').fn({ text: 'Hi' }, ctx);
+    getCallable(ext, 'message').fn({ prompt: 'Hi' }, ctx);
 
     expect(mockStream).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -290,162 +292,13 @@ describe('message() function', () => {
     );
   });
 
-  // AC-2: empty text halts with #INVALID_INPUT
+  // AC-2: empty prompt halts with #INVALID_INPUT
   it('halts with #INVALID_INPUT for empty text', async () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
     expectThrowHalt(() => {
-      getCallable(ext, 'message').fn({ text: '' }, ctx);
-    }, { code: 'INVALID_INPUT', message: 'prompt text cannot be empty' });
-  });
-});
-
-// ============================================================
-// MESSAGES() TESTS
-// ============================================================
-
-describe('messages() function', () => {
-  beforeEach(() => {
-    mockStream.mockReset();
-    mockCreate.mockReset();
-  });
-
-  // AC-3: messages() returns RillStream
-  it('returns a RillStream object', async () => {
-    const runner = createMockStreamRunner(
-      ['Sure'],
-      createMockFinalCompletion('Sure, I can help!')
-    );
-    mockStream.mockReturnValue(runner);
-
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    const inputMessages = [{ role: 'user', content: 'Can you help me?' }];
-    const stream = getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-
-    expect((stream as Record<string, unknown>)['__rill_stream']).toBe(true);
-    expect((stream as Record<string, unknown>)['done']).toBe(false);
-  });
-
-  // AC-3: resolution dict has content, model, usage
-  it('resolves to dict with content, model, usage', async () => {
-    const runner = createMockStreamRunner(
-      ['Sure, ', 'I can help!'],
-      createMockFinalCompletion('Sure, I can help!')
-    );
-    mockStream.mockReturnValue(runner);
-
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    const inputMessages = [{ role: 'user', content: 'Can you help me?' }];
-    const stream = getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-    const result = await resolveStream(stream);
-
-    expect(result['content']).toBe('Sure, I can help!');
-    expect(result['model']).toBe('gpt-4o');
-    expect(result['usage']).toEqual({ input: 10, output: 20 });
-    expect(result['stop_reason']).toBe('stop');
-    expect(result['id']).toBe('chatcmpl-test123');
-  });
-
-  // AC-3: multi-turn conversation messages are passed correctly
-  it('passes multi-turn conversation to the API', async () => {
-    const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
-    mockStream.mockReturnValue(runner);
-
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    const inputMessages = [
-      { role: 'user', content: 'Hello' },
-      { role: 'assistant', content: 'Hi there!' },
-      { role: 'user', content: 'How are you?' },
-    ];
-    getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-
-    expect(mockStream).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({ role: 'user', content: 'Hello' }),
-          expect.objectContaining({ role: 'assistant', content: 'Hi there!' }),
-          expect.objectContaining({ role: 'user', content: 'How are you?' }),
-        ]),
-      })
-    );
-  });
-
-  // AC-3: messages field in result contains conversation
-  it('resolves with messages array in result', async () => {
-    const runner = createMockStreamRunner(
-      ['Response'],
-      createMockFinalCompletion('Response')
-    );
-    mockStream.mockReturnValue(runner);
-
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    const inputMessages = [{ role: 'user', content: 'Tell me something' }];
-    const stream = getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-    const result = await resolveStream(stream);
-
-    expect(Array.isArray(result['messages'])).toBe(true);
-  });
-
-  // AC-3: iterating stream yields string chunks
-  it('iterating stream yields string text deltas', async () => {
-    const runner = createMockStreamRunner(
-      ['Sure', ', I', ' can', ' help!'],
-      createMockFinalCompletion('Sure, I can help!')
-    );
-    mockStream.mockReturnValue(runner);
-
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    const inputMessages = [{ role: 'user', content: 'Can you help me?' }];
-    const stream = getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-    const chunks = await collectStreamChunks(stream);
-
-    expect(chunks).toEqual(['Sure', ', I', ' can', ' help!']);
-  });
-
-  // AC-3: empty messages list halts with #INVALID_INPUT
-  it('halts with #INVALID_INPUT for empty messages list', async () => {
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    expectThrowHalt(() => {
-      getCallable(ext, 'messages').fn({ messages: [] }, ctx);
-    }, { code: 'INVALID_INPUT', message: 'messages list cannot be empty' });
-  });
-
-  // AC-3: message missing role halts with #INVALID_INPUT
-  it('halts with #INVALID_INPUT when message is missing role field', async () => {
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    expectThrowHalt(() => {
-      getCallable(ext, 'messages').fn(
-        { messages: [{ content: 'no role here' }] },
-        ctx
-      );
-    }, { code: 'INVALID_INPUT', message: "required 'role' field" });
-  });
-
-  // AC-3: invalid role halts with #INVALID_INPUT
-  it('halts with #INVALID_INPUT for invalid role', async () => {
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    expectThrowHalt(() => {
-      getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'system', content: 'system message' }] },
-        ctx
-      );
-    }, { code: 'INVALID_INPUT', message: 'invalid role' });
+      getCallable(ext, 'message').fn({ prompt: '' }, ctx);
+    }, { code: 'INVALID_INPUT', message: 'prompt string cannot be empty' });
   });
 });

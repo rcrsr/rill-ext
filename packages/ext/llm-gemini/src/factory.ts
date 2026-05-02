@@ -8,7 +8,7 @@ import {
   Type,
   type FunctionDeclaration,
   type Content,
-  type Part,
+  type Part as GeminiPart,
   type Schema,
 } from '@google/genai';
 import {
@@ -39,9 +39,16 @@ import {
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
   buildResponseMessages,
+  normalizePrompt,
+  RESERVED_KEYS_COMMON,
+  validateExtraKeys,
+  validateMaxTurns,
+  MESSAGE_DICT_STRUCTURE,
   type JsonSchemaProperty,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
+  type Message,
+  type Part,
 } from '@rcrsr/rill-ext-llm-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { GeminiExtensionConfig } from './types.js';
@@ -51,6 +58,79 @@ import type { GeminiExtensionConfig } from './types.js';
 // ============================================================
 
 const DEFAULT_MAX_TOKENS = 8192;
+
+/** Gemini-specific reserved keys — superset of RESERVED_KEYS_COMMON. */
+const RESERVED_KEYS_GEMINI = [
+  ...RESERVED_KEYS_COMMON,
+  'contents',
+  'systemInstruction',
+] as const;
+
+// ============================================================
+// RETURN TYPE CONSTANTS
+// ============================================================
+
+/**
+ * Shared inner structure for the messages list field across all verbs.
+ * Uses MESSAGE_DICT_STRUCTURE from ext-llm-shared, which carries the full
+ * PARTS_LIST_STRUCTURE for the `parts` field (rich superset shape per §EXT.8.1).
+ */
+const MESSAGES_FIELD_STRUCTURE = {
+  kind: 'list' as const,
+  element: MESSAGE_DICT_STRUCTURE,
+};
+
+/**
+ * Shared inner structure for the usage dict field across all verbs.
+ */
+const USAGE_FIELD_STRUCTURE = {
+  kind: 'dict' as const,
+  fields: {
+    input: { type: { kind: 'number' as const } },
+    output: { type: { kind: 'number' as const } },
+  },
+};
+
+/**
+ * Common ret-dict TypeStructure for message and tool_loop verbs.
+ * Used both for RillFunction.returnType (via structureToTypeValue) and
+ * for createRillStream.retType (raw TypeStructure).
+ */
+const MESSAGE_RET_STRUCTURE = {
+  kind: 'dict' as const,
+  fields: {
+    messages: { type: MESSAGES_FIELD_STRUCTURE },
+    model: { type: { kind: 'string' as const } },
+    usage: { type: USAGE_FIELD_STRUCTURE },
+    stop_reason: { type: { kind: 'string' as const } },
+    id: { type: { kind: 'string' as const } },
+  },
+};
+
+const MESSAGE_VERB_RETURN_TYPE = structureToTypeValue({
+  kind: 'stream',
+  chunk: { kind: 'string' },
+  ret: MESSAGE_RET_STRUCTURE,
+});
+
+const TOOL_LOOP_VERB_RETURN_TYPE = structureToTypeValue({
+  kind: 'stream',
+  chunk: { kind: 'dict' },
+  ret: MESSAGE_RET_STRUCTURE,
+});
+
+const GENERATE_VERB_RETURN_TYPE = structureToTypeValue({
+  kind: 'dict',
+  fields: {
+    data: { type: { kind: 'any' } },
+    raw: { type: { kind: 'string' } },
+    messages: { type: MESSAGES_FIELD_STRUCTURE },
+    model: { type: { kind: 'string' } },
+    usage: { type: USAGE_FIELD_STRUCTURE },
+    stop_reason: { type: { kind: 'string' } },
+    id: { type: { kind: 'string' } },
+  },
+});
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -127,7 +207,7 @@ const detectGeminiError: ProviderErrorDetector = (error: unknown) => {
 };
 
 // ============================================================
-// HELPERS
+// WIRE TRANSLATORS
 // ============================================================
 
 /**
@@ -135,7 +215,6 @@ const detectGeminiError: ProviderErrorDetector = (error: unknown) => {
  * (Type enum values). Mirrors the type-mapping pattern in buildTools.
  */
 function toGeminiSchema(prop: JsonSchemaProperty): Schema {
-  // Map JSON Schema type string to Gemini Type enum
   let schemaType = Type.STRING;
   if (prop.type === 'number') schemaType = Type.NUMBER;
   if (prop.type === 'boolean') schemaType = Type.BOOLEAN;
@@ -171,6 +250,100 @@ function toGeminiSchema(prop: JsonSchemaProperty): Schema {
   return schema;
 }
 
+/**
+ * Convert a canonical Part to a Gemini Part.
+ *
+ * Per-Part single-field rule: a Gemini Part may carry ONLY ONE of
+ * text / inlineData / fileData / functionCall / functionResponse.
+ * Do not populate multiple fields on a single Part object.
+ */
+function canonicalPartToGemini(part: Part): GeminiPart {
+  switch (part.type) {
+    case 'text':
+    case 'thinking':
+      // Both map to text on the wire
+      return { text: part.text };
+
+    case 'image': {
+      const src = part.source;
+      if (src.kind === 'base64') {
+        // Canonical base64 image → Gemini inlineData
+        return {
+          inlineData: {
+            mimeType: src.media_type,
+            data: src.data,
+          },
+        };
+      }
+      // Canonical url image → Gemini fileData
+      return {
+        fileData: {
+          fileUri: src.data,
+          mimeType: src.media_type,
+        },
+      };
+    }
+
+    case 'tool_use':
+      // Canonical tool_use → Gemini functionCall
+      return {
+        functionCall: {
+          name: part.name,
+          args: part.input as Record<string, unknown>,
+        },
+      };
+
+    case 'tool_result': {
+      // Canonical tool_result → Gemini functionResponse
+      // Collapse nested parts to a text string for the response body
+      const responseText = part.parts
+        .map((p) => (p.type === 'text' || p.type === 'thinking' ? p.text : JSON.stringify(p)))
+        .join('');
+      return {
+        functionResponse: {
+          name: part.name ?? part.id,
+          response: { result: responseText },
+        },
+      };
+    }
+  }
+}
+
+/**
+ * Convert canonical Message[] to Gemini Content[].
+ *
+ * Rules:
+ * - canonical `system` role is lifted to top-level `systemInstruction` and
+ *   NOT added to the contents array.
+ * - canonical `assistant` role maps to Gemini `model` role.
+ * - canonical `user` role stays `user`.
+ */
+function canonicalToGeminiContents(messages: Message[]): {
+  contents: Content[];
+  systemInstruction: string | undefined;
+} {
+  let systemInstruction: string | undefined;
+  const contents: Content[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      // Lift system turn to systemInstruction; use text from first text part
+      const textPart = msg.parts.find((p) => p.type === 'text' || p.type === 'thinking');
+      if (textPart && (textPart.type === 'text' || textPart.type === 'thinking')) {
+        systemInstruction = textPart.text;
+      }
+      continue;
+    }
+
+    const geminiRole: 'user' | 'model' = msg.role === 'assistant' ? 'model' : 'user';
+    const geminiParts = msg.parts.map(canonicalPartToGemini);
+
+    contents.push({ role: geminiRole, parts: geminiParts });
+  }
+
+  return { contents, systemInstruction };
+}
+
 // ============================================================
 // FACTORY
 // ============================================================
@@ -180,8 +353,8 @@ function toGeminiSchema(prop: JsonSchemaProperty): Schema {
  * Validates configuration and returns host functions with cleanup.
  *
  * @param config - Extension configuration
- * @returns ExtensionResult with message, messages, embed, embed_batch, tool_loop and dispose
- * @throws Error for invalid configuration (EC-1 through EC-4)
+ * @returns ExtensionResult with message, embed, embed_batch, tool_loop, generate and dispose
+ * @throws RuntimeError for invalid configuration (EC-1 through EC-22)
  *
  * @example
  * ```typescript
@@ -197,12 +370,18 @@ function toGeminiSchema(prop: JsonSchemaProperty): Schema {
 export function createGeminiExtension(
   config: GeminiExtensionConfig
 ): ExtensionFactoryResult {
-  // Validate required fields (§4.1)
+  // Validate required fields
   validateApiKey(config.api_key);
   validateModel(config.model);
   validateTemperature(config.temperature);
 
-  // Instantiate SDK client at factory time (§4.1)
+  // EC-21/22: Validate factory-level max_turns
+  validateMaxTurns(config.max_turns);
+
+  // EC-19/20: Validate extra keys against Gemini-specific reserved set
+  validateExtraKeys(config.extra, RESERVED_KEYS_GEMINI);
+
+  // Instantiate SDK client at factory time
   const client = new GoogleGenAI({
     apiKey: config.api_key,
   });
@@ -213,15 +392,16 @@ export function createGeminiExtension(
   const factoryMaxTokens = config.max_tokens ?? DEFAULT_MAX_TOKENS;
   const factorySystem = config.system;
   const factoryEmbedModel = config.embed_model;
+  const factoryMaxTurns = config.max_turns;
+  const factoryMaxErrors = config.max_errors;
+  const factoryExtra = config.extra;
 
-  // AbortController for cancelling pending requests (§4.9, IR-11)
+  // AbortController for cancelling pending requests
   let abortController: AbortController | undefined = new AbortController();
 
-  // Dispose function for cleanup (§4.9)
+  // Dispose function for cleanup
   const dispose = async (): Promise<void> => {
-    // AC-28: Idempotent cleanup, try-catch each step
     try {
-      // Cancel pending API requests via AbortController (IR-11)
       if (abortController) {
         abortController.abort();
         abortController = undefined;
@@ -233,81 +413,92 @@ export function createGeminiExtension(
 
     try {
       // Cleanup SDK HTTP connections
-      // Note: Gemini SDK doesn't expose a close() method, but we include
-      // this structure for consistency with extension pattern
+      // Note: Gemini SDK does not expose a close() method
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.warn(`Failed to cleanup Gemini SDK: ${message}`);
     }
   };
 
-  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
-  const fnDict: { message: RillFunction; messages: RillFunction; embed: RillFunction; embed_batch: RillFunction; tool_loop: RillFunction; generate: RillFunction } = ({
-    // IR-4: gemini::message
+  /**
+   * Build the generationConfig object, merging factory extra.
+   * Validated extra fields merge into generationConfig per Gemini SDK shape.
+   */
+  function buildGenerationConfig(overrides: {
+    systemInstruction?: string | undefined;
+    maxOutputTokens?: number | undefined;
+    temperature?: number | undefined;
+    responseSchema?: Schema | undefined;
+    responseMimeType?: string | undefined;
+  }): Record<string, unknown> {
+    const base: Record<string, unknown> = {};
+
+    if (overrides.systemInstruction !== undefined) {
+      base['systemInstruction'] = overrides.systemInstruction;
+    }
+    if (overrides.maxOutputTokens !== undefined) {
+      base['maxOutputTokens'] = overrides.maxOutputTokens;
+    }
+    if (overrides.temperature !== undefined) {
+      base['temperature'] = overrides.temperature;
+    }
+    if (overrides.responseSchema !== undefined) {
+      base['responseSchema'] = overrides.responseSchema;
+    }
+    if (overrides.responseMimeType !== undefined) {
+      base['responseMimeType'] = overrides.responseMimeType;
+    }
+
+    // Merge factory extra into generationConfig (after reserved keys are validated)
+    if (factoryExtra !== undefined) {
+      for (const [k, v] of Object.entries(factoryExtra)) {
+        base[k] = v;
+      }
+    }
+
+    return base;
+  }
+
+  // Return extension result with implementations — satisfies verifies contract at compile time
+  const fnDict: { message: RillFunction; embed: RillFunction; embed_batch: RillFunction; tool_loop: RillFunction; generate: RillFunction } = ({
+    // gemini::message — single or multi-turn via prompt param (string OR list)
     message: {
       params: [
-        p.str('text'),
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
       ],
       fn: async (args, ctx): Promise<RillValue> => {
-        // Extract arguments
-        const text = args['text'] as string;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
+        const rawPrompt = args['prompt'] as RillValue;
 
-        // EC-1: Validate text is non-empty before stream creation
-        if (text.trim().length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
+        // IR-1: Normalize prompt to canonical Message[]
+        const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+
+        // If normalizePrompt returned an invalid RillValue, surface it
+        if (!Array.isArray(normalized)) {
+          return normalized;
         }
 
-        // Extract options
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
+        const inputMessages = normalized as Message[];
 
-        // Build Gemini API request
-        const contents = [
-          {
-            role: 'user' as const,
-            parts: [{ text }],
-          },
-        ];
+        // Translate canonical messages to Gemini wire format
+        const { contents, systemInstruction: msgSystemInstruction } =
+          canonicalToGeminiContents(inputMessages);
 
-        // Build config object with optional properties
-        const apiConfig: {
-          systemInstruction?: string;
-          maxOutputTokens?: number;
-          temperature?: number;
-        } = {};
+        // Prefer message-level system instruction, then factory-level
+        const resolvedSystem = msgSystemInstruction ?? factorySystem;
 
-        if (system !== undefined) {
-          apiConfig.systemInstruction = system;
-        }
-        if (maxTokens !== undefined) {
-          apiConfig.maxOutputTokens = maxTokens;
-        }
-        if (factoryTemperature !== undefined) {
-          apiConfig.temperature = factoryTemperature;
-        }
+        const apiConfig = buildGenerationConfig({
+          systemInstruction: resolvedSystem,
+          maxOutputTokens: factoryMaxTokens,
+          temperature: factoryTemperature,
+        });
 
         // Accumulate streamed text deltas for resolve
         const collectedChunks: string[] = [];
         let streamError: RuntimeError | RuntimeHaltSignal | undefined;
 
-        // Per-call AbortController to cancel the provider request on dispose
         const streamAbortController = new AbortController();
-
-        // Track stream start time for event emission
         const messageStartTime = Date.now();
 
-        // Async generator yielding string text deltas from Gemini streaming API
         async function* streamChunks(): AsyncGenerator<RillValue> {
           try {
             const stream = await client.models.generateContentStream({
@@ -323,7 +514,6 @@ export function createGeminiExtension(
               }
             }
           } catch (error: unknown) {
-            // EC-2: Provider API error during stream — map and emit error event
             streamError =
               error instanceof RuntimeError || error instanceof RuntimeHaltSignal
                 ? error
@@ -339,30 +529,23 @@ export function createGeminiExtension(
           }
         }
 
-        // Resolve callback returns same dict shape as previous non-streaming return
         const resolve = async (): Promise<RillValue> => {
           if (streamError) {
-            // EC-12: Provider failure during resolution
             throw streamError;
           }
           const duration = Date.now() - messageStartTime;
-          const content = collectedChunks.join('');
+          const textContent = collectedChunks.join('');
+
+          // Build parts-shaped assistant reply
+          const assistantParts: Part[] = [{ type: 'text', text: textContent }];
+          const messages = buildResponseMessages(inputMessages, assistantParts) as unknown as RillValue;
+
           const result = {
-            content,
+            messages,
             model: factoryModel,
-            usage: {
-              input: 0,
-              output: 0,
-            },
+            usage: { input: 0, output: 0 },
             stop_reason: 'stop',
             id: '',
-            messages: buildResponseMessages(
-              [
-                ...(system ? [{ role: 'system', content: system }] : []),
-                { role: 'user', content: text },
-              ],
-              content
-            ),
           };
 
           emitExtensionEvent(ctx as RuntimeContext, {
@@ -372,22 +555,10 @@ export function createGeminiExtension(
             model: factoryModel,
             usage: result.usage,
             request: contents,
-            content,
+            content: textContent,
           });
 
           return result as RillValue;
-        };
-
-        const retTypeStructure = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            id: { type: { kind: 'string' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
         };
 
         return createRillStream({
@@ -395,263 +566,30 @@ export function createGeminiExtension(
           resolve,
           dispose: () => { streamAbortController.abort(); },
           chunkType: { kind: 'string' },
-          retType: retTypeStructure,
+          retType: MESSAGE_RET_STRUCTURE,
         }) as RillValue;
       },
-      annotations: { description: 'Send single message to Gemini API' },
-      returnType: structureToTypeValue({
-        kind: 'stream',
-        chunk: { kind: 'string' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            id: { type: { kind: 'string' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
-      }),
+      annotations: { description: 'Send single or multi-turn message to Gemini API' },
+      returnType: MESSAGE_VERB_RETURN_TYPE,
     },
 
-    // IR-5: gemini::messages
-    messages: {
-      params: [
-        p.list('messages', { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } }),
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
-      ],
-      fn: async (args, ctx): Promise<RillValue> => {
-        // Extract arguments
-        const inputMessages = args['messages'] as Array<Record<string, unknown>>;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
-
-        // AC-23: Empty messages list raises error before stream creation
-        if (inputMessages.length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_messages', 'messages list cannot be empty');
-        }
-
-        // Extract options
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
-
-        // Build Gemini API contents array
-        const contents: Array<{
-          role: 'user' | 'model';
-          parts: Array<{ text: string }>;
-        }> = [];
-
-        // Validate and transform messages before stream creation
-        for (let i = 0; i < inputMessages.length; i++) {
-          const msg = inputMessages[i];
-
-          // EC-10: Missing role raises error
-          if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
-          }
-
-          const role = msg['role'];
-
-          // EC-11: Unknown role value raises error
-          if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
-          }
-
-          // EC-12: User message missing content
-          if (role === 'user' || role === 'tool') {
-            if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
-            }
-            contents.push({
-              role: 'user',
-              parts: [{ text: msg['content'] as string }],
-            });
-          }
-          // EC-13: Assistant missing both content and tool_calls
-          else if (role === 'assistant') {
-            const hasContent = 'content' in msg && msg['content'];
-            const hasToolCalls = 'tool_calls' in msg && msg['tool_calls'];
-
-            if (!hasContent && !hasToolCalls) {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_assistant_message', "assistant message requires 'content' or 'tool_calls'");
-            }
-
-            if (hasContent) {
-              contents.push({
-                role: 'model',
-                parts: [{ text: msg['content'] as string }],
-              });
-            }
-          }
-        }
-
-        // Build config object with optional properties
-        const apiConfig: {
-          systemInstruction?: string;
-          maxOutputTokens?: number;
-          temperature?: number;
-        } = {};
-
-        if (system !== undefined) {
-          apiConfig.systemInstruction = system;
-        }
-        if (maxTokens !== undefined) {
-          apiConfig.maxOutputTokens = maxTokens;
-        }
-        if (factoryTemperature !== undefined) {
-          apiConfig.temperature = factoryTemperature;
-        }
-
-        // Accumulate streamed text deltas for resolve
-        const collectedChunks: string[] = [];
-        let streamError: RuntimeError | RuntimeHaltSignal | undefined;
-
-        // Per-call AbortController to cancel the provider request on dispose
-        const streamAbortController = new AbortController();
-
-        // Track stream start time for event emission
-        const messagesStartTime = Date.now();
-
-        // Async generator yielding string text deltas from Gemini streaming API
-        async function* streamChunks(): AsyncGenerator<RillValue> {
-          try {
-            const stream = await client.models.generateContentStream({
-              model: factoryModel,
-              contents,
-              config: { ...apiConfig, abortSignal: streamAbortController.signal },
-            });
-            for await (const chunk of stream) {
-              const delta = chunk.text ?? '';
-              if (delta) {
-                collectedChunks.push(delta);
-                yield delta as RillValue;
-              }
-            }
-          } catch (error: unknown) {
-            // EC-2: Provider API error during stream — map and emit error event
-            streamError =
-              error instanceof RuntimeError || error instanceof RuntimeHaltSignal
-                ? error
-                : mapToHalt(ctx as RuntimeContext, error);
-            const duration = Date.now() - messagesStartTime;
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'gemini:error',
-              subsystem: 'extension:gemini',
-              error: streamErrorMessage(streamError),
-              duration,
-            });
-            throw streamError;
-          }
-        }
-
-        // Resolve callback returns same dict shape as previous non-streaming return
-        const resolve = async (): Promise<RillValue> => {
-          if (streamError) {
-            // EC-12: Provider failure during resolution
-            throw streamError;
-          }
-          const duration = Date.now() - messagesStartTime;
-          const content = collectedChunks.join('');
-          const result = {
-            content,
-            model: factoryModel,
-            usage: {
-              input: 0,
-              output: 0,
-            },
-            stop_reason: 'stop',
-            id: '',
-            messages: buildResponseMessages(
-              inputMessages.map((m) => ({
-                role: m['role'] as string,
-                content: (m['content'] as string) ?? '',
-              })),
-              content
-            ),
-          };
-
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: 'gemini:messages',
-            subsystem: 'extension:gemini',
-            duration,
-            model: factoryModel,
-            usage: result.usage,
-            request: contents,
-            content,
-          });
-
-          return result as RillValue;
-        };
-
-        const retTypeStructure = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            id: { type: { kind: 'string' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
-        };
-
-        return createRillStream({
-          chunks: streamChunks(),
-          resolve,
-          dispose: () => { streamAbortController.abort(); },
-          chunkType: { kind: 'string' },
-          retType: retTypeStructure,
-        }) as RillValue;
-      },
-      annotations: { description: 'Send multi-turn conversation to Gemini API' },
-      returnType: structureToTypeValue({
-        kind: 'stream',
-        chunk: { kind: 'string' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            id: { type: { kind: 'string' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
-      }),
-    },
-
-    // IR-6: gemini::embed
+    // gemini::embed
     embed: {
       params: [p.str('text')],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
-          // Extract arguments
           const text = args['text'] as string;
 
-          // Validate using shared functions
           validateEmbedText(text);
           validateEmbedModel(factoryEmbedModel);
 
-          // Call Gemini embedContent API
           const response = await client.models.embedContent({
             model: factoryEmbedModel,
             contents: [text],
           });
 
-          // Extract embedding data from response
           const embedding = response.embeddings?.[0];
           if (
             !embedding ||
@@ -661,11 +599,9 @@ export function createGeminiExtension(
             throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'Gemini: empty embedding returned');
           }
 
-          // Convert to Float32Array and create RillVector
           const float32Data = new Float32Array(embedding.values);
           const vector = createVector(float32Data, factoryEmbedModel);
 
-          // Emit success event
           const duration = Date.now() - startTime;
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:embed',
@@ -677,7 +613,6 @@ export function createGeminiExtension(
 
           return vector as RillValue;
         } catch (error: unknown) {
-          // Map error and emit failure event
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal =
             error instanceof RuntimeError || error instanceof RuntimeHaltSignal
@@ -698,32 +633,27 @@ export function createGeminiExtension(
       returnType: structureToTypeValue({ kind: 'vector' }),
     },
 
-    // IR-7: gemini::embed_batch
+    // gemini::embed_batch
     embed_batch: {
       params: [p.list('texts')],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
-          // Extract arguments
           const texts = args['texts'] as Array<RillValue>;
 
-          // AC-24: Empty list returns empty list
           if (texts.length === 0) {
             return [] as RillValue;
           }
 
-          // Validate using shared functions
           validateEmbedModel(factoryEmbedModel);
           const stringTexts = validateEmbedBatch(texts);
 
-          // Call Gemini embedContent API with array of texts
           const response = await client.models.embedContent({
             model: factoryEmbedModel,
             contents: stringTexts,
           });
 
-          // Convert embeddings to RillVector list
           const vectors: RillValue[] = [];
           if (!response.embeddings || response.embeddings.length === 0) {
             throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embeddings_response', 'Gemini: empty embeddings returned');
@@ -742,7 +672,6 @@ export function createGeminiExtension(
             vectors.push(vector as RillValue);
           }
 
-          // Emit success event
           const duration = Date.now() - startTime;
           const firstVector = vectors[0];
           const dimensions =
@@ -758,7 +687,6 @@ export function createGeminiExtension(
 
           return vectors as RillValue;
         } catch (error: unknown) {
-          // Map error and emit failure event
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal =
             error instanceof RuntimeError || error instanceof RuntimeHaltSignal
@@ -779,99 +707,74 @@ export function createGeminiExtension(
       returnType: structureToTypeValue({ kind: 'list', element: { kind: 'vector' } }),
     },
 
-    // IR-8: gemini::tool_loop
+    // gemini::tool_loop — multi-turn tool calling
     tool_loop: {
       params: [
-        p.str('prompt'),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         {
           name: 'tools',
           type: { kind: 'dict', valueType: { kind: 'closure' } },
           defaultValue: undefined,
           annotations: {},
         },
-        p.dict('options', undefined, undefined, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-          max_errors: { type: { kind: 'number' }, defaultValue: 3 },
-          max_turns: { type: { kind: 'number' }, defaultValue: 10 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
-        }),
+        p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
-        // Extract arguments
-        const prompt = args['prompt'] as string;
+        const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
+        const perCallMaxTurns = (args['max_turns'] as number) ?? 0;
 
-        // EC-22: Validate prompt is non-empty before stream creation
-        if (prompt.trim().length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
+        // EC-13: Negative per-call max_turns → INVALID_INPUT
+        if (perCallMaxTurns < 0) {
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'INVALID_INPUT',
+            'invalid_max_turns',
+            'max_turns must be >= 0'
+          );
         }
 
-        // Extract options with defaults
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
-        const maxTurns =
-          typeof options['max_turns'] === 'number'
-            ? options['max_turns']
-            : 10;
-        const maxErrors =
-          typeof options['max_errors'] === 'number'
-            ? options['max_errors']
-            : 3;
-        const initialMessages =
-          Array.isArray(options['messages']) && options['messages'].length > 0
-            ? (options['messages'] as Array<Record<string, unknown>>)
-            : [];
-
-        // Build initial Gemini contents array
-        const contents: Content[] = [];
-
-        // Add history messages if provided
-        for (const msg of initialMessages) {
-          if (
-            typeof msg === 'object' &&
-            msg !== null &&
-            'role' in msg &&
-            'content' in msg
-          ) {
-            const role = msg['role'];
-            if (role === 'user') {
-              contents.push({
-                role: 'user',
-                parts: [{ text: msg['content'] as string }],
-              });
-            } else if (role === 'assistant') {
-              contents.push({
-                role: 'model',
-                parts: [{ text: msg['content'] as string }],
-              });
-            }
-          }
+        // EC-14: Empty tools dict → INVALID_INPUT
+        if (
+          toolsDict !== undefined &&
+          typeof toolsDict === 'object' &&
+          toolsDict !== null &&
+          !Array.isArray(toolsDict) &&
+          Object.keys(toolsDict as Record<string, unknown>).length === 0
+        ) {
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'INVALID_INPUT',
+            'empty_tools_dict',
+            'tool_loop: tools dict cannot be empty'
+          );
         }
 
-        // Add user prompt
-        contents.push({
-          role: 'user',
-          parts: [{ text: prompt }],
+        // IR-1: Normalize prompt to canonical Message[]
+        const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        if (!Array.isArray(normalized)) {
+          // Return the invalid RillValue — caller will see it as an error
+          return normalized;
+        }
+
+        const inputMessages = normalized as Message[];
+
+        // Translate canonical messages to Gemini wire format
+        const { contents, systemInstruction: msgSystemInstruction } =
+          canonicalToGeminiContents(inputMessages);
+
+        // Prefer message-level system instruction, then factory-level
+        const resolvedSystem = msgSystemInstruction ?? factorySystem;
+
+        const apiConfig = buildGenerationConfig({
+          systemInstruction: resolvedSystem,
+          maxOutputTokens: factoryMaxTokens,
+          temperature: factoryTemperature,
         });
 
-        // Build Gemini API config
-        const apiConfig = {
-          ...(system !== undefined && { systemInstruction: system }),
-          ...(maxTokens !== undefined && { maxOutputTokens: maxTokens }),
-          ...(factoryTemperature !== undefined && {
-            temperature: factoryTemperature,
-          }),
-        };
+        const maxErrors = factoryMaxErrors ?? 3;
 
-        // Define Gemini-specific callbacks for shared tool loop
+        // Build Gemini-specific tool declarations from shared schema descriptors
         const buildToolDeclarations = (
           toolDefs: Array<{
             name: string;
@@ -884,7 +787,6 @@ export function createGeminiExtension(
           }>
         ): FunctionDeclaration[] => {
           return toolDefs.map((def) => {
-            // Convert JSON Schema properties to Gemini Schema format
             const properties: Record<string, Schema> = {};
             for (const [propName, propDef] of Object.entries(
               def.input_schema.properties
@@ -892,7 +794,6 @@ export function createGeminiExtension(
               const prop = propDef as Record<string, unknown>;
               const propType = prop['type'] as string;
 
-              // Map JSON Schema types to Gemini Schema types
               let schemaType = Type.STRING;
               if (propType === 'number') schemaType = Type.NUMBER;
               if (propType === 'boolean') schemaType = Type.BOOLEAN;
@@ -918,16 +819,11 @@ export function createGeminiExtension(
           });
         };
 
-        // Run executeToolLoop with yieldChunk. The generator and the tool loop
-        // communicate via a queue + signal: chunks are buffered in the queue
-        // so early yieldChunk calls are not dropped when the generator is not
-        // yet waiting. The generator drains the queue on each wake.
         let resolveNext: (() => void) | undefined;
         const chunkQueue: RillValue[] = [];
         let streamDone = false;
         let streamError: RuntimeError | RuntimeHaltSignal | undefined;
         let loopResultHolder: { response: unknown; totalTokens: { input: number; output: number }; turns: number } | undefined;
-        // AC-16: Accumulate text deltas so resolve() can return partial content on disconnect
         const accumulatedTextDeltas: string[] = [];
 
         const callbacks: ToolLoopCallbacks = {
@@ -951,7 +847,6 @@ export function createGeminiExtension(
             });
           },
 
-          // IR-3: Streaming API path
           callAPIStreaming: async (
             msgs: unknown[],
             tools: unknown,
@@ -1048,7 +943,8 @@ export function createGeminiExtension(
               error?: string;
             }>
           ): unknown => {
-            const functionResponseParts: Part[] = toolResults.map((tr) => ({
+            // Each functionResponse must be its own Part (single-field rule)
+            const functionResponseParts: GeminiPart[] = toolResults.map((tr) => ({
               functionResponse: {
                 name: tr.name,
                 response: {
@@ -1070,7 +966,6 @@ export function createGeminiExtension(
 
         const toolLoopAbortController = new AbortController();
 
-        // Run executeToolLoop as a background Promise; chunks are collected via yieldChunk
         const loopPromise = executeToolLoop(
           contents,
           toolsDict,
@@ -1088,11 +983,8 @@ export function createGeminiExtension(
               ...data,
             });
           },
-          maxTurns,
+          perCallMaxTurns,
           ctx,
-          // yieldChunk — called from executeToolLoop for each text_delta, tool_call,
-          // or tool_result. Buffers the chunk and signals the generator to wake.
-          // AC-16: Also accumulate text_delta text for partial resolve on disconnect.
           (chunk: RillValue) => {
             const chunkRecord = chunk as Record<string, unknown>;
             if (chunkRecord['type'] === 'text_delta' && typeof chunkRecord['text'] === 'string') {
@@ -1105,7 +997,8 @@ export function createGeminiExtension(
               r();
             }
           },
-          toolLoopAbortController.signal
+          toolLoopAbortController.signal,
+          factoryMaxTurns
         ).then((result) => {
           loopResultHolder = result;
           streamDone = true;
@@ -1127,57 +1020,26 @@ export function createGeminiExtension(
           }
         });
 
-        // Async generator that drains chunkQueue, then waits for more chunks.
-        // Chunks buffered before the generator starts are not dropped.
         async function* streamGenerator(): AsyncGenerator<RillValue> {
           while (true) {
-            // Drain all queued chunks first
             while (chunkQueue.length > 0) {
               yield chunkQueue.shift()!;
             }
-            // If loop is done, check for error and exit
             if (streamDone) {
               if (streamError) throw streamError;
               break;
             }
-            // Wait for the next yieldChunk signal or loop completion
             await new Promise<void>((resolve) => {
               resolveNext = resolve;
             });
           }
         }
 
-        const inputMessages = [
-          ...initialMessages.map((m) => ({
-            role: m['role'] as string,
-            content: (m['content'] as string) ?? '',
-          })),
-          { role: 'user', content: prompt },
-        ];
-
-        const retTypeStructure = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            turns: { type: { kind: 'number' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
-        };
-
-        // Resolve callback — called after chunk exhaustion to return the final dict
         const resolve = async (): Promise<RillValue> => {
           const startTime = Date.now();
-          // Ensure the loop promise has settled
           await loopPromise;
 
           if (streamError) {
-            // AC-16: When text was accumulated before the disconnect, return partial dict.
-            // This brings Gemini in line with Anthropic and OpenAI AC-16 behavior.
-            // When no text was accumulated (e.g. pure API failure at start), rethrow so
-            // callers receive the RILL-R005 error (EC-4/EC-12 behavior preserved).
             if (accumulatedTextDeltas.length > 0) {
               const partialContent = accumulatedTextDeltas.join('');
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -1186,16 +1048,15 @@ export function createGeminiExtension(
                 error: streamErrorMessage(streamError),
                 duration: Date.now(),
               });
+              const assistantParts: Part[] = [{ type: 'text', text: partialContent }];
               return {
-                content: partialContent,
+                messages: buildResponseMessages(inputMessages, assistantParts) as unknown as RillValue,
                 model: factoryModel,
                 usage: { input: 0, output: 0 },
                 stop_reason: 'error',
-                turns: 0,
-                messages: buildResponseMessages(inputMessages, partialContent),
+                id: '',
               } as RillValue;
             }
-            // EC-12: No text accumulated — provider failure before any content
             const duration = Date.now();
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'gemini:error',
@@ -1208,32 +1069,34 @@ export function createGeminiExtension(
 
           const result = loopResultHolder!;
           const response = result.response;
-          const content =
+          const textContent =
             response && typeof response === 'object' && 'text' in response
               ? ((response as { text?: string }).text ?? '')
               : '';
 
+          // Build parts-shaped assistant reply
+          const assistantParts: Part[] = [{ type: 'text', text: textContent }];
+          const messages = response
+            ? buildResponseMessages(inputMessages, assistantParts) as unknown as RillValue
+            : inputMessages as unknown as RillValue;
+
           const resolvedResult = {
-            content,
+            messages,
             model: factoryModel,
             usage: result.totalTokens,
             stop_reason: response ? 'stop' : 'max_turns',
-            turns: result.turns,
-            messages: response
-              ? buildResponseMessages(inputMessages, content)
-              : inputMessages,
+            id: '',
           };
 
-          // Emit tool_loop event
           const total_duration = Date.now() - startTime;
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:tool_loop',
             subsystem: 'extension:gemini',
-            turns: resolvedResult.turns,
+            turns: result.turns,
             total_duration,
             usage: resolvedResult.usage,
             request: contents,
-            content,
+            content: textContent,
           });
 
           return resolvedResult as RillValue;
@@ -1244,48 +1107,27 @@ export function createGeminiExtension(
           resolve,
           dispose: () => { toolLoopAbortController.abort(); },
           chunkType: { kind: 'dict' },
-          retType: retTypeStructure,
+          retType: MESSAGE_RET_STRUCTURE,
         }) as RillValue;
       },
       annotations: { description: 'Execute tool-use loop with Gemini API' },
-      returnType: structureToTypeValue({
-        kind: 'stream',
-        chunk: { kind: 'dict' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            turns: { type: { kind: 'number' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
-      }),
+      returnType: TOOL_LOOP_VERB_RETURN_TYPE,
     },
 
-    // IR-3: gemini::generate
+    // gemini::generate — structured output
     generate: {
       params: [
-        p.str('prompt'),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         { name: 'schema', type: { kind: 'type' } as { kind: string }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
-        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
-          // Extract arguments
-          const prompt = args['prompt'] as string;
+          const rawPrompt = args['prompt'] as RillValue;
           const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
-          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-          // EC-3: Validate schema is a type value with dict structure
+          // Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
             throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema', 'generate requires a type expression as schema');
           }
@@ -1293,10 +1135,17 @@ export function createGeminiExtension(
             throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema_type', `generate requires a dict type as schema, got ${schemaArg.structure.kind}`);
           }
 
-          // EC-4: Build JSON Schema from TypeStructure
+          // IR-1: Normalize prompt to canonical Message[]
+          const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+          if (!Array.isArray(normalized)) {
+            return normalized;
+          }
+          const inputMessages = normalized as Message[];
+
+          // Build JSON Schema from TypeStructure
           const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
 
-          // Convert JSON Schema properties to Gemini Schema type (IR-6)
+          // Convert JSON Schema properties to Gemini Schema type
           const geminiProperties: Record<string, Schema> = {};
           for (const [key, prop] of Object.entries(jsonSchema.properties)) {
             geminiProperties[key] = toGeminiSchema(prop);
@@ -1307,86 +1156,35 @@ export function createGeminiExtension(
             required: jsonSchema.required,
           };
 
-          // Extract options
-          const system =
-            typeof options['system'] === 'string'
-              ? options['system']
-              : factorySystem;
-          const maxTokens =
-            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-              ? options['max_tokens']
-              : factoryMaxTokens;
+          // Translate canonical messages to Gemini wire format
+          const { contents, systemInstruction: msgSystemInstruction } =
+            canonicalToGeminiContents(inputMessages);
 
-          // Build Gemini contents array: prepend context messages then prompt
-          const contents: Content[] = [];
+          const resolvedSystem = msgSystemInstruction ?? factorySystem;
 
-          if ('messages' in options && Array.isArray(options['messages'])) {
-            const prependedMessages = options['messages'] as Array<
-              Record<string, unknown>
-            >;
-
-            for (const msg of prependedMessages) {
-              if (
-                typeof msg === 'object' &&
-                msg !== null &&
-                'role' in msg &&
-                'content' in msg
-              ) {
-                const role = msg['role'];
-                if (role === 'user') {
-                  contents.push({
-                    role: 'user',
-                    parts: [{ text: msg['content'] as string }],
-                  });
-                } else if (role === 'assistant') {
-                  contents.push({
-                    role: 'model',
-                    parts: [{ text: msg['content'] as string }],
-                  });
-                }
-              }
-            }
-          }
-
-          // Add the prompt as the final user turn
-          contents.push({
-            role: 'user',
-            parts: [{ text: prompt }],
-          });
-
-          // Build API config with responseSchema and responseMimeType (IR-6)
-          const apiConfig: {
-            systemInstruction?: string;
-            maxOutputTokens?: number;
-            temperature?: number;
-            responseSchema: Schema;
-            responseMimeType: string;
-          } = {
+          const apiConfig = buildGenerationConfig({
+            systemInstruction: resolvedSystem,
+            maxOutputTokens: factoryMaxTokens,
+            temperature: factoryTemperature,
             responseSchema,
             responseMimeType: 'application/json',
-          };
+          });
 
-          if (system !== undefined) {
-            apiConfig.systemInstruction = system;
-          }
-          if (maxTokens !== undefined) {
-            apiConfig.maxOutputTokens = maxTokens;
-          }
-          if (factoryTemperature !== undefined) {
-            apiConfig.temperature = factoryTemperature;
-          }
-
-          // Call Gemini API
+          // EC-18: generate must not use streaming — non-streaming path only
           const response = await client.models.generateContent({
             model: factoryModel,
             contents,
             config: apiConfig,
           });
 
-          // Extract JSON string from response.text (IR-6)
+          // EC-18: Reject streaming response shape
+          if (!('text' in response) && !('candidates' in response)) {
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'unexpected_response_format', 'generate: unexpected response format from Gemini API');
+          }
+
           const raw = response.text ?? '';
 
-          // EC-5: Parse JSON, throw on failure with original error detail
+          // EC-17: Parse JSON; throw on failure with PROTOCOL / schema_validation_failed
           let data: unknown;
           try {
             data = JSON.parse(raw) as unknown;
@@ -1395,22 +1193,24 @@ export function createGeminiExtension(
               parseError instanceof Error
                 ? parseError.message
                 : String(parseError);
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'json_parse_failed', `generate: failed to parse response JSON: ${detail}`);
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'schema_validation_failed', `generate: failed to parse response JSON: ${detail}`);
           }
 
-          // Extract usage metadata (IR-6)
           const inputTokens = response.usageMetadata?.promptTokenCount ?? 0;
           const outputTokens =
             response.usageMetadata?.candidatesTokenCount ?? 0;
 
-          // Extract stop reason and id (IR-6)
           const stopReason = response.candidates?.[0]?.finishReason ?? 'stop';
           const id = response.responseId ?? '';
 
-          // Build 6-key response dict (AC-6, AC-7)
+          // Build parts-shaped messages: input + assistant reply containing raw JSON
+          const assistantParts: Part[] = [{ type: 'text', text: raw }];
+          const messages = buildResponseMessages(inputMessages, assistantParts) as unknown as RillValue;
+
           const generateResult = {
             data,
             raw,
+            messages,
             model: factoryModel,
             usage: {
               input: inputTokens,
@@ -1420,7 +1220,6 @@ export function createGeminiExtension(
             id,
           };
 
-          // Emit success event (AC-34)
           const duration = Date.now() - startTime;
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:generate',
@@ -1451,23 +1250,12 @@ export function createGeminiExtension(
         }
       },
       annotations: { description: 'Generate structured output from Gemini API' },
-      returnType: structureToTypeValue({
-        kind: 'dict',
-        fields: {
-          data: { type: { kind: 'any' } },
-          raw: { type: { kind: 'string' } },
-          model: { type: { kind: 'string' } },
-          usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-          stop_reason: { type: { kind: 'string' } },
-          id: { type: { kind: 'string' } },
-        },
-      }),
+      returnType: GENERATE_VERB_RETURN_TYPE,
     },
   });
 
   const callableDict = {
     message: toCallable(fnDict.message),
-    messages: toCallable(fnDict.messages),
     embed: toCallable(fnDict.embed),
     embed_batch: toCallable(fnDict.embed_batch),
     tool_loop: toCallable(fnDict.tool_loop),

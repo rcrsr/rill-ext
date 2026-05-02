@@ -1,6 +1,7 @@
 /**
- * Function behavior tests for message() and messages()
- * Validates runtime behavior, error handling, and API integration
+ * Function behavior tests for message()
+ * Validates runtime behavior, error handling, and API integration.
+ * The messages() verb was removed in the unified-prompting migration (task 2.1).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -163,6 +164,16 @@ vi.mock('@anthropic-ai/sdk', () => {
 });
 
 // ============================================================
+// HELPER: extract text from last assistant message in the result
+// ============================================================
+
+function extractLastAssistantText(result: Record<string, unknown>): string {
+  const messages = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+  const last = messages[messages.length - 1]!;
+  return last.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+}
+
+// ============================================================
 // MESSAGE() TESTS
 // ============================================================
 
@@ -184,7 +195,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const result = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       expect(isRillStream(result)).toBe(true);
     });
@@ -201,7 +212,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const result = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       const chunks = await collectChunks(result);
 
@@ -210,7 +221,7 @@ describe('message() function', () => {
       expect(chunks.join('')).toBe('Hello from Claude!');
     });
 
-    // IR-1/AC-5: message()() resolution dict has content, model, usage, stop_reason, id, messages
+    // IR-1/AC-5: message()() resolution dict has model, usage, stop_reason, id, messages
     it('resolution dict has correct shape', async () => {
       mockStream.mockReturnValue(createMockStream('Hello from Claude!'));
 
@@ -222,24 +233,26 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
       const result = await resolveStream(stream);
 
-      expect(result['content']).toBe('Hello from Claude!');
+      // content field removed; text lives in messages[last].parts[i].text
+      expect(extractLastAssistantText(result)).toBe('Hello from Claude!');
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
       expect(result['usage']).toEqual({ input: 10, output: 20 });
       expect(result['stop_reason']).toBe('end_turn');
       expect(result['id']).toBe('msg_test123');
-      expect(result['messages']).toEqual([
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hello from Claude!' },
-      ]);
+      // messages is a list of canonical message dicts with role + parts
+      const messages = result['messages'] as Array<{ role: string; parts: unknown[] }>;
+      expect(Array.isArray(messages)).toBe(true);
+      expect(messages[0]!.role).toBe('user');
+      expect(messages[messages.length - 1]!.role).toBe('assistant');
     });
   });
 
   describe('success cases', () => {
-    // AC-2: message("text") resolution returns dict with required fields
-    it('returns dict with content, model, usage, stop_reason, id, messages', async () => {
+    // AC-2: message("prompt") resolution returns dict with required fields
+    it('returns dict with model, usage, stop_reason, id, messages', async () => {
       mockStream.mockReturnValue(createMockStream('Hello from Claude!'));
 
       const config: AnthropicExtensionConfig = {
@@ -250,19 +263,16 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
       const result = await resolveStream(stream);
 
       expect(result).toBeDefined();
-      expect(result['content']).toBe('Hello from Claude!');
+      expect(extractLastAssistantText(result)).toBe('Hello from Claude!');
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
       expect(result['usage']).toEqual({ input: 10, output: 20 });
       expect(result['stop_reason']).toBe('end_turn');
       expect(result['id']).toBe('msg_test123');
-      expect(result['messages']).toEqual([
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hello from Claude!' },
-      ]);
+      expect(Array.isArray(result['messages'])).toBe(true);
     });
 
     it('sends correct parameters to Anthropic stream API', () => {
@@ -278,7 +288,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      getCallable(ext, 'message').fn({ text: 'What is 2+2?' }, ctx);
+      getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
       expect(mockStream).toHaveBeenCalledWith({
         model: 'claude-sonnet-4-5-20250929',
@@ -287,48 +297,6 @@ describe('message() function', () => {
         system: 'You are helpful.',
         messages: [{ role: 'user', content: 'What is 2+2?' }],
       });
-    });
-
-    it('accepts options dict with system override', () => {
-      mockStream.mockReturnValue(createMockStream('Response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        system: 'Default system.',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      getCallable(ext, 'message').fn({ text: 'Test', options: { system: 'Override system.' } }, ctx);
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          system: 'Override system.',
-        })
-      );
-    });
-
-    it('accepts options dict with max_tokens override', () => {
-      mockStream.mockReturnValue(createMockStream('Response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 1000,
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      getCallable(ext, 'message').fn({ text: 'Test', options: { max_tokens: 2000 } }, ctx);
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          max_tokens: 2000,
-        })
-      );
     });
 
     it('uses default max_tokens when not specified', () => {
@@ -342,13 +310,36 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
           max_tokens: 4096,
         })
       );
+    });
+
+    it('accepts list of message dicts as prompt (multi-turn)', async () => {
+      mockStream.mockReturnValue(createMockStream('Response'));
+
+      const config: AnthropicExtensionConfig = {
+        api_key: 'test-key',
+        model: 'claude-sonnet-4-5-20250929',
+      };
+
+      const ext = createAnthropicExtension(config);
+      const ctx = createRuntimeContext();
+
+      const conversationHistory = [
+        { role: 'user', content: 'Hello' },
+        { role: 'assistant', content: 'Hi there!' },
+        { role: 'user', content: 'How are you?' },
+      ];
+
+      // message() now accepts list of {role, content} dicts (content-sugar format)
+      expect(() =>
+        getCallable(ext, 'message').fn({ prompt: conversationHistory }, ctx)
+      ).not.toThrow();
     });
   });
 
@@ -363,7 +354,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '' }, ctx));
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '' }, ctx));
       expect(mockStream).not.toHaveBeenCalled();
     });
 
@@ -376,7 +367,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '' }, ctx), { message: 'prompt text cannot be empty' });
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '' }, ctx), { message: 'prompt string cannot be empty' });
     });
 
     it('throws RuntimeError for whitespace-only prompt', () => {
@@ -388,7 +379,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ text: '   \n\t  ' }, ctx), { message: 'prompt text cannot be empty' });
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '   \n\t  ' }, ctx), { message: 'prompt string cannot be empty' });
     });
 
     // EC-2: Provider API error during stream resolution → RuntimeError RILL-R005
@@ -404,7 +395,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 429): Rate limit exceeded' });
     });
@@ -421,7 +412,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 401): Invalid API key' });
     });
@@ -439,7 +430,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic error: Request timeout' });
     });
@@ -456,7 +447,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 500): Internal server error' });
     });
@@ -473,7 +464,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic error: Unknown error' });
     });
@@ -491,7 +482,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       // Iteration throws after yielding partial chunks
       await expectRejectedHalt(collectChunks(stream), { message: '503' });
@@ -509,11 +500,11 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       // resolve() calls finalMessage() which returns partial response even after disconnect
       const result = await resolveStream(stream);
-      expect(result['content']).toBe('Partial content');
+      expect(extractLastAssistantText(result)).toBe('Partial content');
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
     });
 
@@ -530,458 +521,15 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(resolveStream(stream));
     });
   });
 });
 
-// ============================================================
-// MESSAGES() TESTS
-// ============================================================
-
-describe('messages() function', () => {
-  beforeEach(() => {
-    mockStream.mockReset();
-  });
-
-  // IR-1/AC-2: messages() returns RillStream
-  describe('streaming', () => {
-    it('returns RillStream (isRillStream is true)', () => {
-      mockStream.mockReturnValue(createMockStream('Claude response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const result = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Hello' }] },
-        ctx
-      );
-
-      expect(isRillStream(result)).toBe(true);
-    });
-
-    // IR-1/AC-4: Iterating messages() stream yields string text delta chunks
-    it('yields string text delta chunks when iterated', async () => {
-      mockStream.mockReturnValue(createMockStream('Claude response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const result = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Hello' }] },
-        ctx
-      );
-
-      const chunks = await collectChunks(result);
-
-      expect(chunks.length).toBeGreaterThan(0);
-      expect(chunks.every((c) => typeof c === 'string')).toBe(true);
-      expect(chunks.join('')).toBe('Claude response');
-    });
-
-    // IR-1/AC-6: messages()() resolution dict matches message()() shape
-    it('resolution dict has content, model, usage, stop_reason, id, messages', async () => {
-      mockStream.mockReturnValue(createMockStream('Claude response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Hello' }] },
-        ctx
-      );
-      const result = await resolveStream(stream);
-
-      expect(result['content']).toBe('Claude response');
-      expect(result['model']).toBe('claude-sonnet-4-5-20250929');
-      expect(result['usage']).toEqual({ input: 10, output: 20 });
-      expect(result['stop_reason']).toBe('end_turn');
-      expect(result['id']).toBe('msg_test123');
-      expect(Array.isArray(result['messages'])).toBe(true);
-    });
-  });
-
-  describe('success cases', () => {
-    // AC-3: messages([...]) resolution returns dict with required fields
-    it('returns dict with content, model, usage, stop_reason, id, messages', async () => {
-      mockStream.mockReturnValue(createMockStream('Claude response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const conversationHistory = [
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' },
-        { role: 'user', content: 'How are you?' },
-      ];
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: conversationHistory },
-        ctx
-      );
-      const result = await resolveStream(stream);
-
-      expect(result).toBeDefined();
-      expect(result['content']).toBe('Claude response');
-      expect(result['model']).toBe('claude-sonnet-4-5-20250929');
-      expect(result['usage']).toEqual({ input: 10, output: 20 });
-      expect(result['stop_reason']).toBe('end_turn');
-      expect(result['id']).toBe('msg_test123');
-
-      // Verify full conversation history including new response
-      expect(result['messages']).toEqual([
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' },
-        { role: 'user', content: 'How are you?' },
-        { role: 'assistant', content: 'Claude response' },
-      ]);
-    });
-
-    it('sends correct parameters to Anthropic stream API', () => {
-      mockStream.mockReturnValue(createMockStream('Response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        temperature: 0.5,
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const conversationHistory = [
-        { role: 'user', content: 'First message' },
-        { role: 'assistant', content: 'First response' },
-        { role: 'user', content: 'Second message' },
-      ];
-
-      getCallable(ext, 'messages').fn({ messages: conversationHistory }, ctx);
-
-      expect(mockStream).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 4096,
-        temperature: 0.5,
-        messages: [
-          { role: 'user', content: 'First message' },
-          { role: 'assistant', content: 'First response' },
-          { role: 'user', content: 'Second message' },
-        ],
-      });
-    });
-
-    it('accepts single user message', async () => {
-      mockStream.mockReturnValue(createMockStream('Claude response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const conversationHistory = [{ role: 'user', content: 'Hello' }];
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: conversationHistory },
-        ctx
-      );
-      const result = await resolveStream(stream);
-
-      expect(result['content']).toBe('Claude response');
-    });
-
-    it('accepts options dict with system override', () => {
-      mockStream.mockReturnValue(createMockStream('Response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        system: 'Default system.',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Test' }], options: { system: 'Override system.' } },
-        ctx
-      );
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          system: 'Override system.',
-        })
-      );
-    });
-  });
-
-  describe('error cases', () => {
-    // AC-23: Empty messages list raises error before stream creation
-    it('throws RuntimeError for empty messages list', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: [] }, ctx), { message: 'messages list cannot be empty' });
-      expect(mockStream).not.toHaveBeenCalled();
-    });
-
-    // EC-10: Missing role field
-    it('throws RuntimeError when message is missing role', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ content: 'Hello' }];
-
-      expectThrowHalt(
-        () => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx),
-        { message: "message missing required 'role' field" },
-      );
-    });
-
-    // EC-11: Unknown role value
-    it('throws RuntimeError for unknown role value', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ role: 'system', content: 'Hello' }];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "invalid role 'system'" });
-    });
-
-    // EC-12: User message missing content
-    it('throws RuntimeError when user message missing content', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ role: 'user' }];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "user message requires 'content'" });
-    });
-
-    it('throws RuntimeError when user content is not string', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ role: 'user', content: 123 }];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "user message requires 'content'" });
-    });
-
-    // EC-13: Assistant missing both content and tool_calls
-    it('throws RuntimeError when assistant missing content and tool_calls', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant' },
-      ];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "assistant message requires 'content' or 'tool_calls'" });
-    });
-
-    it('accepts assistant message with content', async () => {
-      mockStream.mockReturnValue(createMockStream('Response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const validMessages = [
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' },
-        { role: 'user', content: 'How are you?' },
-      ];
-
-      expect(() =>
-        getCallable(ext, 'messages').fn({ messages: validMessages }, ctx)
-      ).not.toThrow();
-    });
-
-    // EC-14: API errors during resolution
-    it('maps 429 rate limit error from resolve() correctly', async () => {
-      const mockError = await createMockAPIError(429, 'Rate limit exceeded');
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Test' }] },
-        ctx
-      );
-
-      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 429): Rate limit exceeded' });
-    });
-
-    it('maps 401 auth error from resolve() correctly', async () => {
-      const mockError = await createMockAPIError(401, 'Invalid API key');
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Test' }] },
-        ctx
-      );
-
-      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 401): Invalid API key' });
-    });
-
-    it('maps timeout error from resolve() correctly', async () => {
-      const mockError = new Error('Request timeout');
-      mockError.name = 'AbortError';
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Test' }] },
-        ctx
-      );
-
-      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic error: Request timeout' });
-    });
-
-    // EC-3/AC-16: Provider disconnect mid-stream for messages()
-    it('throws RuntimeError during iteration on mid-stream disconnect [EC-3]', async () => {
-      const mockError = await createMockAPIError(503, 'Service unavailable');
-      mockStream.mockReturnValue(createPartialDisconnectStream('Partial response text', mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Test' }] },
-        ctx
-      );
-
-      await expectRejectedHalt(collectChunks(stream), { message: expect.stringContaining('503') });
-    });
-
-    it('resolves with partial data after mid-stream disconnect [AC-16]', async () => {
-      const mockError = await createMockAPIError(503, 'Service unavailable');
-      mockStream.mockReturnValue(createPartialDisconnectStream('Partial messages content', mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Test' }] },
-        ctx
-      );
-
-      const result = await resolveStream(stream);
-      expect(result['content']).toBe('Partial messages content');
-      expect(result['model']).toBe('claude-sonnet-4-5-20250929');
-    });
-
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
-    it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
-      const mockError = await createMockAPIError(500, 'Internal server error');
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'messages').fn(
-        { messages: [{ role: 'user', content: 'Test' }] },
-        ctx
-      );
-
-      await expectRejectedHalt(resolveStream(stream));
-    });
-  });
-});
+// messages() verb was removed in the unified-prompting migration (task 2.1).
+// Multi-turn conversations now pass a list to message() via the prompt param.
 
 // ============================================================
 // EMBED() TESTS
@@ -1080,9 +628,9 @@ describe('boundary conditions', () => {
     mockStream.mockReset();
   });
 
-  // AC-13: ()  on message() returns dict identical to pre-streaming return
+  // AC-13: resolveStream(message()) returns dict with expected fields
   describe('AC-13: resolveStream(message()) returns expected dict shape', () => {
-    it('resolution dict matches pre-streaming shape field-by-field', async () => {
+    it('resolution dict has model, usage, stop_reason, id, messages fields', async () => {
       mockStream.mockReturnValue(createMockStream('Hello from Claude!'));
 
       const config: AnthropicExtensionConfig = {
@@ -1093,20 +641,20 @@ describe('boundary conditions', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
       const result = await resolveStream(stream);
 
-      // All 6 fields from the LLM Message resolution dict spec (IR-6)
-      expect(result['content']).toBe('Hello from Claude!');
+      // content field removed; text in messages[last].parts[i].text
+      expect(extractLastAssistantText(result)).toBe('Hello from Claude!');
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
       expect(result['usage']).toEqual({ input: 10, output: 20 });
       expect(result['stop_reason']).toBe('end_turn');
       expect(result['id']).toBe('msg_test123');
       expect(Array.isArray(result['messages'])).toBe(true);
 
-      // Exact shape match: only these 6 keys
+      // Exact shape: only these 5 keys (content removed)
       const keys = Object.keys(result);
-      expect(keys).toContain('content');
+      expect(keys).not.toContain('content');
       expect(keys).toContain('model');
       expect(keys).toContain('usage');
       expect(keys).toContain('stop_reason');
@@ -1129,7 +677,7 @@ describe('boundary conditions', () => {
       const ctx = createRuntimeContext();
 
       const before = Date.now();
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // Advance to first chunk via next()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1157,7 +705,7 @@ describe('boundary conditions', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // Navigate to the done step manually (without using collectChunks which discards the done step)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1191,7 +739,7 @@ describe('boundary conditions', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // First call to next() succeeds and marks the root step as consumed
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1221,7 +769,7 @@ describe('boundary conditions', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // Resolve the stream directly (without iterating chunks)
       await resolveStream(stream);
@@ -1262,13 +810,13 @@ describe('boundary conditions', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // The stream should immediately be done (0 chunks)
       const result = await resolveStream(stream);
 
       // Dict shape must be valid even with empty content
-      expect(typeof result['content']).toBe('string');
+      // content field removed; text in messages[last].parts
       expect(typeof result['model']).toBe('string');
       expect(result['usage']).toBeDefined();
       expect(typeof result['stop_reason']).toBe('string');
@@ -1287,7 +835,7 @@ describe('boundary conditions', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
       const chunks = await collectChunks(stream);
 
       // No text chunks emitted for empty content
@@ -1309,7 +857,7 @@ describe('boundary conditions', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // The stream was created and has a dispose callback attached
       // Manually invoke the hidden dispose callback
@@ -1335,7 +883,7 @@ describe('boundary conditions', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello' }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const disposeFn = (stream as any).__rill_stream_dispose;
@@ -1475,7 +1023,7 @@ describe('embed_batch() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(getCallable(ext, 'embed_batch').returnType).toEqual({ __rill_type: true, typeName: 'list', structure: { kind: 'list' } });
+      expect(getCallable(ext, 'embed_batch').returnType).toEqual({ __rill_type: true, typeName: 'list', structure: { kind: 'list', element: { kind: 'vector' } } });
     });
   });
 });

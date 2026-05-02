@@ -2,11 +2,31 @@
 
 *OpenAI API integration for rill scripts*
 
-This extension allows rill scripts to access OpenAI's GPT and embedding APIs. The host declares it in `rill-config.json`, and scripts load it with `use<ext:openai>`. Switching to Anthropic or Google means changing the extension mount. Scripts stay identical.
+This extension allows rill scripts to access OpenAI's GPT, o-series, and embedding APIs. The host declares it in `rill-config.json`, and scripts load it with `use<ext:openai>`. Switching to Anthropic or Google means changing the extension mount. Scripts stay identical.
 
-Six functions cover the core LLM operations. `message` sends a single prompt. `messages` continues a multi-turn conversation. `embed` and `embed_batch` generate vector embeddings — OpenAI offers `text-embedding-3-small` and `text-embedding-3-large` for this. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured output matching a schema dict. `message`, `messages`, and `tool_loop` return a `RillStream` value. Iterate chunks with `-> each` or resolve immediately with `()` to get the result dict. `generate` returns a dict directly (no streaming). `embed` and `embed_batch` return dicts directly.
+Five functions cover the core LLM operations. `message` sends a single prompt or multi-turn conversation. `embed` and `embed_batch` generate vector embeddings — OpenAI offers `text-embedding-3-small` and `text-embedding-3-large` for this. `tool_loop` runs an agentic loop where the model calls rill closures as tools. `generate` extracts structured output matching a schema dict. `message` and `tool_loop` return a `RillStream` value. Iterate chunks with `-> each` or resolve immediately with `()` to get the result dict. `generate` returns a dict directly (no streaming). `embed` and `embed_batch` return dicts directly.
 
 The host sets API key, model, and temperature at creation time — scripts never handle credentials. Each call emits a structured event (`openai:message`, `openai:tool_call`) for host-side logging and metrics.
+
+## Migration: `messages` verb removed
+
+The `messages` verb no longer exists. Pass a list to `message` instead:
+
+```rill
+# Before (no longer valid)
+[
+  [role: "user", content: "What is rill?"],
+  [role: "assistant", content: "A scripting language."],
+  [role: "user", content: "Tell me more."],
+] -> openai::messages
+
+# After
+openai::message([
+  [role: "user", content: "What is rill?"],
+  [role: "assistant", content: "A scripting language."],
+  [role: "user", content: "Tell me more."],
+])
+```
 
 ## Quick Start
 
@@ -38,14 +58,19 @@ Resolve immediately to access the result dict:
 
 ```rill
 openai::message("Explain TCP handshakes")() => $result
-$result.content -> log
+$result.messages[last].parts[0].text -> log
 ```
 
-Secondary pattern (still works, not primary):
+## Model-Class Routing
 
-```rill
-openai::message("Explain TCP handshakes")
-```
+The extension detects the model class once at factory init and fixes the API path for the instance lifetime.
+
+| Model pattern | API path |
+|---------------|----------|
+| `o1`, `o3`, `o4-mini`, `o1-mini`, `o1-preview`, etc. (matches `^o\d`) | Responses API (`client.responses`) |
+| All other models (`gpt-*`, `text-*`, etc.) | Chat Completions API (`client.chat.completions`) |
+
+Routing does not change per call. To switch from a standard model to an o-series model, create a new extension instance with the new model.
 
 ## Configuration
 
@@ -62,7 +87,12 @@ openai::message("Explain TCP handshakes")
         "embed_model": "text-embedding-3-small",
         "base_url": "https://custom-endpoint.example.com",
         "max_retries": 3,
-        "timeout": 30000
+        "timeout": 30000,
+        "max_turns": 10,
+        "max_errors": 3,
+        "extra": {
+          "user": "user-123"
+        }
       }
     }
   }
@@ -72,7 +102,7 @@ openai::message("Explain TCP handshakes")
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `api_key` | string | — | API key (required) |
-| `model` | string | — | Model identifier (required) |
+| `model` | string | — | Model identifier (required); determines API path at factory init |
 | `temperature` | number | — | Response randomness, 0.0–2.0 |
 | `max_tokens` | number | 4096 | Maximum response tokens |
 | `system` | string | — | Default system prompt |
@@ -80,62 +110,91 @@ openai::message("Explain TCP handshakes")
 | `base_url` | string | — | Custom API endpoint |
 | `max_retries` | number | — | Retry attempts for failures |
 | `timeout` | number | — | Request timeout in ms |
+| `max_turns` | number | — | Maximum tool-loop turns per instance; must be a positive integer; `0` is rejected at factory init |
+| `max_errors` | number | 3 | Maximum consecutive tool errors before loop aborts; must be a positive integer |
+| `extra` | dict | — | Additional OpenAI API fields forwarded verbatim; must not contain reserved keys (see below) |
+
+### Factory Validation Rules
+
+| Field | Validation |
+|-------|-----------|
+| `max_turns` | Must be `undefined` or a positive integer. `0` is rejected with "sentinel value not allowed for factory max_turns". Negative values are rejected. |
+| `max_errors` | Must be `undefined` or a positive integer. |
+| `extra` | Keys must not appear in the reserved set. Violation throws `RuntimeError RILL-R001` at factory init. |
+
+### Reserved Keys (`extra` must not contain)
+
+The `extra` dict may not contain any key in the OpenAI reserved superset — the union of `RESERVED_KEYS_COMMON` and OpenAI-specific fields:
+
+`messages`, `model`, `system`, `temperature`, `max_tokens`, `stream`, `response_format`, `tools`, `tool_choice`, `function_call`, `functions`, `input`, `instructions`, `previous_response_id`, `reasoning`
+
+The superset covers both the Chat Completions and Responses API so that `extra` config remains portable when the model is switched between standard and o-series.
+
+### `extra` Forwarding Mechanism
+
+`extra` fields are spread directly into the first-arg params dict passed to the OpenAI SDK (openai v6 mechanism). In v6 the `extra_body` field on `RequestOptions` was removed. Extra fields instead merge into the request body via object spread:
+
+```typescript
+client.chat.completions.stream({
+  model: ...,
+  messages: ...,
+  ...(factoryExtra ?? {}),   // extra spread here
+})
+```
+
+This means every key in `extra` appears as a top-level field in the JSON body sent to the API.
 
 ## Functions
 
-**message(text, options?)** — Send a single prompt. Returns `RillStream`:
+**message(prompt)** — Send a single prompt or multi-turn conversation. Returns `RillStream`:
+
+The `prompt` parameter accepts either a string or a list of message dicts.
 
 ```rill
-# Stream text delta chunks
+# String prompt — single user turn
 openai::message("Explain TCP handshakes") => $s
 $s -> each { log }
 
-# Or resolve to result dict
+# List prompt — multi-turn conversation
+openai::message([
+  [role: "user", content: "What is rill?"],
+  [role: "assistant", content: "A scripting language."],
+  [role: "user", content: "Tell me more."],
+]) => $s
+$s -> each { log }
+
+# Resolve immediately to access the result dict
 openai::message("Explain TCP handshakes")() => $result
-$result.content      # Response text
 $result.stop_reason  # Why generation stopped
 $result.usage.input  # Input tokens
 $result.usage.output # Output tokens
 ```
 
-**messages(messages, options?)** — Multi-turn conversation. Returns `RillStream`:
+Message dicts accept two shapes. The content-sugar form `[role: "user", content: "text"]` expands to parts form automatically.
 
 ```rill
-# Stream text delta chunks
-[
-  [role: "user", content: "What is rill?"],
-  [role: "assistant", content: "A scripting language."],
-  [role: "user", content: "Tell me more."],
-] -> openai::messages => $s
-$s -> each { log }
+# Parts form (canonical)
+[role: "user", parts: [[type: "text", text: "Hello"]]]
 
-# Or resolve to result dict
-[
-  [role: "user", content: "What is rill?"],
-  [role: "assistant", content: "A scripting language."],
-  [role: "user", content: "Tell me more."],
-] -> openai::messages => $s
-$s() => $result
-$result.content   # Latest response
-$result.messages  # Full conversation history
+# Content-sugar form (accepted; expanded internally)
+[role: "user", content: "Hello"]
 ```
 
 **embed(text)** — Generate text embedding:
 
 ```rill
 openai::embed("sample text") => $vec
-$vec -> .dimensions  # Vector size
-$vec.model           # Embedding model used
 ```
 
 **embed_batch(texts)** — Batch embeddings:
 
 ```rill
 ["first text", "second text"] -> openai::embed_batch => $vectors
-$vectors.len  # Number of vectors
 ```
 
-**tool_loop(prompt, tools, options?)** — Agentic tool-use loop. Returns `RillStream`:
+**tool_loop(prompt, tools, max_turns)** — Agentic tool-use loop. Returns `RillStream`:
+
+The `max_turns` parameter is positional (not an options dict). Default value `0` means use the factory `max_turns`. Pass a positive integer to override for a specific call.
 
 ```rill
 ^("Get current weather for a city") |^("City name") city: string| {
@@ -145,7 +204,7 @@ $vectors.len  # Number of vectors
 # Stream structured events
 openai::tool_loop("What's the weather in Paris?", [
   get_weather: $get_weather,
-], [max_turns: 5]) => $s
+], 5) => $s
 $s -> each {
   $.type    # "text_delta", "tool_call", or "tool_result"
   $.text    # available when type == "text_delta"
@@ -154,15 +213,14 @@ $s -> each {
   $.result  # available when type == "tool_result"
 }
 
-# Or resolve to result dict
+# Resolve to result dict (default max_turns from factory)
 openai::tool_loop("What's the weather in Paris?", [
   get_weather: $get_weather,
-], [max_turns: 5])() => $result
-$result.content  # Final response
+], 0)() => $result
 $result.turns    # Number of LLM round-trips
 ```
 
-**generate(prompt, schema, options)** — Structured output extraction:
+**generate(prompt, schema)** — Structured output extraction:
 
 ```rill
 openai::generate(
@@ -187,19 +245,9 @@ Fields using `closure` or `tuple` type are not representable in JSON Schema and 
 # Error: unsupported type for JSON Schema: closure
 ```
 
-### Per-Call Options
-
-| Option | Type | Applies To | Description |
-|--------|------|-----------|-------------|
-| `system` | string | message, messages, tool_loop, generate | Override system prompt |
-| `max_tokens` | number | message, messages, tool_loop, generate | Override max tokens |
-| `max_turns` | number | tool_loop | Limit LLM round-trips |
-| `max_errors` | number | tool_loop | Consecutive error limit (default: 3) |
-| `messages` | list | tool_loop, generate | Prepend conversation history |
-
 ## Streaming
 
-`message`, `messages`, and `tool_loop` return `RillStream`. Two usage patterns:
+`message` and `tool_loop` return `RillStream`. Two usage patterns:
 
 **Iterate chunks** — process output incrementally:
 
@@ -212,10 +260,10 @@ $s -> each { log }
 
 ```rill
 openai::message("hi")() => $result
-$result.content -> log
+$result.messages[last].parts[0].text -> log
 ```
 
-### message / messages chunks
+### message chunks
 
 Each chunk is a string (text delta).
 
@@ -231,19 +279,42 @@ Each event is a dict with a `type` field:
 
 ## Result Dict
 
-`message`, `messages`, and `tool_loop` resolve to:
+`message` and `tool_loop` resolve to a dict with parts-shaped message history:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `content` | string | Response text |
-| `model` | string | Model identifier |
-| `usage.input` | number | Input token count |
-| `usage.output` | number | Output token count |
+| `model` | string | Model identifier used for the request |
+| `usage` | dict | Token counts: `input` (number), `output` (number) |
 | `stop_reason` | string | Why generation stopped |
-| `id` | string | Request identifier |
-| `messages` | list | Conversation history |
+| `id` | string | Provider request identifier |
+| `messages` | list | Conversation history — list of message dicts |
 
-The `tool_loop` result adds `turns` (number of LLM round-trips).
+Each message dict in `messages`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `role` | string | `"user"` or `"assistant"` |
+| `parts` | list | List of part dicts |
+
+Each part dict carries a `type` discriminator. Part variants:
+
+| `type` | Additional fields | Description |
+|--------|------------------|-------------|
+| `text` | `text: string` | Text content |
+| `thinking` | `text: string` | Reasoning text (o-series Responses API) |
+| `tool_use` | `id: string`, `name: string`, `input: dict` | Tool invocation by assistant |
+| `tool_result` | `id: string`, `parts: list` | Tool result in user turn |
+| `image` | `source: dict` | Image content |
+
+Image `source` dict fields: `kind` (`"base64"` or `"url"`), `data` (string), `media_type` (string).
+
+**Security note:** When `source.kind` is `"url"`, the extension passes the URL directly to the OpenAI API. The extension does not validate or proxy the URL. Callers are responsible for ensuring the URL does not point to internal network resources (SSRF mitigation).
+
+The `tool_loop` result adds:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `turns` | number | Number of LLM round-trips executed |
 
 ### Generate Result Dict
 
@@ -253,9 +324,9 @@ The `tool_loop` result adds `turns` (number of LLM round-trips).
 |-------|------|-------------|
 | `data` | dict | Parsed JSON matching schema keys |
 | `raw` | string | Original JSON string from model response |
+| `messages` | list | Conversation history (same shape as above) |
 | `model` | string | Provider model identifier |
-| `usage.input` | number | Input token count |
-| `usage.output` | number | Output token count |
+| `usage` | dict | Token counts: `input` (number), `output` (number) |
 | `stop_reason` | string | Provider stop reason string |
 | `id` | string | Provider response ID |
 
@@ -272,7 +343,9 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 - `api_key is required`
 - `model is required`
 - `temperature must be between 0.0 and 2.0`
-- `embed_model is required when calling embed()`
+- `max_turns: 0 is the sentinel value — use undefined for no cap`
+- `max_turns must be a positive integer`
+- `extra contains reserved key: <key>`
 
 **Host-fn errors:**
 
@@ -281,11 +354,13 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 | Empty prompt or messages list | `#INVALID_INPUT` | `empty_prompt` / `empty_messages` |
 | Message missing required `role` field | `#INVALID_INPUT` | `invalid_message_format` |
 | Invalid `role` value | `#INVALID_INPUT` | `invalid_role` |
-| Missing message `content` | `#INVALID_INPUT` | `missing_message_content` |
+| Missing message `content` or `parts` | `#INVALID_INPUT` | `missing_message_content` |
 | `generate()` schema missing or non-dict | `#INVALID_INPUT` | `invalid_schema` / `invalid_schema_type` |
 | `tool_loop()` `tools` missing or wrong shape | `#INVALID_INPUT` | `tools_required` / `tools_not_dict` |
 | `tool_loop()` builtin used as tool | `#INVALID_INPUT` | `builtin_tool_unsupported` |
 | `tool_loop()` value not callable | `#INVALID_INPUT` | `tool_not_callable` |
+| `tool_loop()` `max_turns` arg < 0 | `#INVALID_INPUT` | `invalid_max_turns` |
+| `tool_loop()` empty tools dict | `#INVALID_INPUT` | `empty_tools_dict` |
 | `tool_loop()` tool not in dict | `#NOT_FOUND` | `unknown_tool` |
 | `tool_loop()` aborted after N consecutive tool errors | `#UNAVAILABLE` | `consecutive_tool_errors` |
 | `tool_loop()` cancelled via `ctx.signal` | `#TIMEOUT` | `tool_loop_cancelled` |
@@ -307,7 +382,6 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 | Event | Emitted When |
 |-------|-------------|
 | `openai:message` | message() completes |
-| `openai:messages` | messages() completes |
 | `openai:embed` | embed() completes |
 | `openai:embed_batch` | embed_batch() completes |
 | `openai:tool_loop` | tool_loop() completes |
@@ -318,15 +392,13 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 
 ### Completion Event Fields
 
-Completion events (`openai:message`, `openai:messages`, `openai:tool_loop`, `openai:generate`) include these fields:
+Completion events (`openai:message`, `openai:tool_loop`, `openai:generate`) include these fields:
 
 | Field | Description |
 |-------|-------------|
 | `duration` | Request duration in milliseconds (`total_duration` for `tool_loop`) |
 | `model` | Model identifier used for the request |
 | `usage` | Token usage object (`input` and `output` counts) |
-| `request` | Messages array sent to the provider API |
-| `content` | Response text from the provider |
 
 ## OpenAI-Compatible Providers
 

@@ -31,8 +31,15 @@ import {
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
   buildResponseMessages,
+  normalizePrompt,
+  RESERVED_KEYS_COMMON,
+  validateExtraKeys,
+  validateMaxTurns,
+  MESSAGES_LIST_STRUCTURE,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
+  type Message,
+  type Part,
 } from '@rcrsr/rill-ext-llm-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { AnthropicExtensionConfig } from './types.js';
@@ -42,6 +49,279 @@ import type { AnthropicExtensionConfig } from './types.js';
 // ============================================================
 
 const DEFAULT_MAX_TOKENS = 4096;
+
+// ============================================================
+// MODULE-LEVEL RETURN TYPE STRUCTURES
+// ============================================================
+
+/**
+ * TypeStructure for the `message` host function resolved dict.
+ * Hoisted to module-level to avoid drift between createRillStream.retType
+ * and the RillFunction.returnType slot (§EXT.6 anti-pattern).
+ */
+const MESSAGE_RET_TYPE_STRUCTURE: TypeStructure = {
+  kind: 'dict',
+  fields: {
+    model: { type: { kind: 'string' } },
+    usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+    stop_reason: { type: { kind: 'string' } },
+    id: { type: { kind: 'string' } },
+    messages: { type: MESSAGES_LIST_STRUCTURE },
+  },
+};
+
+/**
+ * TypeStructure for the `tool_loop` host function resolved dict.
+ * Includes the `turns` counter not present in the plain `message` result.
+ */
+const TOOL_LOOP_RET_TYPE_STRUCTURE: TypeStructure = {
+  kind: 'dict',
+  fields: {
+    model: { type: { kind: 'string' } },
+    usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+    stop_reason: { type: { kind: 'string' } },
+    id: { type: { kind: 'string' } },
+    turns: { type: { kind: 'number' } },
+    messages: { type: MESSAGES_LIST_STRUCTURE },
+  },
+};
+
+/**
+ * TypeStructure for the `generate` host function return dict.
+ * The `data` field carries the structured output (shape set by caller schema).
+ */
+const GENERATE_RETURN_TYPE_STRUCTURE: TypeStructure = {
+  kind: 'dict',
+  fields: {
+    data: { type: { kind: 'any' } },
+    raw: { type: { kind: 'string' } },
+    messages: { type: MESSAGES_LIST_STRUCTURE },
+    model: { type: { kind: 'string' } },
+    usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+    stop_reason: { type: { kind: 'string' } },
+    id: { type: { kind: 'string' } },
+  },
+};
+
+// ============================================================
+// WIRE TRANSLATION — canonical → Anthropic SDK types
+// ============================================================
+
+/**
+ * Translate a canonical ImageSource to Anthropic image source param.
+ */
+function toAnthropicImageSource(
+  source: Record<string, RillValue>
+): Anthropic.Base64ImageSource | Anthropic.URLImageSource {
+  const kind = source['kind'] as string;
+  const data = source['data'] as string;
+  const mediaType = (source['media_type'] as string | undefined) ?? 'image/jpeg';
+
+  if (kind === 'url') {
+    return { type: 'url', url: data };
+  }
+  // Default: base64
+  return {
+    type: 'base64',
+    media_type: mediaType as Anthropic.Base64ImageSource['media_type'],
+    data,
+  };
+}
+
+/**
+ * Convert a canonical Part to Anthropic content block params for a user message.
+ * Only text, image, and tool_result parts are valid in user messages.
+ */
+function partToAnthropicUserContent(
+  part: Record<string, RillValue>
+): Anthropic.ContentBlockParam | null {
+  const type = part['type'] as string;
+
+  if (type === 'text') {
+    return { type: 'text', text: part['text'] as string };
+  }
+
+  if (type === 'image') {
+    const source = part['source'] as Record<string, RillValue>;
+    return {
+      type: 'image',
+      source: toAnthropicImageSource(source),
+    };
+  }
+
+  // tool_result parts are handled separately via buildToolResultMessage
+  return null;
+}
+
+/**
+ * Convert a canonical Part to Anthropic content block param for an assistant message.
+ * Only text and tool_use parts are valid in assistant messages.
+ */
+function partToAnthropicAssistantContent(
+  part: Record<string, RillValue>
+): Anthropic.ContentBlockParam | null {
+  const type = part['type'] as string;
+
+  if (type === 'text') {
+    return { type: 'text', text: part['text'] as string };
+  }
+
+  if (type === 'tool_use') {
+    return {
+      type: 'tool_use',
+      id: part['id'] as string,
+      name: part['name'] as string,
+      input: (part['input'] ?? {}) as Record<string, unknown>,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Convert canonical tool_result parts from a user message into Anthropic
+ * ToolResultBlockParams for a user turn.
+ */
+function extractToolResultBlocks(
+  parts: Array<Record<string, RillValue>>
+): Anthropic.ToolResultBlockParam[] {
+  const blocks: Anthropic.ToolResultBlockParam[] = [];
+  for (const part of parts) {
+    if (part['type'] === 'tool_result') {
+      const resultParts = (part['parts'] ?? []) as Array<Record<string, RillValue>>;
+      const content: string = resultParts
+        .filter((p) => p['type'] === 'text')
+        .map((p) => p['text'] as string)
+        .join('');
+
+      blocks.push({
+        type: 'tool_result',
+        tool_use_id: part['id'] as string,
+        content,
+      });
+    }
+  }
+  return blocks;
+}
+
+/**
+ * Translate a canonical Message[] into Anthropic MessageParam[].
+ *
+ * System role messages are lifted into the returned `systemText` string.
+ * A list with a system turn overrides the factory system parameter (AC-3).
+ *
+ * Tool_result parts in user messages are placed as ToolResultBlockParam arrays
+ * per the Anthropic wire format.
+ */
+function canonicalToAnthropicMessages(messages: Message[]): {
+  apiMessages: Anthropic.MessageParam[];
+  systemText: string | undefined;
+} {
+  let systemText: string | undefined;
+  const apiMessages: Anthropic.MessageParam[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      // Lift system turn into top-level system parameter
+      const textParts = msg.parts.filter((p) => p.type === 'text');
+      systemText = textParts.map((p) => (p as { type: 'text'; text: string }).text).join('\n');
+      continue;
+    }
+
+    if (msg.role === 'user') {
+      const partsAsRecords = msg.parts as unknown as Array<Record<string, RillValue>>;
+      const hasToolResults = partsAsRecords.some((p) => p['type'] === 'tool_result');
+
+      if (hasToolResults) {
+        // Place tool_result blocks inside user role (Anthropic wire format)
+        const toolResultBlocks = extractToolResultBlocks(partsAsRecords);
+        const textBlocks: Anthropic.ContentBlockParam[] = partsAsRecords
+          .filter((p) => p['type'] === 'text')
+          .map((p) => ({ type: 'text' as const, text: p['text'] as string }));
+
+        const content: Anthropic.ContentBlockParam[] = [
+          ...textBlocks,
+          ...toolResultBlocks,
+        ];
+
+        apiMessages.push({ role: 'user', content });
+      } else {
+        // Normal user message
+        const content: Anthropic.ContentBlockParam[] = partsAsRecords
+          .map((p) => partToAnthropicUserContent(p))
+          .filter((b): b is Anthropic.ContentBlockParam => b !== null);
+
+        if (content.length === 1 && content[0]?.type === 'text') {
+          // Optimize: use string shorthand for simple text
+          apiMessages.push({ role: 'user', content: (content[0] as Anthropic.TextBlockParam).text });
+        } else {
+          apiMessages.push({ role: 'user', content });
+        }
+      }
+      continue;
+    }
+
+    if (msg.role === 'assistant') {
+      const partsAsRecords = msg.parts as unknown as Array<Record<string, RillValue>>;
+      const content: Anthropic.ContentBlockParam[] = partsAsRecords
+        .map((p) => partToAnthropicAssistantContent(p))
+        .filter((b): b is Anthropic.ContentBlockParam => b !== null);
+
+      if (content.length === 1 && content[0]?.type === 'text') {
+        apiMessages.push({ role: 'assistant', content: (content[0] as Anthropic.TextBlockParam).text });
+      } else {
+        apiMessages.push({ role: 'assistant', content });
+      }
+    }
+  }
+
+  return { apiMessages, systemText };
+}
+
+/**
+ * Convert Anthropic response content blocks to canonical Part[].
+ * Handles text, tool_use, thinking, and redacted_thinking blocks.
+ * AC-B5: RedactedThinkingBlock → {type:'thinking', text:''}.
+ */
+function anthropicContentToParts(
+  content: Anthropic.ContentBlock[]
+): Part[] {
+  const parts: Part[] = [];
+
+  for (const block of content) {
+    if (block.type === 'text') {
+      parts.push({ type: 'text', text: block.text });
+      continue;
+    }
+
+    if (block.type === 'tool_use') {
+      parts.push({
+        type: 'tool_use',
+        id: block.id,
+        name: block.name,
+        input: block.input as Record<string, RillValue>,
+      });
+      continue;
+    }
+
+    if (block.type === 'thinking') {
+      const thinkingBlock = block as Anthropic.ThinkingBlock;
+      parts.push({
+        type: 'thinking',
+        text: thinkingBlock.thinking ?? '',
+      });
+      continue;
+    }
+
+    // RedactedThinkingBlock — AC-B5: pass through as thinking with empty text
+    if (block.type === 'redacted_thinking') {
+      parts.push({ type: 'thinking', text: '' });
+      continue;
+    }
+  }
+
+  return parts;
+}
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -135,8 +415,8 @@ function haltInvalid(
  * Validates configuration and returns host functions with cleanup.
  *
  * @param config - Extension configuration
- * @returns ExtensionResult with message, messages, embed, embed_batch, tool_loop and dispose
- * @throws Error for invalid configuration (EC-1 through EC-4)
+ * @returns ExtensionResult with message, embed, embed_batch, tool_loop, generate and dispose
+ * @throws RuntimeError for invalid configuration
  *
  * @example
  * ```typescript
@@ -152,12 +432,18 @@ function haltInvalid(
 export function createAnthropicExtension(
   config: AnthropicExtensionConfig
 ): ExtensionFactoryResult {
+  // EC-21, EC-22: Validate factory max_turns BEFORE client creation
+  validateMaxTurns(config.max_turns);
+
+  // EC-19, EC-20: Validate extra keys BEFORE client creation
+  validateExtraKeys(config.extra, RESERVED_KEYS_COMMON);
+
   // Validate required fields
   validateApiKey(config.api_key);
   validateModel(config.model);
   validateTemperature(config.temperature);
 
-  // Instantiate SDK client at factory time (§4.1)
+  // Instantiate SDK client at factory time
   const client = new Anthropic({
     apiKey: config.api_key,
     baseURL: config.base_url,
@@ -171,69 +457,57 @@ export function createAnthropicExtension(
   const factoryMaxTokens = config.max_tokens ?? DEFAULT_MAX_TOKENS;
   const factorySystem = config.system;
   const factoryEmbedModel = config.embed_model;
+  const factoryMaxTurns = config.max_turns;
+  const factoryMaxErrors = config.max_errors ?? 3;
 
-  // Dispose function for cleanup (§4.9)
+  // Dispose function for cleanup
   const dispose = async (): Promise<void> => {
-    // AC-28: Idempotent cleanup, try-catch each step
     try {
-      // Cleanup SDK HTTP connections
-      // Note: @anthropic-ai/sdk doesn't expose a close() method, but we include
-      // this structure for consistency with extension pattern and future SDK versions
+      // @anthropic-ai/sdk does not expose a close() method; placeholder for future SDK versions
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.warn(`Failed to cleanup Anthropic SDK: ${message}`);
     }
   };
 
-  // Return extension result with implementations — satisfies verifies contract at compile time (IR-8)
-  const fnDict: { message: RillFunction; messages: RillFunction; embed: RillFunction; embed_batch: RillFunction; tool_loop: RillFunction; generate: RillFunction } = ({
-    // IR-4: anthropic::message
+  // Return extension result — satisfies verifies contract at compile time
+  const fnDict: { message: RillFunction; embed: RillFunction; embed_batch: RillFunction; tool_loop: RillFunction; generate: RillFunction } = ({
+    // message: accepts string OR list of message dicts (canonical or content-sugar)
     message: {
       params: [
-        p.str('text'),
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
       ],
       fn: (args, ctx): RillValue => {
-        // Extract arguments
-        const text = args['text'] as string;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
+        // Normalize prompt: string → [{role:'user', parts:[{type:'text', text}]}]
+        //                   list  → canonical Message[]
+        const rawPrompt = args['prompt'] as RillValue;
+        const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
 
-        // EC-1: Validate text is non-empty before stream creation
-        if (text.trim().length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
+        // normalizePrompt returns an invalid RillValue on failure — halt immediately
+        if (!Array.isArray(normalized)) {
+          throw new RuntimeHaltSignal(normalized, true);
         }
 
-        // Extract options
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
+        const messages = normalized as Message[];
+
+        // Translate to Anthropic wire format
+        const { apiMessages, systemText } = canonicalToAnthropicMessages(messages);
+
+        // Determine effective system
+        const effectiveSystem = systemText !== undefined ? systemText : factorySystem;
 
         // Build API parameters
         const apiParams: Anthropic.MessageStreamParams = {
           model: factoryModel,
-          max_tokens: maxTokens,
-          messages: [
-            {
-              role: 'user',
-              content: text,
-            },
-          ],
+          max_tokens: factoryMaxTokens,
+          messages: apiMessages,
         };
 
-        // Add optional parameters only if defined
         if (factoryTemperature !== undefined) {
           apiParams.temperature = factoryTemperature;
         }
-        if (system !== undefined) {
-          apiParams.system = system;
+        if (effectiveSystem !== undefined) {
+          apiParams.system = effectiveSystem;
         }
 
         // Create the Anthropic streaming request (lazy — SDK starts on first iteration)
@@ -260,19 +534,21 @@ export function createAnthropicExtension(
           }
         }
 
-        // Resolve callback — called after chunk exhaustion or directly
-        // Returns the same dict shape as the pre-streaming return
+        // Resolve callback — returns the final result dict
         const resolve = async (): Promise<RillValue> => {
           const startTime = Date.now();
           try {
             const response = await sdkStream.finalMessage();
 
-            const content = extractTextContent(
-              response.content as Array<{ type: string; text?: string }>
+            // Build canonical assistant parts from response content
+            const assistantParts = anthropicContentToParts(
+              response.content as Anthropic.ContentBlock[]
             );
 
+            // Build canonical messages list: input + assistant reply
+            const responseMessages = buildResponseMessages(messages, assistantParts);
+
             const result = {
-              content,
               model: response.model,
               usage: {
                 input: response.usage.input_tokens,
@@ -280,10 +556,7 @@ export function createAnthropicExtension(
               },
               stop_reason: response.stop_reason,
               id: response.id,
-              messages: buildResponseMessages(
-                [{ role: 'user', content: text }],
-                content
-              ),
+              messages: responseMessages,
             };
 
             // Emit success event
@@ -294,225 +567,10 @@ export function createAnthropicExtension(
               duration,
               model: response.model,
               usage: result.usage,
-              request: apiParams.messages,
-              content,
-            });
-
-            return result as RillValue;
-          } catch (error: unknown) {
-            const duration = Date.now() - startTime;
-            const invalid = mapProviderError(
-              ctx as RuntimeContext,
-              'Anthropic',
-              error,
-              detectAnthropicError
-            );
-
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'anthropic:error',
-              subsystem: 'extension:anthropic',
-              error: getStatus(invalid).message,
-              duration,
-            });
-
-            throw new RuntimeHaltSignal(invalid, true);
-          }
-        };
-
-        const retTypeStructure = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            id: { type: { kind: 'string' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
-        };
-
-        return createRillStream({
-          chunks: chunks(),
-          resolve,
-          dispose: () => { sdkStream.abort(); },
-          chunkType: { kind: 'string' },
-          retType: retTypeStructure,
-        }) as RillValue;
-      },
-      annotations: { description: 'Send single message to Claude API' },
-      returnType: structureToTypeValue({
-        kind: 'stream',
-        chunk: { kind: 'string' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            id: { type: { kind: 'string' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
-      }),
-    },
-
-    // IR-5: anthropic::messages
-    messages: {
-      params: [
-        p.list('messages', { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } }),
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
-      ],
-      fn: (args, ctx): RillValue => {
-        // Extract arguments
-        const msgList = args['messages'] as Array<Record<string, unknown>>;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
-
-        // AC-23: Empty messages list raises error — before stream creation
-        if (msgList.length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_messages', 'messages list cannot be empty');
-        }
-
-        // Transform and validate messages to Anthropic format
-        const apiMessages: Anthropic.MessageParam[] = [];
-
-        for (let i = 0; i < msgList.length; i++) {
-          const msg = msgList[i]!;
-
-          // EC-10: Missing role raises error
-          if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
-          }
-
-          const role = msg['role'];
-
-          // EC-11: Unknown role value raises error
-          if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
-          }
-
-          // EC-12: User message missing content
-          if (role === 'user' || role === 'tool') {
-            if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
-            }
-            apiMessages.push({
-              role: role as 'user',
-              content: msg['content'] as string,
-            });
-          }
-          // EC-13: Assistant missing both content and tool_calls
-          else if (role === 'assistant') {
-            const hasContent = 'content' in msg && msg['content'];
-            const hasToolCalls = 'tool_calls' in msg && msg['tool_calls'];
-
-            if (!hasContent && !hasToolCalls) {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_assistant_message', "assistant message requires 'content' or 'tool_calls'");
-            }
-
-            // For now, we only support content (tool_calls handled in task 2.6)
-            if (hasContent) {
-              apiMessages.push({
-                role: 'assistant',
-                content: msg['content'] as string,
-              });
-            }
-          }
-        }
-
-        // Extract options
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
-
-        // Build API parameters
-        const apiParams: Anthropic.MessageStreamParams = {
-          model: factoryModel,
-          max_tokens: maxTokens,
-          messages: apiMessages,
-        };
-
-        // Add optional parameters only if defined
-        if (factoryTemperature !== undefined) {
-          apiParams.temperature = factoryTemperature;
-        }
-        if (system !== undefined) {
-          apiParams.system = system;
-        }
-
-        // Create the Anthropic streaming request (lazy — SDK starts on first iteration)
-        const sdkStream = client.messages.stream(apiParams);
-
-        // Async generator yields string text deltas from the provider stream
-        async function* chunks(): AsyncGenerator<RillValue> {
-          try {
-            for await (const event of sdkStream) {
-              if (
-                event.type === 'content_block_delta' &&
-                event.delta.type === 'text_delta'
-              ) {
-                yield event.delta.text;
-              }
-            }
-          } catch (error: unknown) {
-            throwProviderHalt(
-              ctx as RuntimeContext,
-              'Anthropic',
-              error,
-              detectAnthropicError
-            );
-          }
-        }
-
-        // Resolve callback — returns the same dict shape as the pre-streaming return
-        const resolve = async (): Promise<RillValue> => {
-          const startTime = Date.now();
-          try {
-            const response = await sdkStream.finalMessage();
-
-            const content = extractTextContent(
-              response.content as Array<{ type: string; text?: string }>
-            );
-
-            const result = {
-              content,
-              model: response.model,
-              usage: {
-                input: response.usage.input_tokens,
-                output: response.usage.output_tokens,
-              },
-              stop_reason: response.stop_reason,
-              id: response.id,
-              messages: buildResponseMessages(
-                msgList.map((m) => ({
-                  role: m['role'] as string,
-                  content: m['content'] as string,
-                })),
-                content
-              ),
-            };
-
-            // Emit success event
-            const duration = Date.now() - startTime;
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'anthropic:messages',
-              subsystem: 'extension:anthropic',
-              duration,
-              model: response.model,
-              usage: result.usage,
               request: apiMessages,
-              content,
             });
 
-            return result as RillValue;
+            return result as unknown as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
             const invalid = mapProviderError(
@@ -533,45 +591,23 @@ export function createAnthropicExtension(
           }
         };
 
-        const retTypeStructure = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            id: { type: { kind: 'string' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
-        };
-
         return createRillStream({
           chunks: chunks(),
           resolve,
           dispose: () => { sdkStream.abort(); },
           chunkType: { kind: 'string' },
-          retType: retTypeStructure,
+          retType: MESSAGE_RET_TYPE_STRUCTURE,
         }) as RillValue;
       },
-      annotations: { description: 'Send multi-turn conversation to Claude API' },
+      annotations: { description: 'Send single or multi-turn message to Claude API' },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'string' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            id: { type: { kind: 'string' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
+        ret: MESSAGE_RET_TYPE_STRUCTURE,
       }),
     },
 
-    // IR-6: anthropic::embed
+    // embed: generate embedding vector for text
     embed: {
       params: [p.str('text')],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -587,32 +623,7 @@ export function createAnthropicExtension(
 
           // NOTE: Anthropic does not currently provide a public embeddings API.
           // This implementation is prepared for when/if the API becomes available.
-          // The spec requires these functions, so we implement the interface.
-          // For now, this will raise an error indicating unsupported operation.
           throw haltInvalid(ctx as RuntimeContext, 'UNAVAILABLE', 'feature_unavailable', 'Anthropic: embeddings API not available');
-
-          // Future implementation when API available:
-          // Import createVector from '@rcrsr/rill' at top of file
-          // const response = await client.embeddings.create({
-          //   model: factoryEmbedModel,
-          //   input: text,
-          // });
-          //
-          // const vector = createVector(
-          //   new Float32Array(response.embedding),
-          //   factoryEmbedModel
-          // );
-          //
-          // const duration = Date.now() - startTime;
-          // emitExtensionEvent(ctx as RuntimeContext, {
-          //   event: 'anthropic:embed',
-          //   subsystem: 'extension:anthropic',
-          //   duration,
-          //   model: factoryEmbedModel,
-          //   dimensions: response.embedding.length,
-          // });
-          //
-          // return vector as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
 
@@ -655,7 +666,7 @@ export function createAnthropicExtension(
       returnType: structureToTypeValue({ kind: 'vector' }),
     },
 
-    // IR-7: anthropic::embed_batch
+    // embed_batch: generate embedding vectors for multiple texts
     embed_batch: {
       params: [p.list('texts')],
       fn: async (args, ctx): Promise<RillValue> => {
@@ -675,31 +686,7 @@ export function createAnthropicExtension(
           runInFnValidation(ctx as RuntimeContext, () => validateEmbedModel(factoryEmbedModel), 'invalid_embed_model');
 
           // NOTE: Anthropic does not currently provide a public embeddings API.
-          // This implementation is prepared for when/if the API becomes available.
           throw haltInvalid(ctx as RuntimeContext, 'UNAVAILABLE', 'feature_unavailable', 'Anthropic: embeddings API not available');
-
-          // Future implementation when API available:
-          // Import createVector from '@rcrsr/rill' at top of file
-          // const response = await client.embeddings.createBatch({
-          //   model: factoryEmbedModel,
-          //   input: texts as string[],
-          // });
-          //
-          // const vectors = response.embeddings.map((embedding: number[]) =>
-          //   createVector(new Float32Array(embedding), factoryEmbedModel)
-          // );
-          //
-          // const duration = Date.now() - startTime;
-          // emitExtensionEvent(ctx as RuntimeContext, {
-          //   event: 'anthropic:embed_batch',
-          //   subsystem: 'extension:anthropic',
-          //   duration,
-          //   model: factoryEmbedModel,
-          //   dimensions: response.embeddings[0]?.length ?? 0,
-          //   count: vectors.length,
-          // });
-          //
-          // return vectors as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
 
@@ -739,90 +726,68 @@ export function createAnthropicExtension(
         }
       },
       annotations: { description: 'Generate embedding vectors for multiple texts' },
-      returnType: structureToTypeValue({ kind: 'list' }),
+      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'vector' } }),
     },
 
-    // IR-8: anthropic::tool_loop
+    // tool_loop: multi-turn tool-calling loop
+    // max_turns: positional number param, default 0 sentinel (no per-call override)
     tool_loop: {
       params: [
-        p.str('prompt'),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         {
           name: 'tools',
           type: { kind: 'dict', valueType: { kind: 'closure' } },
           defaultValue: undefined,
           annotations: {},
         },
-        p.dict('options', undefined, undefined, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-          max_errors: { type: { kind: 'number' }, defaultValue: 3 },
-          max_turns: { type: { kind: 'number' }, defaultValue: 10 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
-        }),
+        p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
         // Extract arguments
-        const prompt = args['prompt'] as string;
+        const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
+        const maxTurnsArg = args['max_turns'] as number;
 
-        // EC-22: Empty prompt raises error before stream creation
-        if (prompt.trim().length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
+        // EC-13: Negative per-call max_turns → INVALID_INPUT
+        if (typeof maxTurnsArg === 'number' && maxTurnsArg < 0) {
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'INVALID_INPUT',
+            'invalid_max_turns',
+            'max_turns must be >= 0 (use 0 for no per-call override)'
+          );
         }
 
-        // Extract options
-        const system =
-          typeof options['system'] === 'string'
-            ? options['system']
-            : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
-        const maxErrors =
-          typeof options['max_errors'] === 'number'
-            ? options['max_errors']
-            : 3;
-        const maxTurns =
-          typeof options['max_turns'] === 'number'
-            ? options['max_turns']
-            : 10;
-
-        // Initialize conversation with prepended messages if provided
-        const messages: Anthropic.MessageParam[] = [];
-
-        if ('messages' in options && Array.isArray(options['messages'])) {
-          const prependedMessages = options['messages'] as Array<
-            Record<string, unknown>
-          >;
-
-          for (const msg of prependedMessages) {
-            if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
-            }
-
-            const role = msg['role'];
-            if (role !== 'user' && role !== 'assistant') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
-            }
-
-            if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
-            }
-
-            messages.push({
-              role: role as 'user' | 'assistant',
-              content: msg['content'] as string,
-            });
-          }
+        // EC-14: Empty tools dict → INVALID_INPUT
+        if (
+          typeof toolsDict === 'object' &&
+          toolsDict !== null &&
+          !Array.isArray(toolsDict) &&
+          Object.keys(toolsDict as Record<string, unknown>).length === 0
+        ) {
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'INVALID_INPUT',
+            'empty_tools_dict',
+            'tool_loop: tools dict must not be empty'
+          );
         }
 
-        // Add the prompt as initial user message
-        messages.push({
-          role: 'user',
-          content: prompt,
-        });
+        // Normalize prompt
+        const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+
+        // normalizePrompt returns invalid RillValue on failure
+        if (!Array.isArray(normalized)) {
+          throw new RuntimeHaltSignal(normalized, true);
+        }
+
+        const canonicalMessages = normalized as Message[];
+
+        // Translate to Anthropic wire format
+        const { apiMessages, systemText } = canonicalToAnthropicMessages(canonicalMessages);
+
+        // Determine effective system
+        const effectiveSystem = systemText !== undefined ? systemText : factorySystem;
 
         // Define Anthropic-specific callbacks for shared tool loop
         const callbacks: ToolLoopCallbacks = {
@@ -849,7 +814,7 @@ export function createAnthropicExtension(
           ): Promise<unknown> => {
             const apiParams: Anthropic.MessageCreateParamsNonStreaming = {
               model: factoryModel,
-              max_tokens: maxTokens,
+              max_tokens: factoryMaxTokens,
               messages: msgs as Anthropic.MessageParam[],
               tools: tools as Anthropic.Tool[],
             };
@@ -857,14 +822,14 @@ export function createAnthropicExtension(
             if (factoryTemperature !== undefined) {
               apiParams.temperature = factoryTemperature;
             }
-            if (system !== undefined) {
-              apiParams.system = system;
+            if (effectiveSystem !== undefined) {
+              apiParams.system = effectiveSystem;
             }
 
             return await client.messages.create(apiParams, { signal });
           },
 
-          // Call Anthropic API with streaming text deltas (streaming path)
+          // Call Anthropic API with streaming text deltas
           callAPIStreaming: async (
             msgs: unknown[],
             tools: unknown,
@@ -873,7 +838,7 @@ export function createAnthropicExtension(
           ): Promise<unknown> => {
             const apiParams: Anthropic.MessageStreamParams = {
               model: factoryModel,
-              max_tokens: maxTokens,
+              max_tokens: factoryMaxTokens,
               messages: msgs as Anthropic.MessageParam[],
               tools: tools as Anthropic.Tool[],
             };
@@ -881,8 +846,8 @@ export function createAnthropicExtension(
             if (factoryTemperature !== undefined) {
               apiParams.temperature = factoryTemperature;
             }
-            if (system !== undefined) {
-              apiParams.system = system;
+            if (effectiveSystem !== undefined) {
+              apiParams.system = effectiveSystem;
             }
 
             const sdkStream = client.messages.stream(apiParams, { signal });
@@ -972,7 +937,7 @@ export function createAnthropicExtension(
           },
         };
 
-        // Shared event emitter used by both the streaming loop and resolve()
+        // Shared event emitter
         const emitEventFn = (event: string, data: Record<string, unknown>): void => {
           const eventMap: Record<string, string> = {
             tool_call: 'anthropic:tool_call',
@@ -986,7 +951,6 @@ export function createAnthropicExtension(
         };
 
         // Start the tool loop immediately with streaming enabled.
-        // Both chunks() and resolve() share this single execution — tools run once.
         const collected: RillValue[] = [];
         let wakeUp: (() => void) | undefined;
         let loopDone = false;
@@ -1002,15 +966,16 @@ export function createAnthropicExtension(
         const toolLoopAbortController = new AbortController();
 
         const sharedLoopPromise = executeToolLoop(
-          messages,
+          apiMessages,
           toolsDict as RillValue,
-          maxErrors,
+          factoryMaxErrors,
           callbacks,
           emitEventFn,
-          maxTurns,
+          maxTurnsArg,
           ctx,
           yieldChunkFn,
-          toolLoopAbortController.signal
+          toolLoopAbortController.signal,
+          factoryMaxTurns
         );
 
         // Signal the drain loop when the tool loop finishes
@@ -1021,7 +986,6 @@ export function createAnthropicExtension(
 
         // Async generator drains chunks collected by yieldChunkFn
         async function* chunks(): AsyncGenerator<RillValue> {
-          // Drain collected chunks; suspend when empty and loop still running
           while (!loopDone || collected.length > 0) {
             if (collected.length > 0) {
               yield collected.shift()!;
@@ -1033,8 +997,7 @@ export function createAnthropicExtension(
           await sharedLoopPromise;
         }
 
-        // Resolve callback — called after chunk exhaustion or on direct invocation.
-        // Awaits the shared loop promise to build the result dict.
+        // Resolve callback — builds final result dict
         const resolve = async (): Promise<RillValue> => {
           const startTime = Date.now();
           try {
@@ -1042,29 +1005,22 @@ export function createAnthropicExtension(
 
             // Extract response data
             const response = loopResult.response as Anthropic.Message | null;
-            const content = response
-              ? extractTextContent(
-                  response.content as Array<{ type: string; text?: string }>
-                )
-              : '';
 
-            const inputMessages = messages.map((m) => ({
-              role: m.role,
-              content:
-                typeof m.content === 'string'
-                  ? m.content
-                  : JSON.stringify(m.content),
-            }));
+            // Build canonical assistant parts from final response
+            const assistantParts = response
+              ? anthropicContentToParts(response.content as Anthropic.ContentBlock[])
+              : [{ type: 'text' as const, text: '' }];
+
+            // Build full transcript: input canonical messages + assistant reply
+            const responseMessages = buildResponseMessages(canonicalMessages, assistantParts);
 
             const result = {
-              content,
               model: response ? response.model : factoryModel,
               usage: loopResult.totalTokens,
               stop_reason: response ? response.stop_reason : 'max_turns',
+              id: response ? response.id : '',
               turns: loopResult.turns,
-              messages: response
-                ? buildResponseMessages(inputMessages, content)
-                : inputMessages,
+              messages: responseMessages,
             };
 
             // Emit tool_loop event
@@ -1075,11 +1031,10 @@ export function createAnthropicExtension(
               turns: result.turns,
               total_duration: duration,
               usage: result.usage,
-              request: messages,
-              content,
+              request: apiMessages,
             });
 
-            return result as RillValue;
+            return result as unknown as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeError) {
@@ -1116,63 +1071,35 @@ export function createAnthropicExtension(
           }
         };
 
-        const retTypeStructure = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            turns: { type: { kind: 'number' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
-        };
-
         return createRillStream({
           chunks: chunks(),
           resolve,
           dispose: () => { toolLoopAbortController.abort(); },
           chunkType: { kind: 'dict' },
-          retType: retTypeStructure,
+          retType: TOOL_LOOP_RET_TYPE_STRUCTURE,
         }) as RillValue;
       },
       annotations: { description: 'Execute tool-use loop with Claude API' },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'dict' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            turns: { type: { kind: 'number' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
+        ret: TOOL_LOOP_RET_TYPE_STRUCTURE,
       }),
     },
 
-    // IR-3: anthropic::generate
+    // generate: structured output from Anthropic API
     generate: {
       params: [
-        p.str('prompt'),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         { name: 'schema', type: { kind: 'type' } as { kind: string }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
-        }),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           // Extract arguments
-          const prompt = args['prompt'] as string;
+          const rawPrompt = args['prompt'] as RillValue;
           const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
-          const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           // EC-3: Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
@@ -1185,52 +1112,22 @@ export function createAnthropicExtension(
           // EC-4: Build JSON Schema from TypeStructure
           const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
 
-          // Extract options
-          const system =
-            typeof options['system'] === 'string'
-              ? options['system']
-              : factorySystem;
-          const maxTokens =
-            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-              ? options['max_tokens']
-              : factoryMaxTokens;
-
-          // Build messages array: prepend conversation context if provided
-          const apiMessages: Anthropic.MessageParam[] = [];
-
-          if ('messages' in options && Array.isArray(options['messages'])) {
-            const prependedMessages = options['messages'] as Array<
-              Record<string, unknown>
-            >;
-
-            for (const msg of prependedMessages) {
-              if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_message_format', "message missing required 'role' field");
-              }
-
-              const role = msg['role'];
-              if (role !== 'user' && role !== 'assistant') {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${String(role)}'`);
-              }
-
-              if (!('content' in msg) || typeof msg['content'] !== 'string') {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'missing_message_content', `${role} message requires 'content'`);
-              }
-
-              apiMessages.push({
-                role: role as 'user' | 'assistant',
-                content: msg['content'] as string,
-              });
-            }
+          // Normalize prompt
+          const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+          if (!Array.isArray(normalized)) {
+            throw new RuntimeHaltSignal(normalized, true);
           }
 
-          // Add the prompt as the final user message
-          apiMessages.push({ role: 'user', content: prompt });
+          const canonicalMessages = normalized as Message[];
+
+          // Translate to Anthropic wire format
+          const { apiMessages, systemText } = canonicalToAnthropicMessages(canonicalMessages);
+          const effectiveSystem = systemText !== undefined ? systemText : factorySystem;
 
           // Call Anthropic API with native structured output
           const apiParams: Anthropic.MessageCreateParamsNonStreaming = {
             model: factoryModel,
-            max_tokens: maxTokens,
+            max_tokens: factoryMaxTokens,
             messages: apiMessages,
             output_config: {
               format: {
@@ -1244,18 +1141,31 @@ export function createAnthropicExtension(
           if (factoryTemperature !== undefined) {
             apiParams.temperature = factoryTemperature;
           }
-          if (system !== undefined) {
-            apiParams.system = system;
+          if (effectiveSystem !== undefined) {
+            apiParams.system = effectiveSystem;
           }
 
+          // EC-18: Streaming is not supported for structured output (PROTOCOL)
+          // The Anthropic API returns structured output synchronously; if we somehow
+          // get a streaming response, that is an unexpected format.
           const response = await client.messages.create(apiParams);
+
+          // Validate response is not a stream (EC-18)
+          if (typeof (response as unknown as { stream?: unknown }).stream === 'function') {
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'PROTOCOL',
+              'unexpected_response_format',
+              'generate: provider returned a streaming response for structured output'
+            );
+          }
 
           // Extract JSON string from response content text block (AC-8)
           const raw = extractTextContent(
             response.content as Array<{ type: string; text?: string }>
           );
 
-          // EC-5: Parse JSON, throw on failure with original error detail
+          // EC-17: Parse JSON, throw on failure with schema_validation_failed kind
           let data: unknown;
           try {
             data = JSON.parse(raw) as unknown;
@@ -1264,13 +1174,22 @@ export function createAnthropicExtension(
               parseError instanceof Error
                 ? parseError.message
                 : String(parseError);
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'json_parse_failed', `generate: failed to parse response JSON: ${detail}`);
+            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'schema_validation_failed', `generate: failed to parse response JSON: ${detail}`);
           }
 
-          // Build 6-key response dict (AC-6, AC-7)
+          // Build canonical assistant parts from response
+          const assistantParts = anthropicContentToParts(
+            response.content as Anthropic.ContentBlock[]
+          );
+
+          // Build messages: input + assistant reply (length ≥ 2, ends with assistant text part containing raw)
+          const responseMessages = buildResponseMessages(canonicalMessages, assistantParts);
+
+          // Build result dict with data, raw, messages, model, usage, stop_reason, id
           const result = {
             data,
             raw,
+            messages: responseMessages,
             model: response.model,
             usage: {
               input: response.usage.input_tokens,
@@ -1292,7 +1211,7 @@ export function createAnthropicExtension(
             content: raw,
           });
 
-          return result as RillValue;
+          return result as unknown as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
           if (error instanceof RuntimeError) {
@@ -1329,28 +1248,17 @@ export function createAnthropicExtension(
         }
       },
       annotations: { description: 'Generate structured output from Anthropic API' },
-      returnType: structureToTypeValue({
-        kind: 'dict',
-        fields: {
-          data: { type: { kind: 'any' } },
-          raw: { type: { kind: 'string' } },
-          model: { type: { kind: 'string' } },
-          usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-          stop_reason: { type: { kind: 'string' } },
-          id: { type: { kind: 'string' } },
-        },
-      }),
+      returnType: structureToTypeValue(GENERATE_RETURN_TYPE_STRUCTURE),
     },
   });
 
   const callableDict = {
     message: toCallable(fnDict.message),
-    messages: toCallable(fnDict.messages),
     embed: toCallable(fnDict.embed),
     embed_batch: toCallable(fnDict.embed_batch),
     tool_loop: toCallable(fnDict.tool_loop),
     generate: toCallable(fnDict.generate),
   } satisfies LlmExtensionContract;
 
-  return { value: callableDict as unknown as RillValue, dispose };
+  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
 }

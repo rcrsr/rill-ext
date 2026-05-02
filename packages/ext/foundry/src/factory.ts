@@ -30,6 +30,9 @@ import {
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
   buildResponseMessages,
+  normalizePrompt,
+  type Message,
+  type Role,
   type ToolLoopCallbacks,
 } from '@rcrsr/rill-ext-llm-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
@@ -84,6 +87,21 @@ function extractLastMessageText(msgs: unknown[]): string {
       .join('');
   }
   return '';
+}
+
+/**
+ * Convert canonical Message[] (parts-shaped) to OpenAI Chat Completions wire format.
+ * Only text parts are extracted; non-text parts are silently dropped for simple
+ * message/generate paths (tool_loop uses its own wire format via callbacks).
+ */
+function messagesToOpenAI(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
+  return messages.map((msg) => {
+    const content = msg.parts
+      .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+      .map((part) => part.text)
+      .join('');
+    return { role: msg.role, content } as OpenAI.ChatCompletionMessageParam;
+  });
 }
 
 // ============================================================
@@ -151,7 +169,7 @@ export async function createFoundryExtension(
   // AUTO-SHIELD MIDDLEWARE
   // ============================================================
 
-  // Create once; used to wrap message, messages, generate, and tool_loop callbacks.
+  // Create once; used to wrap message, generate, and tool_loop callbacks.
   const autoShieldMiddleware =
     config.contentSafety?.autoShield === true
       ? createAutoShieldMiddleware(config, config.auth, disposedRef)
@@ -253,7 +271,6 @@ export async function createFoundryExtension(
 
   const fnDict: {
     message: RillFunction;
-    messages: RillFunction;
     embed: RillFunction;
     embed_batch: RillFunction;
     tool_loop: RillFunction;
@@ -265,7 +282,7 @@ export async function createFoundryExtension(
     // -------------------------------------------------------
     message: {
       params: [
-        p.str('text'),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         p.dict('options', undefined, {}, {
           system: { type: { kind: 'string' }, defaultValue: '' },
           max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
@@ -275,12 +292,14 @@ export async function createFoundryExtension(
         assertNotDisposed(ctx as RuntimeContext);
         assertInference(ctx as RuntimeContext);
 
-        const text = args['text'] as string;
+        const rawPrompt = args['prompt'] as RillValue;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-        if (text.trim().length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
+        const normalizedResult = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        if (!Array.isArray(normalizedResult)) {
+          throw new RuntimeHaltSignal(normalizedResult, true);
         }
+        const normalizedPrompt = normalizedResult as Message[];
 
         const system =
           typeof options['system'] === 'string' ? options['system'] : factorySystem;
@@ -289,11 +308,11 @@ export async function createFoundryExtension(
             ? options['max_tokens']
             : factoryMaxTokens;
 
-        const apiMessages: OpenAI.ChatCompletionMessageParam[] = [];
-        if (system !== undefined) {
-          apiMessages.push({ role: 'system', content: system });
-        }
-        apiMessages.push({ role: 'user', content: text });
+        const inputMessages: Message[] = system
+          ? [{ role: 'system', parts: [{ type: 'text', text: system }] }, ...normalizedPrompt]
+          : normalizedPrompt;
+
+        const apiMessages = messagesToOpenAI(inputMessages);
 
         const runner = client.chat.completions.stream({
           model: factoryModel!,
@@ -332,13 +351,7 @@ export async function createFoundryExtension(
               usage: { input: inputTokens, output: outputTokens },
               stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
               id: response.id,
-              messages: buildResponseMessages(
-                [
-                  ...(system ? [{ role: 'system', content: system }] : []),
-                  { role: 'user', content: text },
-                ],
-                content
-              ),
+              messages: buildResponseMessages(inputMessages, [{ type: 'text', text: content }]),
             };
 
             const duration = Date.now() - startTime;
@@ -351,7 +364,7 @@ export async function createFoundryExtension(
               outputTokens,
             });
 
-            return result as RillValue;
+            return result as unknown as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
             const rillError: RuntimeError | RuntimeHaltSignal =
@@ -390,184 +403,6 @@ export async function createFoundryExtension(
         });
       },
       annotations: { description: 'Send single message to Azure AI Foundry' },
-      returnType: structureToTypeValue({
-        kind: 'stream',
-        chunk: { kind: 'string' },
-        ret: {
-          kind: 'dict',
-          fields: {
-            content: { type: { kind: 'string' } },
-            model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
-            stop_reason: { type: { kind: 'string' } },
-            id: { type: { kind: 'string' } },
-            messages: { type: { kind: 'list', element: { kind: 'dict' } } },
-          },
-        },
-      }),
-    },
-
-    // -------------------------------------------------------
-    // messages
-    // -------------------------------------------------------
-    messages: {
-      params: [
-        p.list('messages', { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } }),
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
-      ],
-      fn: (args, ctx): RillValue => {
-        assertNotDisposed(ctx as RuntimeContext);
-        assertInference(ctx as RuntimeContext);
-
-        const messages = args['messages'] as Array<Record<string, unknown>>;
-        const options = (args['options'] ?? {}) as Record<string, unknown>;
-
-        if (messages.length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_messages', 'messages list cannot be empty');
-        }
-
-        const system =
-          typeof options['system'] === 'string' ? options['system'] : factorySystem;
-        const maxTokens =
-          typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
-            ? options['max_tokens']
-            : factoryMaxTokens;
-
-        const apiMessages: OpenAI.ChatCompletionMessageParam[] = [];
-        if (system !== undefined) {
-          apiMessages.push({ role: 'system', content: system });
-        }
-
-        for (let i = 0; i < messages.length; i++) {
-          const msg = messages[i];
-
-          if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'role_missing', "message missing required 'role' field");
-          }
-
-          const role = msg['role'];
-
-          if (role !== 'user' && role !== 'assistant' && role !== 'tool') {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${role as string}'`);
-          }
-
-          if (role === 'user' || role === 'tool') {
-            if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'content_missing', `${role} message requires 'content'`);
-            }
-            apiMessages.push({ role: role as 'user', content: msg['content'] as string });
-          } else if (role === 'assistant') {
-            const hasContent = 'content' in msg && msg['content'];
-            const hasToolCalls = 'tool_calls' in msg && msg['tool_calls'];
-
-            if (!hasContent && !hasToolCalls) {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'content_missing', "assistant message requires 'content' or 'tool_calls'");
-            }
-
-            if (hasContent) {
-              apiMessages.push({ role: 'assistant', content: msg['content'] as string });
-            }
-          }
-        }
-
-        const runner = client.chat.completions.stream({
-          model: factoryModel!,
-          max_completion_tokens: maxTokens,
-          messages: apiMessages,
-          stream_options: { include_usage: true },
-          ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
-        });
-
-        async function* chunks(): AsyncGenerator<RillValue> {
-          try {
-            for await (const chunk of runner) {
-              const delta = chunk.choices[0]?.delta?.content;
-              if (delta) {
-                yield delta as RillValue;
-              }
-            }
-          } catch (error: unknown) {
-            throwProviderHalt(ctx as RuntimeContext, 'Foundry', error, detectFoundryError);
-          }
-        }
-
-        const resolve = async (): Promise<RillValue> => {
-          const startTime = Date.now();
-          try {
-            const response = await runner.finalChatCompletion();
-            const content = response.choices[0]?.message?.content ?? '';
-            const inputTokens = response.usage?.prompt_tokens ?? 0;
-            const outputTokens = response.usage?.completion_tokens ?? 0;
-
-            accumulateUsage(inputTokens, outputTokens);
-
-            const result = {
-              content,
-              model: response.model,
-              usage: { input: inputTokens, output: outputTokens },
-              stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
-              id: response.id,
-              messages: buildResponseMessages(
-                messages.map((m) => ({
-                  role: m['role'] as string,
-                  content: (m['content'] as string) ?? '',
-                })),
-                content
-              ),
-            };
-
-            const duration = Date.now() - startTime;
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'foundry:message',
-              subsystem: 'extension:foundry',
-              duration,
-              model: response.model,
-              inputTokens,
-              outputTokens,
-            });
-
-            return result as RillValue;
-          } catch (error: unknown) {
-            const duration = Date.now() - startTime;
-            const rillError: RuntimeError | RuntimeHaltSignal =
-              error instanceof RuntimeHaltSignal || error instanceof RuntimeError
-                ? error
-                : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: 'foundry:message:error',
-              subsystem: 'extension:foundry',
-              model: factoryModel ?? '',
-              error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
-              duration,
-            });
-            throw rillError;
-          }
-        };
-
-        const retType = {
-          kind: 'dict' as const,
-          fields: {
-            content: { type: { kind: 'string' as const } },
-            model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
-            stop_reason: { type: { kind: 'string' as const } },
-            id: { type: { kind: 'string' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
-          },
-        };
-
-        return createRillStream({
-          chunks: chunks(),
-          resolve,
-          dispose: () => { runner.abort(); },
-          chunkType: { kind: 'string' },
-          retType,
-        });
-      },
-      annotations: { description: 'Send multi-turn conversation to Azure AI Foundry' },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'string' },
@@ -723,7 +558,7 @@ export async function createFoundryExtension(
     // -------------------------------------------------------
     tool_loop: {
       params: [
-        p.str('prompt'),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         {
           name: 'tools',
           type: { kind: 'dict', valueType: { kind: 'closure' } },
@@ -742,13 +577,15 @@ export async function createFoundryExtension(
         assertNotDisposed(ctx as RuntimeContext);
         assertInference(ctx as RuntimeContext);
 
-        const prompt = args['prompt'] as string;
+        const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-        if (prompt.trim().length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'empty_prompt', 'prompt text cannot be empty');
+        const normalizedResult2 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        if (!Array.isArray(normalizedResult2)) {
+          throw new RuntimeHaltSignal(normalizedResult2, true);
         }
+        const normalizedPrompt = normalizedResult2 as Message[];
 
         const system =
           typeof options['system'] === 'string' ? options['system'] : factorySystem;
@@ -791,7 +628,9 @@ export async function createFoundryExtension(
           }
         }
 
-        messages.push({ role: 'user', content: prompt });
+        for (const msg of messagesToOpenAI(normalizedPrompt)) {
+          messages.push(msg);
+        }
 
         const callbacks: ToolLoopCallbacks = {
           buildTools: (
@@ -1068,20 +907,12 @@ export async function createFoundryExtension(
                 ? 'max_turns'
                 : (response?.choices[0]?.finish_reason ?? 'stop');
 
-            const inputMessages = messages
-              .filter((m) => 'role' in m && (m as unknown as Record<string, unknown>)['role'] !== 'system')
-              .map((m) => {
-                const msg = m as unknown as Record<string, unknown>;
-                return {
-                  role: msg['role'] as string,
-                  content:
-                    msg['content'] == null
-                      ? ''
-                      : typeof msg['content'] === 'string'
-                        ? msg['content']
-                        : JSON.stringify(msg['content']),
-                };
-              });
+            const inputMessages: Message[] = (messages as unknown as Array<Record<string, unknown>>)
+              .filter((m) => m['role'] === 'user' || m['role'] === 'assistant')
+              .map((m) => ({
+                role: m['role'] as Role,
+                parts: [{ type: 'text' as const, text: typeof m['content'] === 'string' ? m['content'] : '' }],
+              }));
 
             accumulateUsage(loopResult.totalTokens.input, loopResult.totalTokens.output);
 
@@ -1095,7 +926,7 @@ export async function createFoundryExtension(
               stop_reason: stopReason,
               turns: loopResult.turns,
               messages: response
-                ? buildResponseMessages(inputMessages, content)
+                ? buildResponseMessages(inputMessages, [{ type: 'text', text: content }])
                 : inputMessages,
             };
 
@@ -1109,7 +940,7 @@ export async function createFoundryExtension(
               duration,
             });
 
-            return result as RillValue;
+            return result as unknown as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
             const rillError: RuntimeError | RuntimeHaltSignal =
@@ -1169,7 +1000,7 @@ export async function createFoundryExtension(
     // -------------------------------------------------------
     generate: {
       params: [
-        p.str('prompt'),
+        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
         { name: 'schema', type: { kind: 'type' } as { kind: string }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
         p.dict('options', undefined, {}, {
           system: { type: { kind: 'string' }, defaultValue: '' },
@@ -1184,7 +1015,7 @@ export async function createFoundryExtension(
         assertInference(ctx as RuntimeContext);
 
         try {
-          const prompt = args['prompt'] as string;
+          const rawPrompt = args['prompt'] as RillValue;
           const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
@@ -1200,6 +1031,12 @@ export async function createFoundryExtension(
             );
           }
 
+          const normalizedResult3 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+          if (!Array.isArray(normalizedResult3)) {
+            throw new RuntimeHaltSignal(normalizedResult3, true);
+          }
+          const normalizedPrompt = normalizedResult3 as Message[];
+
           const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
 
           const system =
@@ -1209,37 +1046,11 @@ export async function createFoundryExtension(
               ? options['max_tokens']
               : factoryMaxTokens;
 
-          const apiMessages: OpenAI.ChatCompletionMessageParam[] = [];
+          const inputMessages: Message[] = system
+            ? [{ role: 'system', parts: [{ type: 'text', text: system }] }, ...normalizedPrompt]
+            : normalizedPrompt;
 
-          if (system !== undefined) {
-            apiMessages.push({ role: 'system', content: system });
-          }
-
-          if ('messages' in options && Array.isArray(options['messages'])) {
-            const prependedMessages = options['messages'] as Array<Record<string, unknown>>;
-
-            for (const msg of prependedMessages) {
-              if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'role_missing', "message missing required 'role' field");
-              }
-
-              const role = msg['role'];
-              if (role !== 'user' && role !== 'assistant') {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${role as string}'`);
-              }
-
-              if (!('content' in msg) || typeof msg['content'] !== 'string') {
-                throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'content_missing', `${role as string} message requires 'content'`);
-              }
-
-              apiMessages.push({
-                role: role as 'user' | 'assistant',
-                content: msg['content'] as string,
-              });
-            }
-          }
-
-          apiMessages.push({ role: 'user', content: prompt });
+          const apiMessages = messagesToOpenAI(inputMessages);
 
           const apiParams: OpenAI.ChatCompletionCreateParamsNonStreaming = {
             model: factoryModel!,
@@ -1327,10 +1138,10 @@ export async function createFoundryExtension(
   };
 
   // ============================================================
-  // AUTO-SHIELD WRAPPING (message, messages, generate)
+  // AUTO-SHIELD WRAPPING (message, generate)
   // ============================================================
 
-  // When autoShield is enabled, wrap the outer fn for message, messages, and generate
+  // When autoShield is enabled, wrap the outer fn for message and generate
   // so the shield check runs before each LLM call.
   // embed and embed_batch are excluded per spec.
   // tool_loop per-iteration shielding is handled inside the callbacks (see tool_loop.fn).
@@ -1357,13 +1168,11 @@ export async function createFoundryExtension(
   }
 
   const messageFn = wrapWithShield(fnDict.message, 'message');
-  const messagesFn = wrapWithShield(fnDict.messages, 'messages');
   const generateFn = wrapWithShield(fnDict.generate, 'generate');
 
   // Apply LlmExtensionContract satisfies check at compile time
   const callableDict = {
     message: toCallable(messageFn),
-    messages: toCallable(messagesFn),
     embed: toCallable(fnDict.embed),
     embed_batch: toCallable(fnDict.embed_batch),
     tool_loop: toCallable(fnDict.tool_loop),

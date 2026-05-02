@@ -23,6 +23,41 @@ export type {
 } from './types.js';
 
 // ============================================================
+// PROMPT TYPES
+// ============================================================
+export type {
+  Role,
+  Message,
+  Part,
+  MessageInput,
+  ImageSource,
+} from './prompt.js';
+
+// ============================================================
+// PROMPT FUNCTIONS AND CONSTANTS
+// ============================================================
+export {
+  MESSAGES_RETURN_TYPE,
+  MESSAGES_LIST_STRUCTURE,
+  MESSAGE_DICT_STRUCTURE,
+  PARTS_LIST_STRUCTURE,
+  normalizePrompt,
+  assertBoundaryRoles,
+  assertNoTrailingAssistant,
+  assertPartTypes,
+  expandContentSugar,
+} from './prompt.js';
+
+// ============================================================
+// EXTRA CONFIG VALIDATION
+// ============================================================
+export {
+  RESERVED_KEYS_COMMON,
+  validateExtraKeys,
+  validateMaxTurns,
+} from './extra.js';
+
+// ============================================================
 // VALIDATION
 // ============================================================
 export {

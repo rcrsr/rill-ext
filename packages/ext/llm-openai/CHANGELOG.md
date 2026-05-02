@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.19.2] - 2026-05-01
+
+### Changed (Breaking)
+
+- `messages` verb removed. Use `message` with a list prompt for multi-turn conversations.
+- `text` parameter renamed to `prompt` on all verbs (`message`, `tool_loop`, `generate`).
+- `options` dict removed from `message` and `generate`. Per-call `system` and `max_tokens`
+  previously in `options` are now factory-only config (`system`, `max_tokens`).
+- `tool_loop` `max_turns` moves from `options.max_turns` to a positional parameter
+  (default `0` sentinel — resolves to factory `max_turns` or unlimited).
+- Output shape: `content` field removed from all verbs. Replaced by `messages` (parts-shaped
+  list of `{ role, parts }` dicts). `tool_calls` legacy flattened list also removed.
+- `generate` now includes `messages` in its return dict (full conversation transcript).
+- `stop_reason` field added to all verbs (maps from `finish_reason` in Chat Completions).
+- Model-class routing at factory init: o-series models (o1, o3, etc.) use Responses API;
+  standard models use Chat Completions. Routing is fixed for the extension instance lifetime.
+- Factory config adds `max_turns` (positive integer, rejects 0 sentinel and negatives) and
+  `max_errors` (integer, default 3). These are declared in `configSchema`.
+- `extra` is a `LLMProviderConfig` field validated at factory init via `validateExtraKeys`.
+  It is NOT declared in `configSchema` (ConfigFieldDescriptor.type only supports string,
+  number, and boolean). Keys in `extra` must not collide with reserved provider keys.
+  Validated `extra` fields are spread verbatim into the request body params dict (the first
+  argument to OpenAI SDK methods). openai Node SDK v6 removed the `extra_body` request option
+  that existed in v4; params-spread is the v6 mechanism for passing extra body fields.
+
 ## [0.19.1] - 2026-04-28
 
 ### Fixed

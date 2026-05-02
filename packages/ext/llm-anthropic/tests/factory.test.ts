@@ -129,9 +129,9 @@ describe('createAnthropicExtension', () => {
     });
   });
 
-  // AC-1: Factory returns ExtensionFactoryResult with 6 functions in value dict
+  // AC-1: Factory returns ExtensionFactoryResult with 5 functions in value dict
   describe('extension result structure', () => {
-    it('returns object with value dict containing 6 callable entries', () => {
+    it('returns object with value dict containing 5 callable entries', () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -140,13 +140,15 @@ describe('createAnthropicExtension', () => {
       const result = createAnthropicExtension(config);
       const value = result.value as Record<string, unknown>;
 
-      // Verify all 6 functions exist in the value dict
+      // Verify all 5 functions exist in the value dict (messages verb removed)
       expect(value['message']).toBeDefined();
-      expect(value['messages']).toBeDefined();
       expect(value['embed']).toBeDefined();
       expect(value['embed_batch']).toBeDefined();
       expect(value['tool_loop']).toBeDefined();
       expect(value['generate']).toBeDefined();
+
+      // messages verb was removed in unified-prompting migration
+      expect(value['messages']).toBeUndefined();
 
       // Verify dispose exists on the factory result
       expect(result.dispose).toBeDefined();
@@ -161,30 +163,10 @@ describe('createAnthropicExtension', () => {
       const result = createAnthropicExtension(config);
       const value = result.value as Record<string, Record<string, unknown>>;
 
+      // prompt is now a single `any` param (accepts string or list of message dicts)
       expect(value['message']).toMatchObject({
         params: [
-          { name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { kind: 'dict' }, defaultValue: {}, annotations: {} },
-        ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'stream' },
-      });
-    });
-
-    it('messages callable has correct structure', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const result = createAnthropicExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['messages']).toMatchObject({
-        params: [
-          { name: 'messages', type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { kind: 'dict' }, defaultValue: {}, annotations: {} },
+          { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
@@ -233,11 +215,12 @@ describe('createAnthropicExtension', () => {
       const result = createAnthropicExtension(config);
       const value = result.value as Record<string, Record<string, unknown>>;
 
+      // max_turns is now positional (number, default 0); options dict removed
       expect(value['tool_loop']).toMatchObject({
         params: [
-          { name: 'prompt', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
-          { name: 'tools', type: { kind: 'dict', valueType: { kind: 'closure' } }, defaultValue: undefined, annotations: {} },
-          { name: 'options', type: { kind: 'dict' }, defaultValue: undefined, annotations: {} },
+          { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined },
+          { name: 'tools', type: { kind: 'dict', valueType: { kind: 'closure' } }, defaultValue: undefined },
+          { name: 'max_turns', type: { kind: 'number' }, defaultValue: 0 },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },

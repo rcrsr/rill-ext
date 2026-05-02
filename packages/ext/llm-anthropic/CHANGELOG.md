@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.19.2] - 2026-05-01
+
+### Changed (Breaking)
+
+- `messages` verb removed. Pass a list of message dicts directly to `message(prompt)` for multi-turn calls.
+- `text` parameter renamed to `prompt` on all verbs (`message`, `tool_loop`, `generate`). String input still works.
+- Options dicts removed from `message`, `tool_loop`, and `generate`. Per-call `system` and `max_tokens` are now factory-only config fields. `max_turns` for `tool_loop` is now a positional `number` parameter (default `0` = no per-call cap).
+- All verbs return parts-shaped `messages` list (`[{role, parts:[{type, text, ...}]}]`) instead of `content: string`. The `content` field is removed.
+- `tool_loop` result no longer includes `tool_calls` field (subsumed by parts in `messages`).
+- Factory accepts `max_turns` (positive integer or undefined), `max_errors` (number), and `extra` (dict) config fields. Zero or negative `max_turns` at factory init throws `RuntimeError('RILL-R001', ...)`. Keys in `extra` must not collide with `RESERVED_KEYS_COMMON`.
+
 ## [0.19.1] - 2026-04-28
 
 ### Fixed

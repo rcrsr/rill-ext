@@ -32,7 +32,8 @@ const STRING_RETURN_TYPE: RillTypeValue = structureToTypeValue({ kind: 'string' 
  * Return type for `output: 'list'` prompts: `list(dict(role: string, content: string))`.
  *
  * Matches the shape produced by `splitRoleMessages` and accepted by every LLM
- * extension's `messages()` call.
+ * extension's `message()` call when passed a list input (sugar expansion via
+ * `normalizePrompt`).
  */
 const MESSAGE_LIST_RETURN_TYPE: RillTypeValue = structureToTypeValue({
   kind: 'list',

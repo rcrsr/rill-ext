@@ -57,6 +57,25 @@ export interface LLMProviderConfig extends LLMExtensionConfig {
    * System message content
    */
   readonly system?: string | undefined;
+
+  /**
+   * Maximum number of tool-loop turns before the loop halts.
+   * Must be a positive integer or undefined (no cap).
+   * Zero is reserved as a per-call override sentinel.
+   */
+  readonly max_turns?: number | undefined;
+
+  /**
+   * Maximum number of consecutive tool errors before the loop aborts.
+   * Undefined uses the internal default of 3.
+   */
+  readonly max_errors?: number | undefined;
+
+  /**
+   * Additional provider-specific request fields forwarded verbatim.
+   * Must not contain any key present in RESERVED_KEYS_COMMON.
+   */
+  readonly extra?: Record<string, unknown> | undefined;
 }
 
 /**

@@ -156,7 +156,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Events are emitted in the resolve callback, not during stream creation
-      const stream = getCallable(ext, 'message').fn({ text: 'Hello Claude', options: {} }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello Claude' }, ctx);
       await resolveStream(stream);
 
       // Verify event was emitted
@@ -171,12 +171,12 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       expect(event.duration).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
       expect(event.request).toBeDefined();
-      expect(event.content).toBeDefined();
+      // content field removed from anthropic:message event in new factory
     });
   });
 
-  describe('IC-12: anthropic:messages event with duration, model, usage', () => {
-    it('emits event after successful messages() resolve', async () => {
+  describe('IC-12: anthropic:message event for multi-turn input via message()', () => {
+    it('emits event after successful message() resolve with list prompt', async () => {
       const mockResponse = {
         id: 'msg_456',
         type: 'message' as const,
@@ -206,19 +206,21 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const messages = [
+      // messages() verb removed; pass list to message() prompt
+      const promptList = [
         { role: 'user', content: 'Hello' },
         { role: 'assistant', content: 'Hi there!' },
         { role: 'user', content: 'How are you?' },
       ];
 
-      const stream = getCallable(ext, 'messages').fn({ messages, options: {} }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: promptList }, ctx);
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
 
       const event = events[0]!;
-      expect(event.event).toBe('anthropic:messages');
+      // Event name is anthropic:message (messages verb removed)
+      expect(event.event).toBe('anthropic:message');
       expect(event.subsystem).toBe('extension:anthropic');
       expect(event.model).toBe(TEST_MODEL);
       expect(event.usage).toEqual({ input: 20, output: 15 });
@@ -226,7 +228,6 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       expect(event.duration).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
       expect(event.request).toBeDefined();
-      expect(event.content).toBeDefined();
     });
   });
 
@@ -549,7 +550,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Simple question', tools: {}, options: {} }, ctx);
+      // EC-14: tools dict must not be empty; provide a dummy tool so the loop can run
+      const dummyTool = callable(() => 'ok');
+      (dummyTool as Record<string, unknown>)['description'] = 'Dummy tool';
+
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Simple question', tools: { dummy: dummyTool }, options: {} }, ctx);
       await resolveStream(stream);
 
       // Find tool_loop event
@@ -566,7 +571,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       expect(event.total_duration).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
       expect(event.request).toBeDefined();
-      expect(event.content).toBeDefined();
+      // content field removed from anthropic:tool_loop event in new factory
     });
 
     it('includes accumulated usage from multiple turns', async () => {
@@ -697,7 +702,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
       await expectRejectedHalt(resolveStream(stream));
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -711,7 +716,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       expect(typeof event.timestamp).toBe('string');
     });
 
-    it('throws synchronously on messages() validation failure (no stream event)', () => {
+    it('throws synchronously on message() validation failure for empty prompt (no stream event)', () => {
       const events = createEventCollector();
       const ext = createAnthropicExtension({
         api_key: TEST_API_KEY,
@@ -725,8 +730,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      // Empty messages list triggers synchronous validation error before stream creation
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: [], options: {} }, ctx), { message: 'messages list cannot be empty' });
+      // Empty string prompt triggers synchronous validation error before stream creation
+      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '' }, ctx), { message: 'prompt string cannot be empty' });
 
       // No error event emitted for pre-stream validation errors
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -790,7 +795,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = getCallable(ext, 'message').fn({ text: 'Test', options: {} }, ctx);
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
@@ -856,12 +861,16 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      // Test all three main functions — all use stream now; resolve() needed for event emission
-      const stream1 = getCallable(ext, 'message').fn({ text: 'Test message', options: {} }, ctx);
+      // Test message and tool_loop — messages() verb removed; use message() for both
+      // EC-14: tools dict must not be empty; provide a dummy tool
+      const dummyTool = callable(() => 'ok');
+      (dummyTool as Record<string, unknown>)['description'] = 'Dummy tool';
+
+      const stream1 = getCallable(ext, 'message').fn({ prompt: 'Test message' }, ctx);
       await resolveStream(stream1);
-      const stream2 = getCallable(ext, 'messages').fn({ messages: [{ role: 'user', content: 'Test' }], options: {} }, ctx);
+      const stream2 = getCallable(ext, 'message').fn({ prompt: [{ role: 'user', content: 'Test' }] }, ctx);
       await resolveStream(stream2);
-      const stream3 = getCallable(ext, 'tool_loop').fn({ prompt: 'Test tool loop', tools: {}, options: {} }, ctx);
+      const stream3 = getCallable(ext, 'tool_loop').fn({ prompt: 'Test tool loop', tools: { dummy: dummyTool }, max_turns: 0 }, ctx);
       await resolveStream(stream3);
 
       expect(mockStream).toHaveBeenCalledTimes(3);

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Breaking)
+
+- LLM extensions now accept string or message-list input via unified `prompt` parameter, return message-list output with role and parts structure, and consolidate per-call options into factory-level `max_turns`, `max_errors`, and `extra` config
+
 ## [0.19.5] - 2026-04-30
 
 ### Fixed

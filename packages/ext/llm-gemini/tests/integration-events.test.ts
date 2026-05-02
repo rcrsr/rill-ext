@@ -122,7 +122,7 @@ describe('extension event emission', () => {
         },
       });
 
-      const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
       await collectStream(stream, ctx);
 
       // Verify event structure (§4.10) — emitted on resolve
@@ -160,7 +160,7 @@ describe('extension event emission', () => {
         },
       });
 
-      const stream = await getCallable(ext, 'message').fn({ text: 'Test' }, ctx);
+      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
       await expect(collectStream(stream, ctx)).rejects.toThrow();
 
       // Verify error event structure (§4.10)
@@ -174,79 +174,7 @@ describe('extension event emission', () => {
     });
   });
 
-  describe('messages() events', () => {
-    it('emits gemini:messages event on success after stream resolved', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Response']));
-
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const events: Array<Record<string, unknown>> = [];
-      const ctx = createRuntimeContext({
-        callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => {
-            events.push(event);
-          },
-        },
-      });
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
-      await collectStream(stream, ctx);
-
-      // Verify event structure (§4.10) — emitted on resolve
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
-        event: 'gemini:messages',
-        subsystem: 'extension:gemini',
-        model: 'gemini-2.0-flash',
-        usage: { input: 0, output: 0 },
-      });
-      expect(typeof events[0]?.['duration']).toBe('number');
-      expect(events[0]?.['duration']).toBeGreaterThanOrEqual(0);
-      expect(events[0]?.['request']).toBeDefined();
-      expect(events[0]?.['content']).toBeDefined();
-    });
-
-    it('emits gemini:error event when stream iteration fails', async () => {
-      mockGenerateContentStream.mockRejectedValue(
-        new Error('API request failed (429)')
-      );
-
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const events: Array<Record<string, unknown>> = [];
-      const ctx = createRuntimeContext({
-        callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => {
-            events.push(event);
-          },
-        },
-      });
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = await getCallable(ext, 'messages').fn({ messages: messages }, ctx);
-      await expect(collectStream(stream, ctx)).rejects.toThrow();
-
-      // Verify error event structure (§4.10)
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
-        event: 'gemini:error',
-        subsystem: 'extension:gemini',
-        error: 'Gemini API error (HTTP 429): API request failed (429)',
-      });
-      expect(typeof events[0]?.['duration']).toBe('number');
-    });
-  });
+  // messages() verb was removed in the factory migration — no events tests for it
 
   describe('embed() events', () => {
     it('emits gemini:embed event on success', async () => {
@@ -405,9 +333,12 @@ describe('extension event emission', () => {
           { text: 'Final response' },
         ]));
 
+      // max_turns is now a factory-level config (or positional arg); max_errors at factory level
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
         model: 'gemini-2.0-flash',
+        max_turns: 5,
+        max_errors: 3,
       };
 
       const ext = createGeminiExtension(config);
@@ -426,9 +357,8 @@ describe('extension event emission', () => {
       (testToolFn as Record<string, unknown>)['description'] = 'Test tool';
 
       const tools = { test_tool: testToolFn };
-      const options = { max_turns: 5 };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools, options }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools }, ctx);
       await collectStream(stream, ctx);
 
       // Verify event sequence (§4.10)
@@ -522,6 +452,7 @@ describe('extension event emission', () => {
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
         model: 'gemini-2.0-flash',
+        max_errors: 3,
       };
 
       const ext = createGeminiExtension(config);
@@ -542,9 +473,9 @@ describe('extension event emission', () => {
       (failingTool as Record<string, unknown>)['description'] = 'Test tool';
 
       const tools = { test_tool: failingTool };
-      const options = { max_turns: 5, max_errors: 3 };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools, options }, ctx);
+      // max_turns is now a positional arg (3rd param), pass via args dict
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test prompt', tools, max_turns: 5 }, ctx);
       await collectStream(stream, ctx);
 
       // Find tool_result event
