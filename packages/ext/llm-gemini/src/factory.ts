@@ -43,6 +43,7 @@ import {
   RESERVED_KEYS_COMMON,
   validateExtraKeys,
   validateMaxTurns,
+  validateMaxErrors,
   MESSAGE_DICT_STRUCTURE,
   type JsonSchemaProperty,
   type ProviderErrorDetector,
@@ -377,6 +378,10 @@ export function createGeminiExtension(
 
   // EC-21/22: Validate factory-level max_turns
   validateMaxTurns(config.max_turns);
+
+  // Validate factory-level max_errors; reject 0/negative/non-integer so a
+  // misconfigured extension fails fast instead of silently using the default.
+  validateMaxErrors(config.max_errors);
 
   // EC-19/20: Validate extra keys against Gemini-specific reserved set
   validateExtraKeys(config.extra, RESERVED_KEYS_GEMINI);

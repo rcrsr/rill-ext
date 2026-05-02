@@ -3,20 +3,22 @@
  *
  * Splits a prompt body on `@@ role` marker lines into an ordered list
  * of `{ role, content }` objects. Only `^@@ (\w+)$` lines act as
- * role markers — interior `##` headings are preserved as body text.
+ * role markers, comma, interior `##` headings are preserved as body text.
  *
- * `VALID_ROLES` is the canonical allowlist for role enforcement in
- * both contexts where roles appear:
+ * `VALID_ROLES` is the role allowlist enforced for prompt-md role markers
+ * by `splitRoleMessages`. Validation runs every time the prompt-md
+ * closure is invoked, not at extension factory time, because the markdown
+ * body is parsed on each call.
  *
- *   1. Prompt-md files — `splitRoleMessages` rejects any `@@ <role>`
- *      marker whose role is not in `VALID_ROLES` at compile time (EC-23).
- *   2. LLM extension `message()` host function — `assertBoundaryRoles`
- *      in `@rcrsr/rill-ext-llm-shared` rejects runtime messages whose
- *      `role` field is not in the same allowlist (EC-4).
+ * The LLM extension `message()` host function uses an equivalent allowlist
+ * defined in `@rcrsr/rill-ext-llm-shared/prompt.ts` (`assertBoundaryRoles`).
+ * The two allowlists are kept in sync by convention; this module is not
+ * yet a runtime single source of truth for the LLM extensions.
  *
  * The allowlist is `['system', 'user', 'assistant']` as a readonly tuple.
- * Any role string outside this set is rejected with `RILL-R001` (factory
- * time) or `#INVALID_INPUT / invalid_role` (host-function time).
+ * Any role string outside this set is rejected with `RILL-R001` here
+ * (prompt-md path) or `#INVALID_INPUT / invalid_role` at the LLM extension
+ * boundary.
  *
  * Throws RuntimeError RILL-R001 when no role markers are found, or when
  * a role marker references a role not in VALID_ROLES.
@@ -29,13 +31,12 @@ import { RuntimeError } from '@rcrsr/rill';
 // ============================================================
 
 /**
- * Canonical roles accepted at the rill prompt boundary.
+ * Roles accepted by `splitRoleMessages` for prompt-md `@@ role` markers.
  *
- * Single source of truth for both prompt-md role marker validation
- * (`splitRoleMessages`) and LLM extension runtime role validation
- * (`assertBoundaryRoles` in ext-llm-shared). Allowlist enforced at
- * factory time for prompt files and at host-function time for `message()`
- * inputs. Any value not in this tuple is rejected.
+ * Enforced on every closure invocation, not at extension factory time.
+ * `@rcrsr/rill-ext-llm-shared/prompt.ts` declares an equivalent allowlist
+ * for `message()` inputs and is kept in sync with this tuple by convention.
+ * Any value not in this tuple is rejected.
  */
 export const VALID_ROLES = ['system', 'user', 'assistant'] as const;
 

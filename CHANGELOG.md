@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (Breaking)
 
-- LLM extensions now accept string or message-list input via unified `prompt` parameter, return message-list output with role and parts structure, and consolidate per-call options into factory-level `max_turns`, `max_errors`, and `extra` config
+- `@rcrsr/rill-ext-anthropic`, `@rcrsr/rill-ext-openai`, and `@rcrsr/rill-ext-gemini` (each bumped to `0.19.2`) accept string or message-list input via a unified `prompt` parameter, return message-list output with role and parts structure, and consolidate per-call options into factory-level `max_turns`, `max_errors`, and `extra` config. `max_turns` and `max_errors` are validated at factory time and reject `0`, negatives, and non-integers via `RILL-R001`.
+- `@rcrsr/rill-ext-prompt-md` (`0.19.3`) enforces an explicit role allowlist of `system`, `user`, `assistant` for `@@ role` markers, rejecting unknown roles with `RILL-R001`. Prompt-md message lists feed directly into the unified `message()` host functions above.
+- `@rcrsr/rill-ext-foundry` (`0.19.2`) `message()` and `generate()` align with the unified prompt input shape and return parts-shaped `messages`. The `messages` callable is removed. `message()` retains the per-call `options` dict (`system`, `max_tokens`) and a top-level `content` field on the resolved value for backward compatibility.
 
 ## [0.19.5] - 2026-04-30
 

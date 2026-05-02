@@ -50,6 +50,7 @@ import {
   normalizePrompt,
   validateExtraKeys,
   validateMaxTurns,
+  validateMaxErrors,
   RESERVED_KEYS_COMMON,
   PARTS_LIST_STRUCTURE,
   type ProviderErrorDetector,
@@ -390,6 +391,9 @@ export function createOpenAIExtension(
 ): ExtensionFactoryResult {
   // EC-21, EC-22: Validate factory max_turns BEFORE client creation
   validateMaxTurns(config.max_turns);
+
+  // Validate factory max_errors BEFORE client creation; reject 0/negative/non-integer
+  validateMaxErrors(config.max_errors);
 
   // EC-19, EC-20: Validate extra keys BEFORE client creation
   validateExtraKeys(config.extra, RESERVED_KEYS_OPENAI);
@@ -1232,7 +1236,7 @@ export function createOpenAIExtension(
 
   function extractJson(content: string, reasoning: string): string {
     const candidate = content.trim() !== '' ? content : reasoning;
-    try { JSON.parse(candidate); return candidate; } catch {}
+    try { JSON.parse(candidate); return candidate; } catch { /* fall through */ }
     const m = candidate.match(/\{[\s\S]*\}/);
     return m ? m[0] : candidate;
   }

@@ -7,6 +7,7 @@ import {
   RESERVED_KEYS_COMMON,
   validateExtraKeys,
   validateMaxTurns,
+  validateMaxErrors,
 } from '../src/extra.js';
 import type { LLMProviderConfig } from '../src/types.js';
 
@@ -171,6 +172,45 @@ describe('validateMaxTurns', () => {
         /must be a positive integer or undefined/
       );
     });
+  });
+});
+
+// ============================================================
+// validateMaxErrors
+// ============================================================
+
+describe('validateMaxErrors', () => {
+  it('returns without throwing for undefined', () => {
+    expect(() => validateMaxErrors(undefined)).not.toThrow();
+  });
+
+  it('returns without throwing for a positive integer', () => {
+    expect(() => validateMaxErrors(5)).not.toThrow();
+    expect(() => validateMaxErrors(1)).not.toThrow();
+  });
+
+  it('throws RILL-R001 for 0', () => {
+    expect(() => validateMaxErrors(0)).toThrow(
+      /must be a positive integer or undefined/
+    );
+  });
+
+  it('throws RILL-R001 for a negative integer', () => {
+    expect(() => validateMaxErrors(-1)).toThrow(
+      /must be a positive integer or undefined/
+    );
+  });
+
+  it('throws RILL-R001 for a non-integer number', () => {
+    expect(() => validateMaxErrors(2.5)).toThrow(
+      /must be a positive integer or undefined/
+    );
+  });
+
+  it('throws RILL-R001 for a non-number value', () => {
+    expect(() => validateMaxErrors('3')).toThrow(
+      /must be a positive integer or undefined/
+    );
   });
 });
 

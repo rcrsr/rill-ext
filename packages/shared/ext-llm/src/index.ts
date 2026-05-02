@@ -55,6 +55,7 @@ export {
   RESERVED_KEYS_COMMON,
   validateExtraKeys,
   validateMaxTurns,
+  validateMaxErrors,
 } from './extra.js';
 
 // ============================================================

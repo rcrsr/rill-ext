@@ -116,3 +116,34 @@ export function validateMaxTurns(value: unknown): void {
     );
   }
 }
+
+// ============================================================
+// MAX_ERRORS VALIDATION
+// ============================================================
+
+/**
+ * Validates the factory-level `max_errors` config value.
+ *
+ * Called at factory init. Undefined is allowed (default 3 applies). Zero,
+ * negative values, and non-integers are rejected so a misconfigured extension
+ * fails fast instead of silently falling back to the default.
+ *
+ * @param value - The max_errors config value (or undefined)
+ * @throws RuntimeError('RILL-R001', ...) when value is not a positive integer
+ */
+export function validateMaxErrors(value: unknown): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (
+    typeof value !== 'number' ||
+    !Number.isInteger(value) ||
+    value <= 0
+  ) {
+    throw new RuntimeError(
+      'RILL-R001',
+      "Factory config 'max_errors' must be a positive integer or undefined."
+    );
+  }
+}

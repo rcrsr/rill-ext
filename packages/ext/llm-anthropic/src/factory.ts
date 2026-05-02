@@ -35,6 +35,7 @@ import {
   RESERVED_KEYS_COMMON,
   validateExtraKeys,
   validateMaxTurns,
+  validateMaxErrors,
   MESSAGES_LIST_STRUCTURE,
   type ProviderErrorDetector,
   type ToolLoopCallbacks,
@@ -434,6 +435,9 @@ export function createAnthropicExtension(
 ): ExtensionFactoryResult {
   // EC-21, EC-22: Validate factory max_turns BEFORE client creation
   validateMaxTurns(config.max_turns);
+
+  // Validate factory max_errors BEFORE client creation; reject 0/negative/non-integer
+  validateMaxErrors(config.max_errors);
 
   // EC-19, EC-20: Validate extra keys BEFORE client creation
   validateExtraKeys(config.extra, RESERVED_KEYS_COMMON);

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.2] - 2026-05-02
+
+### Changed (Breaking)
+
+- `message()` and `generate()` accept the unified `prompt` parameter (string or message-list with `role` plus `content`/`parts`), normalized through the shared `normalizePrompt` helper. Boundary validation rejects empty prompts, trailing assistant turns, invalid roles, and unsupported part types via `#INVALID_INPUT` with `meta.raw.kind`.
+- `messages()` host function removed. Multi-turn conversations go through `message(prompt: list)` instead.
+- Resolved `message()` value now includes a parts-shaped `messages` field built via `buildResponseMessages`. The top-level `content` field and per-call `options` dict (`system`, `max_tokens`) are retained; foundry does not yet consume `max_turns`, `max_errors`, or `extra` factory config.
+
 ## [0.19.1] - 2026-04-28
 
 ### Fixed

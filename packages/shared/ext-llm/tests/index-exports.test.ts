@@ -23,6 +23,7 @@ import {
   expandContentSugar,
   validateExtraKeys,
   validateMaxTurns,
+  validateMaxErrors,
   validateMessages,
 } from '../src/index.js';
 import type {
@@ -115,6 +116,10 @@ describe('barrel runtime exports', () => {
 
   it('exports validateMaxTurns as a function', () => {
     expect(typeof validateMaxTurns).toBe('function');
+  });
+
+  it('exports validateMaxErrors as a function', () => {
+    expect(typeof validateMaxErrors).toBe('function');
   });
 });
 
