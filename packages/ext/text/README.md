@@ -38,7 +38,7 @@ use<ext:text> => $text
 $text.html_to_text("<h1>Hello</h1><p>World</p>") -> log
 $text.html_to_markdown("<h1>Hello</h1><p>World</p>") -> log
 $text.extract_urls("Visit https://rill.run for docs.") -> log
-$text.truncate("A long article body...", 100, "...") -> log
+$text.truncate("A long article body...", 100, false, "...") -> log
 ```
 
 ```bash

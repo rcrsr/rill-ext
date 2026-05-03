@@ -31,15 +31,11 @@ export function collapseWhitespace(text: string, preserveNewlines: boolean): str
   }
 
   // Split on sequences of two or more newlines (blank-line boundaries).
-  // Each chunk is a paragraph; within it collapse non-newline whitespace runs.
+  // Each chunk is a paragraph; within it collapse all whitespace runs
+  // (including single newlines) to a single space, so only the blank-line
+  // boundary creates a paragraph split in the output.
   const paragraphs = text.split(/\n{2,}/);
-  const normalised = paragraphs.map((para) =>
-    // Within a paragraph, collapse runs of spaces/tabs to a single space.
-    // Single newlines inside a paragraph are treated as ordinary whitespace
-    // and collapsed too, so only the blank-line boundary creates a paragraph
-    // split in the output.
-    para.replace(/[ \t]+/g, ' ').trim(),
-  );
+  const normalised = paragraphs.map((para) => para.replace(/\s+/g, ' ').trim());
   return normalised.join('\n\n');
 }
 

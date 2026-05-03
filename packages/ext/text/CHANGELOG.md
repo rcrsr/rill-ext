@@ -31,4 +31,4 @@
 
 dist/index.js = 20 KB (20,477 bytes). Measured at initial release.
 
-Initial release. Node.js 18+ required.
+Initial release. Node.js 22+ required (matches workspace `engines.node`).

@@ -226,7 +226,14 @@ export function createTextExtension(
             { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
           );
         }
-        const preserveNewlines = args['preserve_newlines'] === true;
+        const rawPreserveNewlines = args['preserve_newlines'];
+        const preserveNewlines = rawPreserveNewlines === undefined ? false : rawPreserveNewlines;
+        if (typeof preserveNewlines !== 'boolean') {
+          return runCtx.invalidate(
+            new Error('preserve_newlines must be a boolean'),
+            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_option_type' } },
+          );
+        }
         return collapseWhitespace(text, preserveNewlines);
       },
       annotations: { description: 'Collapse runs of whitespace to a single space' },
@@ -387,8 +394,22 @@ export function createTextExtension(
             { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_max' } },
           );
         }
-        const wordBoundary = args['word_boundary'] === true;
-        const ellipsis = args['ellipsis'] === undefined ? '' : (args['ellipsis'] as string);
+        const rawWordBoundary = args['word_boundary'];
+        const wordBoundary = rawWordBoundary === undefined ? false : rawWordBoundary;
+        if (typeof wordBoundary !== 'boolean') {
+          return runCtx.invalidate(
+            new Error('word_boundary must be a boolean'),
+            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_option_type' } },
+          );
+        }
+        const rawEllipsis = args['ellipsis'];
+        const ellipsis = rawEllipsis === undefined ? '' : rawEllipsis;
+        if (typeof ellipsis !== 'string') {
+          return runCtx.invalidate(
+            new Error('ellipsis must be a string'),
+            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_option_type' } },
+          );
+        }
         return truncate(text, max, wordBoundary, ellipsis);
       },
       annotations: { description: 'Truncate text to a maximum length' },
