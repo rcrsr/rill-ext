@@ -1,6 +1,7 @@
 # Gmail triage workflow: search, read, label.
 # Capabilities used: gmail.search, gmail.read, gmail.label (all default-true).
 # Token comes from the GOOGLE_TOKEN env var via rill-config.json.
+# Extensions: gw (google-workspace), text (text processing).
 
 gw.gmail_search($context.query, dict[maxResults: 1]) => $results
 "Found {$results.messages.len} message(s)" -> log
@@ -11,6 +12,13 @@ $results.messages.empty
 $results.messages[0].id => $message_id
 gw.gmail_read($message_id) => $msg
 "Subject: {$msg.subject}" -> log
+
+# Text processing pipeline: clean and truncate the message body.
+# html_to_text handles messages where the body fallback is HTML.
+text.html_to_text($msg.body, false, true, 80) => $plain_body
+text.collapse_whitespace($plain_body, false) => $cleaned
+text.truncate($cleaned, 4000, true, "...") => $preview
+"Body preview: {$preview}" -> log
 
 gw.gmail_label($message_id, $context.label) => $labeled
 "Applied label '{$context.label}': {$labeled}" -> log

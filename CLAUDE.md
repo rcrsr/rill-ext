@@ -39,6 +39,7 @@ rill-ext is a pnpm workspace containing official extensions for the rill languag
 | `packages/ext/google-workspace` | `@rcrsr/rill-ext-google-workspace` | fetch (native), node:crypto (built-in) |
 | `packages/ext/foundry` | `@rcrsr/rill-ext-foundry` | openai, @azure/identity (optional) |
 | `packages/ext/prompt-md` | `@rcrsr/rill-ext-prompt-md` | yaml |
+| `packages/ext/text` | `@rcrsr/rill-ext-text` | html-to-text, turndown, defuddle, linkedom, entities, linkify-it |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
 | `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` (private) | -- |
 | `packages/shared/ext-kv` | `@rcrsr/rill-ext-kv-shared` (private) | -- |
