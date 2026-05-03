@@ -6,7 +6,8 @@
   "main": "script.rill",
   "extensions": {
     "mounts": {
-      "gw": "@rcrsr/rill-ext-google-workspace"
+      "gw": "@rcrsr/rill-ext-google-workspace",
+      "text": "@rcrsr/rill-ext-text"
     },
     "config": {
       "gw": {

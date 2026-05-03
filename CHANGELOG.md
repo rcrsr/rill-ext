@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `@rcrsr/rill-ext-text` provides 14 text processing functions: convert HTML to plain text or Markdown, extract readable content from web pages, normalize whitespace, segment text, decode HTML entities, and identify URLs and email addresses
+
 ## [0.19.6] - 2026-05-02
 
 ### Changed (Breaking)
