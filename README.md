@@ -37,6 +37,7 @@ All packages are published under `@rcrsr/` on npm. Provider categories (**LLM**,
 | | [`rill-ext-datetime`](packages/ext/datetime) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-datetime)](https://www.npmjs.com/package/@rcrsr/rill-ext-datetime) | [docs](packages/ext/datetime/docs/extension-datetime.md) | Timezone conversion, formatting, parsing |
 | | [`rill-ext-exec`](packages/ext/exec) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-exec)](https://www.npmjs.com/package/@rcrsr/rill-ext-exec) | [docs](packages/ext/exec/docs/extension-exec.md) | Sandboxed command execution |
 | | [`rill-ext-fetch`](packages/ext/fetch) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-fetch)](https://www.npmjs.com/package/@rcrsr/rill-ext-fetch) | [docs](packages/ext/fetch/docs/extension-fetch.md) | HTTP with endpoint allowlisting |
+| | [`rill-ext-text`](packages/ext/text) | [![npm](https://img.shields.io/npm/v/@rcrsr/rill-ext-text)](https://www.npmjs.com/package/@rcrsr/rill-ext-text) | [docs](packages/ext/text/docs/extension-text.md) | HTML/Markdown conversion, extraction, segmentation |
 
 ## Usage
 
