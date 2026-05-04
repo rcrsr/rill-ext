@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.7] - 2026-05-03
+
 ### Added
 
 - `@rcrsr/rill-ext-text` provides 14 text processing functions: convert HTML to plain text or Markdown, extract readable content from web pages, normalize whitespace, segment text, decode HTML entities, and identify URLs and email addresses
+
+### Fixed
+
+- `@rcrsr/rill-ext-google-workspace` bumped to `0.19.5`. `extensionManifest.version` now reflects the actual package version. Previous publishes (0.19.0 through 0.19.4) shipped `dist/index.js` with `VERSION = "0.1.0"` hardcoded in `src/index.ts`, causing rill's loader to throw `ExtensionVersionError: v0.1.0 does not satisfy ^0.19.x` at load-project time. `VERSION` is now read from `package.json` at runtime via `createRequire`, matching the pattern used by every other extension in this repo.
 
 ## [0.19.6] - 2026-05-02
 
