@@ -111,6 +111,16 @@ Hashing, HMAC, UUID generation, and random bytes via node:crypto.
 
 Functions: `hash`, `hmac`, `uuid`, `random`
 
+## Text Processing (1 package, 14 functions)
+
+HTML to plain text or Markdown, readable-content extraction, MIME quoted-printable decoding, Unicode diacritic stripping, whitespace normalization, URL and email extraction, and paragraph segmentation.
+
+| Package | Docs |
+|---------|------|
+| `@rcrsr/rill-ext-text` | [extension-text.md](packages/ext/text/docs/extension-text.md) |
+
+Functions: `html_to_text`, `html_to_markdown`, `extract_content`, `decode_entities`, `decode_quoted_printable`, `strip_diacritics`, `collapse_whitespace`, `dedent`, `trim_lines`, `extract_urls`, `extract_emails`, `split_paragraphs`, `window`, `truncate`
+
 ## Datetime (1 package, 7 functions)
 
 Timezone conversion, date/time formatting, and parsing via the Intl API. Zero external dependencies.
