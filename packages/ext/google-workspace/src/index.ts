@@ -1,7 +1,10 @@
+import { createRequire } from 'node:module';
 import type { ExtensionConfigSchema, ExtensionManifest } from '@rcrsr/rill';
 import { createGoogleWorkspaceExtension as _factory } from './factory.js';
 
-export const VERSION = '0.1.0';
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+export const VERSION = _pkg.version;
 
 // ============================================================
 // TYPE DEFINITIONS

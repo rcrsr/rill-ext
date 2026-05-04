@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.5] - 2026-05-03
+
+### Fixed
+
+- `extensionManifest.version` now reflects the actual package version. Previous publishes (0.19.0 through 0.19.4) shipped `dist/index.js` with `VERSION = "0.1.0"` hardcoded in `src/index.ts`, causing rill's loader to throw `ExtensionVersionError: v0.1.0 does not satisfy ^0.19.x` at load-project time. `VERSION` is now read from `package.json` at runtime via `createRequire`, matching the pattern used by every other extension in this repo.
+
 ## [0.19.4] - 2026-04-30
 
 ### Changed (Breaking)
