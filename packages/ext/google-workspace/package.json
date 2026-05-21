@@ -18,6 +18,9 @@
     "ai",
     "scripting"
   ],
+  "rill": {
+    "role": "extension"
+  },
   "scripts": {
     "build": "tsup && dts-bundle-generator --config dts-bundle-generator.config.cjs",
     "test": "vitest run",
