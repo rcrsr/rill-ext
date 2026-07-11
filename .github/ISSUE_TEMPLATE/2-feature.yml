@@ -1,0 +1,59 @@
+# Pre-sets the native Issue Type. Decision rule vs Chore: "would a host-script
+# author notice it in a release note?" Yes -> Feature. Taxonomy:
+# .github/labeler.yml.
+name: Feature
+description: 'Net-new capability a host script sees: a new host function, a new provider extension, a new option'
+type: Feature
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: >-
+        What a host script cannot do today, and who hits it (script author, host
+        integrator, agent generating rill)? Show the host-function call you wish
+        you could make.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: >-
+        What does done look like as observable behavior, not the implementation.
+        Include the new host-function surface, its params (snake_case at the
+        boundary), and how it fails (invalid RillValue with a generic atom, no
+        exceptions). Keep it scoped; link related issues with #N.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Supporting context
+      description: >-
+        Optional. Vendor SDK capabilities, prior art in sibling extensions,
+        related issues (#N), and pointers to relevant source. What to look at,
+        not the solution to build.
+    validations:
+      required: false
+  - type: dropdown
+    id: areas
+    attributes:
+      label: Area(s)
+      description: Which capability domain, becomes the area:* labels at triage.
+      multiple: true
+      options:
+        - llm
+        - vectordb
+        - kv
+        - fs
+        - search
+        - mcp
+        - prompt
+        - integrations
+        - utils
+        - shared
+        - docs
+        - dx
+    validations:
+      required: true
