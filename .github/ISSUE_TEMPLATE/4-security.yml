@@ -1,0 +1,63 @@
+# Pre-sets the native Issue Type. Security WINS over Bug/Feature/Chore when the
+# issue is fundamentally about an extension executing with credentials inside a
+# machine-generated or untrusted script: API-key/secret leakage, SSRF
+# (fetch/search/fs-s3 reaching internal hosts), path traversal (fs-local),
+# command injection (exec), or resource-exhaustion halts. Extensions run inside
+# rill executing LLM-generated scripts, so this is a first-class concern.
+name: Security
+description: Credential handling, SSRF, path traversal, command injection, resource exhaustion at the extension boundary
+type: Security
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        **Do not post working exploit payloads against a live host or a real
+        provider account.** Describe the class of issue and a minimal
+        reproduction. If this is a disclosed vulnerability in a published
+        `@rcrsr/rill-ext-*` release, prefer private disclosure over a public
+        issue.
+  - type: textarea
+    id: concern
+    attributes:
+      label: The concern
+      description: What a host script or the extension can reach or expose that it should not, and the execution path involved (which host function, which argument).
+    validations:
+      required: true
+  - type: textarea
+    id: surface
+    attributes:
+      label: Threat surface
+      description: Which boundary is at stake (credential storage/logging, outbound URL/host allowlisting, filesystem path resolution, shell/argument construction, request timeouts and size limits, untrusted host-function args)?
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Supporting context
+      description: >-
+        Optional. Related issues (#N) and pointers to the execution path /
+        relevant source. What to look at. Do not post the fix here: the codebase
+        changes and a solution in the ticket ages.
+    validations:
+      required: false
+  - type: dropdown
+    id: areas
+    attributes:
+      label: Area(s)
+      description: Which capability domain, becomes the area:* labels at triage.
+      multiple: true
+      options:
+        - llm
+        - vectordb
+        - kv
+        - fs
+        - search
+        - mcp
+        - prompt
+        - integrations
+        - utils
+        - shared
+        - docs
+        - dx
+    validations:
+      required: true

@@ -1,0 +1,192 @@
+# =============================================================================
+# THE RILL-EXT ISSUE TAXONOMY, in one place. Four axes; one is a label set.
+#
+#   1. AREA (where) -- `area:*` labels, the glob map below. Every area maps to a
+#      capability domain in the extension monorepo, not to a single package: the
+#      provider extensions in a domain and the private shared package they all
+#      bundle share one area. Path-derivable, so PRs get them automatically
+#      (actions/labeler via .github/workflows/pr-labels.yml). On issues the
+#      filer sets them. The labeler is additive and mechanical: a cross-cutting
+#      PR collects one label per touched domain. Pick ONE primary area, the one
+#      that owns the work, and add a second only when genuinely co-owned.
+#
+#   Twelve areas, mapped to the extension categories in CLAUDE.md plus the two
+#   support surfaces (docs, dx):
+#     area:llm          the LLM provider extensions (Anthropic, Gemini, OpenAI,
+#                       Foundry) and the shared tool-loop / schema / error
+#                       machinery they bundle (shared/ext-llm).
+#     area:vectordb     the vector-DB extensions (Chroma, Pinecone, Qdrant) and
+#                       shared/ext-vector.
+#     area:kv           the key-value extensions (Redis, SQLite, file) and
+#                       shared/ext-kv.
+#     area:fs           the filesystem extensions (local, S3) and shared/ext-fs.
+#     area:search       the web-search extensions (Brave, Exa, SearXNG, Serper,
+#                       Tavily) and shared/ext-search.
+#     area:mcp          the Model Context Protocol client extension.
+#     area:prompt       prompt and content processing: prompt-md, text, and
+#                       shared/ext-prompt.
+#     area:integrations third-party service integrations that are not a KV/FS/
+#                       search/vector backend: Outlook, Google Workspace,
+#                       Claude Code.
+#     area:utils        the built-in / native-primitive extensions with no
+#                       vendor SDK: crypto, exec, fetch, datetime.
+#     area:shared       cross-cutting foundations every extension depends on
+#                       that belong to no single domain: shared/ext-param (the
+#                       `p.*` RillParam helpers).
+#     area:docs         documentation -- per-package docs/**, README, CHANGELOG.
+#                       Overlap with a domain area is intentional: a package's
+#                       docs are both docs and that domain's reference.
+#     area:dx           CI, toolchain, lint/format rules, and root workspace
+#                       config. Anything no consumer of a published extension
+#                       sees. A root deps bump or an oxlint-config change
+#                       touches none of the package source globs above, so it
+#                       would otherwise get no area.
+#
+#   2. STATUS (why not now) -- the `on-hold` label, issues-only, optional. The
+#      one state GitHub has no native home for (unprefixed, matching
+#      needs-triage): valid, shaped work deliberately parked ("not until the
+#      shared vector refactor settles"). Not low priority (that is Priority Low,
+#      how urgent, not why parked) and not blocked-on-a-specific-issue. Blocked
+#      on a SPECIFIC issue: use the native issue dependency ("Mark as blocked
+#      by") and NO label. Deliberate park with no single blocker: on-hold.
+#
+#   3. TYPE (what kind) -- native org-level Issue Type, NOT a label, issues-only:
+#        Bug . Feature . Chore . Security . Idea
+#      Feature = net-new capability a host script sees: a new host function, a
+#      new provider extension, a new option. Chore = robustness work on existing
+#      machinery: debt, refactors, shared-package internals, test suites, perf,
+#      dependency sweeps with no visible surface change. Decision rule: "would a
+#      host-script author notice it in a release note? Feature. Otherwise Chore."
+#      Bug = existing behavior is wrong: a host function returns the wrong value,
+#      an error maps to the wrong atom, a boundary key leaks camelCase.
+#      Security wins over Bug/Feature/Chore when the issue is fundamentally about
+#      an extension executing with credentials inside an LLM-generated script:
+#      API-key leakage, SSRF (fetch/search/fs-s3), path traversal (fs-local),
+#      command injection (exec), or resource-exhaustion halts.
+#      Idea = captured but not yet shaped. Still carries >=1 area: (best guess);
+#      Priority stays unset. Promotion = change the Type to what it became.
+#      Documentation work is NOT a type: it is area:docs on a Bug/Feature/Chore.
+#
+#   4. PRIORITY (how urgent) -- native org-level Priority Issue Field, NOT a
+#      label, issues-only, optional: High = the queue . Medium = this cycle .
+#      Low = someday. Unset = not yet triaged.
+#
+# TITLES: issues are titled `[<primary-area>] <title>`, lowercase, bare area
+# name without the `area:` prefix: "[search] plan_limit maps to wrong atom",
+# "[llm] add streaming to tool_loop". PR titles do NOT take the bracket: they
+# keep conventional-commit format (`feat(search-tavily): ...`), where the scope
+# already names the primary package.
+#
+# COLORS: one signal per axis; label text is the load-bearing distinction
+# (WCAG 1.4.1, color reinforces, never the only signal). area:* uniform blue
+# #1d76db; on-hold gray #d2dae1 (parked); needs-triage yellow #fbca04
+# (pending). Create the labels with .github/scripts/sync-labels.sh.
+#
+# Rule (enforced advisorily by .github/workflows/issue-labels.yml): every open
+# issue carries >=1 area: label + exactly one Type; Priority is set at triage;
+# on-hold is optional and never satisfies the area requirement. Issue forms
+# (.github/ISSUE_TEMPLATE/) pre-set the Type when filing from the web UI. PRs
+# carry only area labels; the linked issue holds Type/Priority/on-hold. The
+# rcrsr org must have Issue Types (Bug/Feature/Chore/Security/Idea) and the
+# Priority field enabled for the native axes to apply.
+# This file doubles as the one-stop taxonomy doc.
+# =============================================================================
+
+'area:llm':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/ext/llm-anthropic/**'
+          - 'packages/ext/llm-gemini/**'
+          - 'packages/ext/llm-openai/**'
+          - 'packages/ext/foundry/**'
+          - 'packages/shared/ext-llm/**'
+
+'area:vectordb':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/ext/vectordb-chroma/**'
+          - 'packages/ext/vectordb-pinecone/**'
+          - 'packages/ext/vectordb-qdrant/**'
+          - 'packages/shared/ext-vector/**'
+
+'area:kv':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/ext/kv-redis/**'
+          - 'packages/ext/kv-sqlite/**'
+          - 'packages/ext/kv-file/**'
+          - 'packages/shared/ext-kv/**'
+
+'area:fs':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/ext/fs-local/**'
+          - 'packages/ext/fs-s3/**'
+          - 'packages/shared/ext-fs/**'
+
+'area:search':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/ext/search-brave/**'
+          - 'packages/ext/search-exa/**'
+          - 'packages/ext/search-searxng/**'
+          - 'packages/ext/search-serper/**'
+          - 'packages/ext/search-tavily/**'
+          - 'packages/shared/ext-search/**'
+
+'area:mcp':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/ext/mcp/**'
+
+'area:prompt':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/ext/prompt-md/**'
+          - 'packages/ext/text/**'
+          - 'packages/shared/ext-prompt/**'
+
+'area:integrations':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/ext/outlook/**'
+          - 'packages/ext/google-workspace/**'
+          - 'packages/ext/claude-code/**'
+
+'area:utils':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/ext/crypto/**'
+          - 'packages/ext/exec/**'
+          - 'packages/ext/fetch/**'
+          - 'packages/ext/datetime/**'
+
+'area:shared':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/shared/ext-param/**'
+
+'area:docs':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packages/*/*/docs/**'
+          - 'packages/**/README.md'
+          - 'packages/**/CHANGELOG.md'
+          - 'README.md'
+          - 'CHANGELOG.md'
+
+'area:dx':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - '.claude/**'
+          # Root and workspace toolchain inputs. A root-only deps or
+          # toolchain-config bump touches none of the source globs above, so it
+          # would otherwise get no area at all.
+          - 'package.json'
+          - 'pnpm-lock.yaml'
+          - 'pnpm-workspace.yaml'
+          - 'tsconfig*.json'
+          - 'packages/ext/tsconfig.ext.json'
+          - '.oxlintrc.json'
+          - '.oxfmtrc.json'
+          - 'knip.json'
+          - 'lefthook.yml'

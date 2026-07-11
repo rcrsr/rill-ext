@@ -1,0 +1,60 @@
+# Pre-sets the native Issue Type so issues filed from the web UI land correctly
+# typed without scripts (gh CLI can set types since 2.94; forms also can).
+# Taxonomy: .github/labeler.yml header.
+name: Bug report
+description: A host function returns a wrong value, maps an error to the wrong atom, or leaks/breaks at the rill boundary
+type: Bug
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: >-
+        What you observed vs. what you expected, the symptom, not a guess at the
+        cause or the fix. If it is about an extension executing with credentials
+        inside an untrusted or machine-generated script (API-key leakage, SSRF,
+        path traversal, command injection, resource exhaustion), file it as a
+        Security issue instead. Security wins over Bug.
+      placeholder: Include the extension, the host-function call, the actual result, and the expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: A minimal host script or config that triggers it, the extension version, the `@rcrsr/rill` version, and the provider/backend involved.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Supporting context
+      description: >-
+        Optional. Error atoms (#TIMEOUT, #AUTH, ...), `meta` payloads, stack
+        traces, related issues (#N), and pointers to relevant source. Do not
+        propose a fix: the codebase changes and a solution in the ticket ages.
+    validations:
+      required: false
+  - type: dropdown
+    id: areas
+    attributes:
+      label: Area(s)
+      description: >-
+        Which capability domain the work lives in, becomes the area:* labels at
+        triage (forms cannot apply per-answer labels).
+      multiple: true
+      options:
+        - llm
+        - vectordb
+        - kv
+        - fs
+        - search
+        - mcp
+        - prompt
+        - integrations
+        - utils
+        - shared
+        - docs
+        - dx
+    validations:
+      required: true
