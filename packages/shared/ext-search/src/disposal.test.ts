@@ -53,7 +53,9 @@ describe('checkDisposed', () => {
   it('includes provider name in disposed message', () => {
     const state = { isDisposed: true };
     const result = checkDisposed(ctx, state, 'my-search-ext');
-    expect(getStatus(result!).message).toBe('my-search-ext: operation cancelled');
+    expect(getStatus(result!).message).toBe(
+      'my-search-ext: operation cancelled'
+    );
   });
 });
 

@@ -20,7 +20,11 @@ import {
 } from '@rcrsr/rill';
 import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
 import { buildRestAuthHeaders } from './client.js';
-import { mapRestError, createTimeoutError, detectFoundryError } from './errors.js';
+import {
+  mapRestError,
+  createTimeoutError,
+  detectFoundryError,
+} from './errors.js';
 import type {
   FoundryAuth,
   FoundryContentSafetyConfig,
@@ -54,7 +58,10 @@ interface ShieldResult {
 export type ShieldMiddleware = (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
-  inner: (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue>,
+  inner: (
+    args: Record<string, RillValue>,
+    ctx: RuntimeContext
+  ) => Promise<RillValue>,
   triggeredBy: string
 ) => Promise<RillValue>;
 
@@ -90,14 +97,24 @@ export async function callShield(
 
   // EC-7: Content Safety must be configured
   if (!config.contentSafety) {
-    throw haltUnconfigured(ctx, 'safety_unconfigured', 'foundry: content safety not configured');
+    throw haltUnconfigured(
+      ctx,
+      'safety_unconfigured',
+      'foundry: content safety not configured'
+    );
   }
 
   const safetyConfig: FoundryContentSafetyConfig = config.contentSafety;
   const startTime = Date.now();
 
   try {
-    const result = await runShieldRequest(ctx, text, documents, safetyConfig, auth);
+    const result = await runShieldRequest(
+      ctx,
+      text,
+      documents,
+      safetyConfig,
+      auth
+    );
     const duration = Date.now() - startTime;
 
     emitExtensionEvent(ctx, {
@@ -163,7 +180,13 @@ export function createAutoShieldMiddleware(
     const promptText = extractPromptText(args);
     const startTime = Date.now();
 
-    const result = await runShieldRequest(ctx, promptText, [], safetyConfig, auth);
+    const result = await runShieldRequest(
+      ctx,
+      promptText,
+      [],
+      safetyConfig,
+      auth
+    );
     const duration = Date.now() - startTime;
 
     emitExtensionEvent(ctx, {
@@ -182,7 +205,11 @@ export function createAutoShieldMiddleware(
         ctx.invalidate(new Error(message), {
           code: 'FORBIDDEN',
           provider: PROVIDER,
-          raw: { kind: 'attack_detected', attackType: result.attackType, message },
+          raw: {
+            kind: 'attack_detected',
+            attackType: result.attackType,
+            message,
+          },
         }),
         true
       );

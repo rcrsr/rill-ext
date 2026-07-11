@@ -50,11 +50,7 @@ export function validateExtraKeys(
   }
 
   // EC-20: extra is not a plain object (null, array, primitive, etc.)
-  if (
-    typeof extra !== 'object' ||
-    extra === null ||
-    Array.isArray(extra)
-  ) {
+  if (typeof extra !== 'object' || extra === null || Array.isArray(extra)) {
     throw new RuntimeError(
       'RILL-R001',
       "Factory config 'extra' must be a dict."
@@ -64,9 +60,7 @@ export function validateExtraKeys(
   // EC-19: extra contains one or more reserved keys
   const extraKeys = Object.keys(extra as Record<string, unknown>);
   const reservedSet = new Set(reservedKeys);
-  const colliding = extraKeys
-    .filter((k) => reservedSet.has(k))
-    .sort();
+  const colliding = extraKeys.filter((k) => reservedSet.has(k)).sort();
 
   if (colliding.length > 0) {
     const keyList = colliding.map((k) => `'${k}'`).join(', ');
@@ -105,11 +99,7 @@ export function validateMaxTurns(value: unknown): void {
   }
 
   // EC-22: negative or non-integer
-  if (
-    typeof value !== 'number' ||
-    !Number.isInteger(value) ||
-    value < 0
-  ) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new RuntimeError(
       'RILL-R001',
       "Factory config 'max_turns' must be a positive integer or undefined."
@@ -136,11 +126,7 @@ export function validateMaxErrors(value: unknown): void {
     return;
   }
 
-  if (
-    typeof value !== 'number' ||
-    !Number.isInteger(value) ||
-    value <= 0
-  ) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
     throw new RuntimeError(
       'RILL-R001',
       "Factory config 'max_errors' must be a positive integer or undefined."

@@ -18,7 +18,7 @@ import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
  */
 function getCallable(
   ext: { value: unknown },
-  name: string,
+  name: string
 ): { fn: (args: Record<string, unknown>) => unknown } {
   const value = ext.value as Record<
     string,
@@ -34,7 +34,11 @@ function getCallable(
   return {
     fn: (args: Record<string, unknown>) => {
       const result = callable.fn(args, makeRuntimeCtx());
-      if (result && typeof result === 'object' && 'then' in (result as object)) {
+      if (
+        result &&
+        typeof result === 'object' &&
+        'then' in (result as object)
+      ) {
         return (result as Promise<unknown>).then(checkInvalid);
       }
       return checkInvalid(result);
@@ -69,7 +73,11 @@ describe('kv functions', () => {
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       // Set then get
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'name',
+        value: 'Alice',
+      });
       const result = getCallable(ext, 'get').fn({ mount: 'test', key: 'name' });
 
       expect(result).toBe('Alice');
@@ -92,7 +100,10 @@ describe('kv functions', () => {
       };
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      const result = getCallable(ext, 'get').fn({ mount: 'test', key: 'count' });
+      const result = getCallable(ext, 'get').fn({
+        mount: 'test',
+        key: 'count',
+      });
 
       expect(result).toBe(0);
       ext.dispose?.();
@@ -111,7 +122,10 @@ describe('kv functions', () => {
       };
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      const result = getCallable(ext, 'get').fn({ mount: 'test', key: 'missing' });
+      const result = getCallable(ext, 'get').fn({
+        mount: 'test',
+        key: 'missing',
+      });
 
       expect(result).toBe('');
       ext.dispose?.();
@@ -131,7 +145,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
+      expect(() =>
+        getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })
+      ).toThrow('not found');
       ext.dispose?.();
     });
 
@@ -152,7 +168,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'get').fn({ mount: 'test', key: 'age' })).toThrow('not declared');
+      expect(() =>
+        getCallable(ext, 'get').fn({ mount: 'test', key: 'age' })
+      ).toThrow('not declared');
       ext.dispose?.();
     });
   });
@@ -173,7 +191,11 @@ describe('kv functions', () => {
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Bob' });
-      const result = getCallable(ext, 'get_or').fn({ mount: 'test', key: 'name', fallback: 'fallback' });
+      const result = getCallable(ext, 'get_or').fn({
+        mount: 'test',
+        key: 'name',
+        fallback: 'fallback',
+      });
 
       expect(result).toBe('Bob');
       ext.dispose?.();
@@ -192,7 +214,11 @@ describe('kv functions', () => {
       };
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      const result = getCallable(ext, 'get_or').fn({ mount: 'test', key: 'missing', fallback: 'default-value' });
+      const result = getCallable(ext, 'get_or').fn({
+        mount: 'test',
+        key: 'missing',
+        fallback: 'default-value',
+      });
 
       expect(result).toBe('default-value');
       ext.dispose?.();
@@ -212,9 +238,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'get_or').fn({ mount: 'unknown', key: 'key', fallback: 'fallback' })).toThrow(
-        'not found'
-      );
+      expect(() =>
+        getCallable(ext, 'get_or').fn({
+          mount: 'unknown',
+          key: 'key',
+          fallback: 'fallback',
+        })
+      ).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -234,7 +264,11 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      const result = getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Charlie' });
+      const result = getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'name',
+        value: 'Charlie',
+      });
       expect(result).toBe(true);
 
       const value = getCallable(ext, 'get').fn({ mount: 'test', key: 'name' });
@@ -257,7 +291,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'value' })).toThrow('read-only');
+      expect(() =>
+        getCallable(ext, 'set').fn({
+          mount: 'test',
+          key: 'name',
+          value: 'value',
+        })
+      ).toThrow('read-only');
       ext.dispose?.();
     });
 
@@ -277,9 +317,13 @@ describe('kv functions', () => {
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
       const largeValue = 'x'.repeat(100);
-      expect(() => getCallable(ext, 'set').fn({ mount: 'test', key: 'key', value: largeValue })).toThrow(
-        'exceeds size limit'
-      );
+      expect(() =>
+        getCallable(ext, 'set').fn({
+          mount: 'test',
+          key: 'key',
+          value: largeValue,
+        })
+      ).toThrow('exceeds size limit');
       ext.dispose?.();
     });
 
@@ -300,9 +344,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'set').fn({ mount: 'test', key: 'count', value: 'not-a-number' })).toThrow(
-        'expects number'
-      );
+      expect(() =>
+        getCallable(ext, 'set').fn({
+          mount: 'test',
+          key: 'count',
+          value: 'not-a-number',
+        })
+      ).toThrow('expects number');
       ext.dispose?.();
     });
 
@@ -321,12 +369,24 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key1', value: 'value1' });
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key2', value: 'value2' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key1',
+        value: 'value1',
+      });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key2',
+        value: 'value2',
+      });
 
-      expect(() => getCallable(ext, 'set').fn({ mount: 'test', key: 'key3', value: 'value3' })).toThrow(
-        'entry limit'
-      );
+      expect(() =>
+        getCallable(ext, 'set').fn({
+          mount: 'test',
+          key: 'key3',
+          value: 'value3',
+        })
+      ).toThrow('entry limit');
       ext.dispose?.();
     });
 
@@ -345,11 +405,25 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key1', value: 'value1' });
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key2', value: 'value2' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key1',
+        value: 'value1',
+      });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key2',
+        value: 'value2',
+      });
 
       // Update existing key should work
-      expect(() => getCallable(ext, 'set').fn({ mount: 'test', key: 'key1', value: 'updated' })).not.toThrow();
+      expect(() =>
+        getCallable(ext, 'set').fn({
+          mount: 'test',
+          key: 'key1',
+          value: 'updated',
+        })
+      ).not.toThrow();
 
       const value = getCallable(ext, 'get').fn({ mount: 'test', key: 'key1' });
       expect(value).toBe('updated');
@@ -371,9 +445,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'set').fn({ mount: 'unknown', key: 'key', value: 'value' })).toThrow(
-        'not found'
-      );
+      expect(() =>
+        getCallable(ext, 'set').fn({
+          mount: 'unknown',
+          key: 'key',
+          value: 'value',
+        })
+      ).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -393,8 +471,16 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'user', value: { name: 'Alice', age: 30 } });
-      const result = getCallable(ext, 'merge').fn({ mount: 'test', key: 'user', partial: { age: 31, city: 'NYC' } });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'user',
+        value: { name: 'Alice', age: 30 },
+      });
+      const result = getCallable(ext, 'merge').fn({
+        mount: 'test',
+        key: 'user',
+        partial: { age: 31, city: 'NYC' },
+      });
 
       expect(result).toBe(true);
 
@@ -418,7 +504,11 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      const result = getCallable(ext, 'merge').fn({ mount: 'test', key: 'user', partial: { name: 'Bob' } });
+      const result = getCallable(ext, 'merge').fn({
+        mount: 'test',
+        key: 'user',
+        partial: { name: 'Bob' },
+      });
 
       expect(result).toBe(true);
 
@@ -442,11 +532,19 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'name',
+        value: 'Alice',
+      });
 
-      expect(() => getCallable(ext, 'merge').fn({ mount: 'test', key: 'name', partial: { age: 30 } })).toThrow(
-        'non-dict'
-      );
+      expect(() =>
+        getCallable(ext, 'merge').fn({
+          mount: 'test',
+          key: 'name',
+          partial: { age: 30 },
+        })
+      ).toThrow('non-dict');
       ext.dispose?.();
     });
 
@@ -464,9 +562,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'merge').fn({ mount: 'test', key: 'user', partial: { name: 'Alice' } })).toThrow(
-        'read-only'
-      );
+      expect(() =>
+        getCallable(ext, 'merge').fn({
+          mount: 'test',
+          key: 'user',
+          partial: { name: 'Alice' },
+        })
+      ).toThrow('read-only');
       ext.dispose?.();
     });
 
@@ -485,12 +587,22 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'user', value: { name: 'Alice' } });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'user',
+        value: { name: 'Alice' },
+      });
 
       // Merge that exceeds size limit should not partially apply
       const largePatch = { name: 'Alice', data: 'x'.repeat(100) };
 
-      expect(() => getCallable(ext, 'merge').fn({ mount: 'test', key: 'user', partial: largePatch })).toThrow();
+      expect(() =>
+        getCallable(ext, 'merge').fn({
+          mount: 'test',
+          key: 'user',
+          partial: largePatch,
+        })
+      ).toThrow();
 
       // Original value should be unchanged
       const value = getCallable(ext, 'get').fn({ mount: 'test', key: 'user' });
@@ -513,9 +625,13 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'merge').fn({ mount: 'unknown', key: 'key', partial: { a: 1 } })).toThrow(
-        'not found'
-      );
+      expect(() =>
+        getCallable(ext, 'merge').fn({
+          mount: 'unknown',
+          key: 'key',
+          partial: { a: 1 },
+        })
+      ).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -535,11 +651,20 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
-      const result = getCallable(ext, 'delete').fn({ mount: 'test', key: 'name' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'name',
+        value: 'Alice',
+      });
+      const result = getCallable(ext, 'delete').fn({
+        mount: 'test',
+        key: 'name',
+      });
 
       expect(result).toBe(true);
-      expect(getCallable(ext, 'has').fn({ mount: 'test', key: 'name' })).toBe(false);
+      expect(getCallable(ext, 'has').fn({ mount: 'test', key: 'name' })).toBe(
+        false
+      );
 
       ext.dispose?.();
     });
@@ -558,7 +683,10 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      const result = getCallable(ext, 'delete').fn({ mount: 'test', key: 'nonexistent' });
+      const result = getCallable(ext, 'delete').fn({
+        mount: 'test',
+        key: 'nonexistent',
+      });
 
       expect(result).toBe(false);
       ext.dispose?.();
@@ -578,7 +706,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'delete').fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
+      expect(() =>
+        getCallable(ext, 'delete').fn({ mount: 'unknown', key: 'key' })
+      ).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -598,9 +728,21 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key1', value: 'value1' });
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key2', value: 'value2' });
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key3', value: 'value3' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key1',
+        value: 'value1',
+      });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key2',
+        value: 'value2',
+      });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key3',
+        value: 'value3',
+      });
 
       const result = getCallable(ext, 'keys').fn({ mount: 'test' });
 
@@ -646,7 +788,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'keys').fn({ mount: 'unknown' })).toThrow('not found');
+      expect(() => getCallable(ext, 'keys').fn({ mount: 'unknown' })).toThrow(
+        'not found'
+      );
       ext.dispose?.();
     });
   });
@@ -666,7 +810,11 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'name',
+        value: 'Alice',
+      });
       const result = getCallable(ext, 'has').fn({ mount: 'test', key: 'name' });
 
       expect(result).toBe(true);
@@ -687,7 +835,10 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      const result = getCallable(ext, 'has').fn({ mount: 'test', key: 'missing' });
+      const result = getCallable(ext, 'has').fn({
+        mount: 'test',
+        key: 'missing',
+      });
 
       expect(result).toBe(false);
       ext.dispose?.();
@@ -707,7 +858,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'has').fn({ mount: 'unknown', key: 'key' })).toThrow('not found');
+      expect(() =>
+        getCallable(ext, 'has').fn({ mount: 'unknown', key: 'key' })
+      ).toThrow('not found');
       ext.dispose?.();
     });
   });
@@ -727,8 +880,16 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key1', value: 'value1' });
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'key2', value: 'value2' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key1',
+        value: 'value1',
+      });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'key2',
+        value: 'value2',
+      });
 
       const result = getCallable(ext, 'clear').fn({ mount: 'test' });
 
@@ -756,13 +917,21 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'name',
+        value: 'Alice',
+      });
       getCallable(ext, 'set').fn({ mount: 'test', key: 'count', value: 42 });
 
       getCallable(ext, 'clear').fn({ mount: 'test' });
 
-      expect(getCallable(ext, 'get').fn({ mount: 'test', key: 'name' })).toBe('Anonymous');
-      expect(getCallable(ext, 'get').fn({ mount: 'test', key: 'count' })).toBe(0);
+      expect(getCallable(ext, 'get').fn({ mount: 'test', key: 'name' })).toBe(
+        'Anonymous'
+      );
+      expect(getCallable(ext, 'get').fn({ mount: 'test', key: 'count' })).toBe(
+        0
+      );
 
       ext.dispose?.();
     });
@@ -781,7 +950,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'clear').fn({ mount: 'unknown' })).toThrow('not found');
+      expect(() => getCallable(ext, 'clear').fn({ mount: 'unknown' })).toThrow(
+        'not found'
+      );
       ext.dispose?.();
     });
   });
@@ -801,7 +972,11 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'name', value: 'Alice' });
+      getCallable(ext, 'set').fn({
+        mount: 'test',
+        key: 'name',
+        value: 'Alice',
+      });
       getCallable(ext, 'set').fn({ mount: 'test', key: 'age', value: 30 });
 
       const result = getCallable(ext, 'getAll').fn({ mount: 'test' });
@@ -848,7 +1023,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'getAll').fn({ mount: 'unknown' })).toThrow('not found');
+      expect(() => getCallable(ext, 'getAll').fn({ mount: 'unknown' })).toThrow(
+        'not found'
+      );
       ext.dispose?.();
     });
   });
@@ -923,7 +1100,9 @@ describe('kv functions', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      expect(() => getCallable(ext, 'schema').fn({ mount: 'unknown' })).toThrow('not found');
+      expect(() => getCallable(ext, 'schema').fn({ mount: 'unknown' })).toThrow(
+        'not found'
+      );
       ext.dispose?.();
     });
   });

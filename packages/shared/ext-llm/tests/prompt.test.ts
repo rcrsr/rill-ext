@@ -56,7 +56,10 @@ describe('normalizePrompt', () => {
       const ctx = makeCtx();
       const result = normalizePrompt('hello', ctx);
       expect(Array.isArray(result)).toBe(true);
-      const messages = result as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const messages = result as Array<{
+        role: string;
+        parts: Array<{ type: string; text: string }>;
+      }>;
       expect(messages).toHaveLength(1);
       expect(messages[0]?.role).toBe('user');
       expect(messages[0]?.parts).toHaveLength(1);
@@ -81,21 +84,28 @@ describe('normalizePrompt', () => {
       const ctx = makeCtx();
       const result = normalizePrompt([{ content: 'hi' }], ctx);
       expect(isInvalid(result as never)).toBe(true);
-      expect(getStatus(result as never).raw['kind']).toBe('invalid_message_format');
+      expect(getStatus(result as never).raw['kind']).toBe(
+        'invalid_message_format'
+      );
     });
 
     it('EC-6: message with neither parts nor content returns invalid with raw.kind=missing_message_content', () => {
       const ctx = makeCtx();
       const result = normalizePrompt([{ role: 'user' }], ctx);
       expect(isInvalid(result as never)).toBe(true);
-      expect(getStatus(result as never).raw['kind']).toBe('missing_message_content');
+      expect(getStatus(result as never).raw['kind']).toBe(
+        'missing_message_content'
+      );
     });
 
     it('IR-1, IR-5: content-sugar form expands to parts', () => {
       const ctx = makeCtx();
       const result = normalizePrompt([{ role: 'user', content: 'hi' }], ctx);
       expect(Array.isArray(result)).toBe(true);
-      const messages = result as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const messages = result as Array<{
+        role: string;
+        parts: Array<{ type: string; text: string }>;
+      }>;
       expect(messages[0]?.role).toBe('user');
       expect(messages[0]?.parts[0]?.type).toBe('text');
       expect(messages[0]?.parts[0]?.text).toBe('hi');
@@ -105,10 +115,13 @@ describe('normalizePrompt', () => {
       const ctx = makeCtx();
       const result = normalizePrompt(
         [{ role: 'user', parts: [{ type: 'text', text: 'hello' }] }],
-        ctx,
+        ctx
       );
       expect(Array.isArray(result)).toBe(true);
-      const messages = result as Array<{ role: string; parts: Array<{ type: string; text: string }> }>;
+      const messages = result as Array<{
+        role: string;
+        parts: Array<{ type: string; text: string }>;
+      }>;
       expect(messages[0]?.parts[0]?.text).toBe('hello');
     });
   });
@@ -122,21 +135,27 @@ describe('normalizePrompt', () => {
       const ctx = makeCtx();
       const result = normalizePrompt(123, ctx);
       expect(isInvalid(result as never)).toBe(true);
-      expect(getStatus(result as never).raw['kind']).toBe('invalid_prompt_type');
+      expect(getStatus(result as never).raw['kind']).toBe(
+        'invalid_prompt_type'
+      );
     });
 
     it('EC-10: boolean returns invalid with raw.kind=invalid_prompt_type', () => {
       const ctx = makeCtx();
       const result = normalizePrompt(true, ctx);
       expect(isInvalid(result as never)).toBe(true);
-      expect(getStatus(result as never).raw['kind']).toBe('invalid_prompt_type');
+      expect(getStatus(result as never).raw['kind']).toBe(
+        'invalid_prompt_type'
+      );
     });
 
     it('EC-10: dict returns invalid with raw.kind=invalid_prompt_type', () => {
       const ctx = makeCtx();
       const result = normalizePrompt({ role: 'user' }, ctx);
       expect(isInvalid(result as never)).toBe(true);
-      expect(getStatus(result as never).raw['kind']).toBe('invalid_prompt_type');
+      expect(getStatus(result as never).raw['kind']).toBe(
+        'invalid_prompt_type'
+      );
     });
   });
 });
@@ -188,7 +207,9 @@ describe('assertNoTrailingAssistant', () => {
     const result = assertNoTrailingAssistant(messages, ctx);
     expect(result).not.toBeUndefined();
     expect(isInvalid(result as never)).toBe(true);
-    expect(getStatus(result as never).raw['kind']).toBe('trailing_assistant_turn');
+    expect(getStatus(result as never).raw['kind']).toBe(
+      'trailing_assistant_turn'
+    );
   });
 
   it('IR-3: list ending with user role passes', () => {
@@ -212,14 +233,14 @@ describe('assertPartTypes', () => {
     const result = assertPartTypes(messages, ctx);
     expect(result).not.toBeUndefined();
     expect(isInvalid(result as never)).toBe(true);
-    expect(getStatus(result as never).raw['kind']).toBe('unsupported_part_type');
+    expect(getStatus(result as never).raw['kind']).toBe(
+      'unsupported_part_type'
+    );
   });
 
   it('IR-4, EC-8: text part missing text field rejected', () => {
     const ctx = makeCtx();
-    const messages = [
-      { role: 'user', parts: [{ type: 'text' }] },
-    ];
+    const messages = [{ role: 'user', parts: [{ type: 'text' }] }];
     const result = assertPartTypes(messages, ctx);
     expect(result).not.toBeUndefined();
     expect(isInvalid(result as never)).toBe(true);
@@ -228,9 +249,7 @@ describe('assertPartTypes', () => {
 
   it('IR-4, EC-8: thinking part missing text field rejected', () => {
     const ctx = makeCtx();
-    const messages = [
-      { role: 'assistant', parts: [{ type: 'thinking' }] },
-    ];
+    const messages = [{ role: 'assistant', parts: [{ type: 'thinking' }] }];
     const result = assertPartTypes(messages, ctx);
     expect(result).not.toBeUndefined();
     expect(getStatus(result as never).raw['kind']).toBe('invalid_part_shape');
@@ -251,7 +270,9 @@ describe('assertPartTypes', () => {
     const messages = [
       {
         role: 'user',
-        parts: [{ type: 'image', source: { kind: 'ftp', data: '', media_type: '' } }],
+        parts: [
+          { type: 'image', source: { kind: 'ftp', data: '', media_type: '' } },
+        ],
       },
     ];
     const result = assertPartTypes(messages, ctx);
@@ -274,7 +295,12 @@ describe('assertPartTypes', () => {
     const messages = [
       {
         role: 'user',
-        parts: [{ type: 'image', source: { kind: 'base64', data: 'abc', media_type: 'image/png' } }],
+        parts: [
+          {
+            type: 'image',
+            source: { kind: 'base64', data: 'abc', media_type: 'image/png' },
+          },
+        ],
       },
     ];
     const result = assertPartTypes(messages, ctx);
@@ -333,10 +359,17 @@ describe('MESSAGES_RETURN_TYPE', () => {
   it('IR-6: has structure.kind = list with a Message element', () => {
     // structureToTypeValue wraps the TypeStructure in a RillTypeValue.
     // The underlying structure is accessible via the .structure property.
-    const typeValue = MESSAGES_RETURN_TYPE as { structure?: { kind: string; element?: { kind: string; fields?: Record<string, unknown> } } };
+    const typeValue = MESSAGES_RETURN_TYPE as {
+      structure?: {
+        kind: string;
+        element?: { kind: string; fields?: Record<string, unknown> };
+      };
+    };
     expect(typeValue.structure?.kind).toBe('list');
     expect(typeValue.structure?.element?.kind).toBe('dict');
-    const fields = typeValue.structure?.element?.fields as Record<string, { type: { kind: string } }> | undefined;
+    const fields = typeValue.structure?.element?.fields as
+      | Record<string, { type: { kind: string } }>
+      | undefined;
     expect(fields?.['role']?.type?.kind).toBe('string');
     expect(fields?.['parts']?.type?.kind).toBe('list');
   });

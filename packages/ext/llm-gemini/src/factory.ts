@@ -142,10 +142,7 @@ const GENERATE_VERB_RETURN_TYPE = structureToTypeValue({
  * factory call sites can capture the halt for later re-throw while still
  * emitting events with the human-readable message.
  */
-function mapToHalt(
-  ctx: RuntimeContext,
-  error: unknown
-): RuntimeHaltSignal {
+function mapToHalt(ctx: RuntimeContext, error: unknown): RuntimeHaltSignal {
   const invalid = mapProviderError(ctx, 'Gemini', error, detectGeminiError);
   return new RuntimeHaltSignal(invalid, true);
 }
@@ -158,7 +155,7 @@ function haltInvalid(
   ctx: RuntimeContext,
   code: string,
   rawKind: string,
-  message: string,
+  message: string
 ): RuntimeHaltSignal {
   return new RuntimeHaltSignal(
     ctx.invalidate(new Error(message), {
@@ -166,7 +163,7 @@ function haltInvalid(
       provider: 'gemini',
       raw: { kind: rawKind, message },
     }),
-    true,
+    true
   );
 }
 
@@ -298,7 +295,11 @@ function canonicalPartToGemini(part: Part): GeminiPart {
       // Canonical tool_result → Gemini functionResponse
       // Collapse nested parts to a text string for the response body
       const responseText = part.parts
-        .map((p) => (p.type === 'text' || p.type === 'thinking' ? p.text : JSON.stringify(p)))
+        .map((p) =>
+          p.type === 'text' || p.type === 'thinking'
+            ? p.text
+            : JSON.stringify(p)
+        )
         .join('');
       return {
         functionResponse: {
@@ -329,14 +330,20 @@ function canonicalToGeminiContents(messages: Message[]): {
   for (const msg of messages) {
     if (msg.role === 'system') {
       // Lift system turn to systemInstruction; use text from first text part
-      const textPart = msg.parts.find((p) => p.type === 'text' || p.type === 'thinking');
-      if (textPart && (textPart.type === 'text' || textPart.type === 'thinking')) {
+      const textPart = msg.parts.find(
+        (p) => p.type === 'text' || p.type === 'thinking'
+      );
+      if (
+        textPart &&
+        (textPart.type === 'text' || textPart.type === 'thinking')
+      ) {
         systemInstruction = textPart.text;
       }
       continue;
     }
 
-    const geminiRole: 'user' | 'model' = msg.role === 'assistant' ? 'model' : 'user';
+    const geminiRole: 'user' | 'model' =
+      msg.role === 'assistant' ? 'model' : 'user';
     const geminiParts = msg.parts.map(canonicalPartToGemini);
 
     contents.push({ role: geminiRole, parts: geminiParts });
@@ -465,11 +472,22 @@ export function createGeminiExtension(
   }
 
   // Return extension result with implementations — satisfies verifies contract at compile time
-  const fnDict: { message: RillFunction; embed: RillFunction; embed_batch: RillFunction; tool_loop: RillFunction; generate: RillFunction } = ({
+  const fnDict: {
+    message: RillFunction;
+    embed: RillFunction;
+    embed_batch: RillFunction;
+    tool_loop: RillFunction;
+    generate: RillFunction;
+  } = {
     // gemini::message — single or multi-turn via prompt param (string OR list)
     message: {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const rawPrompt = args['prompt'] as RillValue;
@@ -509,7 +527,10 @@ export function createGeminiExtension(
             const stream = await client.models.generateContentStream({
               model: factoryModel,
               contents,
-              config: { ...apiConfig, abortSignal: streamAbortController.signal },
+              config: {
+                ...apiConfig,
+                abortSignal: streamAbortController.signal,
+              },
             });
             for await (const chunk of stream) {
               const delta = chunk.text ?? '';
@@ -520,7 +541,8 @@ export function createGeminiExtension(
             }
           } catch (error: unknown) {
             streamError =
-              error instanceof RuntimeError || error instanceof RuntimeHaltSignal
+              error instanceof RuntimeError ||
+              error instanceof RuntimeHaltSignal
                 ? error
                 : mapToHalt(ctx as RuntimeContext, error);
             const duration = Date.now() - messageStartTime;
@@ -543,7 +565,10 @@ export function createGeminiExtension(
 
           // Build parts-shaped assistant reply
           const assistantParts: Part[] = [{ type: 'text', text: textContent }];
-          const messages = buildResponseMessages(inputMessages, assistantParts) as unknown as RillValue;
+          const messages = buildResponseMessages(
+            inputMessages,
+            assistantParts
+          ) as unknown as RillValue;
 
           const result = {
             messages,
@@ -569,12 +594,16 @@ export function createGeminiExtension(
         return createRillStream({
           chunks: streamChunks(),
           resolve,
-          dispose: () => { streamAbortController.abort(); },
+          dispose: () => {
+            streamAbortController.abort();
+          },
           chunkType: { kind: 'string' },
           retType: MESSAGE_RET_STRUCTURE,
         }) as RillValue;
       },
-      annotations: { description: 'Send single or multi-turn message to Gemini API' },
+      annotations: {
+        description: 'Send single or multi-turn message to Gemini API',
+      },
       returnType: MESSAGE_VERB_RETURN_TYPE,
     },
 
@@ -601,7 +630,12 @@ export function createGeminiExtension(
             !embedding.values ||
             embedding.values.length === 0
           ) {
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'Gemini: empty embedding returned');
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'PROTOCOL',
+              'empty_embedding_response',
+              'Gemini: empty embedding returned'
+            );
           }
 
           const float32Data = new Float32Array(embedding.values);
@@ -661,7 +695,12 @@ export function createGeminiExtension(
 
           const vectors: RillValue[] = [];
           if (!response.embeddings || response.embeddings.length === 0) {
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embeddings_response', 'Gemini: empty embeddings returned');
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'PROTOCOL',
+              'empty_embeddings_response',
+              'Gemini: empty embeddings returned'
+            );
           }
 
           for (const embedding of response.embeddings) {
@@ -670,7 +709,12 @@ export function createGeminiExtension(
               !embedding.values ||
               embedding.values.length === 0
             ) {
-              throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'Gemini: empty embedding returned');
+              throw haltInvalid(
+                ctx as RuntimeContext,
+                'PROTOCOL',
+                'empty_embedding_response',
+                'Gemini: empty embedding returned'
+              );
             }
             const float32Data = new Float32Array(embedding.values);
             const vector = createVector(float32Data, factoryEmbedModel);
@@ -708,14 +752,24 @@ export function createGeminiExtension(
           throw rillError;
         }
       },
-      annotations: { description: 'Generate embedding vectors for multiple texts' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'vector' } }),
+      annotations: {
+        description: 'Generate embedding vectors for multiple texts',
+      },
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: { kind: 'vector' },
+      }),
     },
 
     // gemini::tool_loop — multi-turn tool calling
     tool_loop: {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
         {
           name: 'tools',
           type: { kind: 'dict', valueType: { kind: 'closure' } },
@@ -828,7 +882,13 @@ export function createGeminiExtension(
         const chunkQueue: RillValue[] = [];
         let streamDone = false;
         let streamError: RuntimeError | RuntimeHaltSignal | undefined;
-        let loopResultHolder: { response: unknown; totalTokens: { input: number; output: number }; turns: number } | undefined;
+        let loopResultHolder:
+          | {
+              response: unknown;
+              totalTokens: { input: number; output: number };
+              turns: number;
+            }
+          | undefined;
         const accumulatedTextDeltas: string[] = [];
 
         const callbacks: ToolLoopCallbacks = {
@@ -949,18 +1009,20 @@ export function createGeminiExtension(
             }>
           ): unknown => {
             // Each functionResponse must be its own Part (single-field rule)
-            const functionResponseParts: GeminiPart[] = toolResults.map((tr) => ({
-              functionResponse: {
-                name: tr.name,
-                response: {
-                  result: tr.error
-                    ? `Error: ${tr.error}`
-                    : typeof tr.result === 'string'
-                      ? tr.result
-                      : JSON.stringify(tr.result),
+            const functionResponseParts: GeminiPart[] = toolResults.map(
+              (tr) => ({
+                functionResponse: {
+                  name: tr.name,
+                  response: {
+                    result: tr.error
+                      ? `Error: ${tr.error}`
+                      : typeof tr.result === 'string'
+                        ? tr.result
+                        : JSON.stringify(tr.result),
+                  },
                 },
-              },
-            }));
+              })
+            );
 
             return {
               role: 'user' as const,
@@ -992,7 +1054,10 @@ export function createGeminiExtension(
           ctx,
           (chunk: RillValue) => {
             const chunkRecord = chunk as Record<string, unknown>;
-            if (chunkRecord['type'] === 'text_delta' && typeof chunkRecord['text'] === 'string') {
+            if (
+              chunkRecord['type'] === 'text_delta' &&
+              typeof chunkRecord['text'] === 'string'
+            ) {
               accumulatedTextDeltas.push(chunkRecord['text'] as string);
             }
             chunkQueue.push(chunk);
@@ -1004,26 +1069,29 @@ export function createGeminiExtension(
           },
           toolLoopAbortController.signal,
           factoryMaxTurns
-        ).then((result) => {
-          loopResultHolder = result;
-          streamDone = true;
-          if (resolveNext) {
-            const r = resolveNext;
-            resolveNext = undefined;
-            r();
-          }
-        }).catch((error: unknown) => {
-          streamError =
-            error instanceof RuntimeError || error instanceof RuntimeHaltSignal
-              ? error
-              : mapToHalt(ctx as RuntimeContext, error);
-          streamDone = true;
-          if (resolveNext) {
-            const r = resolveNext;
-            resolveNext = undefined;
-            r();
-          }
-        });
+        )
+          .then((result) => {
+            loopResultHolder = result;
+            streamDone = true;
+            if (resolveNext) {
+              const r = resolveNext;
+              resolveNext = undefined;
+              r();
+            }
+          })
+          .catch((error: unknown) => {
+            streamError =
+              error instanceof RuntimeError ||
+              error instanceof RuntimeHaltSignal
+                ? error
+                : mapToHalt(ctx as RuntimeContext, error);
+            streamDone = true;
+            if (resolveNext) {
+              const r = resolveNext;
+              resolveNext = undefined;
+              r();
+            }
+          });
 
         async function* streamGenerator(): AsyncGenerator<RillValue> {
           while (true) {
@@ -1053,9 +1121,14 @@ export function createGeminiExtension(
                 error: streamErrorMessage(streamError),
                 duration: Date.now(),
               });
-              const assistantParts: Part[] = [{ type: 'text', text: partialContent }];
+              const assistantParts: Part[] = [
+                { type: 'text', text: partialContent },
+              ];
               return {
-                messages: buildResponseMessages(inputMessages, assistantParts) as unknown as RillValue,
+                messages: buildResponseMessages(
+                  inputMessages,
+                  assistantParts
+                ) as unknown as RillValue,
                 model: factoryModel,
                 usage: { input: 0, output: 0 },
                 stop_reason: 'error',
@@ -1082,8 +1155,11 @@ export function createGeminiExtension(
           // Build parts-shaped assistant reply
           const assistantParts: Part[] = [{ type: 'text', text: textContent }];
           const messages = response
-            ? buildResponseMessages(inputMessages, assistantParts) as unknown as RillValue
-            : inputMessages as unknown as RillValue;
+            ? (buildResponseMessages(
+                inputMessages,
+                assistantParts
+              ) as unknown as RillValue)
+            : (inputMessages as unknown as RillValue);
 
           const resolvedResult = {
             messages,
@@ -1110,7 +1186,9 @@ export function createGeminiExtension(
         return createRillStream({
           chunks: streamGenerator(),
           resolve,
-          dispose: () => { toolLoopAbortController.abort(); },
+          dispose: () => {
+            toolLoopAbortController.abort();
+          },
           chunkType: { kind: 'dict' },
           retType: MESSAGE_RET_STRUCTURE,
         }) as RillValue;
@@ -1122,22 +1200,46 @@ export function createGeminiExtension(
     // gemini::generate — structured output
     generate: {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
-        { name: 'schema', type: { kind: 'type' } as { kind: string }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
+        {
+          name: 'schema',
+          type: { kind: 'type' } as { kind: string },
+          defaultValue: undefined,
+          annotations: {
+            description: 'Type expression for structured output schema',
+          },
+        },
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
         try {
           const rawPrompt = args['prompt'] as RillValue;
-          const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
+          const schemaArg = args['schema'] as
+            | { __rill_type?: boolean; structure?: TypeStructure }
+            | undefined;
 
           // Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema', 'generate requires a type expression as schema');
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'INVALID_INPUT',
+              'invalid_schema',
+              'generate requires a type expression as schema'
+            );
           }
           if (schemaArg.structure.kind !== 'dict') {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema_type', `generate requires a dict type as schema, got ${schemaArg.structure.kind}`);
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'INVALID_INPUT',
+              'invalid_schema_type',
+              `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
+            );
           }
 
           // IR-1: Normalize prompt to canonical Message[]
@@ -1148,7 +1250,9 @@ export function createGeminiExtension(
           const inputMessages = normalized as Message[];
 
           // Build JSON Schema from TypeStructure
-          const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
+          const jsonSchema = buildJsonSchemaFromStructuralType(
+            schemaArg.structure
+          );
 
           // Convert JSON Schema properties to Gemini Schema type
           const geminiProperties: Record<string, Schema> = {};
@@ -1184,7 +1288,12 @@ export function createGeminiExtension(
 
           // EC-18: Reject streaming response shape
           if (!('text' in response) && !('candidates' in response)) {
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'unexpected_response_format', 'generate: unexpected response format from Gemini API');
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'PROTOCOL',
+              'unexpected_response_format',
+              'generate: unexpected response format from Gemini API'
+            );
           }
 
           const raw = response.text ?? '';
@@ -1198,7 +1307,12 @@ export function createGeminiExtension(
               parseError instanceof Error
                 ? parseError.message
                 : String(parseError);
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'schema_validation_failed', `generate: failed to parse response JSON: ${detail}`);
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'PROTOCOL',
+              'schema_validation_failed',
+              `generate: failed to parse response JSON: ${detail}`
+            );
           }
 
           const inputTokens = response.usageMetadata?.promptTokenCount ?? 0;
@@ -1210,7 +1324,10 @@ export function createGeminiExtension(
 
           // Build parts-shaped messages: input + assistant reply containing raw JSON
           const assistantParts: Part[] = [{ type: 'text', text: raw }];
-          const messages = buildResponseMessages(inputMessages, assistantParts) as unknown as RillValue;
+          const messages = buildResponseMessages(
+            inputMessages,
+            assistantParts
+          ) as unknown as RillValue;
 
           const generateResult = {
             data,
@@ -1254,10 +1371,12 @@ export function createGeminiExtension(
           throw rillError;
         }
       },
-      annotations: { description: 'Generate structured output from Gemini API' },
+      annotations: {
+        description: 'Generate structured output from Gemini API',
+      },
       returnType: GENERATE_VERB_RETURN_TYPE,
     },
-  });
+  };
 
   const callableDict = {
     message: toCallable(fnDict.message),

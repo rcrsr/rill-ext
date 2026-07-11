@@ -41,13 +41,21 @@ import { buildClosure } from './buildClosure.js';
  */
 export async function createPromptMdExtension(
   config: PromptMdExtensionConfig,
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): Promise<ExtensionFactoryResult> {
   // ── EC-6: validate basePath is non-empty ──────────────────────────────────
-  if (typeof config.basePath !== 'string' || config.basePath.trim().length === 0) {
-    throw new RuntimeError('RILL-R001', 'prompt-md: basePath must be a non-empty string', undefined, {
-      config: 'basePath',
-    });
+  if (
+    typeof config.basePath !== 'string' ||
+    config.basePath.trim().length === 0
+  ) {
+    throw new RuntimeError(
+      'RILL-R001',
+      'prompt-md: basePath must be a non-empty string',
+      undefined,
+      {
+        config: 'basePath',
+      }
+    );
   }
 
   const basePath = config.basePath.trim();
@@ -56,9 +64,14 @@ export async function createPromptMdExtension(
   try {
     const info = await stat(basePath);
     if (!info.isDirectory()) {
-      throw new RuntimeError('RILL-R001', `prompt-md: basePath "${basePath}" is not a directory`, undefined, {
-        path: basePath,
-      });
+      throw new RuntimeError(
+        'RILL-R001',
+        `prompt-md: basePath "${basePath}" is not a directory`,
+        undefined,
+        {
+          path: basePath,
+        }
+      );
     }
   } catch (err) {
     if (err instanceof RuntimeError) {
@@ -70,7 +83,7 @@ export async function createPromptMdExtension(
       'RILL-R001',
       `prompt-md: basePath "${basePath}" does not exist or is not accessible: ${message}`,
       undefined,
-      { path: basePath },
+      { path: basePath }
     );
   }
 
@@ -79,7 +92,7 @@ export async function createPromptMdExtension(
 
   // ── Parse all files (EC-8 through EC-14 propagate as RILL-R001) ──────────
   const parsed = await Promise.all(
-    entries.map((entry) => parseFile(entry.absolutePath, entry.relativePath)),
+    entries.map((entry) => parseFile(entry.absolutePath, entry.relativePath))
   );
 
   // ── EC-15: collision detection ────────────────────────────────────────────
@@ -98,7 +111,7 @@ export async function createPromptMdExtension(
         'RILL-R001',
         `prompt-md: collision: multiple files resolve to the same prompt name "${name}"`,
         undefined,
-        { name, paths },
+        { name, paths }
       );
     }
   }
@@ -118,12 +131,14 @@ export async function createPromptMdExtension(
       if (disposed) {
         const ctx = ctxLike as RuntimeContext;
         throw ctx.invalidate(
-          new Error(`prompt-md: extension has been disposed; cannot invoke "${name}"`),
+          new Error(
+            `prompt-md: extension has been disposed; cannot invoke "${name}"`
+          ),
           {
             code: 'DISPOSED',
             provider: 'prompt-md',
             raw: { kind: 'disposed', name },
-          },
+          }
         ) as unknown as RillValue;
       }
       return closure.fn(args, ctxLike, location);

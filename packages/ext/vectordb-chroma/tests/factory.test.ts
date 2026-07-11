@@ -55,7 +55,11 @@ describe('createChromaExtension', () => {
 
       expect(value['upsert']!['params']).toBeDefined();
       expect(value['upsert']!['fn']).toBeTypeOf('function');
-      expect((value['upsert']!['annotations'] as Record<string, unknown>)?.['description']).toBeTypeOf('string');
+      expect(
+        (value['upsert']!['annotations'] as Record<string, unknown>)?.[
+          'description'
+        ]
+      ).toBeTypeOf('string');
       expect(value['upsert']!['returnType']).toBeDefined();
     });
   });

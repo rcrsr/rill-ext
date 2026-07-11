@@ -15,7 +15,11 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import type { CommandConfig, CommandResult, ExecExtensionConfig } from './types.js';
+import type {
+  CommandConfig,
+  CommandResult,
+  ExecExtensionConfig,
+} from './types.js';
 import { runCommand } from './runner.js';
 
 /**
@@ -25,17 +29,18 @@ import { runCommand } from './runner.js';
  */
 export function createExecExtension(
   config: ExecExtensionConfig,
-  ctx: ExtensionFactoryCtx,
+  ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-
   const globalTimeout = config.timeout ?? 30000;
   const globalMaxOutputSize = config.maxOutputSize ?? 1048576;
   const inheritEnv = config.inheritEnv ?? false;
 
   const abortControllers: AbortController[] = [];
 
-  const getTimeout = (cmd: CommandConfig): number => cmd.timeout ?? globalTimeout;
-  const getMaxBuffer = (cmd: CommandConfig): number => cmd.maxBuffer ?? globalMaxOutputSize;
+  const getTimeout = (cmd: CommandConfig): number =>
+    cmd.timeout ?? globalTimeout;
+  const getMaxBuffer = (cmd: CommandConfig): number =>
+    cmd.maxBuffer ?? globalMaxOutputSize;
 
   const getEnv = (cmd: CommandConfig): Record<string, string> | undefined => {
     if (!inheritEnv && !cmd.env) return undefined;
@@ -84,7 +89,7 @@ export function createExecExtension(
           stringArgs,
           stdinParam,
           composedSignal,
-          runCtx,
+          runCtx
         );
 
         if (isInvalid(result as RillValue)) {
@@ -128,8 +133,8 @@ export function createExecExtension(
       returnType: structureToTypeValue({
         kind: 'dict',
         fields: {
-          stdout:    { type: { kind: 'string' } },
-          stderr:    { type: { kind: 'string' } },
+          stdout: { type: { kind: 'string' } },
+          stderr: { type: { kind: 'string' } },
           exit_code: { type: { kind: 'number' } },
         },
       }),
@@ -157,7 +162,7 @@ export function createExecExtension(
       element: {
         kind: 'dict',
         fields: {
-          name:        { type: { kind: 'string' } },
+          name: { type: { kind: 'string' } },
           description: { type: { kind: 'string' } },
         },
       },

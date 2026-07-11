@@ -123,10 +123,15 @@ export function createPineconeExtension(
           return { id, success: true } as RillValue;
         });
       },
-      annotations: { description: 'Insert or update single vector with metadata' },
+      annotations: {
+        description: 'Insert or update single vector with metadata',
+      },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { id: { type: { kind: 'string' } }, success: { type: { kind: 'bool' } } },
+        fields: {
+          id: { type: { kind: 'string' } },
+          success: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -164,7 +169,10 @@ export function createPineconeExtension(
 
             const id = item['id'] as string;
             const vector = item['vector'] as RillVector;
-            const metadataArg = (item['metadata'] ?? {}) as Record<string, unknown>;
+            const metadataArg = (item['metadata'] ?? {}) as Record<
+              string,
+              unknown
+            >;
             const metadata = convertMetadata(metadataArg);
 
             try {
@@ -216,11 +224,16 @@ export function createPineconeExtension(
     search: {
       params: [
         vectorParam('vector'),
-        p.dict('options', undefined, {}, {
-          k: { type: { kind: 'number' }, defaultValue: 10 },
-          filter: { type: { kind: 'dict' }, defaultValue: {} },
-          score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            k: { type: { kind: 'number' }, defaultValue: 10 },
+            filter: { type: { kind: 'dict' }, defaultValue: {} },
+            score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
+          }
+        ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
@@ -253,7 +266,9 @@ export function createPineconeExtension(
           if (Object.keys(filter).length > 0) {
             searchRequest.filter = filter;
           }
-          const response = await index.namespace(factoryNamespace).query(searchRequest);
+          const response = await index
+            .namespace(factoryNamespace)
+            .query(searchRequest);
 
           const results: RillValue = (response.matches ?? []).map((hit) => {
             const metadata: Record<string, RillValue> = {};
@@ -317,7 +332,9 @@ export function createPineconeExtension(
 
         return withEventEmission(ctx, PROVIDER, 'get', { id }, async () => {
           const index = client.Index(factoryIndex);
-          const response = await index.namespace(factoryNamespace).fetch({ ids: [id] });
+          const response = await index
+            .namespace(factoryNamespace)
+            .fetch({ ids: [id] });
 
           if (!response.records || response.records[id] === undefined) {
             // Throw so withEventEmission catches and maps via mapVectorError
@@ -332,7 +349,10 @@ export function createPineconeExtension(
             throw new Error('pinecone: invalid vector format');
           }
 
-          const vector = createVector(new Float32Array(vectorData), factoryIndex);
+          const vector = createVector(
+            new Float32Array(vectorData),
+            factoryIndex
+          );
           return {
             id,
             vector,
@@ -368,7 +388,10 @@ export function createPineconeExtension(
       annotations: { description: 'Delete vector by ID' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { id: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } },
+        fields: {
+          id: { type: { kind: 'string' } },
+          deleted: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -452,10 +475,15 @@ export function createPineconeExtension(
     create_collection: {
       params: [
         p.str('name'),
-        p.dict('options', undefined, {}, {
-          dimensions: { type: { kind: 'number' } },
-          distance: { type: { kind: 'string' }, defaultValue: 'cosine' },
-        }),
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            dimensions: { type: { kind: 'number' } },
+            distance: { type: { kind: 'string' }, defaultValue: 'cosine' },
+          }
+        ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
@@ -482,25 +510,34 @@ export function createPineconeExtension(
           );
         }
 
-        return withEventEmission(ctx, PROVIDER, 'create_collection', { name }, async () => {
-          let pineconeMetric: 'cosine' | 'euclidean' | 'dotproduct';
-          if (distance === 'cosine') pineconeMetric = 'cosine';
-          else if (distance === 'euclidean') pineconeMetric = 'euclidean';
-          else pineconeMetric = 'dotproduct';
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'create_collection',
+          { name },
+          async () => {
+            let pineconeMetric: 'cosine' | 'euclidean' | 'dotproduct';
+            if (distance === 'cosine') pineconeMetric = 'cosine';
+            else if (distance === 'euclidean') pineconeMetric = 'euclidean';
+            else pineconeMetric = 'dotproduct';
 
-          await client.createIndex({
-            name,
-            dimension: dimensions,
-            metric: pineconeMetric,
-            spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
-          });
-          return { name, created: true } as RillValue;
-        });
+            await client.createIndex({
+              name,
+              dimension: dimensions,
+              metric: pineconeMetric,
+              spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
+            });
+            return { name, created: true } as RillValue;
+          }
+        );
       },
       annotations: { description: 'Create new vector collection' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { name: { type: { kind: 'string' } }, created: { type: { kind: 'bool' } } },
+        fields: {
+          name: { type: { kind: 'string' } },
+          created: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -512,15 +549,24 @@ export function createPineconeExtension(
         if (disposed !== null) return disposed;
 
         const name = args['name'] as string;
-        return withEventEmission(ctx, PROVIDER, 'delete_collection', { name }, async () => {
-          await client.deleteIndex(name);
-          return { name, deleted: true } as RillValue;
-        });
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'delete_collection',
+          { name },
+          async () => {
+            await client.deleteIndex(name);
+            return { name, deleted: true } as RillValue;
+          }
+        );
       },
       annotations: { description: 'Delete vector collection' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { name: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } },
+        fields: {
+          name: { type: { kind: 'string' } },
+          deleted: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -531,14 +577,24 @@ export function createPineconeExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) return disposed;
 
-        return withEventEmission(ctx, PROVIDER, 'list_collections', {}, async () => {
-          const response = await client.listIndexes();
-          const names = response.indexes?.map((index) => index.name ?? '') ?? [];
-          return names as RillValue;
-        });
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'list_collections',
+          {},
+          async () => {
+            const response = await client.listIndexes();
+            const names =
+              response.indexes?.map((index) => index.name ?? '') ?? [];
+            return names as RillValue;
+          }
+        );
       },
       annotations: { description: 'List all collection names' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: { kind: 'string' },
+      }),
     },
 
     describe: {
@@ -548,22 +604,34 @@ export function createPineconeExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) return disposed;
 
-        return withEventEmission(ctx, PROVIDER, 'describe', { name: factoryIndex }, async () => {
-          const index = client.Index(factoryIndex);
-          const stats = await index.describeIndexStats();
-          const indexInfo = await client.describeIndex(factoryIndex);
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'describe',
+          { name: factoryIndex },
+          async () => {
+            const index = client.Index(factoryIndex);
+            const stats = await index.describeIndexStats();
+            const indexInfo = await client.describeIndex(factoryIndex);
 
-          const dimensions = stats.dimension ?? 0;
-          const count = stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
+            const dimensions = stats.dimension ?? 0;
+            const count =
+              stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
 
-          let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
-          const metric = indexInfo.metric;
-          if (metric === 'cosine') distance = 'cosine';
-          else if (metric === 'euclidean') distance = 'euclidean';
-          else if (metric === 'dotproduct') distance = 'dot';
+            let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
+            const metric = indexInfo.metric;
+            if (metric === 'cosine') distance = 'cosine';
+            else if (metric === 'euclidean') distance = 'euclidean';
+            else if (metric === 'dotproduct') distance = 'dot';
 
-          return { name: factoryIndex, count, dimensions, distance } as RillValue;
-        });
+            return {
+              name: factoryIndex,
+              count,
+              dimensions,
+              distance,
+            } as RillValue;
+          }
+        );
       },
       annotations: { description: 'Describe configured collection' },
       returnType: structureToTypeValue({

@@ -24,7 +24,10 @@ function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
   };
 }
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -38,7 +41,10 @@ async function expectInvalidWithMessage(
   return result;
 }
 
-function mockFetchJson(status: number, body: unknown): ReturnType<typeof vi.fn> {
+function mockFetchJson(
+  status: number,
+  body: unknown
+): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -54,7 +60,9 @@ function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
-    json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
+    json: vi
+      .fn()
+      .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
   });
 }
 
@@ -63,16 +71,24 @@ const VALID_CONFIG = { apiKey: 'tvly-test-key' };
 const SEARCH_RESPONSE = {
   query: 'TypeScript tutorials',
   results: [
-    { url: 'https://example.com/1', title: 'TS Guide', content: 'Content here', score: 0.9 },
-    { url: 'https://example.com/2', title: 'TS Docs', content: 'More content', score: 0.8 },
+    {
+      url: 'https://example.com/1',
+      title: 'TS Guide',
+      content: 'Content here',
+      score: 0.9,
+    },
+    {
+      url: 'https://example.com/2',
+      title: 'TS Docs',
+      content: 'More content',
+      score: 0.8,
+    },
   ],
   response_time: 1.23,
 };
 
 const EXTRACT_RESPONSE = {
-  results: [
-    { url: 'https://example.com/1', raw_content: 'Page content' },
-  ],
+  results: [{ url: 'https://example.com/1', raw_content: 'Page content' }],
   failed_results: [],
 };
 
@@ -128,7 +144,9 @@ describe('Tavily extension host functions', () => {
       expect(mockFetch).toHaveBeenCalledOnce();
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('https://api.tavily.com/search');
-      expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer tvly-test-key');
+      expect((init.headers as Record<string, string>)['Authorization']).toBe(
+        'Bearer tvly-test-key'
+      );
       expect(init.method).toBe('POST');
     });
 
@@ -161,7 +179,10 @@ describe('Tavily extension host functions', () => {
     });
 
     it('includes optional answer field when present in response', async () => {
-      const responseWithAnswer = { ...SEARCH_RESPONSE, answer: 'TypeScript is a typed language.' };
+      const responseWithAnswer = {
+        ...SEARCH_RESPONSE,
+        answer: 'TypeScript is a typed language.',
+      };
       globalThis.fetch = mockFetchJson(200, responseWithAnswer);
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
@@ -354,7 +375,10 @@ describe('Tavily extension host functions', () => {
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('https://api.tavily.com/extract');
       const body = JSON.parse(init.body as string) as Record<string, unknown>;
-      expect(body['urls']).toEqual(['https://example.com/1', 'https://example.com/2']);
+      expect(body['urls']).toEqual([
+        'https://example.com/1',
+        'https://example.com/2',
+      ]);
     });
 
     it('sends Authorization Bearer header', async () => {
@@ -363,16 +387,23 @@ describe('Tavily extension host functions', () => {
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'extract').fn({ urls: ['https://example.com'] }, ctx);
+      await getCallable(ext, 'extract').fn(
+        { urls: ['https://example.com'] },
+        ctx
+      );
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer tvly-test-key');
+      expect((init.headers as Record<string, string>)['Authorization']).toBe(
+        'Bearer tvly-test-key'
+      );
     });
 
     it('handles mixed URL partial results [AC-37]', async () => {
       const mixedResponse = {
         results: [{ url: 'https://example.com/1', raw_content: 'content' }],
-        failed_results: [{ url: 'https://example.com/bad', error: 'Access denied' }],
+        failed_results: [
+          { url: 'https://example.com/bad', error: 'Access denied' },
+        ],
       };
       globalThis.fetch = mockFetchJson(200, mixedResponse);
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
@@ -483,7 +514,10 @@ describe('Tavily extension host functions', () => {
       const onLogEvent = vi.fn();
       const ctx = createRuntimeContext({ callbacks: { onLogEvent } });
 
-      await getCallable(ext, 'extract').fn({ urls: ['https://example.com/1'] }, ctx);
+      await getCallable(ext, 'extract').fn(
+        { urls: ['https://example.com/1'] },
+        ctx
+      );
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -499,7 +533,10 @@ describe('Tavily extension host functions', () => {
       const onLogEvent = vi.fn();
       const ctx = createRuntimeContext({ callbacks: { onLogEvent } });
 
-      await getCallable(ext, 'extract').fn({ urls: ['https://example.com'] }, ctx);
+      await getCallable(ext, 'extract').fn(
+        { urls: ['https://example.com'] },
+        ctx
+      );
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -524,24 +561,26 @@ describe('Tavily extension host functions', () => {
 
   describe('dispose with in-flight requests [AC-22]', () => {
     it('dispose cancels in-flight search request [AC-22]', async () => {
-      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-        return new Promise((_resolve, reject) => {
-          const signal = init?.signal;
-          if (signal) {
-            if (signal.aborted) {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-              return;
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              if (signal.aborted) {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+                return;
+              }
+              signal.addEventListener('abort', () => {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+              });
             }
-            signal.addEventListener('abort', () => {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-            });
-          }
+          });
         });
-      });
 
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
@@ -554,18 +593,20 @@ describe('Tavily extension host functions', () => {
 
   describe('ctx.signal cancellation', () => {
     it('aborting ctx.signal cancels in-flight request', async () => {
-      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-        return new Promise((_resolve, reject) => {
-          const signal = init?.signal;
-          if (signal) {
-            signal.addEventListener('abort', () => {
-              const err = new Error('aborted');
-              err.name = 'AbortError';
-              reject(err);
-            });
-          }
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              signal.addEventListener('abort', () => {
+                const err = new Error('aborted');
+                err.name = 'AbortError';
+                reject(err);
+              });
+            }
+          });
         });
-      });
 
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
       const controller = new AbortController();

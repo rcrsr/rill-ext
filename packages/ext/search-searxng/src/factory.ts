@@ -34,7 +34,6 @@ export async function createSearxngExtension(
   config: SearxngConfig,
   ctx: ExtensionFactoryCtx
 ): Promise<ExtensionFactoryResult> {
-
   try {
     assertRequired(config.baseUrl, 'baseUrl');
     validateBaseUrl(config.baseUrl);
@@ -53,16 +52,28 @@ export async function createSearxngExtension(
   const disposalState = createDisposalState();
   const inFlightState = createInFlightState();
 
-  const wrap = createSearchFunctionWrapper(PROVIDER, disposalState, inFlightState);
+  const wrap = createSearchFunctionWrapper(
+    PROVIDER,
+    disposalState,
+    inFlightState
+  );
 
-  const failConfig = (callCtx: RuntimeContext, message: string, raw: Record<string, unknown>): RillValue =>
+  const failConfig = (
+    callCtx: RuntimeContext,
+    message: string,
+    raw: Record<string, unknown>
+  ): RillValue =>
     callCtx.invalidate(new Error(`${PROVIDER}: ${message}`), {
       code: 'INVALID_INPUT',
       provider: PROVIDER,
       raw: { ...raw, message: `${PROVIDER}: ${message}` },
     });
 
-  const failHttp = (callCtx: RuntimeContext, message: string, raw: Record<string, unknown>): RillValue =>
+  const failHttp = (
+    callCtx: RuntimeContext,
+    message: string,
+    raw: Record<string, unknown>
+  ): RillValue =>
     callCtx.invalidate(new Error(`${PROVIDER}: ${message}`), {
       code: 'UNAVAILABLE',
       provider: PROVIDER,
@@ -78,24 +89,36 @@ export async function createSearxngExtension(
     }
 
     const params = new URLSearchParams({ format: 'json', q: query });
-    if (options['categories'] !== undefined) params.set('categories', String(options['categories']));
-    if (options['engines'] !== undefined) params.set('engines', String(options['engines']));
-    if (options['language'] !== undefined) params.set('language', String(options['language']));
-    if (options['pageno'] !== undefined) params.set('pageno', String(options['pageno']));
-    if (options['safesearch'] !== undefined) params.set('safesearch', String(options['safesearch']));
+    if (options['categories'] !== undefined)
+      params.set('categories', String(options['categories']));
+    if (options['engines'] !== undefined)
+      params.set('engines', String(options['engines']));
+    if (options['language'] !== undefined)
+      params.set('language', String(options['language']));
+    if (options['pageno'] !== undefined)
+      params.set('pageno', String(options['pageno']));
+    if (options['safesearch'] !== undefined)
+      params.set('safesearch', String(options['safesearch']));
 
     if (options['time_range'] !== undefined) {
       const timeRange = String(options['time_range']);
       if (!VALID_TIME_RANGES.has(timeRange)) {
-        throw failConfig(callCtx, 'time_range must be one of: day, month, year', {
-          kind: 'invalid_time_range',
-          received: timeRange,
-        });
+        throw failConfig(
+          callCtx,
+          'time_range must be one of: day, month, year',
+          {
+            kind: 'invalid_time_range',
+            received: timeRange,
+          }
+        );
       }
       params.set('time_range', timeRange);
     }
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     let response: Response;
     try {
       response = await fetch(`${baseUrl}/search?${params.toString()}`, {
@@ -104,7 +127,9 @@ export async function createSearxngExtension(
       });
     } catch (err: unknown) {
       if (err instanceof TypeError) {
-        throw failHttp(callCtx, 'connection failed', { kind: 'connection_failed' });
+        throw failHttp(callCtx, 'connection failed', {
+          kind: 'connection_failed',
+        });
       }
       throw err;
     }
@@ -128,7 +153,9 @@ export async function createSearxngExtension(
     try {
       data = (await response.json()) as typeof data;
     } catch {
-      throw failHttp(callCtx, 'unexpected response format', { kind: 'unexpected_response_format' });
+      throw failHttp(callCtx, 'unexpected response format', {
+        kind: 'unexpected_response_format',
+      });
     }
 
     const result: Record<string, RillValue> = {
@@ -136,10 +163,14 @@ export async function createSearxngExtension(
       number_of_results: data.number_of_results,
       results: data.results as RillValue,
     };
-    if (data.suggestions !== undefined) result['suggestions'] = data.suggestions as RillValue;
-    if (data.answers !== undefined) result['answers'] = data.answers as RillValue;
-    if (data.infoboxes !== undefined) result['infoboxes'] = data.infoboxes as RillValue;
-    if (data.corrections !== undefined) result['corrections'] = data.corrections as RillValue;
+    if (data.suggestions !== undefined)
+      result['suggestions'] = data.suggestions as RillValue;
+    if (data.answers !== undefined)
+      result['answers'] = data.answers as RillValue;
+    if (data.infoboxes !== undefined)
+      result['infoboxes'] = data.infoboxes as RillValue;
+    if (data.corrections !== undefined)
+      result['corrections'] = data.corrections as RillValue;
 
     return {
       result: result as RillValue,
@@ -149,7 +180,10 @@ export async function createSearxngExtension(
   });
 
   const configFn = wrap('config', async (_args, callCtx, signal) => {
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     let response: Response;
     try {
       response = await fetch(`${baseUrl}/config`, {
@@ -158,20 +192,32 @@ export async function createSearxngExtension(
       });
     } catch (err: unknown) {
       if (err instanceof TypeError) {
-        throw failHttp(callCtx, 'connection failed', { kind: 'connection_failed' });
+        throw failHttp(callCtx, 'connection failed', {
+          kind: 'connection_failed',
+        });
       }
       throw err;
     }
 
     if (!response.ok) {
-      throw failHttp(callCtx, 'connection failed', { kind: 'connection_failed', status: response.status });
+      throw failHttp(callCtx, 'connection failed', {
+        kind: 'connection_failed',
+        status: response.status,
+      });
     }
 
-    let data: { categories: unknown; engines: unknown; plugins: unknown; locales: unknown };
+    let data: {
+      categories: unknown;
+      engines: unknown;
+      plugins: unknown;
+      locales: unknown;
+    };
     try {
       data = (await response.json()) as typeof data;
     } catch {
-      throw failHttp(callCtx, 'unexpected response format', { kind: 'unexpected_response_format' });
+      throw failHttp(callCtx, 'unexpected response format', {
+        kind: 'unexpected_response_format',
+      });
     }
 
     const result: Record<string, RillValue> = {
@@ -201,22 +247,34 @@ export async function createSearxngExtension(
   const SEARCH_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      query:             { type: { kind: 'string' } },
+      query: { type: { kind: 'string' } },
       number_of_results: { type: { kind: 'number' } },
-      results:           { type: { kind: 'list', element: { kind: 'any' } } },
-      suggestions:       { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
-      answers:           { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
-      infoboxes:         { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
-      corrections:       { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+      results: { type: { kind: 'list', element: { kind: 'any' } } },
+      suggestions: {
+        type: { kind: 'list', element: { kind: 'any' } },
+        defaultValue: [],
+      }, // optional
+      answers: {
+        type: { kind: 'list', element: { kind: 'any' } },
+        defaultValue: [],
+      }, // optional
+      infoboxes: {
+        type: { kind: 'list', element: { kind: 'any' } },
+        defaultValue: [],
+      }, // optional
+      corrections: {
+        type: { kind: 'list', element: { kind: 'any' } },
+        defaultValue: [],
+      }, // optional
     },
   });
   const CONFIG_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
       categories: { type: { kind: 'any' } },
-      engines:    { type: { kind: 'any' } },
-      plugins:    { type: { kind: 'any' } },
-      locales:    { type: { kind: 'any' } },
+      engines: { type: { kind: 'any' } },
+      plugins: { type: { kind: 'any' } },
+      locales: { type: { kind: 'any' } },
     },
   });
 

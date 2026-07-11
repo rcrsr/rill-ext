@@ -6,7 +6,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { structureToTypeValue } from '@rcrsr/rill';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { makeFactoryCtx, makeRuntimeCtx, expectInvalidThrow } from './_helpers.js';
+import {
+  makeFactoryCtx,
+  makeRuntimeCtx,
+  expectInvalidThrow,
+} from './_helpers.js';
 
 const EXPECTED_RETURN_TYPE = structureToTypeValue({
   kind: 'stream',
@@ -15,13 +19,18 @@ const EXPECTED_RETURN_TYPE = structureToTypeValue({
     kind: 'dict',
     fields: {
       result: { type: { kind: 'string' } },
-      tokens: { type: { kind: 'dict', fields: {
-        prompt: { type: { kind: 'number' } },
-        cache_write_5m: { type: { kind: 'number' } },
-        cache_write_1h: { type: { kind: 'number' } },
-        cache_read: { type: { kind: 'number' } },
-        output: { type: { kind: 'number' } },
-      } } },
+      tokens: {
+        type: {
+          kind: 'dict',
+          fields: {
+            prompt: { type: { kind: 'number' } },
+            cache_write_5m: { type: { kind: 'number' } },
+            cache_write_1h: { type: { kind: 'number' } },
+            cache_read: { type: { kind: 'number' } },
+            output: { type: { kind: 'number' } },
+          },
+        },
+      },
       cost: { type: { kind: 'number' } },
       exit_code: { type: { kind: 'number' } },
       duration: { type: { kind: 'number' } },
@@ -82,8 +91,21 @@ describe('createClaudeCodeExtension', () => {
       const v = ext.value as any;
 
       expect(v.prompt.params).toEqual([
-        { name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'options', type: { kind: 'dict', fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
+        {
+          name: 'text',
+          type: { kind: 'string' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        {
+          name: 'options',
+          type: {
+            kind: 'dict',
+            fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } },
+          },
+          defaultValue: {},
+          annotations: {},
+        },
       ]);
       expect(v.prompt.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
@@ -93,8 +115,21 @@ describe('createClaudeCodeExtension', () => {
       const v = ext.value as any;
 
       expect(v.skill.params).toEqual([
-        { name: 'name', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'args', type: { kind: 'dict', fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
+        {
+          name: 'name',
+          type: { kind: 'string' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        {
+          name: 'args',
+          type: {
+            kind: 'dict',
+            fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } },
+          },
+          defaultValue: {},
+          annotations: {},
+        },
       ]);
       expect(v.skill.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
@@ -104,8 +139,21 @@ describe('createClaudeCodeExtension', () => {
       const v = ext.value as any;
 
       expect(v.command.params).toEqual([
-        { name: 'name', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'args', type: { kind: 'dict', fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } } }, defaultValue: {}, annotations: {} },
+        {
+          name: 'name',
+          type: { kind: 'string' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        {
+          name: 'args',
+          type: {
+            kind: 'dict',
+            fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } },
+          },
+          defaultValue: {},
+          annotations: {},
+        },
       ]);
       expect(v.command.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
@@ -119,17 +167,17 @@ describe('createClaudeCodeExtension', () => {
       expectInvalidThrow(
         () => v.prompt.fn({ text: '', options: {} }, ctx),
         'INVALID_INPUT',
-        'prompt text cannot be empty',
+        'prompt text cannot be empty'
       );
       expectInvalidThrow(
         () => v.skill.fn({ name: '', args: {} }, ctx),
         'INVALID_INPUT',
-        'skill name cannot be empty',
+        'skill name cannot be empty'
       );
       expectInvalidThrow(
         () => v.command.fn({ name: '', args: {} }, ctx),
         'INVALID_INPUT',
-        'command name cannot be empty',
+        'command name cannot be empty'
       );
     });
   });
@@ -146,24 +194,33 @@ describe('createClaudeCodeExtension', () => {
     });
 
     it('accepts valid binaryPath', () => {
-      const ext = createClaudeCodeExtension({
-        binaryPath: '/usr/bin/claude',
-      }, makeFactoryCtx());
+      const ext = createClaudeCodeExtension(
+        {
+          binaryPath: '/usr/bin/claude',
+        },
+        makeFactoryCtx()
+      );
       expect(ext).toBeDefined();
     });
 
     it('accepts valid timeout', () => {
-      const ext = createClaudeCodeExtension({
-        defaultTimeout: 60000,
-      }, makeFactoryCtx());
+      const ext = createClaudeCodeExtension(
+        {
+          defaultTimeout: 60000,
+        },
+        makeFactoryCtx()
+      );
       expect(ext).toBeDefined();
     });
 
     it('accepts both config options', () => {
-      const ext = createClaudeCodeExtension({
-        binaryPath: '/usr/bin/claude',
-        defaultTimeout: 60000,
-      }, makeFactoryCtx());
+      const ext = createClaudeCodeExtension(
+        {
+          binaryPath: '/usr/bin/claude',
+          defaultTimeout: 60000,
+        },
+        makeFactoryCtx()
+      );
       expect(ext).toBeDefined();
     });
   });
@@ -171,29 +228,35 @@ describe('createClaudeCodeExtension', () => {
   describe('binaryPath validation (EC-1)', () => {
     it('throws RuntimeError RILL-R001 for invalid binaryPath', () => {
       expect(() =>
-        createClaudeCodeExtension({ binaryPath: '/nonexistent/claude' }, makeFactoryCtx())
+        createClaudeCodeExtension(
+          { binaryPath: '/nonexistent/claude' },
+          makeFactoryCtx()
+        )
       ).toThrow('claude binary not found');
     });
 
     it('validates binaryPath eagerly at factory creation', () => {
       // Should throw immediately, not during function call
       expect(() =>
-        createClaudeCodeExtension({ binaryPath: 'invalid-binary' }, makeFactoryCtx())
+        createClaudeCodeExtension(
+          { binaryPath: 'invalid-binary' },
+          makeFactoryCtx()
+        )
       ).toThrow('claude binary not found');
     });
   });
 
   describe('timeout validation (EC-2)', () => {
     it('throws Error for negative timeout', () => {
-      expect(() => createClaudeCodeExtension({ defaultTimeout: -1 }, makeFactoryCtx())).toThrow(
-        'Invalid timeout: must be positive integer, max 3600000'
-      );
+      expect(() =>
+        createClaudeCodeExtension({ defaultTimeout: -1 }, makeFactoryCtx())
+      ).toThrow('Invalid timeout: must be positive integer, max 3600000');
     });
 
     it('throws Error for zero timeout', () => {
-      expect(() => createClaudeCodeExtension({ defaultTimeout: 0 }, makeFactoryCtx())).toThrow(
-        'Invalid timeout: must be positive integer, max 3600000'
-      );
+      expect(() =>
+        createClaudeCodeExtension({ defaultTimeout: 0 }, makeFactoryCtx())
+      ).toThrow('Invalid timeout: must be positive integer, max 3600000');
     });
 
     it('throws Error for non-integer timeout', () => {
@@ -209,12 +272,18 @@ describe('createClaudeCodeExtension', () => {
     });
 
     it('accepts timeout at boundary (3600000)', () => {
-      const ext = createClaudeCodeExtension({ defaultTimeout: 3600000 }, makeFactoryCtx());
+      const ext = createClaudeCodeExtension(
+        { defaultTimeout: 3600000 },
+        makeFactoryCtx()
+      );
       expect(ext).toBeDefined();
     });
 
     it('accepts timeout at lower boundary (1)', () => {
-      const ext = createClaudeCodeExtension({ defaultTimeout: 1 }, makeFactoryCtx());
+      const ext = createClaudeCodeExtension(
+        { defaultTimeout: 1 },
+        makeFactoryCtx()
+      );
       expect(ext).toBeDefined();
     });
   });
@@ -318,12 +387,12 @@ describe('createClaudeCodeExtension', () => {
       expectInvalidThrow(
         () => v.prompt.fn({ text: '', options: {} }, ctx),
         'INVALID_INPUT',
-        'prompt text cannot be empty',
+        'prompt text cannot be empty'
       );
       expectInvalidThrow(
         () => v.prompt.fn({ text: '   ', options: {} }, ctx),
         'INVALID_INPUT',
-        'prompt text cannot be empty',
+        'prompt text cannot be empty'
       );
     });
 
@@ -335,12 +404,12 @@ describe('createClaudeCodeExtension', () => {
       expectInvalidThrow(
         () => v.skill.fn({ name: '', args: {} }, ctx),
         'INVALID_INPUT',
-        'skill name cannot be empty',
+        'skill name cannot be empty'
       );
       expectInvalidThrow(
         () => v.skill.fn({ name: '   ', args: {} }, ctx),
         'INVALID_INPUT',
-        'skill name cannot be empty',
+        'skill name cannot be empty'
       );
     });
 
@@ -352,12 +421,12 @@ describe('createClaudeCodeExtension', () => {
       expectInvalidThrow(
         () => v.command.fn({ name: '', args: {} }, ctx),
         'INVALID_INPUT',
-        'command name cannot be empty',
+        'command name cannot be empty'
       );
       expectInvalidThrow(
         () => v.command.fn({ name: '   ', args: {} }, ctx),
         'INVALID_INPUT',
-        'command name cannot be empty',
+        'command name cannot be empty'
       );
     });
   });

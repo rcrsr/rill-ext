@@ -10,7 +10,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   deserializeValue,
-  isInvalid,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -38,7 +37,11 @@ class LoadInvalid {
 export interface KvStore {
   loadError: RillValue | null;
   get: (key: string, ctx: RuntimeContext) => RillValue | undefined | RillValue;
-  set: (key: string, value: RillValue, ctx: RuntimeContext) => Promise<void | RillValue>;
+  set: (
+    key: string,
+    value: RillValue,
+    ctx: RuntimeContext
+  ) => Promise<void | RillValue>;
   delete: (key: string, ctx: RuntimeContext) => boolean | RillValue;
   keys: () => string[];
   has: (key: string) => boolean;
@@ -56,7 +59,7 @@ export interface KvStore {
  */
 export async function createStore(
   config: StoreConfig,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): Promise<KvStore> {
   const {
     mount,
@@ -94,8 +97,8 @@ export async function createStore(
               code: 'UNAVAILABLE',
               provider: PROVIDER,
               raw: { kind: 'corrupt_file', path: storePath },
-            },
-          ),
+            }
+          )
         );
       }
       throw e;
@@ -113,8 +116,8 @@ export async function createStore(
             code: 'UNAVAILABLE',
             provider: PROVIDER,
             raw: { kind: 'corrupt_file', path: storePath },
-          },
-        ),
+          }
+        )
       );
     }
 
@@ -127,7 +130,7 @@ export async function createStore(
             value,
             schemaEntry.type,
             storePath,
-            ctx,
+            ctx
           );
           if (typeErr !== null) throw new LoadInvalid(typeErr);
           data.set(key, value);
@@ -171,7 +174,7 @@ export async function createStore(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'read_only', mode, path: storePath },
-        },
+        }
       );
     }
     return null;
@@ -194,7 +197,7 @@ export async function createStore(
     value: RillValue,
     expectedType: SchemaEntry['type'],
     location: string,
-    runCtx: RuntimeContext,
+    runCtx: RuntimeContext
   ): RillValue | null {
     let actualType: string;
 
@@ -211,8 +214,14 @@ export async function createStore(
         {
           code: 'INVALID_INPUT',
           provider: PROVIDER,
-          raw: { kind: 'type_mismatch', key, expectedType, actualType, location },
-        },
+          raw: {
+            kind: 'type_mismatch',
+            key,
+            expectedType,
+            actualType,
+            location,
+          },
+        }
       );
     }
     return null;
@@ -222,7 +231,10 @@ export async function createStore(
   // Operations
   // ----------------------------------------------------------
 
-  function get(key: string, runCtx: RuntimeContext): RillValue | undefined | RillValue {
+  function get(
+    key: string,
+    runCtx: RuntimeContext
+  ): RillValue | undefined | RillValue {
     if (schema && !(key in schema)) {
       return runCtx.invalidate(
         new Error(`key "${key}" not declared in schema`),
@@ -230,7 +242,7 @@ export async function createStore(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'undeclared_key', key },
-        },
+        }
       );
     }
     return data.get(key);
@@ -239,7 +251,7 @@ export async function createStore(
   async function set(
     key: string,
     value: RillValue,
-    runCtx: RuntimeContext,
+    runCtx: RuntimeContext
   ): Promise<void | RillValue> {
     const writeErr = checkWritePermission(runCtx);
     if (writeErr !== null) return writeErr;
@@ -251,12 +263,18 @@ export async function createStore(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'undeclared_key', key },
-        },
+        }
       );
     }
 
     if (schema && key in schema) {
-      const typeErr = validateType(key, value, schema[key]!.type, storePath, runCtx);
+      const typeErr = validateType(
+        key,
+        value,
+        schema[key]!.type,
+        storePath,
+        runCtx
+      );
       if (typeErr !== null) return typeErr;
     }
 
@@ -267,19 +285,26 @@ export async function createStore(
         {
           code: 'INVALID_INPUT',
           provider: PROVIDER,
-          raw: { kind: 'value_too_large', key, size: valueSize, max: maxValueSize },
-        },
+          raw: {
+            kind: 'value_too_large',
+            key,
+            size: valueSize,
+            max: maxValueSize,
+          },
+        }
       );
     }
 
     if (!data.has(key) && data.size >= maxEntries) {
       return runCtx.invalidate(
-        new Error(`store exceeds entry limit (${data.size + 1} > ${maxEntries})`),
+        new Error(
+          `store exceeds entry limit (${data.size + 1} > ${maxEntries})`
+        ),
         {
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'entry_limit', count: data.size + 1, max: maxEntries },
-        },
+        }
       );
     }
 
@@ -301,7 +326,7 @@ export async function createStore(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'store_limit', size: storeSize, max: maxStoreSize },
-        },
+        }
       );
     }
 
@@ -352,10 +377,7 @@ export async function createStore(
       await fs.writeFile(tmpPath, content, 'utf-8');
       await fs.rename(tmpPath, storePath);
     } catch (error) {
-      console.warn(
-        `[KV Store] Failed to flush state to ${storePath}:`,
-        error,
-      );
+      console.warn(`[KV Store] Failed to flush state to ${storePath}:`, error);
       try {
         await fs.unlink(tmpPath);
       } catch {
@@ -376,5 +398,3 @@ export async function createStore(
     flush,
   };
 }
-
-export { isInvalid };

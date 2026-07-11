@@ -27,7 +27,10 @@
  *
  * Never throws. Missing keys resolve to empty string.
  */
-export function interpolate(body: string, values: Record<string, string>): string {
+export function interpolate(
+  body: string,
+  values: Record<string, string>
+): string {
   const parts: string[] = [];
   let i = 0;
   const len = body.length;

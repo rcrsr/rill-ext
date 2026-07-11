@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreFiles": [
+    "packages/ext/*/dts-bundle-generator.config.cjs",
+    "packages/ext/*/examples/test-host.ts",
+    "packages/ext/claude-code/verify-factory.mjs",
+    "packages/ext/mcp/tests/integration/mock-mcp-server.mjs"
+  ],
+  "ignoreDependencies": ["undici-types"],
+  "workspaces": {
+    "packages/ext/prompt-md": {
+      "ignoreDependencies": [
+        "@anthropic-ai/sdk",
+        "@google/genai",
+        "openai",
+        "@rcrsr/rill-ext-anthropic",
+        "@rcrsr/rill-ext-gemini",
+        "@rcrsr/rill-ext-openai"
+      ]
+    }
+  }
+}

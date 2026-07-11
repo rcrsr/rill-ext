@@ -79,7 +79,11 @@ function extractLastMessageText(msgs: unknown[]): string {
     return content
       .map((part) => {
         if (typeof part === 'string') return part;
-        if (part && typeof part === 'object' && typeof (part as Record<string, unknown>)['text'] === 'string') {
+        if (
+          part &&
+          typeof part === 'object' &&
+          typeof (part as Record<string, unknown>)['text'] === 'string'
+        ) {
           return (part as Record<string, unknown>)['text'] as string;
         }
         return '';
@@ -94,10 +98,14 @@ function extractLastMessageText(msgs: unknown[]): string {
  * Only text parts are extracted; non-text parts are silently dropped for simple
  * message/generate paths (tool_loop uses its own wire format via callbacks).
  */
-function messagesToOpenAI(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
+function messagesToOpenAI(
+  messages: Message[]
+): OpenAI.ChatCompletionMessageParam[] {
   return messages.map((msg) => {
     const content = msg.parts
-      .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+      .filter(
+        (part): part is { type: 'text'; text: string } => part.type === 'text'
+      )
       .map((part) => part.text)
       .join('');
     return { role: msg.role, content } as OpenAI.ChatCompletionMessageParam;
@@ -132,7 +140,10 @@ export async function createFoundryExtension(
 
   // EC-3: Validate auth.type
   if (config.auth.type !== 'api-key' && config.auth.type !== 'entra') {
-    throw new RuntimeError('RILL-R001', "foundry: auth.type must be 'api-key' or 'entra'");
+    throw new RuntimeError(
+      'RILL-R001',
+      "foundry: auth.type must be 'api-key' or 'entra'"
+    );
   }
 
   // Create the AzureOpenAI client (may be unused if inference not configured)
@@ -200,7 +211,7 @@ export async function createFoundryExtension(
     ctx: RuntimeContext,
     code: string,
     rawKind: string,
-    message: string,
+    message: string
   ): RuntimeHaltSignal {
     return new RuntimeHaltSignal(
       ctx.invalidate(new Error(message), {
@@ -208,7 +219,7 @@ export async function createFoundryExtension(
         provider: 'foundry',
         raw: { kind: rawKind, message },
       }),
-      true,
+      true
     );
   }
 
@@ -220,17 +231,35 @@ export async function createFoundryExtension(
    * Guard: throws EC-4/EC-5/EC-6 when inference config is absent or incomplete.
    * Called at the top of every LLM host function.
    */
-  function assertInference(ctx: RuntimeContext): { model: string; apiVersion: string } {
+  function assertInference(ctx: RuntimeContext): {
+    model: string;
+    apiVersion: string;
+  } {
     if (!inference) {
-      throw haltInvalid(ctx, 'UNAVAILABLE', 'inference_unconfigured', 'foundry: inference not configured');
+      throw haltInvalid(
+        ctx,
+        'UNAVAILABLE',
+        'inference_unconfigured',
+        'foundry: inference not configured'
+      );
     }
     // EC-5: model is required
     if (!inference.model || inference.model.trim().length === 0) {
-      throw haltInvalid(ctx, 'INVALID_INPUT', 'model_missing', 'foundry: model is required');
+      throw haltInvalid(
+        ctx,
+        'INVALID_INPUT',
+        'model_missing',
+        'foundry: model is required'
+      );
     }
     // EC-6: apiVersion is required
     if (!inference.apiVersion || inference.apiVersion.trim().length === 0) {
-      throw haltInvalid(ctx, 'INVALID_INPUT', 'apiversion_missing', 'foundry: inference.apiVersion is required');
+      throw haltInvalid(
+        ctx,
+        'INVALID_INPUT',
+        'apiversion_missing',
+        'foundry: inference.apiVersion is required'
+      );
     }
     return { model: inference.model, apiVersion: inference.apiVersion };
   }
@@ -241,7 +270,12 @@ export async function createFoundryExtension(
 
   function assertNotDisposed(ctx: RuntimeContext): void {
     if (!abortController) {
-      throw haltInvalid(ctx, 'DISPOSED', 'extension_disposed', 'foundry: extension disposed');
+      throw haltInvalid(
+        ctx,
+        'DISPOSED',
+        'extension_disposed',
+        'foundry: extension disposed'
+      );
     }
   }
 
@@ -276,17 +310,26 @@ export async function createFoundryExtension(
     tool_loop: RillFunction;
     generate: RillFunction;
   } = {
-
     // -------------------------------------------------------
     // message
     // -------------------------------------------------------
     message: {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            system: { type: { kind: 'string' }, defaultValue: '' },
+            max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
+          }
+        ),
       ],
       fn: (args, ctx): RillValue => {
         assertNotDisposed(ctx as RuntimeContext);
@@ -295,21 +338,29 @@ export async function createFoundryExtension(
         const rawPrompt = args['prompt'] as RillValue;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-        const normalizedResult = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalizedResult = normalizePrompt(
+          rawPrompt,
+          ctx as RuntimeContext
+        );
         if (!Array.isArray(normalizedResult)) {
           throw new RuntimeHaltSignal(normalizedResult, true);
         }
         const normalizedPrompt = normalizedResult as Message[];
 
         const system =
-          typeof options['system'] === 'string' ? options['system'] : factorySystem;
+          typeof options['system'] === 'string'
+            ? options['system']
+            : factorySystem;
         const maxTokens =
           typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
             ? options['max_tokens']
             : factoryMaxTokens;
 
         const inputMessages: Message[] = system
-          ? [{ role: 'system', parts: [{ type: 'text', text: system }] }, ...normalizedPrompt]
+          ? [
+              { role: 'system', parts: [{ type: 'text', text: system }] },
+              ...normalizedPrompt,
+            ]
           : normalizedPrompt;
 
         const apiMessages = messagesToOpenAI(inputMessages);
@@ -319,7 +370,9 @@ export async function createFoundryExtension(
           max_completion_tokens: maxTokens,
           messages: apiMessages,
           stream_options: { include_usage: true },
-          ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+          ...(factoryTemperature !== undefined
+            ? { temperature: factoryTemperature }
+            : {}),
         });
 
         async function* chunks(): AsyncGenerator<RillValue> {
@@ -331,7 +384,12 @@ export async function createFoundryExtension(
               }
             }
           } catch (error: unknown) {
-            throwProviderHalt(ctx as RuntimeContext, 'Foundry', error, detectFoundryError);
+            throwProviderHalt(
+              ctx as RuntimeContext,
+              'Foundry',
+              error,
+              detectFoundryError
+            );
           }
         }
 
@@ -351,7 +409,9 @@ export async function createFoundryExtension(
               usage: { input: inputTokens, output: outputTokens },
               stop_reason: response.choices[0]?.finish_reason ?? 'unknown',
               id: response.id,
-              messages: buildResponseMessages(inputMessages, [{ type: 'text', text: content }]),
+              messages: buildResponseMessages(inputMessages, [
+                { type: 'text', text: content },
+              ]),
             };
 
             const duration = Date.now() - startTime;
@@ -368,14 +428,26 @@ export async function createFoundryExtension(
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
             const rillError: RuntimeError | RuntimeHaltSignal =
-              error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+              error instanceof RuntimeHaltSignal ||
+              error instanceof RuntimeError
                 ? error
-                : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
+                : new RuntimeHaltSignal(
+                    mapProviderError(
+                      ctx as RuntimeContext,
+                      'Foundry',
+                      error,
+                      detectFoundryError
+                    ),
+                    true
+                  );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'foundry:message:error',
               subsystem: 'extension:foundry',
               model: factoryModel ?? '',
-              error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
+              error:
+                rillError instanceof RuntimeHaltSignal
+                  ? getStatus(rillError.value).message
+                  : rillError.message,
               duration,
             });
             throw rillError;
@@ -387,17 +459,32 @@ export async function createFoundryExtension(
           fields: {
             content: { type: { kind: 'string' as const } },
             model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
+            usage: {
+              type: {
+                kind: 'dict' as const,
+                fields: {
+                  input: { type: { kind: 'number' as const } },
+                  output: { type: { kind: 'number' as const } },
+                },
+              },
+            },
             stop_reason: { type: { kind: 'string' as const } },
             id: { type: { kind: 'string' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
+            messages: {
+              type: {
+                kind: 'list' as const,
+                element: { kind: 'dict' as const },
+              },
+            },
           },
         };
 
         return createRillStream({
           chunks: chunks(),
           resolve,
-          dispose: () => { runner.abort(); },
+          dispose: () => {
+            runner.abort();
+          },
           chunkType: { kind: 'string' },
           retType,
         });
@@ -411,7 +498,15 @@ export async function createFoundryExtension(
           fields: {
             content: { type: { kind: 'string' } },
             model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+            usage: {
+              type: {
+                kind: 'dict',
+                fields: {
+                  input: { type: { kind: 'number' } },
+                  output: { type: { kind: 'number' } },
+                },
+              },
+            },
             stop_reason: { type: { kind: 'string' } },
             id: { type: { kind: 'string' } },
             messages: { type: { kind: 'list', element: { kind: 'dict' } } },
@@ -445,7 +540,12 @@ export async function createFoundryExtension(
 
           const embeddingData = response.data[0]?.embedding;
           if (!embeddingData || embeddingData.length === 0) {
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding', 'foundry: empty embedding returned');
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'PROTOCOL',
+              'empty_embedding',
+              'foundry: empty embedding returned'
+            );
           }
 
           const float32Data = new Float32Array(embeddingData);
@@ -466,11 +566,22 @@ export async function createFoundryExtension(
           const rillError: RuntimeError | RuntimeHaltSignal =
             error instanceof RuntimeHaltSignal || error instanceof RuntimeError
               ? error
-              : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
+              : new RuntimeHaltSignal(
+                  mapProviderError(
+                    ctx as RuntimeContext,
+                    'Foundry',
+                    error,
+                    detectFoundryError
+                  ),
+                  true
+                );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
-            error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
+            error:
+              rillError instanceof RuntimeHaltSignal
+                ? getStatus(rillError.value).message
+                : rillError.message,
             duration,
           });
           throw rillError;
@@ -512,7 +623,12 @@ export async function createFoundryExtension(
           for (const embeddingItem of response.data) {
             const embeddingData = embeddingItem.embedding;
             if (!embeddingData || embeddingData.length === 0) {
-              throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding', 'foundry: empty embedding returned');
+              throw haltInvalid(
+                ctx as RuntimeContext,
+                'PROTOCOL',
+                'empty_embedding',
+                'foundry: empty embedding returned'
+              );
             }
             const float32Data = new Float32Array(embeddingData);
             const vector = createVector(float32Data, factoryEmbedModel);
@@ -539,18 +655,34 @@ export async function createFoundryExtension(
           const rillError: RuntimeError | RuntimeHaltSignal =
             error instanceof RuntimeHaltSignal || error instanceof RuntimeError
               ? error
-              : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
+              : new RuntimeHaltSignal(
+                  mapProviderError(
+                    ctx as RuntimeContext,
+                    'Foundry',
+                    error,
+                    detectFoundryError
+                  ),
+                  true
+                );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
-            error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
+            error:
+              rillError instanceof RuntimeHaltSignal
+                ? getStatus(rillError.value).message
+                : rillError.message,
             duration,
           });
           throw rillError;
         }
       },
-      annotations: { description: 'Generate embedding vectors for multiple texts' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'vector' } }),
+      annotations: {
+        description: 'Generate embedding vectors for multiple texts',
+      },
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: { kind: 'vector' },
+      }),
     },
 
     // -------------------------------------------------------
@@ -558,7 +690,12 @@ export async function createFoundryExtension(
     // -------------------------------------------------------
     tool_loop: {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
         {
           name: 'tools',
           type: { kind: 'dict', valueType: { kind: 'closure' } },
@@ -570,7 +707,19 @@ export async function createFoundryExtension(
           max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
           max_errors: { type: { kind: 'number' }, defaultValue: 3 },
           max_turns: { type: { kind: 'number' }, defaultValue: 10 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
+          messages: {
+            type: {
+              kind: 'list',
+              element: {
+                kind: 'dict',
+                fields: {
+                  role: { type: { kind: 'string' } },
+                  content: { type: { kind: 'string' } },
+                },
+              },
+            },
+            defaultValue: [],
+          },
         }),
       ],
       fn: (args, ctx): RillValue => {
@@ -581,14 +730,19 @@ export async function createFoundryExtension(
         const toolsDict = args['tools'] as RillValue;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-        const normalizedResult2 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalizedResult2 = normalizePrompt(
+          rawPrompt,
+          ctx as RuntimeContext
+        );
         if (!Array.isArray(normalizedResult2)) {
           throw new RuntimeHaltSignal(normalizedResult2, true);
         }
         const normalizedPrompt = normalizedResult2 as Message[];
 
         const system =
-          typeof options['system'] === 'string' ? options['system'] : factorySystem;
+          typeof options['system'] === 'string'
+            ? options['system']
+            : factorySystem;
         const maxTokens =
           typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
             ? options['max_tokens']
@@ -605,20 +759,37 @@ export async function createFoundryExtension(
         }
 
         if ('messages' in options && Array.isArray(options['messages'])) {
-          const prependedMessages = options['messages'] as Array<Record<string, unknown>>;
+          const prependedMessages = options['messages'] as Array<
+            Record<string, unknown>
+          >;
 
           for (const msg of prependedMessages) {
             if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'role_missing', "message missing required 'role' field");
+              throw haltInvalid(
+                ctx as RuntimeContext,
+                'INVALID_INPUT',
+                'role_missing',
+                "message missing required 'role' field"
+              );
             }
 
             const role = msg['role'];
             if (role !== 'user' && role !== 'assistant') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_role', `invalid role '${role as string}'`);
+              throw haltInvalid(
+                ctx as RuntimeContext,
+                'INVALID_INPUT',
+                'invalid_role',
+                `invalid role '${role as string}'`
+              );
             }
 
             if (!('content' in msg) || typeof msg['content'] !== 'string') {
-              throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'content_missing', `${role as string} message requires 'content'`);
+              throw haltInvalid(
+                ctx as RuntimeContext,
+                'INVALID_INPUT',
+                'content_missing',
+                `${role as string} message requires 'content'`
+              );
             }
 
             messages.push({
@@ -634,7 +805,11 @@ export async function createFoundryExtension(
 
         const callbacks: ToolLoopCallbacks = {
           buildTools: (
-            toolDefs: Array<{ name: string; description: string; input_schema: object }>
+            toolDefs: Array<{
+              name: string;
+              description: string;
+              input_schema: object;
+            }>
           ): OpenAI.ChatCompletionTool[] => {
             return toolDefs.map((def) => ({
               type: 'function' as const,
@@ -663,7 +838,9 @@ export async function createFoundryExtension(
               apiParams.temperature = factoryTemperature;
             }
 
-            const response = await client.chat.completions.create(apiParams, { signal });
+            const response = await client.chat.completions.create(apiParams, {
+              signal,
+            });
 
             return {
               ...response,
@@ -680,15 +857,20 @@ export async function createFoundryExtension(
             onTextDelta: (text: string) => void,
             signal?: AbortSignal
           ): Promise<unknown> => {
-            const streamRunner = client.chat.completions.stream({
-              model: factoryModel!,
-              max_completion_tokens: maxTokens,
-              messages: msgs as OpenAI.ChatCompletionMessageParam[],
-              tools: tools as OpenAI.ChatCompletionTool[],
-              tool_choice: 'auto' as const,
-              stream_options: { include_usage: true },
-              ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
-            }, { signal });
+            const streamRunner = client.chat.completions.stream(
+              {
+                model: factoryModel!,
+                max_completion_tokens: maxTokens,
+                messages: msgs as OpenAI.ChatCompletionMessageParam[],
+                tools: tools as OpenAI.ChatCompletionTool[],
+                tool_choice: 'auto' as const,
+                stream_options: { include_usage: true },
+                ...(factoryTemperature !== undefined
+                  ? { temperature: factoryTemperature }
+                  : {}),
+              },
+              { signal }
+            );
 
             streamRunner.on('content', (delta: string) => {
               onTextDelta(delta);
@@ -708,7 +890,11 @@ export async function createFoundryExtension(
           extractToolCalls: (
             response: unknown
           ): Array<{ id: string; name: string; input: object }> | null => {
-            if (!response || typeof response !== 'object' || !('choices' in response)) {
+            if (
+              !response ||
+              typeof response !== 'object' ||
+              !('choices' in response)
+            ) {
               return null;
             }
 
@@ -718,22 +904,33 @@ export async function createFoundryExtension(
             }
 
             const choice = choices[0];
-            if (!choice || typeof choice !== 'object' || !('message' in choice)) {
+            if (
+              !choice ||
+              typeof choice !== 'object' ||
+              !('message' in choice)
+            ) {
               return null;
             }
 
             const message = (choice as { message: unknown }).message;
-            if (!message || typeof message !== 'object' || !('tool_calls' in message)) {
+            if (
+              !message ||
+              typeof message !== 'object' ||
+              !('tool_calls' in message)
+            ) {
               return null;
             }
 
-            const toolCalls = (message as { tool_calls: unknown[] | null }).tool_calls;
+            const toolCalls = (message as { tool_calls: unknown[] | null })
+              .tool_calls;
             if (!toolCalls || !Array.isArray(toolCalls)) {
               return null;
             }
 
             const functionToolCalls = toolCalls.filter(
-              (tc): tc is OpenAI.Chat.Completions.ChatCompletionMessageToolCall =>
+              (
+                tc
+              ): tc is OpenAI.Chat.Completions.ChatCompletionMessageToolCall =>
                 typeof tc === 'object' &&
                 tc !== null &&
                 'type' in tc &&
@@ -741,9 +938,10 @@ export async function createFoundryExtension(
             );
 
             return functionToolCalls.map((tc) => {
-              const functionCall = tc as OpenAI.Chat.Completions.ChatCompletionMessageToolCall & {
-                function: { name: string; arguments: string };
-              };
+              const functionCall =
+                tc as OpenAI.Chat.Completions.ChatCompletionMessageToolCall & {
+                  function: { name: string; arguments: string };
+                };
               const tcArgs = functionCall.function.arguments;
               let parsedArgs: object;
               try {
@@ -760,7 +958,11 @@ export async function createFoundryExtension(
           },
 
           formatAssistantMessage: (response: unknown): unknown => {
-            if (!response || typeof response !== 'object' || !('choices' in response)) {
+            if (
+              !response ||
+              typeof response !== 'object' ||
+              !('choices' in response)
+            ) {
               return null;
             }
 
@@ -770,7 +972,11 @@ export async function createFoundryExtension(
             }
 
             const choice = choices[0];
-            if (!choice || typeof choice !== 'object' || !('message' in choice)) {
+            if (
+              !choice ||
+              typeof choice !== 'object' ||
+              !('message' in choice)
+            ) {
               return null;
             }
 
@@ -791,7 +997,12 @@ export async function createFoundryExtension(
           },
 
           formatToolResult: (
-            toolResults: Array<{ id: string; name: string; result: RillValue; error?: string }>
+            toolResults: Array<{
+              id: string;
+              name: string;
+              result: RillValue;
+              error?: string;
+            }>
           ): unknown => {
             return toolResults.map((tr) => ({
               role: 'tool' as const,
@@ -822,7 +1033,9 @@ export async function createFoundryExtension(
             signal?: AbortSignal
           ): Promise<unknown> => {
             const promptText = extractLastMessageText(msgs);
-            const shieldArgs: Record<string, RillValue> = { text: promptText as RillValue };
+            const shieldArgs: Record<string, RillValue> = {
+              text: promptText as RillValue,
+            };
             await shield(
               shieldArgs,
               ctx as RuntimeContext,
@@ -840,7 +1053,9 @@ export async function createFoundryExtension(
               signal?: AbortSignal
             ): Promise<unknown> => {
               const promptText = extractLastMessageText(msgs);
-              const shieldArgs: Record<string, RillValue> = { text: promptText as RillValue };
+              const shieldArgs: Record<string, RillValue> = {
+                text: promptText as RillValue,
+              };
               await shield(
                 shieldArgs,
                 ctx as RuntimeContext,
@@ -890,7 +1105,12 @@ export async function createFoundryExtension(
               yield chunk;
             }
           } catch (error: unknown) {
-            throwProviderHalt(ctx as RuntimeContext, 'Foundry', error, detectFoundryError);
+            throwProviderHalt(
+              ctx as RuntimeContext,
+              'Foundry',
+              error,
+              detectFoundryError
+            );
           }
         }
 
@@ -907,14 +1127,24 @@ export async function createFoundryExtension(
                 ? 'max_turns'
                 : (response?.choices[0]?.finish_reason ?? 'stop');
 
-            const inputMessages: Message[] = (messages as unknown as Array<Record<string, unknown>>)
+            const inputMessages: Message[] = (
+              messages as unknown as Array<Record<string, unknown>>
+            )
               .filter((m) => m['role'] === 'user' || m['role'] === 'assistant')
               .map((m) => ({
                 role: m['role'] as Role,
-                parts: [{ type: 'text' as const, text: typeof m['content'] === 'string' ? m['content'] : '' }],
+                parts: [
+                  {
+                    type: 'text' as const,
+                    text: typeof m['content'] === 'string' ? m['content'] : '',
+                  },
+                ],
               }));
 
-            accumulateUsage(loopResult.totalTokens.input, loopResult.totalTokens.output);
+            accumulateUsage(
+              loopResult.totalTokens.input,
+              loopResult.totalTokens.output
+            );
 
             const result = {
               content,
@@ -926,7 +1156,9 @@ export async function createFoundryExtension(
               stop_reason: stopReason,
               turns: loopResult.turns,
               messages: response
-                ? buildResponseMessages(inputMessages, [{ type: 'text', text: content }])
+                ? buildResponseMessages(inputMessages, [
+                    { type: 'text', text: content },
+                  ])
                 : inputMessages,
             };
 
@@ -936,7 +1168,8 @@ export async function createFoundryExtension(
               subsystem: 'extension:foundry',
               model: factoryModel ?? '',
               iterations: loopResult.turns,
-              totalTokens: loopResult.totalTokens.input + loopResult.totalTokens.output,
+              totalTokens:
+                loopResult.totalTokens.input + loopResult.totalTokens.output,
               duration,
             });
 
@@ -944,13 +1177,25 @@ export async function createFoundryExtension(
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
             const rillError: RuntimeError | RuntimeHaltSignal =
-              error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+              error instanceof RuntimeHaltSignal ||
+              error instanceof RuntimeError
                 ? error
-                : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
+                : new RuntimeHaltSignal(
+                    mapProviderError(
+                      ctx as RuntimeContext,
+                      'Foundry',
+                      error,
+                      detectFoundryError
+                    ),
+                    true
+                  );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'foundry:error',
               subsystem: 'extension:foundry',
-              error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
+              error:
+                rillError instanceof RuntimeHaltSignal
+                  ? getStatus(rillError.value).message
+                  : rillError.message,
               duration,
             });
             throw rillError;
@@ -962,22 +1207,39 @@ export async function createFoundryExtension(
           fields: {
             content: { type: { kind: 'string' as const } },
             model: { type: { kind: 'string' as const } },
-            usage: { type: { kind: 'dict' as const, fields: { input: { type: { kind: 'number' as const } }, output: { type: { kind: 'number' as const } } } } },
+            usage: {
+              type: {
+                kind: 'dict' as const,
+                fields: {
+                  input: { type: { kind: 'number' as const } },
+                  output: { type: { kind: 'number' as const } },
+                },
+              },
+            },
             stop_reason: { type: { kind: 'string' as const } },
             turns: { type: { kind: 'number' as const } },
-            messages: { type: { kind: 'list' as const, element: { kind: 'dict' as const } } },
+            messages: {
+              type: {
+                kind: 'list' as const,
+                element: { kind: 'dict' as const },
+              },
+            },
           },
         };
 
         return createRillStream({
           chunks: chunks(),
           resolve,
-          dispose: () => { toolLoopAbortController.abort(); },
+          dispose: () => {
+            toolLoopAbortController.abort();
+          },
           chunkType: { kind: 'dict' },
           retType,
         });
       },
-      annotations: { description: 'Execute tool-use loop with Azure AI Foundry' },
+      annotations: {
+        description: 'Execute tool-use loop with Azure AI Foundry',
+      },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'dict' },
@@ -986,7 +1248,15 @@ export async function createFoundryExtension(
           fields: {
             content: { type: { kind: 'string' } },
             model: { type: { kind: 'string' } },
-            usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+            usage: {
+              type: {
+                kind: 'dict',
+                fields: {
+                  input: { type: { kind: 'number' } },
+                  output: { type: { kind: 'number' } },
+                },
+              },
+            },
             stop_reason: { type: { kind: 'string' } },
             turns: { type: { kind: 'number' } },
             messages: { type: { kind: 'list', element: { kind: 'dict' } } },
@@ -1000,13 +1270,42 @@ export async function createFoundryExtension(
     // -------------------------------------------------------
     generate: {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
-        { name: 'schema', type: { kind: 'type' } as { kind: string }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
-        p.dict('options', undefined, {}, {
-          system: { type: { kind: 'string' }, defaultValue: '' },
-          max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
-          messages: { type: { kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }, defaultValue: [] },
-        }),
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
+        {
+          name: 'schema',
+          type: { kind: 'type' } as { kind: string },
+          defaultValue: undefined,
+          annotations: {
+            description: 'Type expression for structured output schema',
+          },
+        },
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            system: { type: { kind: 'string' }, defaultValue: '' },
+            max_tokens: { type: { kind: 'number' }, defaultValue: 0 },
+            messages: {
+              type: {
+                kind: 'list',
+                element: {
+                  kind: 'dict',
+                  fields: {
+                    role: { type: { kind: 'string' } },
+                    content: { type: { kind: 'string' } },
+                  },
+                },
+              },
+              defaultValue: [],
+            },
+          }
+        ),
       ],
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
@@ -1016,11 +1315,18 @@ export async function createFoundryExtension(
 
         try {
           const rawPrompt = args['prompt'] as RillValue;
-          const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
+          const schemaArg = args['schema'] as
+            | { __rill_type?: boolean; structure?: TypeStructure }
+            | undefined;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
 
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
-            throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'schema_missing', 'generate requires a type expression as schema');
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'INVALID_INPUT',
+              'schema_missing',
+              'generate requires a type expression as schema'
+            );
           }
           if (schemaArg.structure.kind !== 'dict') {
             throw haltInvalid(
@@ -1031,23 +1337,34 @@ export async function createFoundryExtension(
             );
           }
 
-          const normalizedResult3 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+          const normalizedResult3 = normalizePrompt(
+            rawPrompt,
+            ctx as RuntimeContext
+          );
           if (!Array.isArray(normalizedResult3)) {
             throw new RuntimeHaltSignal(normalizedResult3, true);
           }
           const normalizedPrompt = normalizedResult3 as Message[];
 
-          const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
+          const jsonSchema = buildJsonSchemaFromStructuralType(
+            schemaArg.structure
+          );
 
           const system =
-            typeof options['system'] === 'string' ? options['system'] : factorySystem;
+            typeof options['system'] === 'string'
+              ? options['system']
+              : factorySystem;
           const maxTokens =
-            typeof options['max_tokens'] === 'number' && options['max_tokens'] > 0
+            typeof options['max_tokens'] === 'number' &&
+            options['max_tokens'] > 0
               ? options['max_tokens']
               : factoryMaxTokens;
 
           const inputMessages: Message[] = system
-            ? [{ role: 'system', parts: [{ type: 'text', text: system }] }, ...normalizedPrompt]
+            ? [
+                { role: 'system', parts: [{ type: 'text', text: system }] },
+                ...normalizedPrompt,
+              ]
             : normalizedPrompt;
 
           const apiMessages = messagesToOpenAI(inputMessages);
@@ -1079,8 +1396,15 @@ export async function createFoundryExtension(
             data = JSON.parse(raw) as unknown;
           } catch (parseError: unknown) {
             const detail =
-              parseError instanceof Error ? parseError.message : String(parseError);
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'json_parse_failed', `generate: failed to parse response JSON: ${detail}`);
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError);
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'PROTOCOL',
+              'json_parse_failed',
+              `generate: failed to parse response JSON: ${detail}`
+            );
           }
 
           const inputTokens = response.usage?.prompt_tokens ?? 0;
@@ -1112,24 +1436,45 @@ export async function createFoundryExtension(
           const rillError: RuntimeError | RuntimeHaltSignal =
             error instanceof RuntimeHaltSignal || error instanceof RuntimeError
               ? error
-              : new RuntimeHaltSignal(mapProviderError(ctx as RuntimeContext, 'Foundry', error, detectFoundryError), true);
+              : new RuntimeHaltSignal(
+                  mapProviderError(
+                    ctx as RuntimeContext,
+                    'Foundry',
+                    error,
+                    detectFoundryError
+                  ),
+                  true
+                );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:error',
             subsystem: 'extension:foundry',
-            error: (rillError instanceof RuntimeHaltSignal ? getStatus(rillError.value).message : rillError.message),
+            error:
+              rillError instanceof RuntimeHaltSignal
+                ? getStatus(rillError.value).message
+                : rillError.message,
             duration,
           });
           throw rillError;
         }
       },
-      annotations: { description: 'Generate structured output from Azure AI Foundry' },
+      annotations: {
+        description: 'Generate structured output from Azure AI Foundry',
+      },
       returnType: structureToTypeValue({
         kind: 'dict',
         fields: {
           data: { type: { kind: 'any' } },
           raw: { type: { kind: 'string' } },
           model: { type: { kind: 'string' } },
-          usage: { type: { kind: 'dict', fields: { input: { type: { kind: 'number' } }, output: { type: { kind: 'number' } } } } },
+          usage: {
+            type: {
+              kind: 'dict',
+              fields: {
+                input: { type: { kind: 'number' } },
+                output: { type: { kind: 'number' } },
+              },
+            },
+          },
           stop_reason: { type: { kind: 'string' } },
           id: { type: { kind: 'string' } },
         },
@@ -1146,7 +1491,10 @@ export async function createFoundryExtension(
   // embed and embed_batch are excluded per spec.
   // tool_loop per-iteration shielding is handled inside the callbacks (see tool_loop.fn).
 
-  function wrapWithShield(rillFn: typeof fnDict.message, triggeredBy: string): typeof fnDict.message {
+  function wrapWithShield(
+    rillFn: typeof fnDict.message,
+    triggeredBy: string
+  ): typeof fnDict.message {
     if (!autoShieldMiddleware) {
       return rillFn;
     }
@@ -1192,7 +1540,9 @@ export async function createFoundryExtension(
         output_tokens: usageOutputTokens,
       } as RillValue;
     },
-    annotations: { description: 'Return accumulated token usage since factory creation' },
+    annotations: {
+      description: 'Return accumulated token usage since factory creation',
+    },
     returnType: structureToTypeValue({
       kind: 'dict',
       fields: {
@@ -1203,17 +1553,25 @@ export async function createFoundryExtension(
   };
 
   const shieldFn: RillFunction = {
-    params: [
-      p.str('text'),
-      p.list('documents', undefined),
-    ],
+    params: [p.str('text'), p.list('documents', undefined)],
     fn: async (args, ctx): Promise<RillValue> => {
       const text = args['text'] as string;
       const documents = (args['documents'] ?? []) as Array<RillValue>;
-      const stringDocs = documents.filter((d): d is string => typeof d === 'string');
-      return callShield(text, stringDocs, config, config.auth, ctx as RuntimeContext, disposedRef);
+      const stringDocs = documents.filter(
+        (d): d is string => typeof d === 'string'
+      );
+      return callShield(
+        text,
+        stringDocs,
+        config,
+        config.auth,
+        ctx as RuntimeContext,
+        disposedRef
+      );
     },
-    annotations: { description: 'Evaluate text for prompt attacks via Azure Content Safety' },
+    annotations: {
+      description: 'Evaluate text for prompt attacks via Azure Content Safety',
+    },
     returnType: structureToTypeValue({
       kind: 'dict',
       fields: {
@@ -1227,9 +1585,17 @@ export async function createFoundryExtension(
     params: [p.str('query')],
     fn: async (args, ctx): Promise<RillValue> => {
       const query = args['query'] as string;
-      return callGround(query, config, client, ctx as RuntimeContext, disposedRef);
+      return callGround(
+        query,
+        config,
+        client,
+        ctx as RuntimeContext,
+        disposedRef
+      );
     },
-    annotations: { description: 'Ground a query via Bing using Azure AI Foundry' },
+    annotations: {
+      description: 'Ground a query via Bing using Azure AI Foundry',
+    },
     returnType: structureToTypeValue({
       kind: 'dict',
       fields: {
@@ -1242,17 +1608,29 @@ export async function createFoundryExtension(
   const searchFn: RillFunction = {
     params: [
       p.str('query'),
-      p.dict('options', undefined, {}, {
-        index: { type: { kind: 'string' }, defaultValue: '' },
-        queryType: { type: { kind: 'string' }, defaultValue: '' },
-        top: { type: { kind: 'number' }, defaultValue: 10 },
-        filter: { type: { kind: 'string' }, defaultValue: '' },
-      }),
+      p.dict(
+        'options',
+        undefined,
+        {},
+        {
+          index: { type: { kind: 'string' }, defaultValue: '' },
+          queryType: { type: { kind: 'string' }, defaultValue: '' },
+          top: { type: { kind: 'number' }, defaultValue: 10 },
+          filter: { type: { kind: 'string' }, defaultValue: '' },
+        }
+      ),
     ],
     fn: async (args, ctx): Promise<RillValue> => {
       const query = args['query'] as string;
       const options = (args['options'] ?? {}) as Record<string, RillValue>;
-      return callSearch(query, options, config, config.auth, ctx as RuntimeContext, disposedRef);
+      return callSearch(
+        query,
+        options,
+        config,
+        config.auth,
+        ctx as RuntimeContext,
+        disposedRef
+      );
     },
     annotations: { description: 'Search Azure AI Search indexes' },
     returnType: structureToTypeValue({

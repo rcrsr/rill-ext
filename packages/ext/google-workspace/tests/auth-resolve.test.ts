@@ -4,7 +4,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createRuntimeContext, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  isInvalid,
+  getStatus,
+  type RillValue,
+} from '@rcrsr/rill';
 import { RuntimeError } from '@rcrsr/rill';
 
 // Mock jwt and exchange modules before importing resolve
@@ -18,9 +23,16 @@ vi.mock('../src/auth/exchange.js', () => ({
   exchangeRefreshToken: vi.fn(),
 }));
 
-import { resolveToken, createTokenCache, clearTokenCache } from '../src/auth/resolve.js';
+import {
+  resolveToken,
+  createTokenCache,
+  clearTokenCache,
+} from '../src/auth/resolve.js';
 import { signServiceAccountJwt } from '../src/auth/jwt.js';
-import { exchangeJwtForToken, exchangeRefreshToken } from '../src/auth/exchange.js';
+import {
+  exchangeJwtForToken,
+  exchangeRefreshToken,
+} from '../src/auth/exchange.js';
 import type { TokenCache } from '../src/auth/resolve.js';
 
 const mockSign = vi.mocked(signServiceAccountJwt);
@@ -37,7 +49,8 @@ beforeEach(() => {
 // A valid service account keyJson
 const VALID_KEY_JSON = JSON.stringify({
   client_email: 'sa@project.iam.gserviceaccount.com',
-  private_key: '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
+  private_key:
+    '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
   token_uri: 'https://oauth2.googleapis.com/token',
 });
 
@@ -76,7 +89,10 @@ describe('clearTokenCache', () => {
     vi.setSystemTime(now);
 
     mockSign.mockReturnValue('jwt-assertion');
-    mockExchange.mockResolvedValue({ accessToken: 'fresh-token', expiresIn: 3600 });
+    mockExchange.mockResolvedValue({
+      accessToken: 'fresh-token',
+      expiresIn: 3600,
+    });
 
     const cache = createTokenCache();
     // Populate the cache
@@ -92,7 +108,10 @@ describe('clearTokenCache', () => {
     mockSign.mockClear();
     mockExchange.mockClear();
     mockSign.mockReturnValue('jwt-assertion-2');
-    mockExchange.mockResolvedValue({ accessToken: 'fresh-token-2', expiresIn: 3600 });
+    mockExchange.mockResolvedValue({
+      accessToken: 'fresh-token-2',
+      expiresIn: 3600,
+    });
 
     await resolveToken(auth, createRuntimeContext(), cache, SCOPES, SIGNAL);
     expect(mockSign).toHaveBeenCalledTimes(1);
@@ -127,7 +146,9 @@ describe('resolveToken — session', () => {
   it('returns the token from the direct context scope (IR-21)', async () => {
     const auth = { type: 'session' as const, tokenVar: 'MY_TOKEN' };
     const cache = createTokenCache();
-    const ctx = createRuntimeContext({ variables: { MY_TOKEN: 'session-token-value' } });
+    const ctx = createRuntimeContext({
+      variables: { MY_TOKEN: 'session-token-value' },
+    });
 
     const result = await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
 
@@ -137,7 +158,9 @@ describe('resolveToken — session', () => {
   it('walks ctx.parent chain and returns token from parent scope (IR-21)', async () => {
     const auth = { type: 'session' as const, tokenVar: 'MY_TOKEN' };
     const cache = createTokenCache();
-    const parent = createRuntimeContext({ variables: { MY_TOKEN: 'parent-token' } });
+    const parent = createRuntimeContext({
+      variables: { MY_TOKEN: 'parent-token' },
+    });
     const child = createRuntimeContext();
     child.parent = parent;
 
@@ -149,7 +172,9 @@ describe('resolveToken — session', () => {
   it('returns token from grandparent scope when parent has no match (IR-21)', async () => {
     const auth = { type: 'session' as const, tokenVar: 'MY_TOKEN' };
     const cache = createTokenCache();
-    const grandparent = createRuntimeContext({ variables: { MY_TOKEN: 'grandparent-token' } });
+    const grandparent = createRuntimeContext({
+      variables: { MY_TOKEN: 'grandparent-token' },
+    });
     const parent = createRuntimeContext();
     const child = createRuntimeContext();
     parent.parent = grandparent;
@@ -167,10 +192,14 @@ describe('resolveToken — session', () => {
     let caught: unknown;
     try {
       await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
-    } catch (e) { caught = e; }
+    } catch (e) {
+      caught = e;
+    }
     expect(isInvalid(caught as RillValue)).toBe(true);
     expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
-    expect(getStatus(caught as RillValue).message).toBe("google: session token 'MISSING_TOKEN' not found");
+    expect(getStatus(caught as RillValue).message).toBe(
+      "google: session token 'MISSING_TOKEN' not found"
+    );
   });
 
   it('session token error with exact var name in message (EC-21)', async () => {
@@ -180,8 +209,12 @@ describe('resolveToken — session', () => {
     let caught: unknown;
     try {
       await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
-    } catch (e) { caught = e; }
-    expect(getStatus(caught as RillValue).message).toBe("google: session token 'gcp_access_token' not found");
+    } catch (e) {
+      caught = e;
+    }
+    expect(getStatus(caught as RillValue).message).toBe(
+      "google: session token 'gcp_access_token' not found"
+    );
   });
 });
 
@@ -199,7 +232,10 @@ describe('resolveToken — service-account', () => {
     vi.setSystemTime(1_000_000_000_000);
 
     mockSign.mockReturnValue('signed-jwt');
-    mockExchange.mockResolvedValue({ accessToken: 'new-token', expiresIn: 3600 });
+    mockExchange.mockResolvedValue({
+      accessToken: 'new-token',
+      expiresIn: 3600,
+    });
 
     const auth = { type: 'service-account' as const, keyJson: VALID_KEY_JSON };
     const cache = createTokenCache();
@@ -210,7 +246,11 @@ describe('resolveToken — service-account', () => {
     expect(result).toBe('new-token');
     expect(mockSign).toHaveBeenCalledTimes(1);
     expect(mockExchange).toHaveBeenCalledTimes(1);
-    expect(mockExchange).toHaveBeenCalledWith(expect.anything(), 'signed-jwt', SIGNAL);
+    expect(mockExchange).toHaveBeenCalledWith(
+      expect.anything(),
+      'signed-jwt',
+      SIGNAL
+    );
   });
 
   it('populates cache with expiresAtMs = Date.now() + (expiresIn - 300) * 1000 (BC-7, AC-10)', async () => {
@@ -219,7 +259,10 @@ describe('resolveToken — service-account', () => {
     vi.setSystemTime(now);
 
     mockSign.mockReturnValue('signed-jwt');
-    mockExchange.mockResolvedValue({ accessToken: 'cached-token', expiresIn: 3600 });
+    mockExchange.mockResolvedValue({
+      accessToken: 'cached-token',
+      expiresIn: 3600,
+    });
 
     const auth = { type: 'service-account' as const, keyJson: VALID_KEY_JSON };
     const cache = createTokenCache();
@@ -264,7 +307,10 @@ describe('resolveToken — service-account', () => {
     const ctx = createRuntimeContext();
 
     mockSign.mockReturnValue('new-jwt');
-    mockExchange.mockResolvedValue({ accessToken: 'refreshed-token', expiresIn: 3600 });
+    mockExchange.mockResolvedValue({
+      accessToken: 'refreshed-token',
+      expiresIn: 3600,
+    });
 
     const result = await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
 
@@ -281,7 +327,10 @@ describe('resolveToken — service-account', () => {
     vi.setSystemTime(now);
 
     mockSign.mockReturnValue('jwt-for-bc6');
-    mockExchange.mockResolvedValue({ accessToken: 'token-bc6', expiresIn: 3600 });
+    mockExchange.mockResolvedValue({
+      accessToken: 'token-bc6',
+      expiresIn: 3600,
+    });
 
     const auth = { type: 'service-account' as const, keyJson: VALID_KEY_JSON };
     const cache = createTokenCache();
@@ -311,7 +360,10 @@ describe('resolveToken — service-account', () => {
     vi.setSystemTime(now);
 
     mockSign.mockReturnValue('jwt-call-1');
-    mockExchange.mockResolvedValue({ accessToken: 'token-call-1', expiresIn: 3600 });
+    mockExchange.mockResolvedValue({
+      accessToken: 'token-call-1',
+      expiresIn: 3600,
+    });
 
     const auth = { type: 'service-account' as const, keyJson: VALID_KEY_JSON };
     const cache = createTokenCache();
@@ -329,7 +381,10 @@ describe('resolveToken — service-account', () => {
 
     // Prepare second-call mocks
     mockSign.mockReturnValue('jwt-call-2');
-    mockExchange.mockResolvedValue({ accessToken: 'token-call-2', expiresIn: 3600 });
+    mockExchange.mockResolvedValue({
+      accessToken: 'token-call-2',
+      expiresIn: 3600,
+    });
 
     // Second call: cache expired → re-signs and re-exchanges
     const second = await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
@@ -353,11 +408,17 @@ describe('resolveToken — service-account', () => {
     let caught: unknown;
     try {
       await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
-    } catch (e) { caught = e; }
+    } catch (e) {
+      caught = e;
+    }
     expect(isInvalid(caught as RillValue)).toBe(true);
     expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
-    expect(getStatus(caught as RillValue).message).toContain('google: service account key parse failed');
-    expect(getStatus(caught as RillValue).message).not.toContain('-----BEGIN PRIVATE KEY-----');
+    expect(getStatus(caught as RillValue).message).toContain(
+      'google: service account key parse failed'
+    );
+    expect(getStatus(caught as RillValue).message).not.toContain(
+      '-----BEGIN PRIVATE KEY-----'
+    );
   });
 });
 
@@ -365,7 +426,12 @@ describe('resolveToken — service-account', () => {
 // resolveToken — oauth-refresh branch (BC-6, BC-7, AC-10)
 // ============================================================
 
-const OAUTH_REFRESH_AUTH = { type: 'oauth-refresh' as const, client_id: 'cid', client_secret: 'csec', refresh_token: 'rtok' };
+const OAUTH_REFRESH_AUTH = {
+  type: 'oauth-refresh' as const,
+  client_id: 'cid',
+  client_secret: 'csec',
+  refresh_token: 'rtok',
+};
 
 describe('resolveToken — oauth-refresh', () => {
   afterEach(() => {
@@ -376,16 +442,31 @@ describe('resolveToken — oauth-refresh', () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000_000_000_000);
 
-    mockRefresh.mockResolvedValue({ accessToken: 'refresh-access-token', expiresIn: 3600 });
+    mockRefresh.mockResolvedValue({
+      accessToken: 'refresh-access-token',
+      expiresIn: 3600,
+    });
 
     const cache = createTokenCache();
     const ctx = createRuntimeContext();
 
-    const result = await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
+    const result = await resolveToken(
+      OAUTH_REFRESH_AUTH,
+      ctx,
+      cache,
+      SCOPES,
+      SIGNAL
+    );
 
     expect(result).toBe('refresh-access-token');
     expect(mockRefresh).toHaveBeenCalledTimes(1);
-    expect(mockRefresh).toHaveBeenCalledWith('cid', 'csec', 'rtok', ctx, SIGNAL);
+    expect(mockRefresh).toHaveBeenCalledWith(
+      'cid',
+      'csec',
+      'rtok',
+      ctx,
+      SIGNAL
+    );
   });
 
   it('populates cache with expiresAtMs = Date.now() + (expiresIn - 300) * 1000 (BC-7, AC-10)', async () => {
@@ -393,7 +474,10 @@ describe('resolveToken — oauth-refresh', () => {
     const now = 1_000_000_000_000;
     vi.setSystemTime(now);
 
-    mockRefresh.mockResolvedValue({ accessToken: 'refresh-cached-token', expiresIn: 3600 });
+    mockRefresh.mockResolvedValue({
+      accessToken: 'refresh-cached-token',
+      expiresIn: 3600,
+    });
 
     const cache = createTokenCache();
     const ctx = createRuntimeContext();
@@ -416,7 +500,13 @@ describe('resolveToken — oauth-refresh', () => {
     };
     const ctx = createRuntimeContext();
 
-    const result = await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
+    const result = await resolveToken(
+      OAUTH_REFRESH_AUTH,
+      ctx,
+      cache,
+      SCOPES,
+      SIGNAL
+    );
 
     expect(result).toBe('refresh-hit-token');
     expect(mockRefresh).not.toHaveBeenCalled();
@@ -433,9 +523,18 @@ describe('resolveToken — oauth-refresh', () => {
     };
     const ctx = createRuntimeContext();
 
-    mockRefresh.mockResolvedValue({ accessToken: 'new-refresh-token', expiresIn: 3600 });
+    mockRefresh.mockResolvedValue({
+      accessToken: 'new-refresh-token',
+      expiresIn: 3600,
+    });
 
-    const result = await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
+    const result = await resolveToken(
+      OAUTH_REFRESH_AUTH,
+      ctx,
+      cache,
+      SCOPES,
+      SIGNAL
+    );
 
     expect(result).toBe('new-refresh-token');
     expect(mockRefresh).toHaveBeenCalledTimes(1);

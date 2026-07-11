@@ -10,7 +10,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { createMcpExtension } from '../../src/factory.js';
-import { makeFactoryCtx, makeRuntimeCtx, expectRejectsInvalid } from '../_helpers.js';
+import {
+  makeFactoryCtx,
+  makeRuntimeCtx,
+  expectRejectsInvalid,
+} from '../_helpers.js';
 import type { McpExtensionConfig } from '../../src/types.js';
 
 describe('dispose() functionality', () => {
@@ -159,7 +163,10 @@ describe('dispose() functionality', () => {
       const tools = fns.tools as Record<string, any>;
 
       // Start a long-running tool call
-      const toolCallResultPromise = tools.long_running_tool!.fn({}, makeRuntimeCtx());
+      const toolCallResultPromise = tools.long_running_tool!.fn(
+        {},
+        makeRuntimeCtx()
+      );
 
       // Immediately dispose (while call is pending)
       await result.dispose?.();

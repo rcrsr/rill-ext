@@ -39,7 +39,7 @@ function atomForStatus(status: number): string {
 export type ResponseShape = 'body' | 'full';
 
 /** Location of argument in request */
-export type ArgLocation = 'path' | 'query' | 'header' | 'body';
+type ArgLocation = 'path' | 'query' | 'header' | 'body';
 
 /** Argument definition for endpoint */
 export interface EndpointArg {
@@ -72,7 +72,7 @@ export interface InternalFetchConfig {
 }
 
 /** Full response shape */
-export interface FullResponse {
+interface FullResponse {
   readonly status: number;
   readonly headers: Record<string, string>;
   readonly body: unknown;
@@ -293,7 +293,10 @@ export async function executeRequest(
 
       try {
         const timeoutController = new AbortController();
-        const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+        const timeoutId = setTimeout(
+          () => timeoutController.abort(),
+          timeoutMs
+        );
 
         const signals: AbortSignal[] = [timeoutController.signal];
         if (options.signal) signals.push(options.signal);
@@ -326,7 +329,7 @@ export async function executeRequest(
                     body,
                     namespace,
                   },
-                },
+                }
               );
             }
 
@@ -348,7 +351,7 @@ export async function executeRequest(
               } else {
                 return ctx.invalidate(
                   new Error(
-                    `${namespace}: HTTP ${status} after ${retryLimit} retries`,
+                    `${namespace}: HTTP ${status} after ${retryLimit} retries`
                   ),
                   {
                     code: atomForStatus(status),
@@ -359,7 +362,7 @@ export async function executeRequest(
                       retries: retryLimit,
                       namespace,
                     },
-                  },
+                  }
                 );
               }
             }
@@ -375,7 +378,7 @@ export async function executeRequest(
                   code: 'PROTOCOL',
                   provider: PROVIDER,
                   raw: { kind: 'invalid_json', namespace },
-                },
+                }
               );
             }
             return full as unknown as RillValue;
@@ -388,7 +391,7 @@ export async function executeRequest(
                   code: 'PROTOCOL',
                   provider: PROVIDER,
                   raw: { kind: 'invalid_json', namespace },
-                },
+                }
               );
             }
             return body as RillValue;
@@ -532,9 +535,7 @@ export function buildRequest(
   const options: FetchOptions = {
     method: endpoint.method,
     headers: finalHeaders,
-    ...(bodyValue !== null
-      ? { body: JSON.stringify(bodyValue) }
-      : {}),
+    ...(bodyValue !== null ? { body: JSON.stringify(bodyValue) } : {}),
   };
 
   return {

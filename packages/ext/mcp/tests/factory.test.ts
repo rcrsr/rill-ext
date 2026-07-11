@@ -43,9 +43,9 @@ describe('createMcpExtension', () => {
         },
       } as McpExtensionConfig;
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        'transport.command is required for stdio transport'
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow('transport.command is required for stdio transport');
     });
 
     it('throws for undefined stdio command', async () => {
@@ -55,9 +55,9 @@ describe('createMcpExtension', () => {
         },
       } as unknown as McpExtensionConfig;
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        'transport.command is required for stdio transport'
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow('transport.command is required for stdio transport');
     });
 
     it('throws for null stdio command', async () => {
@@ -68,9 +68,9 @@ describe('createMcpExtension', () => {
         },
       } as unknown as McpExtensionConfig;
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        'transport.command is required for stdio transport'
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow('transport.command is required for stdio transport');
     });
   });
 
@@ -83,9 +83,9 @@ describe('createMcpExtension', () => {
         },
       } as McpExtensionConfig;
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        'transport.url is required for http transport'
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow('transport.url is required for http transport');
     });
 
     it('throws for undefined http url', async () => {
@@ -95,9 +95,9 @@ describe('createMcpExtension', () => {
         },
       } as unknown as McpExtensionConfig;
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        'transport.url is required for http transport'
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow('transport.url is required for http transport');
     });
 
     it('throws for null http url', async () => {
@@ -108,9 +108,9 @@ describe('createMcpExtension', () => {
         },
       } as unknown as McpExtensionConfig;
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        'transport.url is required for http transport'
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow('transport.url is required for http transport');
     });
   });
 
@@ -129,9 +129,9 @@ describe('createMcpExtension', () => {
       };
 
       // Will fail to connect since test-command doesn't exist
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        /^mcp:/
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow(/^mcp:/);
     });
 
     it('validates http config structure', async () => {
@@ -144,7 +144,9 @@ describe('createMcpExtension', () => {
       };
 
       // Will fail to connect since server doesn't exist
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow();
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow();
     }, 5000);
 
     it('validates stdio config with env variables', async () => {
@@ -160,9 +162,9 @@ describe('createMcpExtension', () => {
       };
 
       // Will fail to connect since test-command doesn't exist
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        /^mcp:/
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow(/^mcp:/);
     });
 
     it('validates http config with headers', async () => {
@@ -178,7 +180,9 @@ describe('createMcpExtension', () => {
       };
 
       // Will fail to connect since server doesn't exist
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow();
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow();
     }, 5000);
 
     it('validates config with filters', async () => {
@@ -193,9 +197,9 @@ describe('createMcpExtension', () => {
       };
 
       // Will fail to connect since test-command doesn't exist
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        /^mcp:/
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow(/^mcp:/);
     });
   });
 });

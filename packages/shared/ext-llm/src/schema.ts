@@ -5,11 +5,7 @@
  * LLM tool definitions.
  */
 
-import {
-  type TypeStructure,
-  type RillParam,
-  RuntimeError,
-} from '@rcrsr/rill';
+import { type TypeStructure, type RillParam, RuntimeError } from '@rcrsr/rill';
 
 type ListTypeStructure = Extract<TypeStructure, { kind: 'list' }>;
 type DictTypeStructure = Extract<TypeStructure, { kind: 'dict' }>;
@@ -77,7 +73,9 @@ export function mapRillType(rillType: string): string {
  * - dict type maps to object.
  * - primitive types (string, number, bool) map via mapRillType.
  */
-function buildPropertyFromStructuralType(rillType: TypeStructure): JsonSchemaProperty {
+function buildPropertyFromStructuralType(
+  rillType: TypeStructure
+): JsonSchemaProperty {
   if (rillType.kind === 'closure' || rillType.kind === 'tuple') {
     throw new RuntimeError(
       'RILL-R005',
@@ -225,4 +223,3 @@ export function buildJsonSchemaFromStructuralType(
 
   return { type: 'object', properties, required, additionalProperties: false };
 }
-

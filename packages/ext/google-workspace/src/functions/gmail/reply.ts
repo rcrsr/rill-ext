@@ -36,7 +36,9 @@ interface GmailMetadataMessage {
  * Fetches thread metadata, builds RFC 2822 reply MIME with threading headers,
  * and POSTs to messages/send with the threadId.
  */
-export function makeGmailReply(deps: GmailReplyDeps): (
+export function makeGmailReply(
+  deps: GmailReplyDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -48,7 +50,11 @@ export function makeGmailReply(deps: GmailReplyDeps): (
   ): Promise<RillValue> => {
     const messageId = args['message_id'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: message_id must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: message_id must be a non-empty string'
+      );
     }
     const body = args['body'];
     if (typeof body !== 'string') {

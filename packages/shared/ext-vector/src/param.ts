@@ -2,8 +2,13 @@ import { RuntimeError } from '@rcrsr/rill';
 import type { RillParam } from '@rcrsr/rill';
 
 function validateParamName(name: string): void {
-  if (name === '') throw new RuntimeError('RILL-R001', 'param name must not be empty');
-  if (/\s/.test(name)) throw new RuntimeError('RILL-R001', 'param name must be a valid identifier');
+  if (name === '')
+    throw new RuntimeError('RILL-R001', 'param name must not be empty');
+  if (/\s/.test(name))
+    throw new RuntimeError(
+      'RILL-R001',
+      'param name must be a valid identifier'
+    );
 }
 
 /**

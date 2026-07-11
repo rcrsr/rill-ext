@@ -15,11 +15,7 @@ const config = {
 
       libraries: {
         inlinedLibraries: [],
-        importedLibraries: [
-          'undici-types',
-          '@rcrsr/rill',
-          'better-sqlite3',
-        ],
+        importedLibraries: ['undici-types', '@rcrsr/rill', 'better-sqlite3'],
       },
 
       output: {

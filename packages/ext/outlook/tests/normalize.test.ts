@@ -123,7 +123,10 @@ describe('normalizeMessage', () => {
     it('maps to as array of addresses', () => {
       const result = normalizeMessage(FULL_GRAPH_MESSAGE);
       expect(Array.isArray(result.to)).toBe(true);
-      expect(result.to).toEqual(['recipient1@example.com', 'recipient2@example.com']);
+      expect(result.to).toEqual([
+        'recipient1@example.com',
+        'recipient2@example.com',
+      ]);
     });
 
     it('maps date as epoch ms from receivedDateTime [AC-14]', () => {
@@ -296,7 +299,10 @@ describe('normalizeEvent', () => {
     it('maps attendees as array of addresses', () => {
       const result = normalizeEvent(FULL_GRAPH_EVENT);
       expect(Array.isArray(result.attendees)).toBe(true);
-      expect(result.attendees).toEqual(['alice@example.com', 'bob@example.com']);
+      expect(result.attendees).toEqual([
+        'alice@example.com',
+        'bob@example.com',
+      ]);
     });
 
     it('maps is_online from isOnlineMeeting', () => {

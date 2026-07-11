@@ -59,7 +59,15 @@ describe('datetime extension factory', () => {
 
     it('wraps all 7 functions as callables', () => {
       const ext = mk();
-      const keys = ['iso', 'date', 'time', 'offset', 'zones', 'format', 'parse'] as const;
+      const keys = [
+        'iso',
+        'date',
+        'time',
+        'offset',
+        'zones',
+        'format',
+        'parse',
+      ] as const;
 
       for (const key of keys) {
         const fn = ext.value[key] as Record<string, unknown>;
@@ -67,7 +75,9 @@ describe('datetime extension factory', () => {
           __type: 'callable',
           kind: 'application',
           fn: expect.any(Function),
-          annotations: expect.objectContaining({ description: expect.any(String) }),
+          annotations: expect.objectContaining({
+            description: expect.any(String),
+          }),
           returnType: expect.objectContaining({ __rill_type: true }),
         });
       }
@@ -133,7 +143,10 @@ describe('datetime extension factory', () => {
       const ext = mk();
       await ext.dispose!();
 
-      const result = await ext.value.iso.fn({ dt: Date.now(), zone: 'UTC' }, makeRuntimeCtx());
+      const result = await ext.value.iso.fn(
+        { dt: Date.now(), zone: 'UTC' },
+        makeRuntimeCtx()
+      );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/datetime: operation cancelled/);
@@ -153,7 +166,10 @@ describe('datetime extension factory', () => {
       const ext = mk();
       await ext.dispose!();
 
-      const result = await ext.value.format.fn({ dt: Date.now(), pattern: 'YYYY-MM-DD' }, makeRuntimeCtx());
+      const result = await ext.value.format.fn(
+        { dt: Date.now(), pattern: 'YYYY-MM-DD' },
+        makeRuntimeCtx()
+      );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/datetime: operation cancelled/);

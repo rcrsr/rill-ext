@@ -45,7 +45,7 @@ export interface GoogleAuthServiceAccount {
  * OAuth refresh token authentication.
  * Exchanges a long-lived refresh token for access tokens at call time.
  */
-export interface GoogleAuthOauthRefresh {
+interface GoogleAuthOauthRefresh {
   readonly type: 'oauth-refresh';
   /** GCP OAuth client ID. */
   readonly client_id: string;
@@ -56,7 +56,11 @@ export interface GoogleAuthOauthRefresh {
 }
 
 /** Authentication configuration for Google Workspace extension (discriminated union on `type`). */
-export type GoogleAuth = GoogleAuthBearer | GoogleAuthSession | GoogleAuthServiceAccount | GoogleAuthOauthRefresh;
+export type GoogleAuth =
+  | GoogleAuthBearer
+  | GoogleAuthSession
+  | GoogleAuthServiceAccount
+  | GoogleAuthOauthRefresh;
 
 // ============================================================
 // CAPABILITIES
@@ -168,11 +172,13 @@ export interface GoogleWorkspaceConfig {
   /** Authentication configuration. Required. */
   readonly auth: GoogleAuth;
   /** Operation permission flags. Merged with defaults when partial. */
-  readonly capabilities?: Partial<{
-    readonly gmail: Partial<GmailCapabilities>;
-    readonly drive: Partial<DriveCapabilities>;
-    readonly calendar: Partial<CalendarCapabilities>;
-  }> | undefined;
+  readonly capabilities?:
+    | Partial<{
+        readonly gmail: Partial<GmailCapabilities>;
+        readonly drive: Partial<DriveCapabilities>;
+        readonly calendar: Partial<CalendarCapabilities>;
+      }>
+    | undefined;
   /** Gmail query constraints. */
   readonly gmail?: GmailConfig | undefined;
   /** Drive query constraints. */

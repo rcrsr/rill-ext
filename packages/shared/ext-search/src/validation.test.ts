@@ -91,9 +91,7 @@ describe('validateBaseUrl', () => {
     });
 
     it('accepts https:// URL with path', () => {
-      expect(() =>
-        validateBaseUrl('https://api.example.com/v1')
-      ).not.toThrow();
+      expect(() => validateBaseUrl('https://api.example.com/v1')).not.toThrow();
     });
   });
 });

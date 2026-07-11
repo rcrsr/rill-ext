@@ -31,7 +31,9 @@ describe('createFunctionWrapper', () => {
       const wrappedFn = wrap('query', async () => 'result' as RillValue);
       const result = await wrappedFn({}, makeCtx());
       expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).message).toBe(`${provider}: operation cancelled`);
+      expect(getStatus(result).message).toBe(
+        `${provider}: operation cancelled`
+      );
     });
 
     it('does not invoke fn when disposed', async () => {
@@ -116,7 +118,10 @@ describe('createFunctionWrapper', () => {
       const state = createDisposalState(provider);
       const wrap = createFunctionWrapper(provider, state);
       const expected = { items: [1, 2, 3], count: 3 };
-      const wrappedFn = wrap('query', async () => expected as unknown as RillValue);
+      const wrappedFn = wrap(
+        'query',
+        async () => expected as unknown as RillValue
+      );
       expect(await wrappedFn({}, makeCtx())).toEqual(expected);
     });
   });

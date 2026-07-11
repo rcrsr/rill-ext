@@ -41,7 +41,9 @@ describe('exec extension factory', () => {
         kind: 'application',
         params: expect.any(Array),
         fn: expect.any(Function),
-        annotations: expect.objectContaining({ description: expect.any(String) }),
+        annotations: expect.objectContaining({
+          description: expect.any(String),
+        }),
         returnType: expect.objectContaining({ __rill_type: true }),
       });
     });
@@ -65,9 +67,12 @@ describe('exec extension factory', () => {
 
   describe('RillFunction structure', () => {
     it('includes params with default values', () => {
-      const ext = createExecExtension({
-        commands: { echo: { binary: 'echo' } },
-      }, makeFactoryCtx());
+      const ext = createExecExtension(
+        {
+          commands: { echo: { binary: 'echo' } },
+        },
+        makeFactoryCtx()
+      );
 
       expect(ext.value.echo.params).toEqual([
         {
@@ -86,25 +91,40 @@ describe('exec extension factory', () => {
     });
 
     it('includes description from config', () => {
-      const ext = createExecExtension({
-        commands: { git: { binary: 'git', description: 'Git version control' } },
-      }, makeFactoryCtx());
+      const ext = createExecExtension(
+        {
+          commands: {
+            git: { binary: 'git', description: 'Git version control' },
+          },
+        },
+        makeFactoryCtx()
+      );
 
-      expect(ext.value.git.annotations?.['description']).toBe('Git version control');
+      expect(ext.value.git.annotations?.['description']).toBe(
+        'Git version control'
+      );
     });
 
     it('generates default description when not provided', () => {
-      const ext = createExecExtension({
-        commands: { echo: { binary: 'echo' } },
-      }, makeFactoryCtx());
+      const ext = createExecExtension(
+        {
+          commands: { echo: { binary: 'echo' } },
+        },
+        makeFactoryCtx()
+      );
 
-      expect(ext.value.echo.annotations?.['description']).toBe('Execute echo command');
+      expect(ext.value.echo.annotations?.['description']).toBe(
+        'Execute echo command'
+      );
     });
 
     it('declares returnType as dict', () => {
-      const ext = createExecExtension({
-        commands: { echo: { binary: 'echo' } },
-      }, makeFactoryCtx());
+      const ext = createExecExtension(
+        {
+          commands: { echo: { binary: 'echo' } },
+        },
+        makeFactoryCtx()
+      );
 
       expect(ext.value.echo.returnType).toMatchObject({
         __rill_type: true,
@@ -115,12 +135,15 @@ describe('exec extension factory', () => {
 
   describe('commands() introspection', () => {
     it('returns list of command dicts', async () => {
-      const ext = createExecExtension({
-        commands: {
-          git: { binary: 'git', description: 'Git VCS' },
-          npm: { binary: 'npm', description: 'Node package manager' },
+      const ext = createExecExtension(
+        {
+          commands: {
+            git: { binary: 'git', description: 'Git VCS' },
+            npm: { binary: 'npm', description: 'Node package manager' },
+          },
         },
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
 
       const result = await ext.value.commands.fn({}, makeRuntimeCtx());
 
@@ -131,9 +154,12 @@ describe('exec extension factory', () => {
     });
 
     it('returns empty description for commands without description', async () => {
-      const ext = createExecExtension({
-        commands: { echo: { binary: 'echo' } },
-      }, makeFactoryCtx());
+      const ext = createExecExtension(
+        {
+          commands: { echo: { binary: 'echo' } },
+        },
+        makeFactoryCtx()
+      );
 
       const result = await ext.value.commands.fn({}, makeRuntimeCtx());
       expect(result).toEqual([{ name: 'echo', description: '' }]);
@@ -154,9 +180,12 @@ describe('exec extension factory', () => {
     });
 
     it('aborts in-flight processes', async () => {
-      ext = createExecExtension({
-        commands: { sleep: { binary: 'sleep', timeout: 10000 } },
-      }, makeFactoryCtx());
+      ext = createExecExtension(
+        {
+          commands: { sleep: { binary: 'sleep', timeout: 10000 } },
+        },
+        makeFactoryCtx()
+      );
 
       const promise = ext.value.sleep.fn({ args: ['5'] }, makeRuntimeCtx());
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -171,9 +200,12 @@ describe('exec extension factory', () => {
     });
 
     it('disposes cleanly with no in-flight processes', async () => {
-      ext = createExecExtension({
-        commands: { echo: { binary: 'echo' } },
-      }, makeFactoryCtx());
+      ext = createExecExtension(
+        {
+          commands: { echo: { binary: 'echo' } },
+        },
+        makeFactoryCtx()
+      );
       await expect(ext.dispose!()).resolves.toBeUndefined();
     });
 
@@ -181,7 +213,7 @@ describe('exec extension factory', () => {
       const controller = new AbortController();
       ext = createExecExtension(
         { commands: { sleep: { binary: 'sleep', timeout: 10000 } } },
-        makeFactoryCtx(controller.signal),
+        makeFactoryCtx(controller.signal)
       );
 
       const start = Date.now();
@@ -201,9 +233,12 @@ describe('exec extension factory', () => {
 
   describe('allowlist enforcement', () => {
     it('script cannot execute undeclared binaries', () => {
-      const ext = createExecExtension({
-        commands: { git: { binary: 'git' } },
-      }, makeFactoryCtx());
+      const ext = createExecExtension(
+        {
+          commands: { git: { binary: 'git' } },
+        },
+        makeFactoryCtx()
+      );
 
       expect(ext.value).toHaveProperty('git');
       expect(ext.value).not.toHaveProperty('rm');

@@ -151,100 +151,118 @@ describe('S3 FS Extension', () => {
     describe('AC-10: configuration validation', () => {
       it('throws error when region is missing', () => {
         expect(() =>
-          createS3FsExtension({
-            region: '',
-            mounts: {
-              test: {
-                mode: 'read',
-                bucket: 'test-bucket',
-                prefix: '',
+          createS3FsExtension(
+            {
+              region: '',
+              mounts: {
+                test: {
+                  mode: 'read',
+                  bucket: 'test-bucket',
+                  prefix: '',
+                },
               },
             },
-          }, makeFactoryCtx())
+            makeFactoryCtx()
+          )
         ).toThrow('S3 configuration requires non-empty region');
       });
 
       it('throws error when mounts is empty', () => {
         expect(() =>
-          createS3FsExtension({
-            region: 'us-west-2',
-            mounts: {},
-          }, makeFactoryCtx())
+          createS3FsExtension(
+            {
+              region: 'us-west-2',
+              mounts: {},
+            },
+            makeFactoryCtx()
+          )
         ).toThrow('S3 configuration requires at least one mount');
       });
 
       it('throws error when endpoint is empty string', () => {
         expect(() =>
-          createS3FsExtension({
-            region: 'us-west-2',
-            endpoint: '',
-            mounts: {
-              test: {
-                mode: 'read',
-                bucket: 'test-bucket',
-                prefix: '',
+          createS3FsExtension(
+            {
+              region: 'us-west-2',
+              endpoint: '',
+              mounts: {
+                test: {
+                  mode: 'read',
+                  bucket: 'test-bucket',
+                  prefix: '',
+                },
               },
             },
-          }, makeFactoryCtx())
+            makeFactoryCtx()
+          )
         ).toThrow('S3 endpoint must be a non-empty string');
       });
 
       it('throws error when endpoint is invalid URL', () => {
         expect(() =>
-          createS3FsExtension({
-            region: 'us-west-2',
-            endpoint: 'not-a-valid-url',
-            mounts: {
-              test: {
-                mode: 'read',
-                bucket: 'test-bucket',
-                prefix: '',
+          createS3FsExtension(
+            {
+              region: 'us-west-2',
+              endpoint: 'not-a-valid-url',
+              mounts: {
+                test: {
+                  mode: 'read',
+                  bucket: 'test-bucket',
+                  prefix: '',
+                },
               },
             },
-          }, makeFactoryCtx())
+            makeFactoryCtx()
+          )
         ).toThrow('S3 endpoint must be a valid URL: not-a-valid-url');
       });
     });
 
     describe('AC-5: S3-compatible configuration', () => {
       it('accepts endpoint and forcePathStyle config', () => {
-        const ext = createS3FsExtension({
-          region: 'us-east-1',
-          credentials: {
-            accessKeyId: 'minioadmin',
-            secretAccessKey: 'minioadmin',
-          },
-          endpoint: 'http://localhost:9000',
-          forcePathStyle: true,
-          mounts: {
-            local: {
-              mode: 'read-write',
-              bucket: 'test-bucket',
-              prefix: '',
+        const ext = createS3FsExtension(
+          {
+            region: 'us-east-1',
+            credentials: {
+              accessKeyId: 'minioadmin',
+              secretAccessKey: 'minioadmin',
+            },
+            endpoint: 'http://localhost:9000',
+            forcePathStyle: true,
+            mounts: {
+              local: {
+                mode: 'read-write',
+                bucket: 'test-bucket',
+                prefix: '',
+              },
             },
           },
-        }, makeFactoryCtx());
+          makeFactoryCtx()
+        );
 
         expect(ext).toBeDefined();
         expect(ext.dispose).toBeDefined();
       });
 
       it('accepts valid endpoint URL formats', () => {
-        const ext = createS3FsExtension({
-          region: 'auto',
-          credentials: {
-            accessKeyId: 'test',
-            secretAccessKey: 'test',
-          },
-          endpoint: 'https://account.r2.cloudflarestorage.com',
-          mounts: {
-            r2: {
-              mode: 'read-write',
-              bucket: 'my-bucket',
-              prefix: 'data/',
+        const ext = createS3FsExtension(
+          {
+            region: 'auto',
+            credentials: {
+              accessKeyId: 'test',
+              secretAccessKey: 'test',
+            },
+            endpoint: 'https://account.r2.cloudflarestorage.com',
+            mounts: {
+              r2: {
+                mode: 'read-write',
+                bucket: 'my-bucket',
+                prefix: 'data/',
+              },
             },
           },
-        }, makeFactoryCtx());
+          makeFactoryCtx()
+        );
 
         expect(ext).toBeDefined();
         expect(ext.dispose).toBeDefined();
@@ -253,40 +271,46 @@ describe('S3 FS Extension', () => {
 
     describe('IC-6: ExtensionResult structure', () => {
       it('returns object with dispose function', () => {
-        const ext = createS3FsExtension({
-          region: 'us-west-2',
-          credentials: {
-            accessKeyId: 'test-key',
-            secretAccessKey: 'test-secret',
-          },
-          mounts: {
-            uploads: {
-              mode: 'read-write',
-              bucket: 'test-bucket',
-              prefix: 'files/',
+        const ext = createS3FsExtension(
+          {
+            region: 'us-west-2',
+            credentials: {
+              accessKeyId: 'test-key',
+              secretAccessKey: 'test-secret',
+            },
+            mounts: {
+              uploads: {
+                mode: 'read-write',
+                bucket: 'test-bucket',
+                prefix: 'files/',
+              },
             },
           },
-        }, makeFactoryCtx());
+          makeFactoryCtx()
+        );
 
         expect(ext).toBeDefined();
         expect(typeof ext.dispose).toBe('function');
       });
 
       it('dispose is async function', async () => {
-        const ext = createS3FsExtension({
-          region: 'us-west-2',
-          credentials: {
-            accessKeyId: 'test-key',
-            secretAccessKey: 'test-secret',
-          },
-          mounts: {
-            test: {
-              mode: 'read',
-              bucket: 'test-bucket',
-              prefix: '',
+        const ext = createS3FsExtension(
+          {
+            region: 'us-west-2',
+            credentials: {
+              accessKeyId: 'test-key',
+              secretAccessKey: 'test-secret',
+            },
+            mounts: {
+              test: {
+                mode: 'read',
+                bucket: 'test-bucket',
+                prefix: '',
+              },
             },
           },
-        }, makeFactoryCtx());
+          makeFactoryCtx()
+        );
 
         expect(ext.dispose).toBeDefined();
         const result = ext.dispose!();
@@ -297,40 +321,46 @@ describe('S3 FS Extension', () => {
 
     describe('IC-6: dispose cleanup', () => {
       it('dispose cleans up S3 client without throwing', async () => {
-        const ext = createS3FsExtension({
-          region: 'us-west-2',
-          credentials: {
-            accessKeyId: 'test-key',
-            secretAccessKey: 'test-secret',
-          },
-          mounts: {
-            test: {
-              mode: 'read',
-              bucket: 'test-bucket',
-              prefix: '',
+        const ext = createS3FsExtension(
+          {
+            region: 'us-west-2',
+            credentials: {
+              accessKeyId: 'test-key',
+              secretAccessKey: 'test-secret',
+            },
+            mounts: {
+              test: {
+                mode: 'read',
+                bucket: 'test-bucket',
+                prefix: '',
+              },
             },
           },
-        }, makeFactoryCtx());
+          makeFactoryCtx()
+        );
 
         expect(ext.dispose).toBeDefined();
         await expect(ext.dispose!()).resolves.toBeUndefined();
       });
 
       it('dispose can be called multiple times', async () => {
-        const ext = createS3FsExtension({
-          region: 'us-west-2',
-          credentials: {
-            accessKeyId: 'test-key',
-            secretAccessKey: 'test-secret',
-          },
-          mounts: {
-            test: {
-              mode: 'read',
-              bucket: 'test-bucket',
-              prefix: '',
+        const ext = createS3FsExtension(
+          {
+            region: 'us-west-2',
+            credentials: {
+              accessKeyId: 'test-key',
+              secretAccessKey: 'test-secret',
+            },
+            mounts: {
+              test: {
+                mode: 'read',
+                bucket: 'test-bucket',
+                prefix: '',
+              },
             },
           },
-        }, makeFactoryCtx());
+          makeFactoryCtx()
+        );
 
         await ext.dispose!();
         await expect(ext.dispose!()).resolves.toBeUndefined();

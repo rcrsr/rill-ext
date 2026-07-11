@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, isRillStream, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  isRillStream,
+  type ApplicationCallable,
+} from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
@@ -17,7 +21,10 @@ import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 /**
  * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
  */
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -44,12 +51,19 @@ function createMockResponse(
  * Create a mock MessageStream that yields text delta events and resolves with finalMessage().
  * The stream is async iterable over content_block_delta events.
  */
-function createMockStream(content: string, model = 'claude-sonnet-4-5-20250929') {
+function createMockStream(
+  content: string,
+  model = 'claude-sonnet-4-5-20250929'
+) {
   const response = createMockResponse(content, model);
   // Split content into two chunks to test multi-chunk iteration
-  const chunks = content.length > 0
-    ? [content.slice(0, Math.ceil(content.length / 2)), content.slice(Math.ceil(content.length / 2))]
-    : [];
+  const chunks =
+    content.length > 0
+      ? [
+          content.slice(0, Math.ceil(content.length / 2)),
+          content.slice(Math.ceil(content.length / 2)),
+        ]
+      : [];
   const events = chunks.map((chunk) => ({
     type: 'content_block_delta',
     delta: { type: 'text_delta', text: chunk },
@@ -107,8 +121,12 @@ function createPartialDisconnectStream(partialContent: string, error: unknown) {
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  return (stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  return (
+    stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
+  ).__rill_stream_resolve();
 }
 
 /**
@@ -168,9 +186,15 @@ vi.mock('@anthropic-ai/sdk', () => {
 // ============================================================
 
 function extractLastAssistantText(result: Record<string, unknown>): string {
-  const messages = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+  const messages = result['messages'] as Array<{
+    role: string;
+    parts: Array<{ type: string; text?: string }>;
+  }>;
   const last = messages[messages.length - 1]!;
-  return last.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+  return last.parts
+    .filter((p) => p.type === 'text')
+    .map((p) => p.text ?? '')
+    .join('');
 }
 
 // ============================================================
@@ -243,7 +267,10 @@ describe('message() function', () => {
       expect(result['stop_reason']).toBe('end_turn');
       expect(result['id']).toBe('msg_test123');
       // messages is a list of canonical message dicts with role + parts
-      const messages = result['messages'] as Array<{ role: string; parts: unknown[] }>;
+      const messages = result['messages'] as Array<{
+        role: string;
+        parts: unknown[];
+      }>;
       expect(Array.isArray(messages)).toBe(true);
       expect(messages[0]!.role).toBe('user');
       expect(messages[messages.length - 1]!.role).toBe('assistant');
@@ -354,7 +381,9 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '' }, ctx));
+      expectThrowHalt(() =>
+        getCallable(ext, 'message').fn({ prompt: '' }, ctx)
+      );
       expect(mockStream).not.toHaveBeenCalled();
     });
 
@@ -367,7 +396,10 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '' }, ctx), { message: 'prompt string cannot be empty' });
+      expectThrowHalt(
+        () => getCallable(ext, 'message').fn({ prompt: '' }, ctx),
+        { message: 'prompt string cannot be empty' }
+      );
     });
 
     it('throws RuntimeError for whitespace-only prompt', () => {
@@ -379,7 +411,10 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '   \n\t  ' }, ctx), { message: 'prompt string cannot be empty' });
+      expectThrowHalt(
+        () => getCallable(ext, 'message').fn({ prompt: '   \n\t  ' }, ctx),
+        { message: 'prompt string cannot be empty' }
+      );
     });
 
     // EC-2: Provider API error during stream resolution → RuntimeError RILL-R005
@@ -397,7 +432,9 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
-      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 429): Rate limit exceeded' });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'Anthropic API error (HTTP 429): Rate limit exceeded',
+      });
     });
 
     it('maps 401 auth error from resolve() correctly', async () => {
@@ -414,7 +451,9 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
-      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 401): Invalid API key' });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'Anthropic API error (HTTP 401): Invalid API key',
+      });
     });
 
     it('maps timeout error from resolve() correctly', async () => {
@@ -432,7 +471,9 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
-      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic error: Request timeout' });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'Anthropic error: Request timeout',
+      });
     });
 
     it('maps 500 error from resolve() correctly', async () => {
@@ -449,7 +490,9 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
-      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic API error (HTTP 500): Internal server error' });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'Anthropic API error (HTTP 500): Internal server error',
+      });
     });
 
     it('maps unknown error from resolve() correctly', async () => {
@@ -466,13 +509,17 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
-      await expectRejectedHalt(resolveStream(stream), { message: 'Anthropic error: Unknown error' });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'Anthropic error: Unknown error',
+      });
     });
 
     // EC-3/AC-16: Provider disconnect mid-stream yields error during iteration; stream resolves with partial data
     it('throws RuntimeError during iteration on mid-stream disconnect [EC-3]', async () => {
       const mockError = await createMockAPIError(503, 'Service unavailable');
-      mockStream.mockReturnValue(createPartialDisconnectStream('Partial response', mockError));
+      mockStream.mockReturnValue(
+        createPartialDisconnectStream('Partial response', mockError)
+      );
 
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
@@ -490,7 +537,9 @@ describe('message() function', () => {
 
     it('resolves with partial data after mid-stream disconnect [AC-16]', async () => {
       const mockError = await createMockAPIError(503, 'Service unavailable');
-      mockStream.mockReturnValue(createPartialDisconnectStream('Partial content', mockError));
+      mockStream.mockReturnValue(
+        createPartialDisconnectStream('Partial content', mockError)
+      );
 
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
@@ -548,7 +597,10 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: '' }, ctx), { message: 'embed text cannot be empty' });
+      await expectRejectedHalt(
+        getCallable(ext, 'embed').fn({ text: '' }, ctx),
+        { message: 'embed text cannot be empty' }
+      );
     });
 
     // EC-16: No embed_model configured raises error
@@ -562,7 +614,10 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx), { message: 'embed_model not configured' });
+      await expectRejectedHalt(
+        getCallable(ext, 'embed').fn({ text: 'test text' }, ctx),
+        { message: 'embed_model not configured' }
+      );
     });
 
     // EC-17: API errors mapped correctly (currently raises "not available")
@@ -576,7 +631,10 @@ describe('embed() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx), { message: 'Anthropic: embeddings API not available' });
+      await expectRejectedHalt(
+        getCallable(ext, 'embed').fn({ text: 'test text' }, ctx),
+        { message: 'Anthropic: embeddings API not available' }
+      );
     });
   });
 
@@ -590,7 +648,14 @@ describe('embed() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(getCallable(ext, 'embed').params).toEqual([{ name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} }]);
+      expect(getCallable(ext, 'embed').params).toEqual([
+        {
+          name: 'text',
+          type: { kind: 'string' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+      ]);
     });
 
     it('has correct description', () => {
@@ -602,7 +667,9 @@ describe('embed() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(getCallable(ext, 'embed').annotations?.['description']).toBe('Generate embedding vector for text');
+      expect(getCallable(ext, 'embed').annotations?.['description']).toBe(
+        'Generate embedding vector for text'
+      );
     });
 
     it('has correct return type', () => {
@@ -614,7 +681,11 @@ describe('embed() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(getCallable(ext, 'embed').returnType).toEqual({ __rill_type: true, typeName: 'vector', structure: { kind: 'vector' } });
+      expect(getCallable(ext, 'embed').returnType).toEqual({
+        __rill_type: true,
+        typeName: 'vector',
+        structure: { kind: 'vector' },
+      });
     });
   });
 });
@@ -666,7 +737,9 @@ describe('boundary conditions', () => {
   // AC-15: First chunk arrives within 500ms (mock timing test)
   describe('AC-15: first chunk from message() arrives within 500ms', () => {
     it('first chunk is emitted before 500ms deadline using mock timing', async () => {
-      mockStream.mockReturnValue(createMockStream('Streaming response content'));
+      mockStream.mockReturnValue(
+        createMockStream('Streaming response content')
+      );
 
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
@@ -914,7 +987,10 @@ describe('embed_batch() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = await getCallable(ext, 'embed_batch').fn({ texts: [] }, ctx);
+      const result = await getCallable(ext, 'embed_batch').fn(
+        { texts: [] },
+        ctx
+      );
 
       expect(result).toEqual([]);
     });
@@ -933,8 +1009,11 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 123, 'text3'] }, ctx),
-        { message: 'embed_batch requires list of strings' },
+        getCallable(ext, 'embed_batch').fn(
+          { texts: ['text1', 123, 'text3'] },
+          ctx
+        ),
+        { message: 'embed_batch requires list of strings' }
       );
     });
 
@@ -950,8 +1029,12 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn({ texts: ['text1', '', 'text3'] }, ctx)
-      , { message: 'embed text cannot be empty at index 1' });
+        getCallable(ext, 'embed_batch').fn(
+          { texts: ['text1', '', 'text3'] },
+          ctx
+        ),
+        { message: 'embed text cannot be empty at index 1' }
+      );
     });
 
     // EC-20: No embed_model configured raises error
@@ -966,8 +1049,9 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
-      , { message: 'embed_model not configured' });
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx),
+        { message: 'embed_model not configured' }
+      );
     });
 
     // EC-21: API errors mapped correctly (currently raises "not available")
@@ -982,8 +1066,9 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
-      , { message: 'Anthropic: embeddings API not available' });
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx),
+        { message: 'Anthropic: embeddings API not available' }
+      );
     });
   });
 
@@ -997,7 +1082,14 @@ describe('embed_batch() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(getCallable(ext, 'embed_batch').params).toEqual([{ name: 'texts', type: { kind: 'list' }, defaultValue: undefined, annotations: {} }]);
+      expect(getCallable(ext, 'embed_batch').params).toEqual([
+        {
+          name: 'texts',
+          type: { kind: 'list' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+      ]);
     });
 
     it('has correct description', () => {
@@ -1023,7 +1115,11 @@ describe('embed_batch() function', () => {
 
       const ext = createAnthropicExtension(config);
 
-      expect(getCallable(ext, 'embed_batch').returnType).toEqual({ __rill_type: true, typeName: 'list', structure: { kind: 'list', element: { kind: 'vector' } } });
+      expect(getCallable(ext, 'embed_batch').returnType).toEqual({
+        __rill_type: true,
+        typeName: 'list',
+        structure: { kind: 'list', element: { kind: 'vector' } },
+      });
     });
   });
 });

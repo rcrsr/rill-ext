@@ -30,7 +30,8 @@ function matchMessage(actual: string, expected: unknown): void {
     expected !== null &&
     typeof expected === 'object' &&
     'asymmetricMatch' in expected &&
-    typeof (expected as { asymmetricMatch: unknown }).asymmetricMatch === 'function'
+    typeof (expected as { asymmetricMatch: unknown }).asymmetricMatch ===
+      'function'
   ) {
     const matched = (
       expected as { asymmetricMatch: (v: unknown) => boolean }
@@ -47,11 +48,12 @@ function matchMessage(actual: string, expected: unknown): void {
  * (synchronous validation throws) so tests need not branch on the
  * underlying exception class.
  */
-export function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
+function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
   if (error instanceof RuntimeHaltSignal) {
     const status = getStatus(error.value);
     if (opts.code !== undefined) expect(status.code.name).toBe(opts.code);
-    if (opts.provider !== undefined) expect(status.provider).toBe(opts.provider);
+    if (opts.provider !== undefined)
+      expect(status.provider).toBe(opts.provider);
     if (opts.message !== undefined) matchMessage(status.message, opts.message);
     return;
   }

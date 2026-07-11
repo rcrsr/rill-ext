@@ -14,7 +14,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, type ApplicationCallable, type RillValue } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  type ApplicationCallable,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/types.js';
 
@@ -31,7 +35,12 @@ const mockEmbeddingsCreate = vi.fn();
 vi.mock('openai', () => {
   class MockAPIError extends Error {
     status: number | undefined;
-    constructor(status: number | undefined, _error: unknown, message: string, _headers: unknown) {
+    constructor(
+      status: number | undefined,
+      _error: unknown,
+      message: string,
+      _headers: unknown
+    ) {
       super(message);
       this.status = status;
       this.name = 'APIError';
@@ -63,15 +72,22 @@ vi.mock('openai', () => {
 // HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /**
  * Resolves a RillStream returned from a host function.
  */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  const resolve = (stream as Record<string, unknown>)['__rill_stream_resolve'] as () => Promise<unknown>;
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  const resolve = (stream as Record<string, unknown>)[
+    '__rill_stream_resolve'
+  ] as () => Promise<unknown>;
   return (await resolve()) as Record<string, unknown>;
 }
 
@@ -80,7 +96,7 @@ async function resolveStream(stream: unknown): Promise<Record<string, unknown>> 
  */
 function mockCCResponse(
   content: string,
-  toolCalls?: Array<{ id: string; name: string; arguments: string }>,
+  toolCalls?: Array<{ id: string; name: string; arguments: string }>
 ) {
   return {
     id: 'chatcmpl-test',
@@ -90,7 +106,9 @@ function mockCCResponse(
     choices: [
       {
         index: 0,
-        finish_reason: (toolCalls && toolCalls.length > 0 ? 'tool_calls' : 'stop') as string,
+        finish_reason: (toolCalls && toolCalls.length > 0
+          ? 'tool_calls'
+          : 'stop') as string,
         message: {
           role: 'assistant' as const,
           content: content || null,
@@ -113,7 +131,9 @@ function mockCCResponse(
 /**
  * Build a minimal CC stream runner that resolves with finalChatCompletion.
  */
-function mockCCStreamRunner(finalCompletion: ReturnType<typeof mockCCResponse>) {
+function mockCCStreamRunner(
+  finalCompletion: ReturnType<typeof mockCCResponse>
+) {
   async function* asyncChunks() {
     // no streaming deltas for wire-format tests
   }
@@ -131,7 +151,7 @@ function mockResponsesResponse(
   outputItems: Array<{
     type: string;
     [key: string]: unknown;
-  }>,
+  }>
 ) {
   return {
     id: 'resp-test',
@@ -184,14 +204,16 @@ describe('Chat Completions wire-format', () => {
       { role: 'user', content: 'call the tool' },
       {
         role: 'assistant',
-        parts: [
-          { type: 'tool_use', id: 'tu_1', name: 'fn', input: { x: 1 } },
-        ],
+        parts: [{ type: 'tool_use', id: 'tu_1', name: 'fn', input: { x: 1 } }],
       },
       {
         role: 'user',
         parts: [
-          { type: 'tool_result', id: 'tu_1', parts: [{ type: 'text', text: 'ok' }] },
+          {
+            type: 'tool_result',
+            id: 'tu_1',
+            parts: [{ type: 'text', text: 'ok' }],
+          },
         ],
       },
     ] as RillValue;
@@ -205,7 +227,9 @@ describe('Chat Completions wire-format', () => {
     };
 
     // assistant message with tool_calls
-    const assistantMsg = callArgs.messages.find((m) => m['role'] === 'assistant');
+    const assistantMsg = callArgs.messages.find(
+      (m) => m['role'] === 'assistant'
+    );
     expect(assistantMsg).toBeDefined();
     const toolCalls = assistantMsg!['tool_calls'] as Array<{
       id: string;
@@ -237,14 +261,16 @@ describe('Chat Completions wire-format', () => {
       { role: 'user', content: 'call the tool' },
       {
         role: 'assistant',
-        parts: [
-          { type: 'tool_use', id: 'tu_1', name: 'fn', input: {} },
-        ],
+        parts: [{ type: 'tool_use', id: 'tu_1', name: 'fn', input: {} }],
       },
       {
         role: 'user',
         parts: [
-          { type: 'tool_result', id: 'tu_1', parts: [{ type: 'text', text: 'ok' }] },
+          {
+            type: 'tool_result',
+            id: 'tu_1',
+            parts: [{ type: 'text', text: 'ok' }],
+          },
         ],
       },
     ] as RillValue;
@@ -281,7 +307,10 @@ describe('Chat Completions wire-format', () => {
     await resolveStream(stream);
 
     expect(mockCCStream).toHaveBeenCalledOnce();
-    const callParams = mockCCStream.mock.calls[0]![0] as Record<string, unknown>;
+    const callParams = mockCCStream.mock.calls[0]![0] as Record<
+      string,
+      unknown
+    >;
     expect(callParams['reasoning_effort']).toBe('high');
   });
 
@@ -346,7 +375,10 @@ describe('Responses API wire-format', () => {
     const ext = createOpenAIExtension(config);
     const ctx = createRuntimeContext();
 
-    const stream = getCallable(ext, 'message').fn({ prompt: 'think please' }, ctx);
+    const stream = getCallable(ext, 'message').fn(
+      { prompt: 'think please' },
+      ctx
+    );
     const result = await resolveStream(stream);
 
     const messages = result['messages'] as Array<{
@@ -382,7 +414,10 @@ describe('Responses API wire-format', () => {
     const ext = createOpenAIExtension(config);
     const ctx = createRuntimeContext();
 
-    const stream = getCallable(ext, 'message').fn({ prompt: 'use the tool' }, ctx);
+    const stream = getCallable(ext, 'message').fn(
+      { prompt: 'use the tool' },
+      ctx
+    );
     const result = await resolveStream(stream);
 
     const messages = result['messages'] as Array<{
@@ -423,14 +458,16 @@ describe('Responses API wire-format', () => {
       { role: 'user', content: 'call tool' },
       {
         role: 'assistant',
-        parts: [
-          { type: 'tool_use', id: 'call_xyz', name: 'fn', input: {} },
-        ],
+        parts: [{ type: 'tool_use', id: 'call_xyz', name: 'fn', input: {} }],
       },
       {
         role: 'user',
         parts: [
-          { type: 'tool_result', id: 'call_xyz', parts: [{ type: 'text', text: 'result value' }] },
+          {
+            type: 'tool_result',
+            id: 'call_xyz',
+            parts: [{ type: 'text', text: 'result value' }],
+          },
         ],
       },
     ] as RillValue;
@@ -444,7 +481,7 @@ describe('Responses API wire-format', () => {
     };
 
     const fcoItem = callParams.input.find(
-      (item) => item['type'] === 'function_call_output',
+      (item) => item['type'] === 'function_call_output'
     );
     expect(fcoItem).toBeDefined();
     expect(fcoItem!['call_id']).toBe('call_xyz');
@@ -475,7 +512,10 @@ describe('Responses API wire-format', () => {
     await resolveStream(stream);
 
     expect(mockResponsesCreate).toHaveBeenCalledOnce();
-    const callParams = mockResponsesCreate.mock.calls[0]![0] as Record<string, unknown>;
+    const callParams = mockResponsesCreate.mock.calls[0]![0] as Record<
+      string,
+      unknown
+    >;
     expect(callParams['reasoning_effort']).toBe('high');
     // model, input are managed fields — they should NOT be overridden by extra
     expect(callParams['model']).toBe('o1');

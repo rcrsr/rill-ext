@@ -34,16 +34,14 @@ export async function reply(
   const path = `messages/${encodeURIComponent(messageId)}/reply`;
 
   // Graph returns 202 with no body; graphFetch returns null for 202
-  await graphFetch(
-    'POST',
-    path,
-    config.auth,
-    config.mailbox,
-    ctx,
-    controller,
-    { comment: body }
-  );
+  await graphFetch('POST', path, config.auth, config.mailbox, ctx, controller, {
+    comment: body,
+  });
 
   // subject is empty: Graph 202 response carries no message metadata
-  return { sent: true, to: [] as string[], subject: '' } as unknown as RillValue;
+  return {
+    sent: true,
+    to: [] as string[],
+    subject: '',
+  } as unknown as RillValue;
 }

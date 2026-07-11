@@ -58,7 +58,18 @@ describe('Prompt Function Generation', () => {
       expect(fn.params[1]?.defaultValue).toBeUndefined();
 
       expect(fn.annotations?.description).toBe('Review code for issues');
-      expect(fn.returnType).toEqual(structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }));
+      expect(fn.returnType).toEqual(
+        structureToTypeValue({
+          kind: 'list',
+          element: {
+            kind: 'dict',
+            fields: {
+              role: { type: { kind: 'string' } },
+              content: { type: { kind: 'string' } },
+            },
+          },
+        })
+      );
     });
 
     it('generates function with no parameters for prompt without arguments', () => {
@@ -75,7 +86,18 @@ describe('Prompt Function Generation', () => {
       const fn = functions.greeting!;
 
       expect(fn.params).toHaveLength(0);
-      expect(fn.returnType).toEqual(structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }));
+      expect(fn.returnType).toEqual(
+        structureToTypeValue({
+          kind: 'list',
+          element: {
+            kind: 'dict',
+            fields: {
+              role: { type: { kind: 'string' } },
+              content: { type: { kind: 'string' } },
+            },
+          },
+        })
+      );
     });
 
     it('sets defaultValue for optional arguments only', () => {
@@ -123,7 +145,10 @@ describe('Prompt Function Generation', () => {
       ];
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-      await functions.test_prompt!.fn({ arg1: 'value1', arg2: 'value2' }, makeRuntimeCtx());
+      await functions.test_prompt!.fn(
+        { arg1: 'value1', arg2: 'value2' },
+        makeRuntimeCtx()
+      );
 
       expect(mockGetPrompt).toHaveBeenCalledTimes(1);
       expect(mockGetPrompt).toHaveBeenCalledWith({
@@ -153,7 +178,10 @@ describe('Prompt Function Generation', () => {
       ];
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-      await functions.test!.fn({ required: 'req-value', optional: undefined }, makeRuntimeCtx());
+      await functions.test!.fn(
+        { required: 'req-value', optional: undefined },
+        makeRuntimeCtx()
+      );
 
       expect(mockGetPrompt).toHaveBeenCalledWith({
         name: 'test',
@@ -174,7 +202,10 @@ describe('Prompt Function Generation', () => {
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      await expectRejectsInvalid(functions.test!.fn({ required: undefined }, makeRuntimeCtx()), 'required parameter required is missing');
+      await expectRejectsInvalid(
+        functions.test!.fn({ required: undefined }, makeRuntimeCtx()),
+        'required parameter required is missing'
+      );
     });
 
     it('validates argument types are strings', async () => {
@@ -187,7 +218,10 @@ describe('Prompt Function Generation', () => {
 
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      await expectRejectsInvalid(functions.test!.fn({ arg: 123 }, makeRuntimeCtx()), 'expected string for parameter arg, got number');
+      await expectRejectsInvalid(
+        functions.test!.fn({ arg: 123 }, makeRuntimeCtx()),
+        'expected string for parameter arg, got number'
+      );
     });
   });
 
@@ -394,7 +428,10 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      await expectRejectsInvalid(functions.test!.fn({}, makeRuntimeCtx()), 'connection lost');
+      await expectRejectsInvalid(
+        functions.test!.fn({}, makeRuntimeCtx()),
+        'connection lost'
+      );
     });
 
     it('handles authentication errors', async () => {
@@ -407,7 +444,10 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      await expectRejectsInvalid(functions.test!.fn({}, makeRuntimeCtx()), 'authentication failed');
+      await expectRejectsInvalid(
+        functions.test!.fn({}, makeRuntimeCtx()),
+        'authentication failed'
+      );
     });
 
     it('handles protocol errors', async () => {
@@ -420,7 +460,10 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      await expectRejectsInvalid(functions.test!.fn({}, makeRuntimeCtx()), 'protocol');
+      await expectRejectsInvalid(
+        functions.test!.fn({}, makeRuntimeCtx()),
+        'protocol'
+      );
     });
 
     it('wraps generic errors as tool errors', async () => {
@@ -433,7 +476,10 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      await expectRejectsInvalid(functions.test!.fn({}, makeRuntimeCtx()), 'Something went wrong');
+      await expectRejectsInvalid(
+        functions.test!.fn({}, makeRuntimeCtx()),
+        'Something went wrong'
+      );
     });
 
     it('maps thrown errors via mapMcpError into invalid RillValues', async () => {
@@ -444,7 +490,10 @@ describe('Prompt Function Generation', () => {
       const prompts: McpPrompt[] = [{ name: 'test' }];
       const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
 
-      await expectRejectsInvalid(functions.test!.fn({}, makeRuntimeCtx()), 'Runtime error');
+      await expectRejectsInvalid(
+        functions.test!.fn({}, makeRuntimeCtx()),
+        'Runtime error'
+      );
     });
   });
 

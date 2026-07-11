@@ -25,30 +25,31 @@ import type { GeminiExtensionConfig } from '../src/types.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /** Drain a RillStream to completion and return the resolved dict. */
 async function collectStream(
   stream: RillValue,
-  ctx: ReturnType<typeof createRuntimeContext>,
+  ctx: ReturnType<typeof createRuntimeContext>
 ): Promise<Record<string, unknown>> {
   let current = stream as RillStream;
   while (!current.done) {
     const nextFn = current.next as ApplicationCallable;
     current = (await nextFn.fn({}, ctx)) as RillStream;
   }
-  return (
-    await (
-      stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
-    ).__rill_stream_resolve()
-  ) as Record<string, unknown>;
+  return (await (
+    stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+  ).__rill_stream_resolve()) as Record<string, unknown>;
 }
 
 /** Build an async generator that yields simple text chunks. */
 async function* makeChunksIterable(
-  chunks: string[],
+  chunks: string[]
 ): AsyncGenerator<{ text: string }> {
   for (const text of chunks) {
     yield { text };
@@ -61,7 +62,7 @@ async function* makeChunksIterable(
  */
 function makeTool(
   fn: (args: Record<string, RillValue>) => RillValue | Promise<RillValue>,
-  description = 'A test tool',
+  description = 'A test tool'
 ): RillValue {
   const tool = callable(fn);
   (tool as Record<string, unknown>)['description'] = description;
@@ -153,7 +154,11 @@ describe('Gemini boundary conditions', () => {
           parts: [
             {
               type: 'image',
-              source: { kind: 'base64', data: 'abc123', media_type: 'image/png' },
+              source: {
+                kind: 'base64',
+                data: 'abc123',
+                media_type: 'image/png',
+              },
             },
           ],
         },
@@ -196,7 +201,7 @@ describe('Gemini boundary conditions', () => {
   describe('AC-B6: factory extra: {} accepted', () => {
     it('does not throw for empty extra dict', () => {
       expect(() =>
-        createGeminiExtension({ ...BASE_CONFIG, extra: {} }),
+        createGeminiExtension({ ...BASE_CONFIG, extra: {} })
       ).not.toThrow();
     });
   });
@@ -208,9 +213,9 @@ describe('Gemini boundary conditions', () => {
   describe('AC-B7: factory max_turns: 0 rejected with specific message', () => {
     it('throws RuntimeError RILL-R001 with exact message when max_turns is 0', () => {
       expect(() =>
-        createGeminiExtension({ ...BASE_CONFIG, max_turns: 0 }),
+        createGeminiExtension({ ...BASE_CONFIG, max_turns: 0 })
       ).toThrow(
-        "Factory config 'max_turns' must be a positive integer or undefined; sentinel value 0 is reserved for per-call override semantics.",
+        "Factory config 'max_turns' must be a positive integer or undefined; sentinel value 0 is reserved for per-call override semantics."
       );
     });
 
@@ -235,14 +240,14 @@ describe('Gemini boundary conditions', () => {
       const ctx = createRuntimeContext();
 
       const calls = Array.from({ length: 10 }, () =>
-        getCallable(ext, 'message').fn({ prompt: 'hello' }, ctx),
+        getCallable(ext, 'message').fn({ prompt: 'hello' }, ctx)
       );
 
       const streams = await Promise.all(calls);
 
       // Drain all streams and collect resolved values
       const results = await Promise.all(
-        streams.map((s) => collectStream(s, ctx)),
+        streams.map((s) => collectStream(s, ctx))
       );
 
       // All results must report the same model (factory config not mutated)
@@ -276,7 +281,7 @@ describe('Gemini boundary error cases', () => {
 
       const result = await getCallable(ext, 'message').fn(
         { prompt: [{ role: 'tool', content: 'some result' }] },
-        ctx,
+        ctx
       );
 
       expect(isInvalid(result)).toBe(true);
@@ -296,7 +301,7 @@ describe('Gemini boundary error cases', () => {
 
       const result = await getCallable(ext, 'message').fn(
         { prompt: [{ role: 'model', content: 'hi' }] },
-        ctx,
+        ctx
       );
 
       expect(isInvalid(result)).toBe(true);
@@ -316,7 +321,7 @@ describe('Gemini boundary error cases', () => {
 
       const result = await getCallable(ext, 'message').fn(
         { prompt: [{ role: 'foo', content: 'hi' }] },
-        ctx,
+        ctx
       );
 
       expect(isInvalid(result)).toBe(true);
@@ -341,7 +346,7 @@ describe('Gemini boundary error cases', () => {
             { role: 'assistant', content: 'hello' },
           ],
         },
-        ctx,
+        ctx
       );
 
       expect(isInvalid(result)).toBe(true);
@@ -369,7 +374,7 @@ describe('Gemini boundary error cases', () => {
             },
           ],
         },
-        ctx,
+        ctx
       );
 
       expect(isInvalid(result)).toBe(true);
@@ -388,7 +393,7 @@ describe('Gemini boundary error cases', () => {
         createGeminiExtension({
           ...BASE_CONFIG,
           extra: { model: 'some-model' },
-        }),
+        })
       ).toThrow(/reserved key/i);
     });
   });
@@ -403,7 +408,7 @@ describe('Gemini boundary error cases', () => {
         createGeminiExtension({
           ...BASE_CONFIG,
           extra: { temperature: 0.5 },
-        }),
+        })
       ).toThrow(/reserved key/i);
     });
   });
@@ -418,7 +423,7 @@ describe('Gemini boundary error cases', () => {
         createGeminiExtension({
           ...BASE_CONFIG,
           extra: { systemInstruction: 'some instruction' },
-        }),
+        })
       ).toThrow(/reserved key/i);
     });
   });
@@ -438,7 +443,7 @@ describe('Gemini boundary error cases', () => {
       try {
         getCallable(ext, 'tool_loop').fn(
           { prompt: 'hello', tools, max_turns: -1 },
-          ctx,
+          ctx
         );
       } catch (e) {
         thrown = e;
@@ -463,7 +468,7 @@ describe('Gemini boundary error cases', () => {
 
       const result = await getCallable(ext, 'message').fn(
         { prompt: 123 as unknown as RillValue },
-        ctx,
+        ctx
       );
 
       expect(isInvalid(result)).toBe(true);
@@ -484,7 +489,7 @@ describe('Gemini boundary error cases', () => {
 
       const result = await getCallable(ext, 'message').fn(
         { prompt: [] as unknown as RillValue },
-        ctx,
+        ctx
       );
 
       expect(isInvalid(result)).toBe(true);

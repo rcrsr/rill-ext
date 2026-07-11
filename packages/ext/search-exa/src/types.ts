@@ -3,7 +3,7 @@
  * Defines configuration and contract types for the Exa API integration.
  */
 
-import type { ApplicationCallable, ExtensionFactoryResult } from '@rcrsr/rill';
+import type { ApplicationCallable } from '@rcrsr/rill';
 
 // ============================================================
 // CONFIGURATION
@@ -53,8 +53,3 @@ export type ExaExtensionContract = {
   readonly find_similar: ApplicationCallable;
   readonly answer: ApplicationCallable;
 };
-
-/**
- * Re-export for satisfies check usage.
- */
-export type { ExtensionFactoryResult };

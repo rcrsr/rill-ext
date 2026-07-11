@@ -426,9 +426,14 @@ export async function executeToolLoop(
       // param.annotations['description'] used for all callable kinds (AC-10, AC-11, AC-30).
       const closureType: TypeStructure = {
         kind: 'closure',
-        params: params.map((p) => ({ name: p.name, type: p.type ?? { kind: 'any' } as TypeStructure })),
+        params: params.map((p) => ({
+          name: p.name,
+          type: p.type ?? ({ kind: 'any' } as TypeStructure),
+        })),
       };
-      const builtSchema = buildJsonSchemaFromStructuralType(closureType, [...params]);
+      const builtSchema = buildJsonSchemaFromStructuralType(closureType, [
+        ...params,
+      ]);
 
       inputSchema = {
         type: 'object',
@@ -497,7 +502,10 @@ export async function executeToolLoop(
     // When yieldChunk is provided and callAPIStreaming is defined, use streaming path.
     let response: unknown;
     try {
-      if (yieldChunk !== undefined && callbacks.callAPIStreaming !== undefined) {
+      if (
+        yieldChunk !== undefined &&
+        callbacks.callAPIStreaming !== undefined
+      ) {
         const onTextDelta = (text: string): void => {
           yieldChunk({ type: 'text_delta', text } as RillValue);
         };
@@ -508,7 +516,11 @@ export async function executeToolLoop(
           signal
         );
       } else {
-        response = await callbacks.callAPI(currentMessages, providerTools, signal);
+        response = await callbacks.callAPI(
+          currentMessages,
+          providerTools,
+          signal
+        );
       }
     } catch (error: unknown) {
       // In-fn halts (e.g. middleware-shielded callAPI) already carry a generic

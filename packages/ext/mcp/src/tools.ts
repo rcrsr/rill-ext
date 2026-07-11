@@ -14,11 +14,7 @@ import {
   isInvalid,
   structureToTypeValue,
 } from '@rcrsr/rill';
-import {
-  failTool,
-  failTimeout,
-  mapMcpError,
-} from './errors.js';
+import { failTool, failTimeout, mapMcpError } from './errors.js';
 
 function describeError(error: unknown): string {
   if (isInvalid(error as RillValue)) {
@@ -26,7 +22,12 @@ function describeError(error: unknown): string {
   }
   return error instanceof Error ? error.message : String(error);
 }
-import { generateParametersFromSchema, jsonSchemaToTypeStructure, type JsonSchema, type OutputJsonSchema } from './parsing.js';
+import {
+  generateParametersFromSchema,
+  jsonSchemaToTypeStructure,
+  type JsonSchema,
+  type OutputJsonSchema,
+} from './parsing.js';
 import { sanitizeNames } from './naming.js';
 
 // ============================================================
@@ -183,7 +184,7 @@ function generateToolFunction(
   // Create async function wrapper
   const fn = async (
     args: Record<string, RillValue>,
-    ctxLike: unknown,
+    ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
     // Emit mcp:connect on first tool call [IR-1]
@@ -249,7 +250,9 @@ function generateToolFunction(
   return {
     params,
     fn,
-    ...(tool.description !== undefined && { annotations: { description: tool.description } }),
+    ...(tool.description !== undefined && {
+      annotations: { description: tool.description },
+    }),
     returnType: tool.outputSchema
       ? structureToTypeValue(jsonSchemaToTypeStructure(tool.outputSchema))
       : anyTypeValue,

@@ -33,7 +33,7 @@ export class SpawnError extends Error {
   constructor(
     kind: SpawnErrorKind,
     message: string,
-    extra: Record<string, unknown> = {},
+    extra: Record<string, unknown> = {}
   ) {
     super(message);
     this.kind = kind;
@@ -83,10 +83,9 @@ export function mapSpawnError(ctx: RuntimeContext, error: unknown): RillValue {
   });
 }
 
-function codeForKind(kind: SpawnErrorKind):
-  | 'UNAVAILABLE'
-  | 'FORBIDDEN'
-  | 'TIMEOUT' {
+function codeForKind(
+  kind: SpawnErrorKind
+): 'UNAVAILABLE' | 'FORBIDDEN' | 'TIMEOUT' {
   switch (kind) {
     case 'binary_eacces':
       return 'FORBIDDEN';

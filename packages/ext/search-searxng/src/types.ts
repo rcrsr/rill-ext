@@ -3,7 +3,7 @@
  * Defines configuration and contract types for self-hosted SearXNG integration.
  */
 
-import type { ApplicationCallable, ExtensionFactoryResult } from '@rcrsr/rill';
+import type { ApplicationCallable } from '@rcrsr/rill';
 
 // ============================================================
 // CONFIGURATION
@@ -45,8 +45,3 @@ export type SearxngExtensionContract = {
   readonly search: ApplicationCallable;
   readonly config: ApplicationCallable;
 };
-
-/**
- * Re-export for satisfies check usage.
- */
-export type { ExtensionFactoryResult };

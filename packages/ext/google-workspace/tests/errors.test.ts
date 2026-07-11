@@ -37,7 +37,9 @@ describe('checkCapability [EC-5]', () => {
     let caught: unknown;
     try {
       checkCapability(ctx, false, 'gmail.send');
-    } catch (e) { caught = e; }
+    } catch (e) {
+      caught = e;
+    }
     expectInvalid(caught, 'FORBIDDEN', 'google: gmail.send not enabled');
   });
 
@@ -46,7 +48,9 @@ describe('checkCapability [EC-5]', () => {
     let caught: unknown;
     try {
       checkCapability(ctx, false, 'drive.upload');
-    } catch (e) { caught = e; }
+    } catch (e) {
+      caught = e;
+    }
     expectInvalid(caught, 'FORBIDDEN', 'google: drive.upload not enabled');
   });
 
@@ -69,33 +73,49 @@ describe('checkCapability [EC-5]', () => {
 describe('mapGoogleError', () => {
   describe('EC-14: HTTP 401 invalid token', () => {
     it('produces "google: invalid Gmail token" for gmail service', () => {
-      expectInvalid(mapGoogleError(makeCtx(), 401, 'gmail', 'read'), 'AUTH', 'google: invalid Gmail token');
+      expectInvalid(
+        mapGoogleError(makeCtx(), 401, 'gmail', 'read'),
+        'AUTH',
+        'google: invalid Gmail token'
+      );
     });
 
     it('produces "google: invalid Drive token" for drive service', () => {
-      expectInvalid(mapGoogleError(makeCtx(), 401, 'drive', 'list'), 'AUTH', 'google: invalid Drive token');
+      expectInvalid(
+        mapGoogleError(makeCtx(), 401, 'drive', 'list'),
+        'AUTH',
+        'google: invalid Drive token'
+      );
     });
 
     it('produces "google: invalid Calendar token" for calendar service', () => {
-      expectInvalid(mapGoogleError(makeCtx(), 401, 'calendar', 'read'), 'AUTH', 'google: invalid Calendar token');
+      expectInvalid(
+        mapGoogleError(makeCtx(), 401, 'calendar', 'read'),
+        'AUTH',
+        'google: invalid Calendar token'
+      );
     });
   });
 
   describe('EC-15: HTTP 403 insufficient scopes', () => {
     it('produces scope error with gmail service and operation', () => {
-      expectInvalid(mapGoogleError(makeCtx(), 403, 'gmail', 'send'), 'FORBIDDEN', 'google: insufficient Gmail scopes for send');
+      expectInvalid(
+        mapGoogleError(makeCtx(), 403, 'gmail', 'send'),
+        'FORBIDDEN',
+        'google: insufficient Gmail scopes for send'
+      );
     });
 
     it('produces scope error with drive service and operation', () => {
-      expect(getStatus(mapGoogleError(makeCtx(), 403, 'drive', 'download')).message).toBe(
-        'google: insufficient Drive scopes for download',
-      );
+      expect(
+        getStatus(mapGoogleError(makeCtx(), 403, 'drive', 'download')).message
+      ).toBe('google: insufficient Drive scopes for download');
     });
 
     it('produces scope error with calendar service and operation', () => {
-      expect(getStatus(mapGoogleError(makeCtx(), 403, 'calendar', 'create')).message).toBe(
-        'google: insufficient Calendar scopes for create',
-      );
+      expect(
+        getStatus(mapGoogleError(makeCtx(), 403, 'calendar', 'create')).message
+      ).toBe('google: insufficient Calendar scopes for create');
     });
   });
 
@@ -104,7 +124,7 @@ describe('mapGoogleError', () => {
       expectInvalid(
         mapGoogleError(makeCtx(), 404, 'drive', 'read', 'file-id-abc'),
         'NOT_FOUND',
-        "google: Drive file 'file-id-abc' not found",
+        "google: Drive file 'file-id-abc' not found"
       );
     });
 
@@ -112,7 +132,7 @@ describe('mapGoogleError', () => {
       expectInvalid(
         mapGoogleError(makeCtx(), 404, 'gmail', 'read', 'msg-id-xyz'),
         'NOT_FOUND',
-        "google: Gmail resource 'msg-id-xyz' not found",
+        "google: Gmail resource 'msg-id-xyz' not found"
       );
     });
 
@@ -120,16 +140,20 @@ describe('mapGoogleError', () => {
       expectInvalid(
         mapGoogleError(makeCtx(), 404, 'calendar', 'read', 'event-id-123'),
         'NOT_FOUND',
-        "google: Calendar resource 'event-id-123' not found",
+        "google: Calendar resource 'event-id-123' not found"
       );
     });
 
     it('drive without id omits the id in message', () => {
-      expect(getStatus(mapGoogleError(makeCtx(), 404, 'drive', 'read')).message).toBe('google: Drive file not found');
+      expect(
+        getStatus(mapGoogleError(makeCtx(), 404, 'drive', 'read')).message
+      ).toBe('google: Drive file not found');
     });
 
     it('gmail without id omits the id in message', () => {
-      expect(getStatus(mapGoogleError(makeCtx(), 404, 'gmail', 'read')).message).toBe('google: Gmail resource not found');
+      expect(
+        getStatus(mapGoogleError(makeCtx(), 404, 'gmail', 'read')).message
+      ).toBe('google: Gmail resource not found');
     });
   });
 
@@ -138,14 +162,20 @@ describe('mapGoogleError', () => {
       expectInvalid(
         mapGoogleError(makeCtx(), 429, 'gmail', 'search'),
         'RATE_LIMIT',
-        'google: rate limit exceeded; retry after delay',
+        'google: rate limit exceeded; retry after delay'
       );
     });
 
     it('rate limit message is identical for all services', () => {
-      const a = getStatus(mapGoogleError(makeCtx(), 429, 'gmail', 'read')).message;
-      const b = getStatus(mapGoogleError(makeCtx(), 429, 'drive', 'list')).message;
-      const c = getStatus(mapGoogleError(makeCtx(), 429, 'calendar', 'read')).message;
+      const a = getStatus(
+        mapGoogleError(makeCtx(), 429, 'gmail', 'read')
+      ).message;
+      const b = getStatus(
+        mapGoogleError(makeCtx(), 429, 'drive', 'list')
+      ).message;
+      const c = getStatus(
+        mapGoogleError(makeCtx(), 429, 'calendar', 'read')
+      ).message;
       expect(a).toBe(b);
       expect(b).toBe(c);
     });
@@ -156,20 +186,20 @@ describe('mapGoogleError', () => {
       expectInvalid(
         mapGoogleError(makeCtx(), 500, 'gmail', 'read'),
         'UNAVAILABLE',
-        'google: Gmail server error (500); temporarily unavailable',
+        'google: Gmail server error (500); temporarily unavailable'
       );
     });
 
     it('maps 503 to server error with status for drive', () => {
-      expect(getStatus(mapGoogleError(makeCtx(), 503, 'drive', 'list')).message).toBe(
-        'google: Drive server error (503); temporarily unavailable',
-      );
+      expect(
+        getStatus(mapGoogleError(makeCtx(), 503, 'drive', 'list')).message
+      ).toBe('google: Drive server error (503); temporarily unavailable');
     });
 
     it('maps 599 to server error with status for calendar', () => {
-      expect(getStatus(mapGoogleError(makeCtx(), 599, 'calendar', 'read')).message).toBe(
-        'google: Calendar server error (599); temporarily unavailable',
-      );
+      expect(
+        getStatus(mapGoogleError(makeCtx(), 599, 'calendar', 'read')).message
+      ).toBe('google: Calendar server error (599); temporarily unavailable');
     });
   });
 
@@ -185,7 +215,9 @@ describe('mapGoogleError', () => {
     for (const [s, atom] of Object.entries(expected)) {
       const status = Number(s);
       const result = mapGoogleError(makeCtx(), status, 'gmail', 'read');
-      expect(isInvalid(result), `status ${status} should be invalid`).toBe(true);
+      expect(isInvalid(result), `status ${status} should be invalid`).toBe(
+        true
+      );
       expect(getStatus(result).code.name, `status ${status} atom`).toBe(atom);
     }
   });
@@ -199,7 +231,11 @@ describe('mapFetchError', () => {
   it('maps AbortError to request timeout [EC-19]', () => {
     const abortErr = new Error('The operation was aborted');
     abortErr.name = 'AbortError';
-    expectInvalid(mapFetchError(makeCtx(), abortErr, 'gmail'), 'TIMEOUT', 'google: request timeout');
+    expectInvalid(
+      mapFetchError(makeCtx(), abortErr, 'gmail'),
+      'TIMEOUT',
+      'google: request timeout'
+    );
   });
 
   it('AbortError timeout message is the same for all services', () => {
@@ -215,14 +251,16 @@ describe('mapFetchError', () => {
     expectInvalid(
       mapFetchError(makeCtx(), new TypeError('Failed to fetch'), 'gmail'),
       'UNAVAILABLE',
-      'google: gmail connection failed',
+      'google: gmail connection failed'
     );
   });
 
   it('maps drive TypeError to drive-specific connection failed', () => {
-    expect(getStatus(mapFetchError(makeCtx(), new TypeError('Failed to fetch'), 'drive')).message).toBe(
-      'google: drive connection failed',
-    );
+    expect(
+      getStatus(
+        mapFetchError(makeCtx(), new TypeError('Failed to fetch'), 'drive')
+      ).message
+    ).toBe('google: drive connection failed');
   });
 
   it('all fetch error types produce invalid RillValues', () => {

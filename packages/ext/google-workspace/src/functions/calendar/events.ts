@@ -31,7 +31,9 @@ export interface CalendarEventsDeps {
  * EC-13: Rejects naive ISO timestamps (no timezone).
  * AC-12: Returns rill primitive dict { events: list[dict] }.
  */
-export function makeCalendarEvents(deps: CalendarEventsDeps): (
+export function makeCalendarEvents(
+  deps: CalendarEventsDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -44,10 +46,18 @@ export function makeCalendarEvents(deps: CalendarEventsDeps): (
     const startDate = args['start_date'];
     const endDate = args['end_date'];
     if (typeof startDate !== 'string' || startDate.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: start_date must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: start_date must be a non-empty string'
+      );
     }
     if (typeof endDate !== 'string' || endDate.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: end_date must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: end_date must be a non-empty string'
+      );
     }
     // Determine if date-only or datetime, and derive timeMin/timeMax
     const startIsDateOnly = DATE_ONLY_RE.test(startDate);
@@ -66,7 +76,11 @@ export function makeCalendarEvents(deps: CalendarEventsDeps): (
       timeMax = endDate;
     } else {
       // Mixed: one date-only, one datetime — reject
-      failInput(ctx, 'invalid_arg', 'google: start_date and end_date must both be date-only or both be ISO 8601 with timezone');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: start_date and end_date must both be date-only or both be ISO 8601 with timezone'
+      );
     }
     // BC-3: start equal to end → empty result, no fetch
     if (timeMin === timeMax) {
@@ -111,7 +125,11 @@ export function makeCalendarEvents(deps: CalendarEventsDeps): (
         summary?: string;
         start?: { dateTime?: string; date?: string; timeZone?: string };
         end?: { dateTime?: string; date?: string; timeZone?: string };
-        attendees?: Array<{ email?: string; displayName?: string; responseStatus?: string }>;
+        attendees?: Array<{
+          email?: string;
+          displayName?: string;
+          responseStatus?: string;
+        }>;
         description?: string;
         location?: string;
         status?: string;

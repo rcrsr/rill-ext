@@ -33,8 +33,12 @@ vi.mock('../src/result.js');
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  * The resolve callback is where events are emitted.
  */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  return (stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  return (
+    stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
+  ).__rill_stream_resolve();
 }
 
 // ============================================================
@@ -109,7 +113,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       // Execute prompt and resolve stream to trigger event emission
-      const stream = (ext.value as any).prompt.fn({ text: 'Hello Claude', options: {} }, ctx);
+      const stream = (ext.value as any).prompt.fn(
+        { text: 'Hello Claude', options: {} },
+        ctx
+      );
       await resolveStream(stream);
 
       // Verify event was emitted
@@ -169,7 +176,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).prompt.fn({ text: longPrompt, options: {} }, ctx);
+      const stream = (ext.value as any).prompt.fn(
+        { text: longPrompt, options: {} },
+        ctx
+      );
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
@@ -225,7 +235,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const skillArgs = { verbose: true, retries: 3 };
-      const stream = (ext.value as any).skill.fn({ name: 'test-skill', args: skillArgs }, ctx);
+      const stream = (ext.value as any).skill.fn(
+        { name: 'test-skill', args: skillArgs },
+        ctx
+      );
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
@@ -284,7 +297,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx);
+      const stream = (ext.value as any).skill.fn(
+        { name: 'test-skill', args: {} },
+        ctx
+      );
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
@@ -339,7 +355,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const commandArgs = { config: { format: 'json' }, priority: 'high' };
-      const stream = (ext.value as any).command.fn({ name: 'test-command', args: commandArgs }, ctx);
+      const stream = (ext.value as any).command.fn(
+        { name: 'test-command', args: commandArgs },
+        ctx
+      );
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
@@ -387,7 +406,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       // fn() returns stream synchronously; resolve it to trigger event emission
-      const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      const stream = (ext.value as any).prompt.fn(
+        { text: 'Test', options: {} },
+        ctx
+      );
       // Resolving a stream with an error chunk still resolves (not rejects)
       await resolveStream(stream);
 
@@ -431,7 +453,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).skill.fn({ name: 'failing-skill', args: {} }, ctx);
+      const stream = (ext.value as any).skill.fn(
+        { name: 'failing-skill', args: {} },
+        ctx
+      );
       await resolveStream(stream);
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
@@ -470,7 +495,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).command.fn({ name: 'failing-command', args: {} }, ctx);
+      const stream = (ext.value as any).command.fn(
+        { name: 'failing-command', args: {} },
+        ctx
+      );
       await resolveStream(stream);
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
@@ -510,7 +538,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      const stream = (ext.value as any).prompt.fn(
+        { text: 'Test', options: {} },
+        ctx
+      );
       await resolveStream(stream);
 
       const errorEvents = events.filter((e) => e.event === 'claude-code:error');
@@ -576,7 +607,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      const stream = (ext.value as any).prompt.fn(
+        { text: 'Test', options: {} },
+        ctx
+      );
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
@@ -635,13 +669,19 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       // Test all three functions — resolve each stream to emit events
-      const s1 = (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      const s1 = (ext.value as any).prompt.fn(
+        { text: 'Test', options: {} },
+        ctx
+      );
       await resolveStream(s1);
 
       const s2 = (ext.value as any).skill.fn({ name: 'skill', args: {} }, ctx);
       await resolveStream(s2);
 
-      const s3 = (ext.value as any).command.fn({ name: 'command', args: {} }, ctx);
+      const s3 = (ext.value as any).command.fn(
+        { name: 'command', args: {} },
+        ctx
+      );
       await resolveStream(s3);
 
       expect(events).toHaveLength(3);

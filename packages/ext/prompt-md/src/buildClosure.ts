@@ -9,7 +9,17 @@
  * Covers IR-9, AC-4, AC-14, EC-17.
  */
 
-import { formatValue, RuntimeError, structureToTypeValue, toCallable, type ApplicationCallable, type CallableFn, type RillTypeValue, type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import {
+  formatValue,
+  RuntimeError,
+  structureToTypeValue,
+  toCallable,
+  type ApplicationCallable,
+  type CallableFn,
+  type RillTypeValue,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import {
   interpolate,
   splitRoleMessages,
@@ -26,7 +36,9 @@ import type { ParsedPrompt } from './parseFile.js';
 // ============================================================
 
 /** Return type for `output: 'string'` prompts: a plain rill string. */
-const STRING_RETURN_TYPE: RillTypeValue = structureToTypeValue({ kind: 'string' });
+const STRING_RETURN_TYPE: RillTypeValue = structureToTypeValue({
+  kind: 'string',
+});
 
 /**
  * Return type for `output: 'list'` prompts: `list(dict(role: string, content: string))`.
@@ -71,7 +83,8 @@ const MESSAGE_LIST_RETURN_TYPE: RillTypeValue = structureToTypeValue({
 export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
   // ── Build ^input annotation: ordered list of { name, type } dicts ────────
   const inputList: RillValue[] = parsed.params.map((param) => {
-    const typeLabel: string = param.type === undefined ? 'any' : param.type.kind;
+    const typeLabel: string =
+      param.type === undefined ? 'any' : param.type.kind;
     return { name: param.name, type: typeLabel } as Record<string, RillValue>;
   });
 
@@ -141,6 +154,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
     params: parsed.params,
     fn,
     annotations,
-    returnType: parsed.output === 'list' ? MESSAGE_LIST_RETURN_TYPE : STRING_RETURN_TYPE,
+    returnType:
+      parsed.output === 'list' ? MESSAGE_LIST_RETURN_TYPE : STRING_RETURN_TYPE,
   });
 }

@@ -220,7 +220,10 @@ describe('createFetchExtension', () => {
       };
 
       const ext = createFetchExtension(config, makeFactoryCtx());
-      const result = (await getCallable(ext, 'endpoints').fn({}, makeRuntimeCtx())) as Array<{
+      const result = (await getCallable(ext, 'endpoints').fn(
+        {},
+        makeRuntimeCtx()
+      )) as Array<{
         name: string;
         method: string;
         path: string;
@@ -255,7 +258,10 @@ describe('createFetchExtension', () => {
       };
 
       const ext = createFetchExtension(config, makeFactoryCtx());
-      const result = (await getCallable(ext, 'endpoints').fn({}, makeRuntimeCtx())) as Array<{
+      const result = (await getCallable(ext, 'endpoints').fn(
+        {},
+        makeRuntimeCtx()
+      )) as Array<{
         description: string;
       }>;
 
@@ -632,11 +638,14 @@ describe('createFetchExtension', () => {
       const ctrl = new AbortController();
       const runCtx = makeRuntimeCtx();
       // Override signal field
-      Object.defineProperty(runCtx, 'signal', { value: ctrl.signal, configurable: true });
+      Object.defineProperty(runCtx, 'signal', {
+        value: ctrl.signal,
+        configurable: true,
+      });
 
       const requestPromise = getCallable(ext, 'getUser').fn(
         { id: '123' },
-        runCtx,
+        runCtx
       );
       ctrl.abort();
 

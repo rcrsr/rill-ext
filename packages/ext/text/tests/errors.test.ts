@@ -19,7 +19,12 @@ import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 const ext = createTextExtension({}, makeFactoryCtx());
 const val = ext.value as Record<
   string,
-  { fn: (args: Record<string, unknown>, ctx: ReturnType<typeof makeRuntimeCtx>) => Promise<unknown> }
+  {
+    fn: (
+      args: Record<string, unknown>,
+      ctx: ReturnType<typeof makeRuntimeCtx>
+    ) => Promise<unknown>;
+  }
 >;
 
 // Helper: extract function by name
@@ -203,7 +208,7 @@ describe('non-string input across all functions (EC-6 / AC-28)', () => {
           expect(meta.code).toBe('INVALID_INPUT');
           expect(meta.provider).toBe('text');
           expect(meta.raw).toMatchObject({ kind: 'non_string_input' });
-        },
+        }
       );
     });
   }

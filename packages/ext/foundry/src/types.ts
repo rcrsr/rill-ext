@@ -32,7 +32,14 @@ export interface FoundryEntraAuth {
    * Optional credential. Accepts any @azure/identity TokenCredential.
    * Defaults to DefaultAzureCredential when omitted.
    */
-  readonly credential?: { getToken(scopes: string | string[], options?: Record<string, unknown>): Promise<{ token: string; expiresOnTimestamp: number } | null> } | undefined;
+  readonly credential?:
+    | {
+        getToken(
+          scopes: string | string[],
+          options?: Record<string, unknown>
+        ): Promise<{ token: string; expiresOnTimestamp: number } | null>;
+      }
+    | undefined;
 }
 
 /**

@@ -60,22 +60,30 @@ describe('name validation', () => {
   describe('whitespace name (EC-2)', () => {
     it('p.str throws RuntimeError RILL-R001 for name with space', () => {
       expect(() => p.str('my param')).toThrow(RuntimeError);
-      expect(() => p.str('my param')).toThrow('param name must be a valid identifier');
+      expect(() => p.str('my param')).toThrow(
+        'param name must be a valid identifier'
+      );
     });
 
     it('p.num throws RuntimeError RILL-R001 for name with tab', () => {
       expect(() => p.num('my\tparam')).toThrow(RuntimeError);
-      expect(() => p.num('my\tparam')).toThrow('param name must be a valid identifier');
+      expect(() => p.num('my\tparam')).toThrow(
+        'param name must be a valid identifier'
+      );
     });
 
     it('p.bool throws RuntimeError RILL-R001 for name with newline', () => {
       expect(() => p.bool('my\nparam')).toThrow(RuntimeError);
-      expect(() => p.bool('my\nparam')).toThrow('param name must be a valid identifier');
+      expect(() => p.bool('my\nparam')).toThrow(
+        'param name must be a valid identifier'
+      );
     });
 
     it('p.list throws RuntimeError RILL-R001 for name with leading space', () => {
       expect(() => p.list(' items')).toThrow(RuntimeError);
-      expect(() => p.list(' items')).toThrow('param name must be a valid identifier');
+      expect(() => p.list(' items')).toThrow(
+        'param name must be a valid identifier'
+      );
     });
 
     it('whitespace error has errorId RILL-R001', () => {
@@ -171,7 +179,9 @@ describe('p.bool', () => {
 
   it('includes description when provided', () => {
     const result = p.bool('enabled', 'Whether to enable feature');
-    expect(result.annotations).toEqual({ description: 'Whether to enable feature' });
+    expect(result.annotations).toEqual({
+      description: 'Whether to enable feature',
+    });
   });
 
   it('includes defaultValue true when provided', () => {
@@ -200,7 +210,9 @@ describe('p.dict', () => {
 
   it('includes description when provided', () => {
     const result = p.dict('options', 'Configuration options');
-    expect(result.annotations).toEqual({ description: 'Configuration options' });
+    expect(result.annotations).toEqual({
+      description: 'Configuration options',
+    });
   });
 
   it('includes defaultValue when provided', () => {
@@ -240,7 +252,10 @@ describe('p.list', () => {
   });
 
   it('includes element for nested list itemType', () => {
-    const result = p.list('matrix', { kind: 'list', element: { kind: 'number' } });
+    const result = p.list('matrix', {
+      kind: 'list',
+      element: { kind: 'number' },
+    });
     expect(result.type).toEqual({
       kind: 'list',
       element: { kind: 'list', element: { kind: 'number' } },
@@ -274,7 +289,9 @@ describe('p.callable', () => {
 
   it('includes description when provided', () => {
     const result = p.callable('handler', 'The callback function');
-    expect(result.annotations).toEqual({ description: 'The callback function' });
+    expect(result.annotations).toEqual({
+      description: 'The callback function',
+    });
   });
 });
 

@@ -4,7 +4,12 @@
  * Converts MCP tool JSON Schema definitions to rill RillParam arrays.
  */
 
-import type { RillFieldDef, RillParam, RillValue, TypeStructure } from '@rcrsr/rill';
+import type {
+  RillFieldDef,
+  RillParam,
+  RillValue,
+  TypeStructure,
+} from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 // ============================================================
@@ -45,7 +50,14 @@ export interface JsonSchema {
  * including primitives, arrays, and objects with nested structure.
  */
 export interface OutputJsonSchema {
-  readonly type?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | undefined;
+  readonly type?:
+    | 'string'
+    | 'number'
+    | 'integer'
+    | 'boolean'
+    | 'object'
+    | 'array'
+    | undefined;
   readonly properties?: Record<string, JsonSchemaProperty> | undefined;
   readonly items?: OutputJsonSchema | undefined;
   readonly required?: readonly string[] | undefined;
@@ -60,7 +72,14 @@ export interface OutputJsonSchema {
 // ============================================================
 
 /** Rill type names used for JSON Schema mapping. */
-export type RillTypeName = 'string' | 'number' | 'bool' | 'dict' | 'list' | 'vector' | 'any';
+export type RillTypeName =
+  | 'string'
+  | 'number'
+  | 'bool'
+  | 'dict'
+  | 'list'
+  | 'vector'
+  | 'any';
 
 /**
  * Maps JSON Schema type to rill type name.
@@ -120,9 +139,7 @@ export function mapJsonSchemaTypeToRillType(
  * @param type - Rill type
  * @returns Default value for the type
  */
-export function getDefaultValueForType(
-  type: RillTypeName
-): RillValue {
+export function getDefaultValueForType(type: RillTypeName): RillValue {
   switch (type) {
     case 'string':
       return '';
@@ -190,7 +207,9 @@ export function sanitizeParameterName(name: string): string {
  * @param schema - JSON Schema definition for any value type
  * @returns TypeStructure representing the schema in the rill type system
  */
-export function jsonSchemaToTypeStructure(schema: OutputJsonSchema): TypeStructure {
+export function jsonSchemaToTypeStructure(
+  schema: OutputJsonSchema
+): TypeStructure {
   // enum/oneOf/anyOf: fall back to any (value is not structurally typed)
   if (schema.enum || schema.oneOf || schema.anyOf) {
     return { kind: 'any' };
@@ -206,7 +225,10 @@ export function jsonSchemaToTypeStructure(schema: OutputJsonSchema): TypeStructu
       return { kind: 'bool' };
     case 'array':
       if (schema.items !== undefined) {
-        return { kind: 'list', element: jsonSchemaToTypeStructure(schema.items) };
+        return {
+          kind: 'list',
+          element: jsonSchemaToTypeStructure(schema.items),
+        };
       }
       return { kind: 'list' };
     case 'object': {
@@ -243,7 +265,7 @@ export function jsonSchemaToTypeStructure(schema: OutputJsonSchema): TypeStructu
  */
 export function jsonSchemaPropertyToRillParam(
   name: string,
-  property: JsonSchemaProperty,
+  property: JsonSchemaProperty
 ): RillParam {
   const rillType = mapJsonSchemaTypeToRillType(property);
   const desc = property.description;
@@ -277,9 +299,7 @@ export function jsonSchemaPropertyToRillParam(
  * @param schema - JSON Schema object definition
  * @returns Array of RillParam
  */
-export function generateParametersFromSchema(
-  schema: JsonSchema
-): RillParam[] {
+export function generateParametersFromSchema(schema: JsonSchema): RillParam[] {
   // Missing properties: return empty array (AC-34)
   if (!schema.properties) {
     return [];
@@ -303,7 +323,7 @@ export function generateParametersFromSchema(
 /**
  * MCP resource content block (single item in contents array).
  */
-export interface ResourceContentBlock {
+interface ResourceContentBlock {
   readonly uri: string;
   readonly text?: string | undefined;
   readonly blob?: string | undefined; // base64

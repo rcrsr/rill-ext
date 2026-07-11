@@ -38,9 +38,7 @@ export function extractUrls(text: string): string[] {
   if (matches === null) {
     return [];
   }
-  return matches
-    .filter((m) => m.schema !== 'mailto:')
-    .map((m) => m.url);
+  return matches.filter((m) => m.schema !== 'mailto:').map((m) => m.url);
 }
 
 /**
@@ -61,7 +59,5 @@ export function extractEmails(text: string): string[] {
   if (matches === null) {
     return [];
   }
-  return matches
-    .filter((m) => m.schema === 'mailto:')
-    .map((m) => m.text);
+  return matches.filter((m) => m.schema === 'mailto:').map((m) => m.text);
 }

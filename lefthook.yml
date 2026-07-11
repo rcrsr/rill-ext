@@ -1,0 +1,18 @@
+pre-commit:
+  commands:
+    format:
+      glob: '*.{ts,tsx,js,mjs,cjs,json,yaml,yml}'
+      run: pnpm exec oxfmt {staged_files}
+      stage_fixed: true
+    lint:
+      # Match the src-only scope of the per-package `lint` scripts and CI `check:lint`.
+      glob: '**/src/**/*.{ts,tsx}'
+      run: pnpm exec oxlint --config .oxlintrc.json --fix {staged_files}
+      stage_fixed: true
+
+pre-push:
+  commands:
+    typecheck:
+      run: pnpm -r run typecheck
+    test:
+      run: pnpm -r run test

@@ -67,7 +67,10 @@ export function mapSearchError(
     return ctx.invalidate(error, {
       code: 'TIMEOUT',
       provider,
-      raw: { kind: 'request_cancelled', message: `${provider}: request cancelled` },
+      raw: {
+        kind: 'request_cancelled',
+        message: `${provider}: request cancelled`,
+      },
     });
   }
 
@@ -83,7 +86,10 @@ export function mapSearchError(
     return ctx.invalidate(error, {
       code: 'UNAVAILABLE',
       provider,
-      raw: { kind: 'connection_failed', message: `${provider}: connection failed` },
+      raw: {
+        kind: 'connection_failed',
+        message: `${provider}: connection failed`,
+      },
     });
   }
 
@@ -108,13 +114,19 @@ export function mapSearchError(
     const code = atomForStatus(status);
     const kind = kindForStatus(status);
     const message =
-      status === 401 ? `${provider}: authentication failed`
-      : status === 403 ? `${provider}: forbidden`
-      : status === 404 ? `${provider}: not found`
-      : status === 429 ? `${provider}: rate limit exceeded`
-      : status === 402 ? `${provider}: quota exceeded`
-      : status >= 500 ? `${provider}: server error (${status})`
-      : `${provider}: request failed (${status})`;
+      status === 401
+        ? `${provider}: authentication failed`
+        : status === 403
+          ? `${provider}: forbidden`
+          : status === 404
+            ? `${provider}: not found`
+            : status === 429
+              ? `${provider}: rate limit exceeded`
+              : status === 402
+                ? `${provider}: quota exceeded`
+                : status >= 500
+                  ? `${provider}: server error (${status})`
+                  : `${provider}: request failed (${status})`;
 
     return ctx.invalidate(error, {
       code,
@@ -153,7 +165,11 @@ export function mapProviderSearchError(
     return ctx.invalidate(new Error('exa: credits depleted'), {
       code: 'QUOTA_EXCEEDED',
       provider,
-      raw: { kind: 'credits_depleted', status, message: 'exa: credits depleted' },
+      raw: {
+        kind: 'credits_depleted',
+        status,
+        message: 'exa: credits depleted',
+      },
     });
   }
 
@@ -161,7 +177,11 @@ export function mapProviderSearchError(
     return ctx.invalidate(new Error('tavily: plan limit exceeded'), {
       code: 'QUOTA_EXCEEDED',
       provider,
-      raw: { kind: 'plan_limit_exceeded', status, message: 'tavily: plan limit exceeded' },
+      raw: {
+        kind: 'plan_limit_exceeded',
+        status,
+        message: 'tavily: plan limit exceeded',
+      },
     });
   }
 
@@ -185,7 +205,12 @@ export function mapProviderSearchError(
       return ctx.invalidate(new Error(message), {
         code: 'FORBIDDEN',
         provider,
-        raw: { kind: 'access_denied', status, providerCode: String(code), message },
+        raw: {
+          kind: 'access_denied',
+          status,
+          providerCode: String(code),
+          message,
+        },
       });
     }
   }

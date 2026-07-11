@@ -116,7 +116,7 @@ function haltInvalid(
   ctx: RuntimeContext,
   code: string,
   rawKind: string,
-  message: string,
+  message: string
 ): RuntimeHaltSignal {
   return new RuntimeHaltSignal(
     ctx.invalidate(new Error(message), {
@@ -124,7 +124,7 @@ function haltInvalid(
       provider: 'openai',
       raw: { kind: rawKind, message },
     }),
-    true,
+    true
   );
 }
 
@@ -138,7 +138,9 @@ function haltInvalid(
  * user messages → { role: 'user', content: string } (tool_result parts become role:'tool' messages)
  * assistant messages → { role: 'assistant', content, tool_calls? }
  */
-function canonicalToCC(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
+function canonicalToCC(
+  messages: Message[]
+): OpenAI.ChatCompletionMessageParam[] {
   const result: OpenAI.ChatCompletionMessageParam[] = [];
 
   for (const msg of messages) {
@@ -182,13 +184,19 @@ function canonicalToCC(messages: Message[]): OpenAI.ChatCompletionMessageParam[]
       const textParts = msg.parts.filter((p) => p.type === 'text');
       const toolUseParts = msg.parts.filter((p) => p.type === 'tool_use');
 
-      const content = textParts
-        .map((p) => (p as { type: 'text'; text: string }).text)
-        .join('') || null;
+      const content =
+        textParts
+          .map((p) => (p as { type: 'text'; text: string }).text)
+          .join('') || null;
 
       if (toolUseParts.length > 0) {
         const toolCalls = toolUseParts.map((p) => {
-          const tu = p as { type: 'tool_use'; id: string; name: string; input: Record<string, RillValue> };
+          const tu = p as {
+            type: 'tool_use';
+            id: string;
+            name: string;
+            input: Record<string, RillValue>;
+          };
           return {
             id: tu.id,
             type: 'function' as const,
@@ -212,7 +220,7 @@ function canonicalToCC(messages: Message[]): OpenAI.ChatCompletionMessageParam[]
  * Convert OpenAI Chat Completions response choice to canonical assistant Message.
  */
 function ccChoiceToCanonical(
-  choice: OpenAI.Chat.Completions.ChatCompletion['choices'][0],
+  choice: OpenAI.Chat.Completions.ChatCompletion['choices'][0]
 ): Message {
   const parts: Part[] = [];
   const msg = choice.message;
@@ -224,7 +232,13 @@ function ccChoiceToCanonical(
   if (msg.tool_calls) {
     for (const tc of msg.tool_calls) {
       // tool_calls items have a .function property on ChatCompletionMessageToolCall
-      const fn = (tc as { type: string; id: string; function: { name: string; arguments: string } }).function;
+      const fn = (
+        tc as {
+          type: string;
+          id: string;
+          function: { name: string; arguments: string };
+        }
+      ).function;
       const toolInput = (() => {
         try {
           return JSON.parse(fn.arguments) as Record<string, RillValue>;
@@ -232,7 +246,12 @@ function ccChoiceToCanonical(
           return {} as Record<string, RillValue>;
         }
       })();
-      parts.push({ type: 'tool_use', id: tc.id, name: fn.name, input: toolInput });
+      parts.push({
+        type: 'tool_use',
+        id: tc.id,
+        name: fn.name,
+        input: toolInput,
+      });
     }
   }
 
@@ -284,7 +303,10 @@ function canonicalToResponsesAPI(messages: Message[]): {
         const text = contentParts
           .map((p) => (p as { type: 'text'; text: string }).text)
           .join('');
-        input.push({ role: 'user', content: text } as EasyInputMessage as ResponseInputItem);
+        input.push({
+          role: 'user',
+          content: text,
+        } as EasyInputMessage as ResponseInputItem);
       }
       continue;
     }
@@ -305,7 +327,12 @@ function canonicalToResponsesAPI(messages: Message[]): {
       // tool_use parts → function_call items using call_id
       const toolUseParts = msg.parts.filter((p) => p.type === 'tool_use');
       for (const part of toolUseParts) {
-        const tu = part as { type: 'tool_use'; id: string; name: string; input: Record<string, RillValue> };
+        const tu = part as {
+          type: 'tool_use';
+          id: string;
+          name: string;
+          input: Record<string, RillValue>;
+        };
         input.push({
           type: 'function_call',
           call_id: tu.id,
@@ -320,7 +347,10 @@ function canonicalToResponsesAPI(messages: Message[]): {
         const text = textParts
           .map((p) => (p as { type: 'text'; text: string }).text)
           .join('');
-        input.push({ role: 'assistant', content: text } as EasyInputMessage as ResponseInputItem);
+        input.push({
+          role: 'assistant',
+          content: text,
+        } as EasyInputMessage as ResponseInputItem);
       }
     }
   }
@@ -353,7 +383,12 @@ function responsesAPIToCanonical(response: OAIResponse): Message {
         }
       })();
       // Responses API uses call_id for tool threading (not id)
-      parts.push({ type: 'tool_use', id: fc.call_id, name: fc.name, input: fcInput });
+      parts.push({
+        type: 'tool_use',
+        id: fc.call_id,
+        name: fc.name,
+        input: fcInput,
+      });
     } else if (item.type === 'reasoning') {
       const ri = item as ResponseReasoningItem;
       const summaryText = ri.summary
@@ -480,7 +515,12 @@ export function createOpenAIExtension(
   function makeMessageFnCC(): RillFunction {
     return {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
       ],
       fn: (args, ctx): RillValue => {
         const rawPrompt = args['prompt'] as RillValue;
@@ -493,7 +533,13 @@ export function createOpenAIExtension(
         const normalized = normalizedCC as Message[];
 
         const inputMessages: Message[] = factorySystem
-          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized]
+          ? [
+              {
+                role: 'system',
+                parts: [{ type: 'text', text: factorySystem }],
+              },
+              ...normalized,
+            ]
           : normalized;
 
         const apiMessages = canonicalToCC(inputMessages);
@@ -503,7 +549,9 @@ export function createOpenAIExtension(
           max_completion_tokens: factoryMaxTokens,
           messages: apiMessages,
           stream_options: { include_usage: true },
-          ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+          ...(factoryTemperature !== undefined
+            ? { temperature: factoryTemperature }
+            : {}),
           ...(factoryExtra ?? {}),
         } as OpenAI.ChatCompletionCreateParamsStreaming);
 
@@ -516,7 +564,12 @@ export function createOpenAIExtension(
               }
             }
           } catch (error: unknown) {
-            throwProviderHalt(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            throwProviderHalt(
+              ctx as RuntimeContext,
+              'OpenAI',
+              error,
+              detectOpenAIError
+            );
           }
         }
 
@@ -525,7 +578,10 @@ export function createOpenAIExtension(
           try {
             const response = await runner.finalChatCompletion();
             const assistantMsg = ccChoiceToCanonical(response.choices[0]!);
-            const responseMessages = buildResponseMessages(inputMessages, assistantMsg.parts);
+            const responseMessages = buildResponseMessages(
+              inputMessages,
+              assistantMsg.parts
+            );
 
             const result = {
               messages: responseMessages as unknown as RillValue,
@@ -559,7 +615,12 @@ export function createOpenAIExtension(
               });
               throw error;
             }
-            const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            const invalid = mapProviderError(
+              ctx as RuntimeContext,
+              'OpenAI',
+              error,
+              detectOpenAIError
+            );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'openai:error',
               subsystem: 'extension:openai',
@@ -573,12 +634,16 @@ export function createOpenAIExtension(
         return createRillStream({
           chunks: chunks(),
           resolve,
-          dispose: () => { runner.abort(); },
+          dispose: () => {
+            runner.abort();
+          },
           chunkType: { kind: 'string' },
           retType: VERB_STREAM_RET_TYPE,
         });
       },
-      annotations: { description: 'Send message to OpenAI Chat Completions API' },
+      annotations: {
+        description: 'Send message to OpenAI Chat Completions API',
+      },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'string' },
@@ -594,19 +659,33 @@ export function createOpenAIExtension(
   function makeMessageFnResponses(): RillFunction {
     return {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
       ],
       fn: (args, ctx): RillValue => {
         const rawPrompt = args['prompt'] as RillValue;
 
-        const normalizedRaw1 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalizedRaw1 = normalizePrompt(
+          rawPrompt,
+          ctx as RuntimeContext
+        );
         if (!Array.isArray(normalizedRaw1)) {
           throw new RuntimeHaltSignal(normalizedRaw1, true);
         }
         const normalized1 = normalizedRaw1 as Message[];
 
         const inputMessages: Message[] = factorySystem
-          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized1]
+          ? [
+              {
+                role: 'system',
+                parts: [{ type: 'text', text: factorySystem }],
+              },
+              ...normalized1,
+            ]
           : normalized1;
 
         const { input, instructions } = canonicalToResponsesAPI(inputMessages);
@@ -616,7 +695,9 @@ export function createOpenAIExtension(
           max_output_tokens: factoryMaxTokens,
           input,
           ...(instructions !== undefined ? { instructions } : {}),
-          ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+          ...(factoryTemperature !== undefined
+            ? { temperature: factoryTemperature }
+            : {}),
           ...(factoryExtra ?? {}),
         };
 
@@ -633,7 +714,12 @@ export function createOpenAIExtension(
               }
             }
           } catch (error: unknown) {
-            throwProviderHalt(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            throwProviderHalt(
+              ctx as RuntimeContext,
+              'OpenAI',
+              error,
+              detectOpenAIError
+            );
           }
         }
 
@@ -646,7 +732,10 @@ export function createOpenAIExtension(
             } as ResponseCreateParamsNonStreaming);
 
             const assistantMsg = responsesAPIToCanonical(response);
-            const responseMessages = buildResponseMessages(inputMessages, assistantMsg.parts);
+            const responseMessages = buildResponseMessages(
+              inputMessages,
+              assistantMsg.parts
+            );
 
             const result = {
               messages: responseMessages as unknown as RillValue,
@@ -680,7 +769,12 @@ export function createOpenAIExtension(
               });
               throw error;
             }
-            const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            const invalid = mapProviderError(
+              ctx as RuntimeContext,
+              'OpenAI',
+              error,
+              detectOpenAIError
+            );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'openai:error',
               subsystem: 'extension:openai',
@@ -694,7 +788,9 @@ export function createOpenAIExtension(
         return createRillStream({
           chunks: chunks(),
           resolve,
-          dispose: () => { /* stream aborts via AbortController if needed */ },
+          dispose: () => {
+            /* stream aborts via AbortController if needed */
+          },
           chunkType: { kind: 'string' },
           retType: VERB_STREAM_RET_TYPE,
         });
@@ -715,11 +811,16 @@ export function createOpenAIExtension(
   function validateToolLoopArgs(
     toolsDict: RillValue,
     perCallMaxTurns: number,
-    ctx: RuntimeContext,
+    ctx: RuntimeContext
   ): void {
     // EC-13: Negative per-call max_turns
     if (perCallMaxTurns < 0) {
-      throw haltInvalid(ctx, 'INVALID_INPUT', 'invalid_max_turns', 'max_turns must be >= 0');
+      throw haltInvalid(
+        ctx,
+        'INVALID_INPUT',
+        'invalid_max_turns',
+        'max_turns must be >= 0'
+      );
     }
 
     // EC-14: Empty tools dict
@@ -729,7 +830,12 @@ export function createOpenAIExtension(
       !Array.isArray(toolsDict) &&
       Object.keys(toolsDict as Record<string, unknown>).length === 0
     ) {
-      throw haltInvalid(ctx, 'INVALID_INPUT', 'empty_tools_dict', 'tools dict cannot be empty');
+      throw haltInvalid(
+        ctx,
+        'INVALID_INPUT',
+        'empty_tools_dict',
+        'tools dict cannot be empty'
+      );
     }
   }
 
@@ -740,7 +846,12 @@ export function createOpenAIExtension(
   function makeToolLoopFnCC(): RillFunction {
     return {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
         {
           name: 'tools',
           type: { kind: 'dict', valueType: { kind: 'closure' } },
@@ -756,14 +867,23 @@ export function createOpenAIExtension(
 
         validateToolLoopArgs(toolsDict, perCallMaxTurns, ctx as RuntimeContext);
 
-        const normalizedRaw2 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalizedRaw2 = normalizePrompt(
+          rawPrompt,
+          ctx as RuntimeContext
+        );
         if (!Array.isArray(normalizedRaw2)) {
           throw new RuntimeHaltSignal(normalizedRaw2, true);
         }
         const normalized2 = normalizedRaw2 as Message[];
 
         const inputMessages: Message[] = factorySystem
-          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized2]
+          ? [
+              {
+                role: 'system',
+                parts: [{ type: 'text', text: factorySystem }],
+              },
+              ...normalized2,
+            ]
           : normalized2;
 
         const ccMessages = canonicalToCC(inputMessages);
@@ -790,11 +910,15 @@ export function createOpenAIExtension(
               messages: msgs as OpenAI.ChatCompletionMessageParam[],
               tools: tools as OpenAI.ChatCompletionTool[],
               tool_choice: 'auto' as const,
-              ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+              ...(factoryTemperature !== undefined
+                ? { temperature: factoryTemperature }
+                : {}),
               ...(factoryExtra ?? {}),
             } as OpenAI.ChatCompletionCreateParamsNonStreaming;
 
-            const response = await client.chat.completions.create(apiParams, { signal });
+            const response = await client.chat.completions.create(apiParams, {
+              signal,
+            });
             return {
               ...response,
               usage: {
@@ -805,18 +929,25 @@ export function createOpenAIExtension(
           },
 
           callAPIStreaming: async (msgs, tools, onTextDelta, signal) => {
-            const streamRunner = client.chat.completions.stream({
-              model: factoryModel,
-              max_completion_tokens: factoryMaxTokens,
-              messages: msgs as OpenAI.ChatCompletionMessageParam[],
-              tools: tools as OpenAI.ChatCompletionTool[],
-              tool_choice: 'auto' as const,
-              stream_options: { include_usage: true },
-              ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
-              ...(factoryExtra ?? {}),
-            } as OpenAI.ChatCompletionCreateParamsStreaming, { signal });
+            const streamRunner = client.chat.completions.stream(
+              {
+                model: factoryModel,
+                max_completion_tokens: factoryMaxTokens,
+                messages: msgs as OpenAI.ChatCompletionMessageParam[],
+                tools: tools as OpenAI.ChatCompletionTool[],
+                tool_choice: 'auto' as const,
+                stream_options: { include_usage: true },
+                ...(factoryTemperature !== undefined
+                  ? { temperature: factoryTemperature }
+                  : {}),
+                ...(factoryExtra ?? {}),
+              } as OpenAI.ChatCompletionCreateParamsStreaming,
+              { signal }
+            );
 
-            streamRunner.on('content', (delta: string) => { onTextDelta(delta); });
+            streamRunner.on('content', (delta: string) => {
+              onTextDelta(delta);
+            });
 
             const response = await streamRunner.finalChatCompletion();
             return {
@@ -829,21 +960,39 @@ export function createOpenAIExtension(
           },
 
           extractToolCalls: (response) => {
-            if (!response || typeof response !== 'object' || !('choices' in response)) return null;
+            if (
+              !response ||
+              typeof response !== 'object' ||
+              !('choices' in response)
+            )
+              return null;
             const choices = (response as { choices: unknown[] }).choices;
             if (!Array.isArray(choices) || choices.length === 0) return null;
 
             const choice = choices[0];
-            if (!choice || typeof choice !== 'object' || !('message' in choice)) return null;
+            if (!choice || typeof choice !== 'object' || !('message' in choice))
+              return null;
 
             const message = (choice as { message: unknown }).message;
-            if (!message || typeof message !== 'object' || !('tool_calls' in message)) return null;
+            if (
+              !message ||
+              typeof message !== 'object' ||
+              !('tool_calls' in message)
+            )
+              return null;
 
-            const toolCalls = (message as { tool_calls: unknown[] | null }).tool_calls;
+            const toolCalls = (message as { tool_calls: unknown[] | null })
+              .tool_calls;
             if (!toolCalls || !Array.isArray(toolCalls)) return null;
 
             const functionToolCalls = toolCalls.filter(
-              (tc): tc is { id: string; type: string; function: { name: string; arguments: string } } =>
+              (
+                tc
+              ): tc is {
+                id: string;
+                type: string;
+                function: { name: string; arguments: string };
+              } =>
                 typeof tc === 'object' &&
                 tc !== null &&
                 'type' in tc &&
@@ -863,18 +1012,27 @@ export function createOpenAIExtension(
           },
 
           formatAssistantMessage: (response) => {
-            if (!response || typeof response !== 'object' || !('choices' in response)) return null;
+            if (
+              !response ||
+              typeof response !== 'object' ||
+              !('choices' in response)
+            )
+              return null;
             const choices = (response as { choices: unknown[] }).choices;
             if (!Array.isArray(choices) || choices.length === 0) return null;
 
             const choice = choices[0];
-            if (!choice || typeof choice !== 'object' || !('message' in choice)) return null;
+            if (!choice || typeof choice !== 'object' || !('message' in choice))
+              return null;
 
             const msg = (choice as { message: unknown }).message;
             if (!msg || typeof msg !== 'object') return null;
 
             const m = msg as Record<string, unknown>;
-            const clean: Record<string, unknown> = { role: m['role'], content: m['content'] };
+            const clean: Record<string, unknown> = {
+              role: m['role'],
+              content: m['content'],
+            };
             if (m['tool_calls']) clean['tool_calls'] = m['tool_calls'];
             return clean;
           },
@@ -893,7 +1051,9 @@ export function createOpenAIExtension(
         };
 
         const chunkBuffer: RillValue[] = [];
-        const yieldChunk = (chunk: RillValue): void => { chunkBuffer.push(chunk); };
+        const yieldChunk = (chunk: RillValue): void => {
+          chunkBuffer.push(chunk);
+        };
         const toolLoopAbortController = new AbortController();
 
         const loopPromise = executeToolLoop(
@@ -916,16 +1076,23 @@ export function createOpenAIExtension(
           ctx,
           yieldChunk,
           toolLoopAbortController.signal,
-          factoryMaxTurns,
+          factoryMaxTurns
         );
 
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
             await loopPromise;
-            for (const chunk of chunkBuffer) { yield chunk; }
+            for (const chunk of chunkBuffer) {
+              yield chunk;
+            }
           } catch (error: unknown) {
             if (error instanceof RuntimeHaltSignal) throw error;
-            throwProviderHalt(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            throwProviderHalt(
+              ctx as RuntimeContext,
+              'OpenAI',
+              error,
+              detectOpenAIError
+            );
           }
         }
 
@@ -933,12 +1100,16 @@ export function createOpenAIExtension(
           const startTime = Date.now();
           try {
             const loopResult = await loopPromise;
-            const response = loopResult.response as OpenAI.Chat.Completions.ChatCompletion | null;
+            const response =
+              loopResult.response as OpenAI.Chat.Completions.ChatCompletion | null;
 
             const assistantMsg = response
               ? ccChoiceToCanonical(response.choices[0]!)
               : { role: 'assistant' as const, parts: [] as Part[] };
-            const responseMessages = buildResponseMessages(inputMessages, assistantMsg.parts);
+            const responseMessages = buildResponseMessages(
+              inputMessages,
+              assistantMsg.parts
+            );
 
             const result = {
               messages: responseMessages as unknown as RillValue,
@@ -972,7 +1143,12 @@ export function createOpenAIExtension(
               });
               throw error;
             }
-            const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            const invalid = mapProviderError(
+              ctx as RuntimeContext,
+              'OpenAI',
+              error,
+              detectOpenAIError
+            );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'openai:error',
               subsystem: 'extension:openai',
@@ -986,12 +1162,16 @@ export function createOpenAIExtension(
         return createRillStream({
           chunks: chunks(),
           resolve,
-          dispose: () => { toolLoopAbortController.abort(); },
+          dispose: () => {
+            toolLoopAbortController.abort();
+          },
           chunkType: { kind: 'dict' },
           retType: VERB_STREAM_RET_TYPE,
         });
       },
-      annotations: { description: 'Execute tool-use loop with OpenAI Chat Completions API' },
+      annotations: {
+        description: 'Execute tool-use loop with OpenAI Chat Completions API',
+      },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'dict' },
@@ -1007,7 +1187,12 @@ export function createOpenAIExtension(
   function makeToolLoopFnResponses(): RillFunction {
     return {
       params: [
-        { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+        {
+          name: 'prompt',
+          type: { kind: 'any' },
+          defaultValue: undefined,
+          annotations: { description: 'String or list of message dicts' },
+        },
         {
           name: 'tools',
           type: { kind: 'dict', valueType: { kind: 'closure' } },
@@ -1023,17 +1208,27 @@ export function createOpenAIExtension(
 
         validateToolLoopArgs(toolsDict, perCallMaxTurns, ctx as RuntimeContext);
 
-        const normalizedRaw3 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalizedRaw3 = normalizePrompt(
+          rawPrompt,
+          ctx as RuntimeContext
+        );
         if (!Array.isArray(normalizedRaw3)) {
           throw new RuntimeHaltSignal(normalizedRaw3, true);
         }
         const normalized3 = normalizedRaw3 as Message[];
 
         const inputMessages: Message[] = factorySystem
-          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized3]
+          ? [
+              {
+                role: 'system',
+                parts: [{ type: 'text', text: factorySystem }],
+              },
+              ...normalized3,
+            ]
           : normalized3;
 
-        const { input: initialInput, instructions } = canonicalToResponsesAPI(inputMessages);
+        const { input: initialInput, instructions } =
+          canonicalToResponsesAPI(inputMessages);
         const maxErrors = factoryMaxErrors ?? 3;
 
         const callbacks: ToolLoopCallbacks = {
@@ -1056,7 +1251,9 @@ export function createOpenAIExtension(
               tools,
               tool_choice: 'auto',
               ...(instructions !== undefined ? { instructions } : {}),
-              ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+              ...(factoryTemperature !== undefined
+                ? { temperature: factoryTemperature }
+                : {}),
               ...(factoryExtra ?? {}),
             };
 
@@ -1075,12 +1272,24 @@ export function createOpenAIExtension(
           },
 
           extractToolCalls: (response) => {
-            if (!response || typeof response !== 'object' || !('output' in response)) return null;
+            if (
+              !response ||
+              typeof response !== 'object' ||
+              !('output' in response)
+            )
+              return null;
             const output = (response as { output: unknown[] }).output;
             if (!Array.isArray(output)) return null;
 
             const functionCalls = output.filter(
-              (item): item is { type: string; call_id: string; name: string; arguments: string } =>
+              (
+                item
+              ): item is {
+                type: string;
+                call_id: string;
+                name: string;
+                arguments: string;
+              } =>
                 typeof item === 'object' &&
                 item !== null &&
                 'type' in item &&
@@ -1103,7 +1312,12 @@ export function createOpenAIExtension(
 
           formatAssistantMessage: (response) => {
             // Responses API: the output items themselves are appended to next turn input
-            if (!response || typeof response !== 'object' || !('output' in response)) return null;
+            if (
+              !response ||
+              typeof response !== 'object' ||
+              !('output' in response)
+            )
+              return null;
             const output = (response as { output: unknown[] }).output;
             if (!Array.isArray(output) || output.length === 0) return null;
             return output;
@@ -1123,7 +1337,9 @@ export function createOpenAIExtension(
         };
 
         const chunkBuffer: RillValue[] = [];
-        const yieldChunk = (chunk: RillValue): void => { chunkBuffer.push(chunk); };
+        const yieldChunk = (chunk: RillValue): void => {
+          chunkBuffer.push(chunk);
+        };
         const toolLoopAbortController = new AbortController();
 
         const loopPromise = executeToolLoop(
@@ -1146,16 +1362,23 @@ export function createOpenAIExtension(
           ctx,
           yieldChunk,
           toolLoopAbortController.signal,
-          factoryMaxTurns,
+          factoryMaxTurns
         );
 
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
             await loopPromise;
-            for (const chunk of chunkBuffer) { yield chunk; }
+            for (const chunk of chunkBuffer) {
+              yield chunk;
+            }
           } catch (error: unknown) {
             if (error instanceof RuntimeHaltSignal) throw error;
-            throwProviderHalt(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            throwProviderHalt(
+              ctx as RuntimeContext,
+              'OpenAI',
+              error,
+              detectOpenAIError
+            );
           }
         }
 
@@ -1168,7 +1391,10 @@ export function createOpenAIExtension(
             const assistantMsg = response
               ? responsesAPIToCanonical(response)
               : { role: 'assistant' as const, parts: [] as Part[] };
-            const responseMessages = buildResponseMessages(inputMessages, assistantMsg.parts);
+            const responseMessages = buildResponseMessages(
+              inputMessages,
+              assistantMsg.parts
+            );
 
             const result = {
               messages: responseMessages as unknown as RillValue,
@@ -1202,7 +1428,12 @@ export function createOpenAIExtension(
               });
               throw error;
             }
-            const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+            const invalid = mapProviderError(
+              ctx as RuntimeContext,
+              'OpenAI',
+              error,
+              detectOpenAIError
+            );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'openai:error',
               subsystem: 'extension:openai',
@@ -1216,12 +1447,16 @@ export function createOpenAIExtension(
         return createRillStream({
           chunks: chunks(),
           resolve,
-          dispose: () => { toolLoopAbortController.abort(); },
+          dispose: () => {
+            toolLoopAbortController.abort();
+          },
           chunkType: { kind: 'dict' },
           retType: VERB_STREAM_RET_TYPE,
         });
       },
-      annotations: { description: 'Execute tool-use loop with OpenAI Responses API' },
+      annotations: {
+        description: 'Execute tool-use loop with OpenAI Responses API',
+      },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'dict' },
@@ -1236,19 +1471,31 @@ export function createOpenAIExtension(
 
   function extractJson(content: string, reasoning: string): string {
     const candidate = content.trim() !== '' ? content : reasoning;
-    try { JSON.parse(candidate); return candidate; } catch { /* fall through */ }
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      /* fall through */
+    }
     const m = candidate.match(/\{[\s\S]*\}/);
     return m ? m[0] : candidate;
   }
 
   const generateFn: RillFunction = {
     params: [
-      { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+      {
+        name: 'prompt',
+        type: { kind: 'any' },
+        defaultValue: undefined,
+        annotations: { description: 'String or list of message dicts' },
+      },
       {
         name: 'schema',
         type: { kind: 'type' } as { kind: string },
         defaultValue: undefined,
-        annotations: { description: 'Type expression for structured output schema' },
+        annotations: {
+          description: 'Type expression for structured output schema',
+        },
       },
     ],
     fn: async (args, ctx): Promise<RillValue> => {
@@ -1256,27 +1503,50 @@ export function createOpenAIExtension(
 
       try {
         const rawPrompt = args['prompt'] as RillValue;
-        const schemaArg = args['schema'] as { __rill_type?: boolean; structure?: TypeStructure } | undefined;
+        const schemaArg = args['schema'] as
+          | { __rill_type?: boolean; structure?: TypeStructure }
+          | undefined;
 
         // EC-17: Validate schema is a rill type expression with dict structure
         if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema', 'generate requires a type expression as schema');
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'INVALID_INPUT',
+            'invalid_schema',
+            'generate requires a type expression as schema'
+          );
         }
         if (schemaArg.structure.kind !== 'dict') {
-          throw haltInvalid(ctx as RuntimeContext, 'INVALID_INPUT', 'invalid_schema_type', `generate requires a dict type as schema, got ${schemaArg.structure.kind}`);
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'INVALID_INPUT',
+            'invalid_schema_type',
+            `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
+          );
         }
 
-        const jsonSchema = buildJsonSchemaFromStructuralType(schemaArg.structure);
+        const jsonSchema = buildJsonSchemaFromStructuralType(
+          schemaArg.structure
+        );
 
         // IR-1: Normalize prompt
-        const normalizedRaw4 = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalizedRaw4 = normalizePrompt(
+          rawPrompt,
+          ctx as RuntimeContext
+        );
         if (!Array.isArray(normalizedRaw4)) {
           throw new RuntimeHaltSignal(normalizedRaw4, true);
         }
         const normalized4 = normalizedRaw4 as Message[];
 
         const inputMessages: Message[] = factorySystem
-          ? [{ role: 'system', parts: [{ type: 'text', text: factorySystem }] }, ...normalized4]
+          ? [
+              {
+                role: 'system',
+                parts: [{ type: 'text', text: factorySystem }],
+              },
+              ...normalized4,
+            ]
           : normalized4;
 
         const apiMessages = canonicalToCC(inputMessages);
@@ -1293,7 +1563,9 @@ export function createOpenAIExtension(
               strict: true,
             },
           },
-          ...(factoryTemperature !== undefined ? { temperature: factoryTemperature } : {}),
+          ...(factoryTemperature !== undefined
+            ? { temperature: factoryTemperature }
+            : {}),
           ...(factoryExtra ?? {}),
         } as OpenAI.ChatCompletionCreateParamsNonStreaming;
 
@@ -1306,7 +1578,7 @@ export function createOpenAIExtension(
             ctx as RuntimeContext,
             'PROTOCOL',
             'unexpected_response_format',
-            `generate: unexpected finish_reason '${finishReason ?? 'unknown'}'`,
+            `generate: unexpected finish_reason '${finishReason ?? 'unknown'}'`
           );
         }
 
@@ -1317,7 +1589,8 @@ export function createOpenAIExtension(
         const generateMessage = response.choices[0]?.message;
         const raw = extractJson(
           generateMessage?.content ?? '',
-          (generateMessage as { reasoning_content?: string } | undefined)?.reasoning_content ?? '',
+          (generateMessage as { reasoning_content?: string } | undefined)
+            ?.reasoning_content ?? ''
         );
 
         // EC-17: Parse JSON — reject non-JSON response
@@ -1325,18 +1598,24 @@ export function createOpenAIExtension(
         try {
           data = JSON.parse(raw) as unknown;
         } catch (parseError: unknown) {
-          const detail = parseError instanceof Error ? parseError.message : String(parseError);
+          const detail =
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError);
           throw haltInvalid(
             ctx as RuntimeContext,
             'PROTOCOL',
             'schema_validation_failed',
-            `generate: failed to parse response JSON: ${detail}`,
+            `generate: failed to parse response JSON: ${detail}`
           );
         }
 
         // Build canonical messages transcript
         const assistantParts: Part[] = [{ type: 'text', text: raw }];
-        const responseMessages = buildResponseMessages(inputMessages, assistantParts);
+        const responseMessages = buildResponseMessages(
+          inputMessages,
+          assistantParts
+        );
 
         const result = {
           data,
@@ -1381,7 +1660,12 @@ export function createOpenAIExtension(
           });
           throw error;
         }
-        const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+        const invalid = mapProviderError(
+          ctx as RuntimeContext,
+          'OpenAI',
+          error,
+          detectOpenAIError
+        );
         emitExtensionEvent(ctx as RuntimeContext, {
           event: 'openai:error',
           subsystem: 'extension:openai',
@@ -1448,7 +1732,12 @@ export function createOpenAIExtension(
 
         const embeddingData = response.data[0]?.embedding;
         if (!embeddingData || embeddingData.length === 0) {
-          throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'OpenAI: empty embedding returned');
+          throw haltInvalid(
+            ctx as RuntimeContext,
+            'PROTOCOL',
+            'empty_embedding_response',
+            'OpenAI: empty embedding returned'
+          );
         }
 
         const float32Data = new Float32Array(embeddingData);
@@ -1477,7 +1766,12 @@ export function createOpenAIExtension(
           throw error;
         }
 
-        const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+        const invalid = mapProviderError(
+          ctx as RuntimeContext,
+          'OpenAI',
+          error,
+          detectOpenAIError
+        );
         emitExtensionEvent(ctx as RuntimeContext, {
           event: 'openai:error',
           subsystem: 'extension:openai',
@@ -1521,15 +1815,23 @@ export function createOpenAIExtension(
         for (const embeddingItem of response.data) {
           const embeddingData = embeddingItem.embedding;
           if (!embeddingData || embeddingData.length === 0) {
-            throw haltInvalid(ctx as RuntimeContext, 'PROTOCOL', 'empty_embedding_response', 'OpenAI: empty embedding returned');
+            throw haltInvalid(
+              ctx as RuntimeContext,
+              'PROTOCOL',
+              'empty_embedding_response',
+              'OpenAI: empty embedding returned'
+            );
           }
           const float32Data = new Float32Array(embeddingData);
-          vectors.push(createVector(float32Data, factoryEmbedModel) as RillValue);
+          vectors.push(
+            createVector(float32Data, factoryEmbedModel) as RillValue
+          );
         }
 
         const duration = Date.now() - startTime;
         const firstVector = vectors[0];
-        const dimensions = firstVector && isVector(firstVector) ? firstVector.data.length : 0;
+        const dimensions =
+          firstVector && isVector(firstVector) ? firstVector.data.length : 0;
         emitExtensionEvent(ctx as RuntimeContext, {
           event: 'openai:embed_batch',
           subsystem: 'extension:openai',
@@ -1553,7 +1855,12 @@ export function createOpenAIExtension(
           throw error;
         }
 
-        const invalid = mapProviderError(ctx as RuntimeContext, 'OpenAI', error, detectOpenAIError);
+        const invalid = mapProviderError(
+          ctx as RuntimeContext,
+          'OpenAI',
+          error,
+          detectOpenAIError
+        );
         emitExtensionEvent(ctx as RuntimeContext, {
           event: 'openai:error',
           subsystem: 'extension:openai',
@@ -1563,8 +1870,13 @@ export function createOpenAIExtension(
         throw new RuntimeHaltSignal(invalid, true);
       }
     },
-    annotations: { description: 'Generate embedding vectors for multiple texts' },
-    returnType: structureToTypeValue({ kind: 'list', element: { kind: 'vector' } }),
+    annotations: {
+      description: 'Generate embedding vectors for multiple texts',
+    },
+    returnType: structureToTypeValue({
+      kind: 'list',
+      element: { kind: 'vector' },
+    }),
   };
 
   // ============================================================
@@ -1597,5 +1909,8 @@ export function createOpenAIExtension(
     generate: toCallable(fnDict.generate),
   } satisfies LlmExtensionContract;
 
-  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
+  return {
+    value: callableDict as unknown as RillValue,
+    dispose,
+  } satisfies ExtensionFactoryResult;
 }

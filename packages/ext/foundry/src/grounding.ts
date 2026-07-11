@@ -24,10 +24,7 @@ import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
 import { detectFoundryError } from './errors.js';
 import type { AzureOpenAI } from 'openai';
 import type { ResponseOutputItem } from 'openai/resources/responses/responses.js';
-import type {
-  FoundryConfig,
-  FoundryGroundingConfig,
-} from './types.js';
+import type { FoundryConfig, FoundryGroundingConfig } from './types.js';
 
 // ============================================================
 // CONSTANTS
@@ -82,7 +79,11 @@ export async function callGround(
 
   // EC-9: Grounding must be configured
   if (!config.grounding) {
-    throw haltUnconfigured(ctx, 'grounding_unconfigured', 'foundry: grounding connection not configured');
+    throw haltUnconfigured(
+      ctx,
+      'grounding_unconfigured',
+      'foundry: grounding connection not configured'
+    );
   }
 
   const groundingConfig: FoundryGroundingConfig = config.grounding;
@@ -229,7 +230,9 @@ function haltInvalidInput(
  * @param output - Response output item array
  * @returns Array of citation dicts with url and title fields
  */
-function extractCitations(output: ResponseOutputItem[]): Array<Record<string, RillValue>> {
+function extractCitations(
+  output: ResponseOutputItem[]
+): Array<Record<string, RillValue>> {
   const citations: Array<Record<string, RillValue>> = [];
 
   for (const item of output) {

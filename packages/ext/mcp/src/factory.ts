@@ -10,7 +10,11 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { HeadersInit } from 'undici-types';
-import type { ExtensionFactoryCtx, ExtensionFactoryResult, RillValue } from '@rcrsr/rill';
+import type {
+  ExtensionFactoryCtx,
+  ExtensionFactoryResult,
+  RillValue,
+} from '@rcrsr/rill';
 import { RuntimeError } from '@rcrsr/rill';
 import type { McpExtensionConfig } from './types.js';
 import {
@@ -52,7 +56,7 @@ import { createIntrospectionDicts } from './introspection.js';
  */
 export async function createMcpExtension(
   config: McpExtensionConfig,
-  factoryCtx: ExtensionFactoryCtx,
+  factoryCtx: ExtensionFactoryCtx
 ): Promise<ExtensionFactoryResult> {
   // ============================================================
   // STEP 1: CONFIG VALIDATION (sync)
@@ -149,7 +153,9 @@ export async function createMcpExtension(
     lifecycleState
   );
   const staticResourceFunctions = generateStaticResourceFunctions(
-    capabilities.filteredResources as Parameters<typeof generateStaticResourceFunctions>[0],
+    capabilities.filteredResources as Parameters<
+      typeof generateStaticResourceFunctions
+    >[0],
     client,
     timeout,
     lifecycleState
@@ -168,7 +174,11 @@ export async function createMcpExtension(
   // Generate introspection dicts (all three use filtered function dicts)
   const introspectionDicts = createIntrospectionDicts(
     toolFunctions,
-    { read_resource: readResourceFunction, ...resourceTemplateFunctions, ...staticResourceFunctions },
+    {
+      read_resource: readResourceFunction,
+      ...resourceTemplateFunctions,
+      ...staticResourceFunctions,
+    },
     promptFunctions
   );
 
@@ -208,7 +218,7 @@ export async function createMcpExtension(
     () => {
       void dispose();
     },
-    { once: true },
+    { once: true }
   );
 
   // Build value dict from introspection dicts — capabilities are namespaced
@@ -366,7 +376,9 @@ async function discoverCapabilities(
     await Promise.all([
       caps.tools ? client.listTools() : { tools: [] },
       caps.resources ? client.listResources() : { resources: [] },
-      caps.resources ? client.listResourceTemplates() : { resourceTemplates: [] },
+      caps.resources
+        ? client.listResourceTemplates()
+        : { resourceTemplates: [] },
       caps.prompts ? client.listPrompts() : { prompts: [] },
     ]);
 
@@ -442,7 +454,10 @@ function filterCapabilities<T>(
  * @param config - Extension configuration (for context)
  * @returns Mapped error
  */
-function mapConnectionError(error: unknown, config: McpExtensionConfig): RuntimeError {
+function mapConnectionError(
+  error: unknown,
+  config: McpExtensionConfig
+): RuntimeError {
   if (error instanceof RuntimeError) {
     return error;
   }
@@ -457,12 +472,18 @@ function mapConnectionError(error: unknown, config: McpExtensionConfig): Runtime
       return processExitError(1);
     }
 
-    const exitCodeMatch = /exit(?:ed)?\s+(?:with\s+)?code\s+(\d+)/i.exec(message);
+    const exitCodeMatch = /exit(?:ed)?\s+(?:with\s+)?code\s+(\d+)/i.exec(
+      message
+    );
     if (exitCodeMatch) {
       return processExitError(Number.parseInt(exitCodeMatch[1]!, 10));
     }
 
-    if (/spawn/i.test(message) || /exit/i.test(message) || /process/i.test(message)) {
+    if (
+      /spawn/i.test(message) ||
+      /exit/i.test(message) ||
+      /process/i.test(message)
+    ) {
       return processExitError(1);
     }
   }

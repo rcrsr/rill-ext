@@ -28,7 +28,10 @@ const listReturn = structureToTypeValue({ kind: 'list' });
 // getAll returns a homogeneous-value dict per §EXT.8.2: keys are arbitrary
 // user-chosen strings; values are user-stored RillValues whose schema is set
 // by the caller (§EXT.8.3 case 1), so the value type is `any`.
-const getAllReturn = structureToTypeValue({ kind: 'dict', valueType: { kind: 'any' } });
+const getAllReturn = structureToTypeValue({
+  kind: 'dict',
+  valueType: { kind: 'any' },
+});
 
 const PROVIDER = 'kv-file';
 
@@ -40,9 +43,8 @@ const PROVIDER = 'kv-file';
  */
 export function createFileKvExtension(
   config: KvFileExtensionConfig,
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-
   let mounts: Record<string, KvFileMountConfig>;
 
   if (config.mounts) {
@@ -62,7 +64,7 @@ export function createFileKvExtension(
   } else {
     throw new RuntimeError(
       'RILL-R005',
-      'KV file extension requires either "mounts" or "store" configuration',
+      'KV file extension requires either "mounts" or "store" configuration'
     );
   }
 
@@ -89,7 +91,7 @@ export function createFileKvExtension(
    */
   const getStore = async (
     mountName: string,
-    runCtx: RuntimeContext,
+    runCtx: RuntimeContext
   ): Promise<StoreResolution> => {
     const mountConfig = mounts[mountName];
     if (!mountConfig) {
@@ -105,7 +107,7 @@ export function createFileKvExtension(
               mountName,
               availableMounts: Object.keys(mounts),
             },
-          },
+          }
         ),
       };
     }
@@ -130,7 +132,7 @@ export function createFileKvExtension(
           writePolicy: mountConfig.writePolicy ?? 'dispose',
           mode: mountConfig.mode,
         },
-        runCtx,
+        runCtx
       );
     }
 
@@ -174,7 +176,7 @@ export function createFileKvExtension(
     const setResult = await r.store.set(
       args['key'] as string,
       args['value'] as RillValue,
-      runCtx,
+      runCtx
     );
     if (setResult !== undefined) return setResult as RillValue;
     return true;
@@ -197,8 +199,12 @@ export function createFileKvExtension(
         {
           code: 'INVALID_INPUT',
           provider: PROVIDER,
-          raw: { kind: 'merge_non_dict', key, currentType: typeof currentValue },
-        },
+          raw: {
+            kind: 'merge_non_dict',
+            key,
+            currentType: typeof currentValue,
+          },
+        }
       );
     }
 
@@ -256,25 +262,26 @@ export function createFileKvExtension(
     const mountConfig = mounts[mountName];
 
     if (!mountConfig) {
-      return runCtx.invalidate(
-        new Error(`Mount '${mountName}' not found`),
-        {
-          code: 'INVALID_INPUT',
-          provider: PROVIDER,
-          raw: {
-            kind: 'unknown_mount',
-            mountName,
-            availableMounts: Object.keys(mounts),
-          },
+      return runCtx.invalidate(new Error(`Mount '${mountName}' not found`), {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: {
+          kind: 'unknown_mount',
+          mountName,
+          availableMounts: Object.keys(mounts),
         },
-      );
+      });
     }
 
     if (!mountConfig.schema) return [];
 
     const result: RillValue[] = [];
     for (const [key, entry] of Object.entries(mountConfig.schema)) {
-      result.push({ key, type: entry.type, description: entry.description ?? '' });
+      result.push({
+        key,
+        type: entry.type,
+        description: entry.description ?? '',
+      });
     }
     return result;
   };
@@ -325,7 +332,9 @@ export function createFileKvExtension(
         p.dict('fallback', 'Fallback value if key missing'),
       ],
       fn: get_or,
-      annotations: { description: 'Get value or return fallback if key missing' },
+      annotations: {
+        description: 'Get value or return fallback if key missing',
+      },
       returnType: anyReturn,
     } satisfies RillFunction,
     set: {
@@ -345,7 +354,9 @@ export function createFileKvExtension(
         p.dict('partial', 'Partial dict to merge'),
       ],
       fn: merge,
-      annotations: { description: 'Merge partial dict into existing dict value' },
+      annotations: {
+        description: 'Merge partial dict into existing dict value',
+      },
       returnType: boolReturn,
     } satisfies RillFunction,
     delete: {

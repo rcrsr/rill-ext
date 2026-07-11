@@ -28,7 +28,9 @@ const stringListReturn = structureToTypeValue({
   kind: 'list',
   element: { kind: 'string' },
 });
-const datetimeReturn = structureToTypeValue({ kind: 'datetime' } as { kind: string });
+const datetimeReturn = structureToTypeValue({ kind: 'datetime' } as {
+  kind: string;
+});
 
 const PROVIDER = 'datetime';
 
@@ -54,12 +56,12 @@ const TOKEN_REGISTRY: ReadonlyArray<{
   group: string;
 }> = [
   { token: 'YYYY', regex: '\\d{4}', group: 'YYYY' },
-  { token: 'SSS',  regex: '\\d{3}', group: 'SSS' },
-  { token: 'MM',   regex: '\\d{2}', group: 'MM' },
-  { token: 'DD',   regex: '\\d{2}', group: 'DD' },
-  { token: 'HH',   regex: '\\d{2}', group: 'HH' },
-  { token: 'mm',   regex: '\\d{2}', group: 'mm' },
-  { token: 'ss',   regex: '\\d{2}', group: 'ss' },
+  { token: 'SSS', regex: '\\d{3}', group: 'SSS' },
+  { token: 'MM', regex: '\\d{2}', group: 'MM' },
+  { token: 'DD', regex: '\\d{2}', group: 'DD' },
+  { token: 'HH', regex: '\\d{2}', group: 'HH' },
+  { token: 'mm', regex: '\\d{2}', group: 'mm' },
+  { token: 'ss', regex: '\\d{2}', group: 'ss' },
 ];
 
 /**
@@ -94,7 +96,9 @@ function applyFormat(date: Date, pattern: string): string {
   // Replace tokens longest-first to avoid partial replacement
   let result = pattern;
   for (const entry of TOKEN_REGISTRY) {
-    result = result.split(entry.token).join(replacements[entry.token] ?? entry.token);
+    result = result
+      .split(entry.token)
+      .join(replacements[entry.token] ?? entry.token);
   }
   return result;
 }
@@ -144,7 +148,9 @@ function getOffsetMinutes(epochMs: number, zone: string): number {
 function formatOffset(offsetMinutes: number): string {
   const sign = offsetMinutes >= 0 ? '+' : '-';
   const abs = Math.abs(offsetMinutes);
-  const h = Math.floor(abs / 60).toString().padStart(2, '0');
+  const h = Math.floor(abs / 60)
+    .toString()
+    .padStart(2, '0');
   const m = (abs % 60).toString().padStart(2, '0');
   return `${sign}${h}:${m}`;
 }
@@ -154,8 +160,15 @@ function formatOffset(offsetMinutes: number): string {
  */
 function getLocalComponents(
   epochMs: number,
-  zone: string,
-): { year: number; month: number; day: number; hours: number; minutes: number; seconds: number } {
+  zone: string
+): {
+  year: number;
+  month: number;
+  day: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+} {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: zone,
     year: 'numeric',
@@ -195,9 +208,8 @@ function getLocalComponents(
  */
 export function createDatetimeExtension(
   _config: DatetimeExtensionConfig = {},
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-
   let disposed = false;
 
   // ----------------------------------------------------------
@@ -206,28 +218,25 @@ export function createDatetimeExtension(
 
   function checkDisposed(runCtx: RuntimeContext): RillValue | null {
     if (disposed) {
-      return runCtx.invalidate(
-        new Error('datetime: operation cancelled'),
-        {
-          code: 'INVALID_INPUT',
-          provider: PROVIDER,
-          raw: { kind: 'disposed' },
-        },
-      );
+      return runCtx.invalidate(new Error('datetime: operation cancelled'), {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: { kind: 'disposed' },
+      });
     }
     return null;
   }
 
-  function validateZone(zone: string, runCtx: RuntimeContext): RillValue | null {
+  function validateZone(
+    zone: string,
+    runCtx: RuntimeContext
+  ): RillValue | null {
     if (!validZones.has(zone)) {
-      return runCtx.invalidate(
-        new Error(`unknown timezone: "${zone}"`),
-        {
-          code: 'INVALID_INPUT',
-          provider: PROVIDER,
-          raw: { kind: 'invalid_timezone', zone },
-        },
-      );
+      return runCtx.invalidate(new Error(`unknown timezone: "${zone}"`), {
+        code: 'INVALID_INPUT',
+        provider: PROVIDER,
+        raw: { kind: 'invalid_timezone', zone },
+      });
     }
     return null;
   }
@@ -235,7 +244,10 @@ export function createDatetimeExtension(
   /**
    * Scan a pattern for unrecognized tokens.
    */
-  function validatePattern(pattern: string, runCtx: RuntimeContext): RillValue | null {
+  function validatePattern(
+    pattern: string,
+    runCtx: RuntimeContext
+  ): RillValue | null {
     let pos = 0;
     while (pos < pattern.length) {
       let tokenMatched = false;
@@ -250,7 +262,10 @@ export function createDatetimeExtension(
         const ch = pattern[pos] ?? '';
         if (/[A-Za-z]/.test(ch)) {
           let tokenEnd = pos + 1;
-          while (tokenEnd < pattern.length && /[A-Za-z]/.test(pattern[tokenEnd] ?? '')) {
+          while (
+            tokenEnd < pattern.length &&
+            /[A-Za-z]/.test(pattern[tokenEnd] ?? '')
+          ) {
             tokenEnd++;
           }
           const unknownToken = pattern.slice(pos, tokenEnd);
@@ -260,7 +275,7 @@ export function createDatetimeExtension(
               code: 'INVALID_INPUT',
               provider: PROVIDER,
               raw: { kind: 'unknown_format_token', token: unknownToken },
-            },
+            }
           );
         }
         pos++;
@@ -274,20 +289,21 @@ export function createDatetimeExtension(
    */
   function extractDatetime(
     value: RillValue,
-    runCtx: RuntimeContext,
+    runCtx: RuntimeContext
   ): { ok: true; value: number } | { ok: false; invalid: RillValue } {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
       const got = typeof value === 'number' ? String(value) : typeof value;
       return {
         ok: false,
-        invalid: runCtx.invalidate(
-          new Error(`expected datetime, got ${got}`),
-          {
-            code: 'INVALID_INPUT',
-            provider: PROVIDER,
-            raw: { kind: 'invalid_argument', expected: 'datetime', got: typeof value },
+        invalid: runCtx.invalidate(new Error(`expected datetime, got ${got}`), {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: {
+            kind: 'invalid_argument',
+            expected: 'datetime',
+            got: typeof value,
           },
-        ),
+        }),
       };
     }
     return { ok: true, value };
@@ -298,7 +314,7 @@ export function createDatetimeExtension(
    */
   function extractString(
     value: RillValue,
-    runCtx: RuntimeContext,
+    runCtx: RuntimeContext
   ): { ok: true; value: string } | { ok: false; invalid: RillValue } {
     if (typeof value !== 'string') {
       return {
@@ -308,8 +324,12 @@ export function createDatetimeExtension(
           {
             code: 'INVALID_INPUT',
             provider: PROVIDER,
-            raw: { kind: 'invalid_argument', expected: 'string', got: typeof value },
-          },
+            raw: {
+              kind: 'invalid_argument',
+              expected: 'string',
+              got: typeof value,
+            },
+          }
         ),
       };
     }
@@ -322,7 +342,7 @@ export function createDatetimeExtension(
   function parseWithPattern(
     str: string,
     pattern: string,
-    runCtx: RuntimeContext,
+    runCtx: RuntimeContext
   ): { ok: true; value: number } | { ok: false; invalid: RillValue } {
     let regexSource = '';
     let remaining = pattern;
@@ -355,7 +375,7 @@ export function createDatetimeExtension(
             code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: { kind: 'parse_mismatch', str, pattern },
-          },
+          }
         ),
       };
     }
@@ -371,9 +391,14 @@ export function createDatetimeExtension(
 
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
     if (
-      month < 1 || month > 12 ||
-      day < 1 || day > daysInMonth ||
-      hours > 23 || minutes > 59 || seconds > 59 || ms > 999
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > daysInMonth ||
+      hours > 23 ||
+      minutes > 59 ||
+      seconds > 59 ||
+      ms > 999
     ) {
       return {
         ok: false,
@@ -383,12 +408,15 @@ export function createDatetimeExtension(
             code: 'INVALID_INPUT',
             provider: PROVIDER,
             raw: { kind: 'date_out_of_range', str, pattern },
-          },
+          }
         ),
       };
     }
 
-    return { ok: true, value: Date.UTC(year, month - 1, day, hours, minutes, seconds, ms) };
+    return {
+      ok: true,
+      value: Date.UTC(year, month - 1, day, hours, minutes, seconds, ms),
+    };
   }
 
   // ----------------------------------------------------------
@@ -397,14 +425,19 @@ export function createDatetimeExtension(
 
   const iso: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
-    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dInv = checkDisposed(runCtx);
+    if (dInv) return dInv;
     const dt = extractDatetime(args['dt'] as RillValue, runCtx);
     if (!dt.ok) return dt.invalid;
     const zoneArg = extractString(args['zone'] as RillValue, runCtx);
     if (!zoneArg.ok) return zoneArg.invalid;
-    const zInv = validateZone(zoneArg.value, runCtx); if (zInv) return zInv;
+    const zInv = validateZone(zoneArg.value, runCtx);
+    if (zInv) return zInv;
 
-    const { year, month, day, hours, minutes, seconds } = getLocalComponents(dt.value, zoneArg.value);
+    const { year, month, day, hours, minutes, seconds } = getLocalComponents(
+      dt.value,
+      zoneArg.value
+    );
     const offsetMin = getOffsetMinutes(dt.value, zoneArg.value);
 
     const pad2 = (n: number): string => String(n).padStart(2, '0');
@@ -419,12 +452,14 @@ export function createDatetimeExtension(
 
   const date: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
-    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dInv = checkDisposed(runCtx);
+    if (dInv) return dInv;
     const dt = extractDatetime(args['dt'] as RillValue, runCtx);
     if (!dt.ok) return dt.invalid;
     const zoneArg = extractString(args['zone'] as RillValue, runCtx);
     if (!zoneArg.ok) return zoneArg.invalid;
-    const zInv = validateZone(zoneArg.value, runCtx); if (zInv) return zInv;
+    const zInv = validateZone(zoneArg.value, runCtx);
+    if (zInv) return zInv;
 
     const { year, month, day } = getLocalComponents(dt.value, zoneArg.value);
     const pad2 = (n: number): string => String(n).padStart(2, '0');
@@ -437,14 +472,19 @@ export function createDatetimeExtension(
 
   const time: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
-    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dInv = checkDisposed(runCtx);
+    if (dInv) return dInv;
     const dt = extractDatetime(args['dt'] as RillValue, runCtx);
     if (!dt.ok) return dt.invalid;
     const zoneArg = extractString(args['zone'] as RillValue, runCtx);
     if (!zoneArg.ok) return zoneArg.invalid;
-    const zInv = validateZone(zoneArg.value, runCtx); if (zInv) return zInv;
+    const zInv = validateZone(zoneArg.value, runCtx);
+    if (zInv) return zInv;
 
-    const { hours, minutes, seconds } = getLocalComponents(dt.value, zoneArg.value);
+    const { hours, minutes, seconds } = getLocalComponents(
+      dt.value,
+      zoneArg.value
+    );
     const pad2 = (n: number): string => String(n).padStart(2, '0');
     return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
   };
@@ -455,10 +495,12 @@ export function createDatetimeExtension(
 
   const offset: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
-    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dInv = checkDisposed(runCtx);
+    if (dInv) return dInv;
     const zoneArg = extractString(args['zone'] as RillValue, runCtx);
     if (!zoneArg.ok) return zoneArg.invalid;
-    const zInv = validateZone(zoneArg.value, runCtx); if (zInv) return zInv;
+    const zInv = validateZone(zoneArg.value, runCtx);
+    if (zInv) return zInv;
 
     const dtArg = args['dt'];
     let epochMs: number;
@@ -480,7 +522,8 @@ export function createDatetimeExtension(
 
   const zones: CallableFn = async (_args, ctx) => {
     const runCtx = ctx as RuntimeContext;
-    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dInv = checkDisposed(runCtx);
+    if (dInv) return dInv;
     return Array.from(validZones) as unknown as RillValue;
   };
 
@@ -490,12 +533,14 @@ export function createDatetimeExtension(
 
   const format: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
-    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dInv = checkDisposed(runCtx);
+    if (dInv) return dInv;
     const dt = extractDatetime(args['dt'] as RillValue, runCtx);
     if (!dt.ok) return dt.invalid;
     const patternArg = extractString(args['pattern'] as RillValue, runCtx);
     if (!patternArg.ok) return patternArg.invalid;
-    const pInv = validatePattern(patternArg.value, runCtx); if (pInv) return pInv;
+    const pInv = validatePattern(patternArg.value, runCtx);
+    if (pInv) return pInv;
 
     const d = new Date(dt.value);
     return applyFormat(d, patternArg.value);
@@ -507,12 +552,14 @@ export function createDatetimeExtension(
 
   const parse: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
-    const dInv = checkDisposed(runCtx); if (dInv) return dInv;
+    const dInv = checkDisposed(runCtx);
+    if (dInv) return dInv;
     const strArg = extractString(args['str'] as RillValue, runCtx);
     if (!strArg.ok) return strArg.invalid;
     const patternArg = extractString(args['pattern'] as RillValue, runCtx);
     if (!patternArg.ok) return patternArg.invalid;
-    const pInv = validatePattern(patternArg.value, runCtx); if (pInv) return pInv;
+    const pInv = validatePattern(patternArg.value, runCtx);
+    if (pInv) return pInv;
 
     const result = parseWithPattern(strArg.value, patternArg.value, runCtx);
     if (!result.ok) return result.invalid;
@@ -546,39 +593,36 @@ export function createDatetimeExtension(
 
   const fnDict: Record<string, RillFunction> = {
     iso: {
-      params: [
-        dtParam,
-        p.str('zone', 'IANA timezone name'),
-      ],
+      params: [dtParam, p.str('zone', 'IANA timezone name')],
       fn: iso,
-      annotations: { description: 'Convert UTC datetime to offset ISO 8601 string in named zone' },
+      annotations: {
+        description:
+          'Convert UTC datetime to offset ISO 8601 string in named zone',
+      },
       returnType: stringReturn,
     },
     date: {
-      params: [
-        dtParam,
-        p.str('zone', 'IANA timezone name'),
-      ],
+      params: [dtParam, p.str('zone', 'IANA timezone name')],
       fn: date,
-      annotations: { description: 'Convert UTC datetime to YYYY-MM-DD string in named zone' },
+      annotations: {
+        description: 'Convert UTC datetime to YYYY-MM-DD string in named zone',
+      },
       returnType: stringReturn,
     },
     time: {
-      params: [
-        dtParam,
-        p.str('zone', 'IANA timezone name'),
-      ],
+      params: [dtParam, p.str('zone', 'IANA timezone name')],
       fn: time,
-      annotations: { description: 'Convert UTC datetime to HH:mm:ss string in named zone' },
+      annotations: {
+        description: 'Convert UTC datetime to HH:mm:ss string in named zone',
+      },
       returnType: stringReturn,
     },
     offset: {
-      params: [
-        p.str('zone', 'IANA timezone name'),
-        dtOptionalParam,
-      ],
+      params: [p.str('zone', 'IANA timezone name'), dtOptionalParam],
       fn: offset,
-      annotations: { description: 'Get UTC offset in decimal hours for named zone' },
+      annotations: {
+        description: 'Get UTC offset in decimal hours for named zone',
+      },
       returnType: numberReturn,
     },
     zones: {
@@ -590,7 +634,10 @@ export function createDatetimeExtension(
     format: {
       params: [
         dtParam,
-        p.str('pattern', 'Format pattern using tokens: YYYY MM DD HH mm ss SSS'),
+        p.str(
+          'pattern',
+          'Format pattern using tokens: YYYY MM DD HH mm ss SSS'
+        ),
       ],
       fn: format,
       annotations: { description: 'Format UTC datetime using pattern tokens' },
@@ -602,7 +649,9 @@ export function createDatetimeExtension(
         p.str('pattern', 'Parse pattern using tokens: YYYY MM DD HH mm ss SSS'),
       ],
       fn: parse,
-      annotations: { description: 'Parse string using pattern and return UTC datetime' },
+      annotations: {
+        description: 'Parse string using pattern and return UTC datetime',
+      },
       returnType: datetimeReturn,
     },
   };

@@ -4,11 +4,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import {
-  createInFlightState,
-  trackRequest,
-  abortAll,
-} from './request.js';
+import { createInFlightState, trackRequest, abortAll } from './request.js';
 
 describe('createInFlightState', () => {
   it('returns state with empty controllers Set (IR-4)', () => {

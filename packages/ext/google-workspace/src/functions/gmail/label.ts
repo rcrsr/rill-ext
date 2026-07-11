@@ -38,18 +38,26 @@ interface GmailLabel {
 function validateLabelAccess(
   ctx: RuntimeContext,
   labelName: string,
-  gmailConfig: GmailConfig | undefined,
+  gmailConfig: GmailConfig | undefined
 ): void {
   const allowedLabels = gmailConfig?.allowedLabels;
   const deniedLabels = gmailConfig?.deniedLabels ?? [];
   // EC-12: Check denied list first (before fetch)
   if (deniedLabels.includes(labelName)) {
-    failForbidden(ctx, 'forbidden', `google: label '${labelName}' in denied set`);
+    failForbidden(
+      ctx,
+      'forbidden',
+      `google: label '${labelName}' in denied set`
+    );
   }
   // BC-10: Check allowed list when defined and non-empty
   if (allowedLabels !== undefined && allowedLabels.length > 0) {
     if (!allowedLabels.includes(labelName)) {
-      failForbidden(ctx, 'forbidden', `google: label '${labelName}' not in allowed set`);
+      failForbidden(
+        ctx,
+        'forbidden',
+        `google: label '${labelName}' not in allowed set`
+      );
     }
   }
 }
@@ -58,7 +66,9 @@ function validateLabelAccess(
  * Validates label access, resolves the label ID, then applies it via messages.modify.
  * Returns true after 200 OK per IR-8.
  */
-export function makeGmailLabel(deps: GmailLabelDeps): (
+export function makeGmailLabel(
+  deps: GmailLabelDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -70,11 +80,19 @@ export function makeGmailLabel(deps: GmailLabelDeps): (
   ): Promise<RillValue> => {
     const messageId = args['message_id'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: message_id must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: message_id must be a non-empty string'
+      );
     }
     const labelName = args['label_name'];
     if (typeof labelName !== 'string' || labelName.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: label_name must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: label_name must be a non-empty string'
+      );
     }
     // EC-6/EC-12/BC-9/BC-10: Validate before any API call
     validateLabelAccess(ctx, labelName, deps.gmailConfig);
@@ -95,7 +113,17 @@ export function makeGmailLabel(deps: GmailLabelDeps): (
     const labels = labelsData?.labels ?? [];
     const matched = labels.find((l) => l.name === labelName);
     if (!matched?.id) {
-      throw ctx.invalidate(new Error(`google: label '${labelName}' not found`), { code: 'NOT_FOUND', provider: 'google-workspace', raw: { kind: 'label_not_found', message: `google: label '${labelName}' not found` } });
+      throw ctx.invalidate(
+        new Error(`google: label '${labelName}' not found`),
+        {
+          code: 'NOT_FOUND',
+          provider: 'google-workspace',
+          raw: {
+            kind: 'label_not_found',
+            message: `google: label '${labelName}' not found`,
+          },
+        }
+      );
     }
     // Step 2: Apply label to the message
     const modifyPath = `/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`;

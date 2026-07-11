@@ -18,11 +18,15 @@ import { interpolate, scanTemplateReferences } from './interpolate.js';
 describe('interpolate', () => {
   describe('basic substitution (IR-4)', () => {
     it('substitutes a single reference', () => {
-      expect(interpolate('Hello {name}', { name: 'world' })).toBe('Hello world');
+      expect(interpolate('Hello {name}', { name: 'world' })).toBe(
+        'Hello world'
+      );
     });
 
     it('substitutes multiple references in one line', () => {
-      expect(interpolate('{greeting}, {name}!', { greeting: 'Hi', name: 'Alice' })).toBe('Hi, Alice!');
+      expect(
+        interpolate('{greeting}, {name}!', { greeting: 'Hi', name: 'Alice' })
+      ).toBe('Hi, Alice!');
     });
 
     it('substitutes the same reference appearing twice', () => {
@@ -39,7 +43,9 @@ describe('interpolate', () => {
 
     it('handles multi-line body with references on different lines', () => {
       const body = 'Line1: {a}\nLine2: {b}';
-      expect(interpolate(body, { a: 'alpha', b: 'beta' })).toBe('Line1: alpha\nLine2: beta');
+      expect(interpolate(body, { a: 'alpha', b: 'beta' })).toBe(
+        'Line1: alpha\nLine2: beta'
+      );
     });
 
     it('uses empty string for missing key (never throws)', () => {
@@ -75,7 +81,9 @@ describe('interpolate', () => {
 
     it('mixes escaped and unescaped in same string', () => {
       // {{ → {, {b} → bar, }} → }
-      expect(interpolate('{{literal}} and {b}', { b: 'bar' })).toBe('{literal} and bar');
+      expect(interpolate('{{literal}} and {b}', { b: 'bar' })).toBe(
+        '{literal} and bar'
+      );
     });
 
     it('handles }} at end of string', () => {
@@ -99,7 +107,9 @@ describe('scanTemplateReferences', () => {
     });
 
     it('returns single reference with line 1', () => {
-      expect(scanTemplateReferences('{name}')).toEqual([{ name: 'name', line: 1 }]);
+      expect(scanTemplateReferences('{name}')).toEqual([
+        { name: 'name', line: 1 },
+      ]);
     });
 
     it('returns two references on the same line', () => {

@@ -5,7 +5,10 @@ import { createQdrantExtension } from '../src/factory.js';
 /**
  * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
  */
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -82,9 +85,24 @@ describe('createQdrantExtension', () => {
       // IR-1: upsert signature
       const upsert = getCallable(ext, 'upsert');
       expect(upsert.params).toEqual([
-        { name: 'id', type: { kind: 'string' }, defaultValue: undefined, annotations: {} },
-        { name: 'vector', type: { kind: 'vector' }, defaultValue: undefined, annotations: {} },
-        { name: 'metadata', type: { kind: 'dict' }, defaultValue: {}, annotations: {} },
+        {
+          name: 'id',
+          type: { kind: 'string' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        {
+          name: 'vector',
+          type: { kind: 'vector' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        {
+          name: 'metadata',
+          type: { kind: 'dict' },
+          defaultValue: {},
+          annotations: {},
+        },
       ]);
       expect(upsert.returnType).toBeDefined();
       expect(upsert.annotations?.['description']).toBe(
@@ -101,15 +119,30 @@ describe('createQdrantExtension', () => {
       // IR-3: search signature
       const search = getCallable(ext, 'search');
       expect(search.params).toEqual([
-        { name: 'vector', type: { kind: 'vector' }, defaultValue: undefined, annotations: {} },
-        { name: 'options', type: { kind: 'dict', fields: {
-          k: { type: { kind: 'number' }, defaultValue: 10 },
-          filter: { type: { kind: 'dict' }, defaultValue: {} },
-          score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
-        } }, defaultValue: {}, annotations: {} },
+        {
+          name: 'vector',
+          type: { kind: 'vector' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        {
+          name: 'options',
+          type: {
+            kind: 'dict',
+            fields: {
+              k: { type: { kind: 'number' }, defaultValue: 10 },
+              filter: { type: { kind: 'dict' }, defaultValue: {} },
+              score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
+            },
+          },
+          defaultValue: {},
+          annotations: {},
+        },
       ]);
       expect(search.returnType).toBeDefined();
-      expect(search.annotations?.['description']).toBe('Search k nearest neighbors');
+      expect(search.annotations?.['description']).toBe(
+        'Search k nearest neighbors'
+      );
     });
 
     it('creates functions with correct signatures (IR-7)', () => {

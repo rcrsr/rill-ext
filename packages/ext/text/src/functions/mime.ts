@@ -37,7 +37,7 @@ export function decodeQuotedPrintable(text: string): string {
       // If the byte sequence is not valid UTF-8, fall back to individual
       // Latin-1 character decoding so no data is lost.
       return run.replace(/=([0-9A-Fa-f]{2})/g, (_, hex: string) =>
-        String.fromCharCode(parseInt(hex, 16)),
+        String.fromCharCode(parseInt(hex, 16))
       );
     }
   });

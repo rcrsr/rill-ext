@@ -349,14 +349,18 @@ describe('createS3FsExtension', () => {
       expect(v.read.params.length).toBeGreaterThan(0);
       expect(v.read.fn).toBeTypeOf('function');
       expect(v.read.annotations?.['description']).toBeTypeOf('string');
-      expect(v.read.returnType).toEqual(structureToTypeValue({ kind: 'string' }));
+      expect(v.read.returnType).toEqual(
+        structureToTypeValue({ kind: 'string' })
+      );
 
       // Verify structure for write function
       expect(v.write.params).toBeDefined();
       expect(Array.isArray(v.write.params)).toBe(true);
       expect(v.write.fn).toBeTypeOf('function');
       expect(v.write.annotations?.['description']).toBeTypeOf('string');
-      expect(v.write.returnType).toEqual(structureToTypeValue({ kind: 'string' }));
+      expect(v.write.returnType).toEqual(
+        structureToTypeValue({ kind: 'string' })
+      );
 
       // Verify structure for mounts function (no params)
       expect(v.mounts.params).toBeDefined();
@@ -364,19 +368,21 @@ describe('createS3FsExtension', () => {
       expect(v.mounts.params.length).toBe(0);
       expect(v.mounts.fn).toBeTypeOf('function');
       expect(v.mounts.annotations?.['description']).toBeTypeOf('string');
-      expect(v.mounts.returnType).toEqual(structureToTypeValue({
-        kind: 'list',
-        element: {
-          kind: 'dict',
-          fields: {
-            name: { type: { kind: 'string' } },
-            mode: { type: { kind: 'string' } },
-            glob: { type: { kind: 'string' } },
-            bucket: { type: { kind: 'string' } },
-            prefix: { type: { kind: 'string' } },
+      expect(v.mounts.returnType).toEqual(
+        structureToTypeValue({
+          kind: 'list',
+          element: {
+            kind: 'dict',
+            fields: {
+              name: { type: { kind: 'string' } },
+              mode: { type: { kind: 'string' } },
+              glob: { type: { kind: 'string' } },
+              bucket: { type: { kind: 'string' } },
+              prefix: { type: { kind: 'string' } },
+            },
           },
-        },
-      }));
+        })
+      );
 
       ext.dispose?.();
     });

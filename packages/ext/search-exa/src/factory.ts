@@ -33,7 +33,6 @@ export function createExaExtension(
   config: ExaConfig,
   _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-
   try {
     assertRequired(config.apiKey, 'apiKey');
     if (config.baseUrl !== undefined) {
@@ -53,7 +52,11 @@ export function createExaExtension(
   const disposalState = createDisposalState();
   const inFlightState = createInFlightState();
 
-  const wrap = createSearchFunctionWrapper(PROVIDER, disposalState, inFlightState);
+  const wrap = createSearchFunctionWrapper(
+    PROVIDER,
+    disposalState,
+    inFlightState
+  );
 
   const authHeaders = {
     'Content-Type': 'application/json',
@@ -74,22 +77,39 @@ export function createExaExtension(
 
     const body: Record<string, unknown> = { query };
     if (options['type'] !== undefined) body['type'] = options['type'];
-    if (options['num_results'] !== undefined) body['numResults'] = options['num_results'];
-    if (options['include_text'] !== undefined) body['contents'] = { text: options['include_text'] };
+    if (options['num_results'] !== undefined)
+      body['numResults'] = options['num_results'];
+    if (options['include_text'] !== undefined)
+      body['contents'] = { text: options['include_text'] };
     if (options['include_highlights'] !== undefined) {
-      body['contents'] = { ...(body['contents'] as Record<string, unknown> ?? {}), highlights: options['include_highlights'] };
+      body['contents'] = {
+        ...((body['contents'] as Record<string, unknown>) ?? {}),
+        highlights: options['include_highlights'],
+      };
     }
     if (options['include_summary'] !== undefined) {
-      body['contents'] = { ...(body['contents'] as Record<string, unknown> ?? {}), summary: options['include_summary'] };
+      body['contents'] = {
+        ...((body['contents'] as Record<string, unknown>) ?? {}),
+        summary: options['include_summary'],
+      };
     }
-    if (options['category'] !== undefined) body['category'] = options['category'];
-    if (options['include_domains'] !== undefined) body['includeDomains'] = options['include_domains'];
-    if (options['exclude_domains'] !== undefined) body['excludeDomains'] = options['exclude_domains'];
-    if (options['start_published_date'] !== undefined) body['startPublishedDate'] = options['start_published_date'];
-    if (options['end_published_date'] !== undefined) body['endPublishedDate'] = options['end_published_date'];
-    if (options['max_age_hours'] !== undefined) body['maxAgeHours'] = options['max_age_hours'];
+    if (options['category'] !== undefined)
+      body['category'] = options['category'];
+    if (options['include_domains'] !== undefined)
+      body['includeDomains'] = options['include_domains'];
+    if (options['exclude_domains'] !== undefined)
+      body['excludeDomains'] = options['exclude_domains'];
+    if (options['start_published_date'] !== undefined)
+      body['startPublishedDate'] = options['start_published_date'];
+    if (options['end_published_date'] !== undefined)
+      body['endPublishedDate'] = options['end_published_date'];
+    if (options['max_age_hours'] !== undefined)
+      body['maxAgeHours'] = options['max_age_hours'];
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/search`, {
       method: 'POST',
       headers: authHeaders,
@@ -99,10 +119,15 @@ export function createExaExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       requestId?: string;
       results: unknown[];
     };
@@ -124,17 +149,27 @@ export function createExaExtension(
     const options = (args['options'] ?? {}) as Record<string, unknown>;
 
     const body: Record<string, unknown> = { urls };
-    const textOption = options['include_text'] !== undefined ? options['include_text'] : true;
+    const textOption =
+      options['include_text'] !== undefined ? options['include_text'] : true;
     body['contents'] = { text: textOption };
 
     if (options['include_highlights'] !== undefined) {
-      body['contents'] = { ...(body['contents'] as Record<string, unknown>), highlights: options['include_highlights'] };
+      body['contents'] = {
+        ...(body['contents'] as Record<string, unknown>),
+        highlights: options['include_highlights'],
+      };
     }
     if (options['include_summary'] !== undefined) {
-      body['contents'] = { ...(body['contents'] as Record<string, unknown>), summary: options['include_summary'] };
+      body['contents'] = {
+        ...(body['contents'] as Record<string, unknown>),
+        summary: options['include_summary'],
+      };
     }
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/contents`, {
       method: 'POST',
       headers: authHeaders,
@@ -144,10 +179,15 @@ export function createExaExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       results: unknown[];
       statuses?: unknown[];
     };
@@ -155,7 +195,8 @@ export function createExaExtension(
     const result: Record<string, RillValue> = {
       results: data.results as RillValue,
     };
-    if (data.statuses !== undefined) result['statuses'] = data.statuses as RillValue;
+    if (data.statuses !== undefined)
+      result['statuses'] = data.statuses as RillValue;
 
     return {
       result: result as RillValue,
@@ -169,16 +210,27 @@ export function createExaExtension(
     const options = (args['options'] ?? {}) as Record<string, unknown>;
 
     const body: Record<string, unknown> = { url };
-    if (options['num_results'] !== undefined) body['numResults'] = options['num_results'];
-    if (options['exclude_source_domain'] !== undefined) body['excludeSourceDomain'] = options['exclude_source_domain'];
-    if (options['include_domains'] !== undefined) body['includeDomains'] = options['include_domains'];
-    if (options['exclude_domains'] !== undefined) body['excludeDomains'] = options['exclude_domains'];
-    if (options['include_text'] !== undefined) body['contents'] = { text: options['include_text'] };
+    if (options['num_results'] !== undefined)
+      body['numResults'] = options['num_results'];
+    if (options['exclude_source_domain'] !== undefined)
+      body['excludeSourceDomain'] = options['exclude_source_domain'];
+    if (options['include_domains'] !== undefined)
+      body['includeDomains'] = options['include_domains'];
+    if (options['exclude_domains'] !== undefined)
+      body['excludeDomains'] = options['exclude_domains'];
+    if (options['include_text'] !== undefined)
+      body['contents'] = { text: options['include_text'] };
     if (options['include_highlights'] !== undefined) {
-      body['contents'] = { ...(body['contents'] as Record<string, unknown> ?? {}), highlights: options['include_highlights'] };
+      body['contents'] = {
+        ...((body['contents'] as Record<string, unknown>) ?? {}),
+        highlights: options['include_highlights'],
+      };
     }
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/findSimilar`, {
       method: 'POST',
       headers: authHeaders,
@@ -188,10 +240,15 @@ export function createExaExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       requestId?: string;
       results: unknown[];
     };
@@ -224,9 +281,13 @@ export function createExaExtension(
     if (options['include_text'] !== undefined) {
       body['contents'] = { text: options['include_text'] };
     }
-    if (options['num_results'] !== undefined) body['numResults'] = options['num_results'];
+    if (options['num_results'] !== undefined)
+      body['numResults'] = options['num_results'];
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/answer`, {
       method: 'POST',
       headers: authHeaders,
@@ -236,10 +297,15 @@ export function createExaExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       answer: string;
       citations: unknown[];
     };
@@ -270,21 +336,24 @@ export function createExaExtension(
   const SEARCH_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      results:    { type: { kind: 'list', element: { kind: 'any' } } },
-      request_id: { type: { kind: 'string' }, defaultValue: '' },  // optional: present when API returns requestId
+      results: { type: { kind: 'list', element: { kind: 'any' } } },
+      request_id: { type: { kind: 'string' }, defaultValue: '' }, // optional: present when API returns requestId
     },
   });
   const CONTENTS_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      results:  { type: { kind: 'list', element: { kind: 'any' } } },
-      statuses: { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional: present when API returns statuses
+      results: { type: { kind: 'list', element: { kind: 'any' } } },
+      statuses: {
+        type: { kind: 'list', element: { kind: 'any' } },
+        defaultValue: [],
+      }, // optional: present when API returns statuses
     },
   });
   const ANSWER_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      answer:    { type: { kind: 'string' } },
+      answer: { type: { kind: 'string' } },
       citations: { type: { kind: 'list', element: { kind: 'any' } } },
     },
   });
@@ -298,7 +367,12 @@ export function createExaExtension(
     contents: toCallable({
       fn: contents as CallableFn,
       params: [
-        { name: 'urls', type: { kind: 'tuple' as const }, defaultValue: undefined, annotations: {} },
+        {
+          name: 'urls',
+          type: { kind: 'tuple' as const },
+          defaultValue: undefined,
+          annotations: {},
+        },
         p.dict('options', undefined, {}),
       ],
       returnType: CONTENTS_RT,

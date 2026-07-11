@@ -38,7 +38,7 @@ export interface TokenExchangeResult {
 export async function exchangeJwtForToken(
   ctx: RuntimeContext,
   assertion: string,
-  signal: AbortSignal,
+  signal: AbortSignal
 ): Promise<TokenExchangeResult> {
   const body = new URLSearchParams({
     grant_type: JWT_BEARER_GRANT_TYPE,
@@ -57,11 +57,14 @@ export async function exchangeJwtForToken(
       ctx,
       'token_refresh_failed',
       `google: token exchange failed: ${response.status}`,
-      { status: response.status },
+      { status: response.status }
     );
   }
 
-  const json = (await response.json()) as { access_token: string; expires_in: number };
+  const json = (await response.json()) as {
+    access_token: string;
+    expires_in: number;
+  };
   return {
     accessToken: json.access_token,
     expiresIn: json.expires_in,
@@ -75,7 +78,7 @@ export async function exchangeJwtForToken(
 export async function exchangeJwtForAccessToken(
   ctx: RuntimeContext,
   assertion: string,
-  signal: AbortSignal,
+  signal: AbortSignal
 ): Promise<string> {
   const result = await exchangeJwtForToken(ctx, assertion, signal);
   return result.accessToken;
@@ -98,7 +101,7 @@ export async function exchangeRefreshToken(
   clientSecret: string,
   refreshToken: string,
   ctx: RuntimeContext,
-  signal: AbortSignal,
+  signal: AbortSignal
 ): Promise<TokenExchangeResult> {
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -119,11 +122,14 @@ export async function exchangeRefreshToken(
       ctx,
       'token_refresh_failed',
       `google: token exchange failed: ${response.status}`,
-      { status: response.status },
+      { status: response.status }
     );
   }
 
-  const json = (await response.json()) as { access_token: string; expires_in: number };
+  const json = (await response.json()) as {
+    access_token: string;
+    expires_in: number;
+  };
   return {
     accessToken: json.access_token,
     expiresIn: json.expires_in,

@@ -4,7 +4,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, RuntimeError, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  RuntimeError,
+  isInvalid,
+  getStatus,
+  type RillValue,
+} from '@rcrsr/rill';
 
 // Mock auth/resolve so resolveToken is controllable without real JWT
 vi.mock('../src/auth/resolve.js', () => ({
@@ -55,12 +61,16 @@ describe('HTTPS enforcement', () => {
         ctx,
         controller,
         makeCache(),
-        SCOPES,
+        SCOPES
       );
-    } catch (e) { caught = e; }
+    } catch (e) {
+      caught = e;
+    }
     expect(isInvalid(caught as RillValue)).toBe(true);
     expect(getStatus(caught as RillValue).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught as RillValue).message).toBe('google: baseUrl must be HTTPS');
+    expect(getStatus(caught as RillValue).message).toBe(
+      'google: baseUrl must be HTTPS'
+    );
     expect(mockResolveToken).not.toHaveBeenCalled();
   });
 
@@ -77,7 +87,18 @@ describe('HTTPS enforcement', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     await expect(
-      googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES)
+      googleFetch(
+        'GET',
+        BASE_URL,
+        PATH,
+        'gmail',
+        'read',
+        BEARER_AUTH,
+        ctx,
+        controller,
+        makeCache(),
+        SCOPES
+      )
     ).resolves.not.toThrow();
 
     vi.unstubAllGlobals();
@@ -101,7 +122,18 @@ describe('token resolution', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, cache, SCOPES);
+    await googleFetch(
+      'GET',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'read',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      cache,
+      SCOPES
+    );
 
     expect(mockResolveToken).toHaveBeenCalledOnce();
     const [calledAuth, calledCtx, calledCache, calledScopes, calledSignal] =
@@ -126,10 +158,23 @@ describe('token resolution', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
+    await googleFetch(
+      'GET',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'read',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES
+    );
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    const authHeader = (init.headers as Record<string, string>)['Authorization'];
+    const authHeader = (init.headers as Record<string, string>)[
+      'Authorization'
+    ];
     expect(authHeader).toBe('Bearer resolved-token');
 
     vi.unstubAllGlobals();
@@ -152,7 +197,18 @@ describe('request construction', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
+    await googleFetch(
+      'GET',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'read',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES
+    );
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`${BASE_URL}${PATH}`);
@@ -171,10 +227,24 @@ describe('request construction', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    await googleFetch('POST', BASE_URL, PATH, 'gmail', 'send', BEARER_AUTH, ctx, controller, makeCache(), SCOPES, { subject: 'hello' });
+    await googleFetch(
+      'POST',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'send',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES,
+      { subject: 'hello' }
+    );
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+      'application/json'
+    );
     expect(init.body).toBe(JSON.stringify({ subject: 'hello' }));
 
     vi.unstubAllGlobals();
@@ -191,10 +261,23 @@ describe('request construction', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
+    await googleFetch(
+      'GET',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'read',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES
+    );
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+    expect(
+      (init.headers as Record<string, string>)['Content-Type']
+    ).toBeUndefined();
     expect(init.body).toBeUndefined();
 
     vi.unstubAllGlobals();
@@ -212,8 +295,18 @@ describe('request construction', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     await googleFetch(
-      'GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller,
-      makeCache(), SCOPES, undefined, { 'X-Goog-FieldMask': 'id,name' }
+      'GET',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'read',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES,
+      undefined,
+      { 'X-Goog-FieldMask': 'id,name' }
     );
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -241,7 +334,18 @@ describe('response handling', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    const result = await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
+    const result = await googleFetch(
+      'GET',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'read',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES
+    );
     expect(result).toEqual({ messages: [] });
 
     vi.unstubAllGlobals();
@@ -254,7 +358,18 @@ describe('response handling', () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 204 });
     vi.stubGlobal('fetch', mockFetch);
 
-    const result = await googleFetch('DELETE', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
+    const result = await googleFetch(
+      'DELETE',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'read',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES
+    );
     expect(result).toBeNull();
 
     vi.unstubAllGlobals();
@@ -267,7 +382,19 @@ describe('response handling', () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 202 });
     vi.stubGlobal('fetch', mockFetch);
 
-    const result = await googleFetch('POST', BASE_URL, PATH, 'gmail', 'send', BEARER_AUTH, ctx, controller, makeCache(), SCOPES, {});
+    const result = await googleFetch(
+      'POST',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'send',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES,
+      {}
+    );
     expect(result).toBeNull();
 
     vi.unstubAllGlobals();
@@ -283,16 +410,34 @@ describe('HTTP error mapping', () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 401 })
+    );
 
     let caught: unknown;
     try {
-      await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
-    } catch (e) { caught = e; }
+      await googleFetch(
+        'GET',
+        BASE_URL,
+        PATH,
+        'gmail',
+        'read',
+        BEARER_AUTH,
+        ctx,
+        controller,
+        makeCache(),
+        SCOPES
+      );
+    } catch (e) {
+      caught = e;
+    }
 
     expect(isInvalid(caught as RillValue)).toBe(true);
     expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
-    expect(getStatus(caught as RillValue).message).toBe('google: invalid Gmail token');
+    expect(getStatus(caught as RillValue).message).toBe(
+      'google: invalid Gmail token'
+    );
 
     vi.unstubAllGlobals();
   });
@@ -301,14 +446,32 @@ describe('HTTP error mapping', () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 403 })
+    );
 
     let caught: unknown;
     try {
-      await googleFetch('POST', BASE_URL, '/send', 'gmail', 'send', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
-    } catch (e) { caught = e; }
+      await googleFetch(
+        'POST',
+        BASE_URL,
+        '/send',
+        'gmail',
+        'send',
+        BEARER_AUTH,
+        ctx,
+        controller,
+        makeCache(),
+        SCOPES
+      );
+    } catch (e) {
+      caught = e;
+    }
 
-    expect(getStatus(caught).message).toBe('google: insufficient Gmail scopes for send');
+    expect(getStatus(caught).message).toBe(
+      'google: insufficient Gmail scopes for send'
+    );
 
     vi.unstubAllGlobals();
   });
@@ -317,17 +480,35 @@ describe('HTTP error mapping', () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404 })
+    );
 
     let caught: unknown;
     try {
       await googleFetch(
-        'GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller,
-        makeCache(), SCOPES, undefined, undefined, 'msg-abc'
+        'GET',
+        BASE_URL,
+        PATH,
+        'gmail',
+        'read',
+        BEARER_AUTH,
+        ctx,
+        controller,
+        makeCache(),
+        SCOPES,
+        undefined,
+        undefined,
+        'msg-abc'
       );
-    } catch (e) { caught = e; }
+    } catch (e) {
+      caught = e;
+    }
 
-    expect(getStatus(caught).message).toBe("google: Gmail resource 'msg-abc' not found");
+    expect(getStatus(caught).message).toBe(
+      "google: Gmail resource 'msg-abc' not found"
+    );
 
     vi.unstubAllGlobals();
   });
@@ -336,14 +517,32 @@ describe('HTTP error mapping', () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429 }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 429 })
+    );
 
     let caught: unknown;
     try {
-      await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
-    } catch (e) { caught = e; }
+      await googleFetch(
+        'GET',
+        BASE_URL,
+        PATH,
+        'gmail',
+        'read',
+        BEARER_AUTH,
+        ctx,
+        controller,
+        makeCache(),
+        SCOPES
+      );
+    } catch (e) {
+      caught = e;
+    }
 
-    expect(getStatus(caught).message).toBe('google: rate limit exceeded; retry after delay');
+    expect(getStatus(caught).message).toBe(
+      'google: rate limit exceeded; retry after delay'
+    );
 
     vi.unstubAllGlobals();
   });
@@ -352,14 +551,32 @@ describe('HTTP error mapping', () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 500 })
+    );
 
     let caught: unknown;
     try {
-      await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
-    } catch (e) { caught = e; }
+      await googleFetch(
+        'GET',
+        BASE_URL,
+        PATH,
+        'gmail',
+        'read',
+        BEARER_AUTH,
+        ctx,
+        controller,
+        makeCache(),
+        SCOPES
+      );
+    } catch (e) {
+      caught = e;
+    }
 
-    expect(getStatus(caught).message).toBe('google: Gmail server error (500); temporarily unavailable');
+    expect(getStatus(caught).message).toBe(
+      'google: Gmail server error (500); temporarily unavailable'
+    );
 
     vi.unstubAllGlobals();
   });
@@ -380,12 +597,27 @@ describe('network and abort error mapping', () => {
 
     let caught: unknown;
     try {
-      await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
-    } catch (e) { caught = e; }
+      await googleFetch(
+        'GET',
+        BASE_URL,
+        PATH,
+        'gmail',
+        'read',
+        BEARER_AUTH,
+        ctx,
+        controller,
+        makeCache(),
+        SCOPES
+      );
+    } catch (e) {
+      caught = e;
+    }
 
     expect(isInvalid(caught as RillValue)).toBe(true);
     expect(getStatus(caught as RillValue).code.name).toBe('TIMEOUT');
-    expect(getStatus(caught as RillValue).message).toBe('google: request timeout');
+    expect(getStatus(caught as RillValue).message).toBe(
+      'google: request timeout'
+    );
 
     vi.unstubAllGlobals();
   });
@@ -394,12 +626,28 @@ describe('network and abort error mapping', () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    );
 
     let caught: unknown;
     try {
-      await googleFetch('GET', BASE_URL, PATH, 'gmail', 'read', BEARER_AUTH, ctx, controller, makeCache(), SCOPES);
-    } catch (e) { caught = e; }
+      await googleFetch(
+        'GET',
+        BASE_URL,
+        PATH,
+        'gmail',
+        'read',
+        BEARER_AUTH,
+        ctx,
+        controller,
+        makeCache(),
+        SCOPES
+      );
+    } catch (e) {
+      caught = e;
+    }
 
     expect(getStatus(caught).message).toBe('google: gmail connection failed');
 

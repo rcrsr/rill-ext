@@ -149,7 +149,11 @@ describe('barrel type exports', () => {
   });
 
   it('ImageSource type is constructible', () => {
-    const src: ImageSource = { kind: 'url', data: 'https://example.com/img.png', media_type: 'image/png' };
+    const src: ImageSource = {
+      kind: 'url',
+      data: 'https://example.com/img.png',
+      media_type: 'image/png',
+    };
     expect(src.kind).toBe('url');
   });
 });
@@ -178,15 +182,13 @@ describe('validateMessages migration path', () => {
   });
 
   it('throws for message missing both parts and content', () => {
-    expect(() =>
-      validateMessages([{ role: 'user' }])
-    ).toThrow("parts' or 'content'");
+    expect(() => validateMessages([{ role: 'user' }])).toThrow(
+      "parts' or 'content'"
+    );
   });
 
   it('throws for message missing role', () => {
-    expect(() =>
-      validateMessages([{ content: 'hello' }])
-    ).toThrow("role");
+    expect(() => validateMessages([{ content: 'hello' }])).toThrow('role');
   });
 });
 
@@ -205,10 +207,7 @@ describe('normalizePrompt via barrel', () => {
   });
 
   it('normalizes a list of content-sugar messages', () => {
-    const result = normalizePrompt(
-      [{ role: 'user', content: 'hi' }],
-      ctx,
-    );
+    const result = normalizePrompt([{ role: 'user', content: 'hi' }], ctx);
     expect(Array.isArray(result)).toBe(true);
   });
 });

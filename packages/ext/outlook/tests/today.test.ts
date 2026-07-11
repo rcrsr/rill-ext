@@ -12,7 +12,10 @@ import { createOutlookExtension } from '../src/factory.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -64,7 +67,10 @@ describe('today() host function', () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const result = (await getCallable(ext, 'today').fn({}, ctx)) as Record<string, unknown>;
+    const result = (await getCallable(ext, 'today').fn({}, ctx)) as Record<
+      string,
+      unknown
+    >;
 
     expect(Array.isArray(result['events'])).toBe(true);
     const eventsArr = result['events'] as Record<string, unknown>[];
@@ -72,7 +78,9 @@ describe('today() host function', () => {
     expect(eventsArr[0]!['id']).toBe('today-event-001');
     expect(eventsArr[0]!['title']).toBe('Daily Sync');
     expect(eventsArr[0]!['is_online']).toBe(true);
-    expect(eventsArr[0]!['online_url']).toBe('https://teams.microsoft.com/join/abc');
+    expect(eventsArr[0]!['online_url']).toBe(
+      'https://teams.microsoft.com/join/abc'
+    );
   });
 
   // AC-11: returns empty list when no events today
@@ -85,7 +93,10 @@ describe('today() host function', () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const result = (await getCallable(ext, 'today').fn({}, ctx)) as Record<string, unknown>;
+    const result = (await getCallable(ext, 'today').fn({}, ctx)) as Record<
+      string,
+      unknown
+    >;
 
     expect(result['events']).toEqual([]);
   });

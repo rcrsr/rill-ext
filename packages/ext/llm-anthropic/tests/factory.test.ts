@@ -184,7 +184,14 @@ describe('createAnthropicExtension', () => {
       const value = result.value as Record<string, Record<string, unknown>>;
 
       expect(value['embed']).toMatchObject({
-        params: [{ name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} }],
+        params: [
+          {
+            name: 'text',
+            type: { kind: 'string' },
+            defaultValue: undefined,
+            annotations: {},
+          },
+        ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
       });
@@ -200,7 +207,14 @@ describe('createAnthropicExtension', () => {
       const value = result.value as Record<string, Record<string, unknown>>;
 
       expect(value['embed_batch']).toMatchObject({
-        params: [{ name: 'texts', type: { kind: 'list' }, defaultValue: undefined, annotations: {} }],
+        params: [
+          {
+            name: 'texts',
+            type: { kind: 'list' },
+            defaultValue: undefined,
+            annotations: {},
+          },
+        ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
       });
@@ -219,7 +233,11 @@ describe('createAnthropicExtension', () => {
       expect(value['tool_loop']).toMatchObject({
         params: [
           { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined },
-          { name: 'tools', type: { kind: 'dict', valueType: { kind: 'closure' } }, defaultValue: undefined },
+          {
+            name: 'tools',
+            type: { kind: 'dict', valueType: { kind: 'closure' } },
+            defaultValue: undefined,
+          },
           { name: 'max_turns', type: { kind: 'number' }, defaultValue: 0 },
         ],
         fn: expect.any(Function),

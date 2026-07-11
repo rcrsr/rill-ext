@@ -11,9 +11,18 @@ const repoRoot = path.resolve(currentDir, '../../..');
 export default defineConfig({
   resolve: {
     alias: {
-      '@rcrsr/rill-ext-anthropic': path.join(repoRoot, 'packages/ext/llm-anthropic/src/index.ts'),
-      '@rcrsr/rill-ext-openai': path.join(repoRoot, 'packages/ext/llm-openai/src/index.ts'),
-      '@rcrsr/rill-ext-gemini': path.join(repoRoot, 'packages/ext/llm-gemini/src/index.ts'),
+      '@rcrsr/rill-ext-anthropic': path.join(
+        repoRoot,
+        'packages/ext/llm-anthropic/src/index.ts'
+      ),
+      '@rcrsr/rill-ext-openai': path.join(
+        repoRoot,
+        'packages/ext/llm-openai/src/index.ts'
+      ),
+      '@rcrsr/rill-ext-gemini': path.join(
+        repoRoot,
+        'packages/ext/llm-gemini/src/index.ts'
+      ),
     },
   },
   test: {

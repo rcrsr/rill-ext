@@ -84,7 +84,12 @@ export async function googleFetch(
 
   const init =
     body !== undefined
-      ? { method, headers: requestHeaders, signal: combinedSignal, body: JSON.stringify(body) }
+      ? {
+          method,
+          headers: requestHeaders,
+          signal: combinedSignal,
+          body: JSON.stringify(body),
+        }
       : { method, headers: requestHeaders, signal: combinedSignal };
 
   let response: Response;
@@ -100,7 +105,7 @@ export async function googleFetch(
       response.status,
       service,
       operation,
-      resourceId,
+      resourceId
     ) as unknown as RillValue;
   }
 

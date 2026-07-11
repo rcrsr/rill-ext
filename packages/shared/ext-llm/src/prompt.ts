@@ -45,19 +45,19 @@ import {
 export type Role = 'system' | 'user' | 'assistant';
 
 /** Text content part — used in all roles. */
-export interface TextPart {
+interface TextPart {
   type: 'text';
   text: string;
 }
 
 /** Thinking content part — assistant-only on output. */
-export interface ThinkingPart {
+interface ThinkingPart {
   type: 'thinking';
   text: string;
 }
 
 /** Tool invocation — assistant-only. */
-export interface ToolUsePart {
+interface ToolUsePart {
   type: 'tool_use';
   id: string;
   name: string;
@@ -65,7 +65,7 @@ export interface ToolUsePart {
 }
 
 /** Tool result — user-only. */
-export interface ToolResultPart {
+interface ToolResultPart {
   type: 'tool_result';
   id: string;
   name?: string;
@@ -80,13 +80,18 @@ export interface ImageSource {
 }
 
 /** Image content part — user input only in v1. */
-export interface ImagePart {
+interface ImagePart {
   type: 'image';
   source: ImageSource;
 }
 
 /** Discriminated union of all part variants. */
-export type Part = TextPart | ThinkingPart | ToolUsePart | ToolResultPart | ImagePart;
+export type Part =
+  | TextPart
+  | ThinkingPart
+  | ToolUsePart
+  | ToolResultPart
+  | ImagePart;
 
 /** Canonical message — always parts-shaped. */
 export interface Message {
@@ -95,16 +100,18 @@ export interface Message {
 }
 
 /** Input message — either canonical or content-sugar form. */
-export type MessageInput =
-  | Message
-  | { role: Role; content: string };
+export type MessageInput = Message | { role: Role; content: string };
 
 // ============================================================
 // CONSTANTS
 // ============================================================
 
 /** Valid role names at the boundary. */
-const VALID_ROLES: ReadonlySet<string> = new Set(['system', 'user', 'assistant']);
+const VALID_ROLES: ReadonlySet<string> = new Set([
+  'system',
+  'user',
+  'assistant',
+]);
 
 /** Valid part types in v1. */
 const VALID_PART_TYPES: ReadonlySet<string> = new Set([
@@ -207,7 +214,9 @@ export const MESSAGES_LIST_STRUCTURE: TypeStructure = {
  * `messages`) is declared separately per factory. This constant
  * represents only the `messages` list element of that wrapper.
  */
-export const MESSAGES_RETURN_TYPE = structureToTypeValue(MESSAGES_LIST_STRUCTURE);
+export const MESSAGES_RETURN_TYPE = structureToTypeValue(
+  MESSAGES_LIST_STRUCTURE
+);
 
 // ============================================================
 // IR-5: expandContentSugar
@@ -222,7 +231,7 @@ export const MESSAGES_RETURN_TYPE = structureToTypeValue(MESSAGES_LIST_STRUCTURE
  * @returns Array of Message objects in canonical parts form
  */
 export function expandContentSugar(
-  messages: Array<Record<string, RillValue>>,
+  messages: Array<Record<string, RillValue>>
 ): Array<Record<string, RillValue>> {
   return messages.map((msg) => {
     // Already parts-shaped — pass through
@@ -257,30 +266,24 @@ export function expandContentSugar(
  */
 export function assertBoundaryRoles(
   messages: Array<Record<string, RillValue>>,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): RillValue | undefined {
   for (const msg of messages) {
     if (!('role' in msg) || msg['role'] === undefined || msg['role'] === null) {
-      return ctx.invalidate(
-        new Error('message missing required role field'),
-        {
-          code: 'INVALID_INPUT',
-          provider: '',
-          raw: { kind: 'invalid_message_format' },
-        },
-      );
+      return ctx.invalidate(new Error('message missing required role field'), {
+        code: 'INVALID_INPUT',
+        provider: '',
+        raw: { kind: 'invalid_message_format' },
+      });
     }
 
     const role = msg['role'];
     if (typeof role !== 'string' || !VALID_ROLES.has(role)) {
-      return ctx.invalidate(
-        new Error(`invalid role '${String(role)}'`),
-        {
-          code: 'INVALID_INPUT',
-          provider: '',
-          raw: { kind: 'invalid_role', role: String(role) },
-        },
-      );
+      return ctx.invalidate(new Error(`invalid role '${String(role)}'`), {
+        code: 'INVALID_INPUT',
+        provider: '',
+        raw: { kind: 'invalid_role', role: String(role) },
+      });
     }
   }
   return undefined;
@@ -301,7 +304,7 @@ export function assertBoundaryRoles(
  */
 export function assertNoTrailingAssistant(
   messages: Array<Record<string, RillValue>>,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): RillValue | undefined {
   const last = messages[messages.length - 1];
   if (last && last['role'] === 'assistant') {
@@ -311,7 +314,7 @@ export function assertNoTrailingAssistant(
         code: 'INVALID_INPUT',
         provider: '',
         raw: { kind: 'trailing_assistant_turn' },
-      },
+      }
     );
   }
   return undefined;
@@ -335,7 +338,7 @@ export function assertNoTrailingAssistant(
  */
 export function assertPartTypes(
   messages: Array<Record<string, RillValue>>,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): RillValue | undefined {
   for (const msg of messages) {
     const parts = msg['parts'];
@@ -344,15 +347,16 @@ export function assertPartTypes(
     }
 
     for (const rawPart of parts) {
-      if (typeof rawPart !== 'object' || rawPart === null || Array.isArray(rawPart)) {
-        return ctx.invalidate(
-          new Error('part must be a dict'),
-          {
-            code: 'INVALID_INPUT',
-            provider: '',
-            raw: { kind: 'invalid_part_shape' },
-          },
-        );
+      if (
+        typeof rawPart !== 'object' ||
+        rawPart === null ||
+        Array.isArray(rawPart)
+      ) {
+        return ctx.invalidate(new Error('part must be a dict'), {
+          code: 'INVALID_INPUT',
+          provider: '',
+          raw: { kind: 'invalid_part_shape' },
+        });
       }
 
       const part = rawPart as Record<string, RillValue>;
@@ -365,7 +369,7 @@ export function assertPartTypes(
             code: 'INVALID_INPUT',
             provider: '',
             raw: { kind: 'unsupported_part_type', type: String(partType) },
-          },
+          }
         );
       }
 
@@ -386,7 +390,7 @@ export function assertPartTypes(
 function validatePartShape(
   part: Record<string, RillValue>,
   partType: string,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): RillValue | undefined {
   switch (partType) {
     case 'text':
@@ -397,8 +401,12 @@ function validatePartShape(
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'invalid_part_shape', part_type: partType, missing_field: 'text' },
-          },
+            raw: {
+              kind: 'invalid_part_shape',
+              part_type: partType,
+              missing_field: 'text',
+            },
+          }
         );
       }
       return undefined;
@@ -411,8 +419,12 @@ function validatePartShape(
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'invalid_part_shape', part_type: 'tool_use', missing_field: 'id' },
-          },
+            raw: {
+              kind: 'invalid_part_shape',
+              part_type: 'tool_use',
+              missing_field: 'id',
+            },
+          }
         );
       }
       if (typeof part['name'] !== 'string') {
@@ -421,8 +433,12 @@ function validatePartShape(
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'invalid_part_shape', part_type: 'tool_use', missing_field: 'name' },
-          },
+            raw: {
+              kind: 'invalid_part_shape',
+              part_type: 'tool_use',
+              missing_field: 'name',
+            },
+          }
         );
       }
       if (
@@ -435,8 +451,12 @@ function validatePartShape(
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'invalid_part_shape', part_type: 'tool_use', missing_field: 'input' },
-          },
+            raw: {
+              kind: 'invalid_part_shape',
+              part_type: 'tool_use',
+              missing_field: 'input',
+            },
+          }
         );
       }
       return undefined;
@@ -449,8 +469,12 @@ function validatePartShape(
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'invalid_part_shape', part_type: 'tool_result', missing_field: 'id' },
-          },
+            raw: {
+              kind: 'invalid_part_shape',
+              part_type: 'tool_result',
+              missing_field: 'id',
+            },
+          }
         );
       }
       if (!Array.isArray(part['parts'])) {
@@ -459,8 +483,12 @@ function validatePartShape(
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'invalid_part_shape', part_type: 'tool_result', missing_field: 'parts' },
-          },
+            raw: {
+              kind: 'invalid_part_shape',
+              part_type: 'tool_result',
+              missing_field: 'parts',
+            },
+          }
         );
       }
       return undefined;
@@ -478,8 +506,12 @@ function validatePartShape(
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'invalid_part_shape', part_type: 'image', missing_field: 'source' },
-          },
+            raw: {
+              kind: 'invalid_part_shape',
+              part_type: 'image',
+              missing_field: 'source',
+            },
+          }
         );
       }
       const src = source as Record<string, RillValue>;
@@ -491,7 +523,7 @@ function validatePartShape(
             code: 'INVALID_INPUT',
             provider: '',
             raw: { kind: 'invalid_image_source', source_kind: String(srcKind) },
-          },
+          }
         );
       }
       return undefined;
@@ -522,7 +554,7 @@ function validatePartShape(
  */
 export function normalizePrompt(
   rawPrompt: RillValue,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): Array<Message> | RillValue {
   // EC-10: Prompt is neither string nor list
   if (typeof rawPrompt !== 'string' && !Array.isArray(rawPrompt)) {
@@ -532,7 +564,7 @@ export function normalizePrompt(
         code: 'INVALID_INPUT',
         provider: '',
         raw: { kind: 'invalid_prompt_type' },
-      },
+      }
     );
   }
 
@@ -540,14 +572,11 @@ export function normalizePrompt(
   if (typeof rawPrompt === 'string') {
     // EC-1: Empty string
     if (rawPrompt.trim().length === 0) {
-      return ctx.invalidate(
-        new Error('prompt string cannot be empty'),
-        {
-          code: 'INVALID_INPUT',
-          provider: '',
-          raw: { kind: 'empty_prompt' },
-        },
-      );
+      return ctx.invalidate(new Error('prompt string cannot be empty'), {
+        code: 'INVALID_INPUT',
+        provider: '',
+        raw: { kind: 'empty_prompt' },
+      });
     }
 
     return [
@@ -563,42 +592,33 @@ export function normalizePrompt(
 
   // EC-2: Empty list
   if (list.length === 0) {
-    return ctx.invalidate(
-      new Error('message list cannot be empty'),
-      {
-        code: 'INVALID_INPUT',
-        provider: '',
-        raw: { kind: 'empty_message_list' },
-      },
-    );
+    return ctx.invalidate(new Error('message list cannot be empty'), {
+      code: 'INVALID_INPUT',
+      provider: '',
+      raw: { kind: 'empty_message_list' },
+    });
   }
 
   // Validate each item is a dict, then check for role and content/parts
   const rawMessages: Array<Record<string, RillValue>> = [];
   for (const item of list) {
     if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-      return ctx.invalidate(
-        new Error('each message must be a dict'),
-        {
-          code: 'INVALID_INPUT',
-          provider: '',
-          raw: { kind: 'invalid_message_format' },
-        },
-      );
+      return ctx.invalidate(new Error('each message must be a dict'), {
+        code: 'INVALID_INPUT',
+        provider: '',
+        raw: { kind: 'invalid_message_format' },
+      });
     }
 
     const msg = item as Record<string, RillValue>;
 
     // EC-3: Message missing role
     if (!('role' in msg) || msg['role'] === undefined || msg['role'] === null) {
-      return ctx.invalidate(
-        new Error('message missing required role field'),
-        {
-          code: 'INVALID_INPUT',
-          provider: '',
-          raw: { kind: 'invalid_message_format' },
-        },
-      );
+      return ctx.invalidate(new Error('message missing required role field'), {
+        code: 'INVALID_INPUT',
+        provider: '',
+        raw: { kind: 'invalid_message_format' },
+      });
     }
 
     // EC-6: Message has neither parts nor content
@@ -609,7 +629,7 @@ export function normalizePrompt(
           code: 'INVALID_INPUT',
           provider: '',
           raw: { kind: 'missing_message_content' },
-        },
+        }
       );
     }
 

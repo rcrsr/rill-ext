@@ -17,7 +17,10 @@ function mk(config: CryptoExtensionConfig = {}) {
 describe('hash()', () => {
   it('hashes content with default algorithm (sha256)', async () => {
     const ext = mk({ defaultAlgorithm: 'sha256' });
-    const result = await ext.value.hash.fn({ input: 'hello world' }, makeRuntimeCtx());
+    const result = await ext.value.hash.fn(
+      { input: 'hello world' },
+      makeRuntimeCtx()
+    );
 
     expect(typeof result).toBe('string');
     expect(result).toMatch(/^[0-9a-f]+$/);
@@ -26,10 +29,13 @@ describe('hash()', () => {
 
   it('hashes content with explicit algorithm', async () => {
     const ext = mk();
-    const result = await ext.value.hash.fn({
-      input: 'hello world',
-      algorithm: 'md5',
-    }, makeRuntimeCtx());
+    const result = await ext.value.hash.fn(
+      {
+        input: 'hello world',
+        algorithm: 'md5',
+      },
+      makeRuntimeCtx()
+    );
 
     expect(result).toMatch(/^[0-9a-f]+$/);
     expect(result).toHaveLength(32);
@@ -37,21 +43,36 @@ describe('hash()', () => {
 
   it('produces consistent output for same input', async () => {
     const ext = mk();
-    const r1 = await ext.value.hash.fn({ input: 'test', algorithm: 'sha256' }, makeRuntimeCtx());
-    const r2 = await ext.value.hash.fn({ input: 'test', algorithm: 'sha256' }, makeRuntimeCtx());
+    const r1 = await ext.value.hash.fn(
+      { input: 'test', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
+    const r2 = await ext.value.hash.fn(
+      { input: 'test', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
     expect(r1).toBe(r2);
   });
 
   it('produces different output for different input', async () => {
     const ext = mk();
-    const r1 = await ext.value.hash.fn({ input: 'input1', algorithm: 'sha256' }, makeRuntimeCtx());
-    const r2 = await ext.value.hash.fn({ input: 'input2', algorithm: 'sha256' }, makeRuntimeCtx());
+    const r1 = await ext.value.hash.fn(
+      { input: 'input1', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
+    const r2 = await ext.value.hash.fn(
+      { input: 'input2', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
     expect(r1).not.toBe(r2);
   });
 
   it('supports sha512 algorithm', async () => {
     const ext = mk();
-    const result = await ext.value.hash.fn({ input: 'test', algorithm: 'sha512' }, makeRuntimeCtx());
+    const result = await ext.value.hash.fn(
+      { input: 'test', algorithm: 'sha512' },
+      makeRuntimeCtx()
+    );
     expect(result).toMatch(/^[0-9a-f]{128}$/);
   });
 
@@ -59,7 +80,7 @@ describe('hash()', () => {
     const ext = mk();
     const result = await ext.value.hash.fn(
       { input: 'test', algorithm: 'invalid-algo' },
-      makeRuntimeCtx(),
+      makeRuntimeCtx()
     );
     const status = getStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
@@ -74,18 +95,24 @@ describe('hash()', () => {
 
   it('hashes empty string', async () => {
     const ext = mk();
-    const result = await ext.value.hash.fn({ input: '', algorithm: 'sha256' }, makeRuntimeCtx());
+    const result = await ext.value.hash.fn(
+      { input: '', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
     expect(result).toBe(
-      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
     );
   });
 
   it('handles unicode input', async () => {
     const ext = mk();
-    const result = await ext.value.hash.fn({
-      input: 'Hello 世界 🌍',
-      algorithm: 'sha256',
-    }, makeRuntimeCtx());
+    const result = await ext.value.hash.fn(
+      {
+        input: 'Hello 世界 🌍',
+        algorithm: 'sha256',
+      },
+      makeRuntimeCtx()
+    );
     expect(result).toMatch(/^[0-9a-f]{64}$/);
   });
 });
@@ -96,7 +123,10 @@ describe('hmac()', () => {
       hmacKey: 'secret-key',
       defaultAlgorithm: 'sha256',
     });
-    const result = await ext.value.hmac.fn({ input: 'message to authenticate' }, makeRuntimeCtx());
+    const result = await ext.value.hmac.fn(
+      { input: 'message to authenticate' },
+      makeRuntimeCtx()
+    );
 
     expect(typeof result).toBe('string');
     expect(result).toMatch(/^[0-9a-f]+$/);
@@ -105,30 +135,48 @@ describe('hmac()', () => {
 
   it('generates HMAC with explicit algorithm', async () => {
     const ext = mk({ hmacKey: 'secret' });
-    const result = await ext.value.hmac.fn({
-      input: 'message',
-      algorithm: 'sha512',
-    }, makeRuntimeCtx());
+    const result = await ext.value.hmac.fn(
+      {
+        input: 'message',
+        algorithm: 'sha512',
+      },
+      makeRuntimeCtx()
+    );
     expect(result).toMatch(/^[0-9a-f]{128}$/);
   });
 
   it('produces consistent output for same input and key', async () => {
     const ext = mk({ hmacKey: 'secret' });
-    const r1 = await ext.value.hmac.fn({ input: 'message', algorithm: 'sha256' }, makeRuntimeCtx());
-    const r2 = await ext.value.hmac.fn({ input: 'message', algorithm: 'sha256' }, makeRuntimeCtx());
+    const r1 = await ext.value.hmac.fn(
+      { input: 'message', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
+    const r2 = await ext.value.hmac.fn(
+      { input: 'message', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
     expect(r1).toBe(r2);
   });
 
   it('produces different output for different messages', async () => {
     const ext = mk({ hmacKey: 'secret' });
-    const r1 = await ext.value.hmac.fn({ input: 'message1', algorithm: 'sha256' }, makeRuntimeCtx());
-    const r2 = await ext.value.hmac.fn({ input: 'message2', algorithm: 'sha256' }, makeRuntimeCtx());
+    const r1 = await ext.value.hmac.fn(
+      { input: 'message1', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
+    const r2 = await ext.value.hmac.fn(
+      { input: 'message2', algorithm: 'sha256' },
+      makeRuntimeCtx()
+    );
     expect(r1).not.toBe(r2);
   });
 
   it('returns invalid value when hmacKey not configured', async () => {
     const ext = mk();
-    const result = await ext.value.hmac.fn({ input: 'message' }, makeRuntimeCtx());
+    const result = await ext.value.hmac.fn(
+      { input: 'message' },
+      makeRuntimeCtx()
+    );
     const status = getStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/hmacKey required/);
@@ -138,7 +186,7 @@ describe('hmac()', () => {
     const ext = mk({ hmacKey: 'secret' });
     const result = await ext.value.hmac.fn(
       { input: 'message', algorithm: 'invalid-algo' },
-      makeRuntimeCtx(),
+      makeRuntimeCtx()
     );
     const status = getStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
@@ -149,16 +197,22 @@ describe('hmac()', () => {
       hmacKey: 'secret',
       defaultAlgorithm: 'sha512',
     });
-    const result = await ext.value.hmac.fn({ input: 'message' }, makeRuntimeCtx());
+    const result = await ext.value.hmac.fn(
+      { input: 'message' },
+      makeRuntimeCtx()
+    );
     expect(result).toMatch(/^[0-9a-f]{128}$/);
   });
 
   it('handles unicode input', async () => {
     const ext = mk({ hmacKey: 'key' });
-    const result = await ext.value.hmac.fn({
-      input: 'Hello 世界 🌍',
-      algorithm: 'sha256',
-    }, makeRuntimeCtx());
+    const result = await ext.value.hmac.fn(
+      {
+        input: 'Hello 世界 🌍',
+        algorithm: 'sha256',
+      },
+      makeRuntimeCtx()
+    );
     expect(result).toMatch(/^[0-9a-f]{64}$/);
   });
 });
@@ -170,7 +224,7 @@ describe('uuid()', () => {
 
     expect(typeof result).toBe('string');
     expect(result).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
   });
 
@@ -205,11 +259,20 @@ describe('random()', () => {
 
   it('returns correct length for byte count', async () => {
     const ext = mk();
-    const r8 = (await ext.value.random.fn({ bytes: 8 }, makeRuntimeCtx())) as string;
+    const r8 = (await ext.value.random.fn(
+      { bytes: 8 },
+      makeRuntimeCtx()
+    )) as string;
     expect(r8).toHaveLength(16);
-    const r32 = (await ext.value.random.fn({ bytes: 32 }, makeRuntimeCtx())) as string;
+    const r32 = (await ext.value.random.fn(
+      { bytes: 32 },
+      makeRuntimeCtx()
+    )) as string;
     expect(r32).toHaveLength(64);
-    const r64 = (await ext.value.random.fn({ bytes: 64 }, makeRuntimeCtx())) as string;
+    const r64 = (await ext.value.random.fn(
+      { bytes: 64 },
+      makeRuntimeCtx()
+    )) as string;
     expect(r64).toHaveLength(128);
   });
 
@@ -255,7 +318,10 @@ describe('random()', () => {
 
   it('returns invalid value when bytes exceeds 1MB limit', async () => {
     const ext = mk();
-    const result = await ext.value.random.fn({ bytes: 1_048_577 }, makeRuntimeCtx());
+    const result = await ext.value.random.fn(
+      { bytes: 1_048_577 },
+      makeRuntimeCtx()
+    );
     const status = getStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/must not exceed 1048576/);
@@ -263,7 +329,10 @@ describe('random()', () => {
 
   it('accepts exactly 1MB bytes', async () => {
     const ext = mk();
-    const result = (await ext.value.random.fn({ bytes: 1_048_576 }, makeRuntimeCtx())) as string;
+    const result = (await ext.value.random.fn(
+      { bytes: 1_048_576 },
+      makeRuntimeCtx()
+    )) as string;
     expect(result).toHaveLength(2_097_152);
   });
 });

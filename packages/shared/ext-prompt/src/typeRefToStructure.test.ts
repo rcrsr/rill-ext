@@ -285,7 +285,13 @@ describe('typeRefToStructure', () => {
   // ============================================================
 
   describe('non-renderable type rejection', () => {
-    const nonRenderableTypes = ['closure', 'iterator', 'stream', 'vector', 'type'] as const;
+    const nonRenderableTypes = [
+      'closure',
+      'iterator',
+      'stream',
+      'vector',
+      'type',
+    ] as const;
 
     for (const typeName of nonRenderableTypes) {
       it(`rejects bare ${typeName} with RILL-R001`, () => {

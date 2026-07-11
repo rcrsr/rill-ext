@@ -384,7 +384,15 @@ describe('createSqliteKvExtension', () => {
       };
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      const value = ext.value as Record<string, { fn: unknown; params: unknown; annotations?: Record<string, unknown>; returnType: unknown }>;
+      const value = ext.value as Record<
+        string,
+        {
+          fn: unknown;
+          params: unknown;
+          annotations?: Record<string, unknown>;
+          returnType: unknown;
+        }
+      >;
 
       // Verify structure for one function (all follow same pattern)
       expect(value['get']?.params).toBeDefined();

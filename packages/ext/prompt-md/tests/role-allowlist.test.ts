@@ -28,7 +28,11 @@ async function makeTempDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'rill-prompt-md-role-test-'));
 }
 
-async function writePrompt(dir: string, relPath: string, content: string): Promise<void> {
+async function writePrompt(
+  dir: string,
+  relPath: string,
+  content: string
+): Promise<void> {
   const fullPath = path.join(dir, relPath);
   await fs.mkdir(path.dirname(fullPath), { recursive: true });
   await fs.writeFile(fullPath, content, 'utf-8');
@@ -44,9 +48,11 @@ const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) =>
-      fs.rm(dir, { recursive: true, force: true }).catch(() => undefined),
-    ),
+    tempDirs
+      .splice(0)
+      .map((dir) =>
+        fs.rm(dir, { recursive: true, force: true }).catch(() => undefined)
+      )
   );
 });
 
@@ -72,10 +78,13 @@ params: []
 Hello!
 @@ assistant
 Hi there, how can I help?
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const result = await dict['chat']!.fn({}, {} as never);
 
@@ -87,7 +96,9 @@ Hi there, how can I help?
     expect(messages[0]!['role']).toBe('user');
     expect((messages[0]!['content'] as string).trim()).toBe('Hello!');
     expect(messages[1]!['role']).toBe('assistant');
-    expect((messages[1]!['content'] as string).trim()).toBe('Hi there, how can I help?');
+    expect((messages[1]!['content'] as string).trim()).toBe(
+      'Hi there, how can I help?'
+    );
   });
 
   it('assistant entry has role string equal to "assistant"', async () => {
@@ -105,10 +116,13 @@ Be helpful.
 Question?
 @@ assistant
 Answer.
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const result = await dict['reply']!.fn({}, {} as never);
 
@@ -136,10 +150,13 @@ params: []
 ---
 @@ tool
 some tool output
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -165,10 +182,13 @@ params: []
 ---
 @@ tool
 output
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -193,10 +213,13 @@ params: []
 ---
 @@ tool
 output
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -226,10 +249,13 @@ params: []
 ---
 @@ model
 some model name
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -255,10 +281,13 @@ params: []
 ---
 @@ model
 content
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -285,10 +314,13 @@ params: []
 preamble
 @@ model
 content
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -319,10 +351,13 @@ params: []
 ---
 @@ foo
 some content
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -348,10 +383,13 @@ params: []
 ---
 @@ foo
 content
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -378,10 +416,13 @@ params: []
 ---
 @@ foo
 content
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     let caught: unknown;
@@ -412,10 +453,13 @@ params: []
 first message
 @@ user
 second message
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const result = await dict['double_user']!.fn({}, {} as never);
 
@@ -439,10 +483,13 @@ params: []
 first message
 @@ user
 second message
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const result = await dict['double_user_content']!.fn({}, {} as never);
 

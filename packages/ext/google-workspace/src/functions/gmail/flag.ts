@@ -20,7 +20,9 @@ export interface GmailFlagDeps {
  * Uses messages.modify to add or remove the STARRED system label.
  * Returns true after 200 OK per IR-7.
  */
-export function makeGmailFlag(deps: GmailFlagDeps): (
+export function makeGmailFlag(
+  deps: GmailFlagDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -32,7 +34,11 @@ export function makeGmailFlag(deps: GmailFlagDeps): (
   ): Promise<RillValue> => {
     const messageId = args['message_id'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: message_id must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: message_id must be a non-empty string'
+      );
     }
     const flagged = args['flagged'];
     if (typeof flagged !== 'boolean') {

@@ -12,7 +12,8 @@ import { failInput, failForbidden } from '../../errors.js';
 
 export const CAL_BASE = 'https://www.googleapis.com/calendar/v3';
 
-const ISO_TZ_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const ISO_TZ_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 /**
  * Assert that a string is ISO 8601 datetime with timezone.
@@ -22,13 +23,13 @@ const ISO_TZ_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2
 export function assertIsoTimestamp(
   ctx: RuntimeContext,
   value: string,
-  field: string,
+  field: string
 ): void {
   if (!ISO_TZ_RE.test(value)) {
     failInput(
       ctx,
       'naive_iso_timestamp',
-      `google: ${field} must be ISO 8601 with timezone`,
+      `google: ${field} must be ISO 8601 with timezone`
     );
   }
 }
@@ -41,7 +42,7 @@ export function assertIsoTimestamp(
 export function assertAllowedCalendarId(
   ctx: RuntimeContext,
   calendarId: string,
-  calendarConfig: CalendarConfig | undefined,
+  calendarConfig: CalendarConfig | undefined
 ): void {
   if (
     calendarConfig?.allowedCalendarIds !== undefined &&
@@ -51,7 +52,7 @@ export function assertAllowedCalendarId(
     failForbidden(
       ctx,
       'calendar_not_allowed',
-      `google: calendar '${calendarId}' not in allowed set`,
+      `google: calendar '${calendarId}' not in allowed set`
     );
   }
 }

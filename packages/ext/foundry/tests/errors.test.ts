@@ -133,7 +133,10 @@ describe('mapRestError', () => {
     const ctx = createRuntimeContext();
 
     expectThrowHalt(
-      () => mapRestError(ctx, 500, { error: { message: 'Internal server error detail' } }),
+      () =>
+        mapRestError(ctx, 500, {
+          error: { message: 'Internal server error detail' },
+        }),
       { code: 'UNAVAILABLE', message: 'Internal server error detail' }
     );
   });
@@ -178,9 +181,12 @@ describe('createModelNotDeployedError', () => {
     const { createModelNotDeployedError } = await import('../src/errors.js');
     const ctx = createRuntimeContext();
 
-    expectThrowHalt(() => createModelNotDeployedError(ctx, 'my-custom-deployment-name'), {
-      message: 'my-custom-deployment-name',
-    });
+    expectThrowHalt(
+      () => createModelNotDeployedError(ctx, 'my-custom-deployment-name'),
+      {
+        message: 'my-custom-deployment-name',
+      }
+    );
   });
 });
 
@@ -194,11 +200,14 @@ describe('resolveVariables', () => {
     const { resolveVariables } = await import('../src/errors.js');
     const ctx = createRuntimeContext();
 
-    expectThrowHalt(() => resolveVariables(ctx, 'Hello @{NAME}', () => undefined), {
-      code: 'INVALID_INPUT',
-      provider: 'foundry',
-      message: "foundry: unresolved variable 'NAME'",
-    });
+    expectThrowHalt(
+      () => resolveVariables(ctx, 'Hello @{NAME}', () => undefined),
+      {
+        code: 'INVALID_INPUT',
+        provider: 'foundry',
+        message: "foundry: unresolved variable 'NAME'",
+      }
+    );
   });
 
   it('halt carries unresolved_variable raw.kind (EC-17)', async () => {
@@ -214,7 +223,9 @@ describe('resolveVariables', () => {
     }
 
     expect(caught).toBeInstanceOf(RuntimeHaltSignal);
-    const status = getStatus((caught as InstanceType<typeof RuntimeHaltSignal>).value);
+    const status = getStatus(
+      (caught as InstanceType<typeof RuntimeHaltSignal>).value
+    );
     expect((status.raw as { kind: string }).kind).toBe('unresolved_variable');
   });
 
@@ -252,7 +263,9 @@ describe('resolveVariables', () => {
 // ============================================================
 
 describe('mapProviderError + detectFoundryError integration', () => {
-  async function runMap(error: unknown): Promise<{ code: string; message: string }> {
+  async function runMap(
+    error: unknown
+  ): Promise<{ code: string; message: string }> {
     const { detectFoundryError } = await import('../src/errors.js');
     const { mapProviderError } = await import('@rcrsr/rill-ext-llm-shared');
     const { createRuntimeContext, getStatus } = await import('@rcrsr/rill');

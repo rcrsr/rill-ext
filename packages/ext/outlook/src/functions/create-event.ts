@@ -46,12 +46,18 @@ export async function createEvent(
 
   // Apply optional fields from options dict
   const options = args['options'] as Record<string, RillValue> | undefined;
-  if (options !== null && options !== undefined && typeof options === 'object') {
+  if (
+    options !== null &&
+    options !== undefined &&
+    typeof options === 'object'
+  ) {
     if (Array.isArray(options['attendees'])) {
-      eventBody['attendees'] = (options['attendees'] as RillValue[]).map((addr) => ({
-        emailAddress: { address: String(addr) },
-        type: 'required',
-      }));
+      eventBody['attendees'] = (options['attendees'] as RillValue[]).map(
+        (addr) => ({
+          emailAddress: { address: String(addr) },
+          type: 'required',
+        })
+      );
     }
 
     if (typeof options['location'] === 'string' && options['location'] !== '') {

@@ -33,7 +33,9 @@ export interface DriveUploadDeps {
  * EC-9: Rejects content byte size > maxUploadBytes (== is allowed per BC-8).
  * AC-12: Returns rill primitive dict.
  */
-export function makeDriveUpload(deps: DriveUploadDeps): (
+export function makeDriveUpload(
+  deps: DriveUploadDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -50,11 +52,17 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
     }
     const filename = args['filename'];
     if (typeof filename !== 'string' || filename.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: filename must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: filename must be a non-empty string'
+      );
     }
     const folderId = args['folder_id'];
     const folderIdStr =
-      folderId !== undefined && folderId !== null && typeof folderId === 'string'
+      folderId !== undefined &&
+      folderId !== null &&
+      typeof folderId === 'string'
         ? folderId
         : undefined;
     // Resolve mimeType from options
@@ -69,14 +77,21 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
     // EC-8: Check deniedMimeTypes
     const deniedMimeTypes = deps.driveConfig?.deniedMimeTypes ?? [];
     if (deniedMimeTypes.includes(mimeType)) {
-      failInput(ctx, 'invalid_arg', `google: MIME type '${mimeType}' not allowed`);
+      failInput(
+        ctx,
+        'invalid_arg',
+        `google: MIME type '${mimeType}' not allowed`
+      );
     }
     // Decode base64 content to bytes. Node's Buffer.from(_, 'base64') silently
     // skips characters outside the base64 alphabet, which can corrupt uploads.
     // Validate strictly against standard or URL-safe base64, then normalize to
     // standard alphabet before decoding.
     const stripped = content.replace(/\s+/g, '');
-    if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(stripped) || stripped.length % 4 === 1) {
+    if (
+      !/^[A-Za-z0-9+/_-]*={0,2}$/.test(stripped) ||
+      stripped.length % 4 === 1
+    ) {
       failInput(ctx, 'invalid_arg', 'google: content is not valid base64');
     }
     const normalized = stripped.replace(/-/g, '+').replace(/_/g, '/');
@@ -85,13 +100,21 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
     // EC-9: Check maxUploadBytes (inclusive: == is allowed per BC-8)
     const maxUploadBytes = deps.driveConfig?.maxUploadBytes;
     if (maxUploadBytes !== undefined && byteLength > maxUploadBytes) {
-      failInput(ctx, 'invalid_arg', `google: file exceeds maximum upload size (${maxUploadBytes} bytes)`);
+      failInput(
+        ctx,
+        'invalid_arg',
+        `google: file exceeds maximum upload size (${maxUploadBytes} bytes)`
+      );
     }
     // EC-7: Validate folderId against allowedFolderIds when defined
     if (folderIdStr !== undefined && folderIdStr !== '') {
       const allowed = deps.driveConfig?.allowedFolderIds;
       if (allowed !== undefined && !allowed.includes(folderIdStr)) {
-        failForbidden(ctx, 'forbidden', `google: folder '${folderIdStr}' not in allowed set`);
+        failForbidden(
+          ctx,
+          'forbidden',
+          `google: folder '${folderIdStr}' not in allowed set`
+        );
       }
     }
     // AC-11: compose lifecycle (ctx.signal), caller signal, and 30s hard timeout
@@ -149,7 +172,12 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
       throw mapFetchError(ctx, error, 'drive') as unknown as RillValue;
     }
     if (!uploadResponse.ok) {
-      throw mapGoogleError(ctx, uploadResponse.status, 'drive', 'upload') as unknown as RillValue;
+      throw mapGoogleError(
+        ctx,
+        uploadResponse.status,
+        'drive',
+        'upload'
+      ) as unknown as RillValue;
     }
     const data = (await uploadResponse.json()) as {
       id?: string;
@@ -165,9 +193,7 @@ export function makeDriveUpload(deps: DriveUploadDeps): (
       mime_type: data.mimeType ?? mimeType,
       size: data.size !== undefined ? Number(data.size) : byteLength,
       owner:
-        data.owners?.[0]?.emailAddress ??
-        data.owners?.[0]?.displayName ??
-        null,
+        data.owners?.[0]?.emailAddress ?? data.owners?.[0]?.displayName ?? null,
     } as unknown as RillValue;
   };
 }

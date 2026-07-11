@@ -69,14 +69,22 @@ function validConfig(): FoundryConfig {
   };
 }
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /**
  * Build a mock stream runner with a successful final chat completion.
  */
-function createMockStreamRunner(content: string, model = 'gpt-4o', promptTokens = 10, completionTokens = 20) {
+function createMockStreamRunner(
+  content: string,
+  model = 'gpt-4o',
+  promptTokens = 10,
+  completionTokens = 20
+) {
   const finalCompletion = {
     id: 'chatcmpl-test123',
     object: 'chat.completion' as const,
@@ -132,7 +140,9 @@ function createErrorStreamRunner(error: unknown) {
  * Resolve a RillStream by calling its internal resolve callback to trigger event emission.
  */
 async function resolveStream(stream: unknown): Promise<unknown> {
-  return (stream as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve();
+  return (
+    stream as { __rill_stream_resolve: () => Promise<unknown> }
+  ).__rill_stream_resolve();
 }
 
 // ============================================================
@@ -148,7 +158,9 @@ describe('extension event emission', () => {
   describe('message() events', () => {
     // AC-13: Successful message call emits event with model, tokens, duration
     it('emits foundry:message event on success (AC-13)', async () => {
-      mockStream.mockReturnValue(createMockStreamRunner('Hello world', 'gpt-4o', 10, 20));
+      mockStream.mockReturnValue(
+        createMockStreamRunner('Hello world', 'gpt-4o', 10, 20)
+      );
 
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(validConfig());
@@ -209,7 +221,9 @@ describe('extension event emission', () => {
     });
 
     it('emitted event duration is a non-negative number', async () => {
-      mockStream.mockReturnValue(createMockStreamRunner('Response', 'gpt-4o', 5, 10));
+      mockStream.mockReturnValue(
+        createMockStreamRunner('Response', 'gpt-4o', 5, 10)
+      );
 
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(validConfig());
@@ -231,7 +245,9 @@ describe('extension event emission', () => {
     });
 
     it('emitted event model matches the configured model', async () => {
-      mockStream.mockReturnValue(createMockStreamRunner('Response', 'gpt-4o', 5, 10));
+      mockStream.mockReturnValue(
+        createMockStreamRunner('Response', 'gpt-4o', 5, 10)
+      );
 
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(validConfig());

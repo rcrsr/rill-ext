@@ -3,7 +3,7 @@
  * Defines configuration and contract types for the Microsoft Graph API integration.
  */
 
-import type { ApplicationCallable, ExtensionFactoryResult } from '@rcrsr/rill';
+import type { ApplicationCallable } from '@rcrsr/rill';
 
 // ============================================================
 // AUTHENTICATION
@@ -13,7 +13,7 @@ import type { ApplicationCallable, ExtensionFactoryResult } from '@rcrsr/rill';
  * Bearer token authentication.
  * Uses a static token for all Graph API requests.
  */
-export interface OutlookAuthBearer {
+interface OutlookAuthBearer {
   readonly type: 'bearer';
   /** Static Bearer token for all requests. */
   readonly token: string;
@@ -23,7 +23,7 @@ export interface OutlookAuthBearer {
  * Session token authentication.
  * Resolves the Bearer token from RuntimeContext at call time.
  */
-export interface OutlookAuthSession {
+interface OutlookAuthSession {
   readonly type: 'session';
   /** Name of the RuntimeContext variable holding the Bearer token. */
   readonly tokenVar: string;
@@ -37,7 +37,7 @@ export type OutlookAuth = OutlookAuthBearer | OutlookAuthSession;
 // ============================================================
 
 /** Mail capability flags. */
-export interface OutlookMailCapabilities {
+interface OutlookMailCapabilities {
   /** Allow reading inbox, from, read operations. Default: true */
   readonly read: boolean;
   /** Allow send and reply operations. Default: false */
@@ -51,7 +51,7 @@ export interface OutlookMailCapabilities {
 }
 
 /** Calendar capability flags. */
-export interface OutlookCalendarCapabilities {
+interface OutlookCalendarCapabilities {
   /** Allow reading events, today, free_busy. Default: true */
   readonly read: boolean;
   /** Allow create_event. Default: false */
@@ -69,7 +69,7 @@ export interface OutlookCapabilities {
 // ============================================================
 
 /** Mail query constraint options. */
-export interface OutlookMailConfig {
+interface OutlookMailConfig {
   /**
    * Maximum number of results to return per query.
    * Range: 1-1000 (Graph API $top limit). Default: 50
@@ -101,10 +101,12 @@ export interface OutlookConfig {
   /** Authentication configuration. Required. */
   readonly auth: OutlookAuth;
   /** Operation permission flags. Merged with defaults when partial. */
-  readonly capabilities?: Partial<{
-    readonly mail: Partial<OutlookMailCapabilities>;
-    readonly calendar: Partial<OutlookCalendarCapabilities>;
-  }> | undefined;
+  readonly capabilities?:
+    | Partial<{
+        readonly mail: Partial<OutlookMailCapabilities>;
+        readonly calendar: Partial<OutlookCalendarCapabilities>;
+      }>
+    | undefined;
   /** Mail query constraints. */
   readonly mail?: OutlookMailConfig | undefined;
   /**
@@ -137,8 +139,3 @@ export type OutlookExtensionContract = {
   readonly free_busy: ApplicationCallable;
   readonly create_event: ApplicationCallable;
 };
-
-/**
- * Re-export for satisfies check usage.
- */
-export type { ExtensionFactoryResult };

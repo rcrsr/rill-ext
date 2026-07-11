@@ -51,8 +51,12 @@ beforeEach(() => {
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  return (stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  return (
+    stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
+  ).__rill_stream_resolve();
 }
 
 /**
@@ -189,7 +193,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
 
     // Verify result extracted correctly
     expect(result['result']).toBe('Processed 10000 lines successfully');
-    expect(result["exit_code"]).toBe(0);
+    expect(result['exit_code']).toBe(0);
 
     // Verify parser processed all chunks
     expect(mockParser.processChunk).toHaveBeenCalled();
@@ -295,7 +299,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     const result = await resolveStream(stream);
 
     expect(result['result']).toBe('Mixed content processed');
-    expect(result["exit_code"]).toBe(0);
+    expect(result['exit_code']).toBe(0);
     expect(mockParser.processChunk).toHaveBeenCalledTimes(100);
   });
 });
@@ -398,7 +402,9 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     );
 
     // For each stream: iterate chunks (so generator processes all data), then resolve
-    async function drainAndResolve(s: unknown): Promise<Record<string, unknown>> {
+    async function drainAndResolve(
+      s: unknown
+    ): Promise<Record<string, unknown>> {
       await collectChunks(s);
       return resolveStream(s);
     }
@@ -410,17 +416,15 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     expect(results).toHaveLength(10);
 
     // Collect all result texts to verify uniqueness
-    const resultTexts = new Set(
-      results.map((r) => r['result'] as string)
-    );
+    const resultTexts = new Set(results.map((r) => r['result'] as string));
 
     // Verify each has unique result (10 unique results)
     expect(resultTexts.size).toBe(10);
 
     // Verify all have exit_code 0
     results.forEach((result) => {
-      expect(result["exit_code"]).toBe(0);
-      expect((result['result'] as string)).toMatch(/^Response from call \d+$/);
+      expect(result['exit_code']).toBe(0);
+      expect(result['result'] as string).toMatch(/^Response from call \d+$/);
     });
 
     // Verify 10 separate processes were spawned
@@ -523,7 +527,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     expect(results).toHaveLength(10);
     results.forEach((result, i) => {
       expect(result['result']).toBe(`Response ${i}`);
-      expect(result["exit_code"]).toBe(0);
+      expect(result['exit_code']).toBe(0);
     });
 
     expect(spawnClaudeCli).toHaveBeenCalledTimes(10);
@@ -561,9 +565,13 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
           setTimeout(() => {
             if (shouldFail) {
               reject(
-                new SpawnError('exit_nonzero', `Claude CLI exited with code 1`, {
-                  exit_code: 1,
-                }),
+                new SpawnError(
+                  'exit_nonzero',
+                  `Claude CLI exited with code 1`,
+                  {
+                    exit_code: 1,
+                  }
+                )
               );
             } else {
               if (onDataCallback) {
@@ -620,7 +628,9 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     // Use Promise.allSettled to capture both successful and failed stream resolutions.
     // Failed streams (calls 3 and 7) yield [error] chunks instead of rejecting,
     // so resolveStream() still resolves. This test verifies all streams complete.
-    const results = await Promise.allSettled(streams.map((s) => resolveStream(s)));
+    const results = await Promise.allSettled(
+      streams.map((s) => resolveStream(s))
+    );
 
     expect(results).toHaveLength(10);
 
@@ -726,7 +736,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       const result = await resolveStream(stream);
 
       expect(result['result']).toBe('OK');
-      expect(result["exit_code"]).toBe(0);
+      expect(result['exit_code']).toBe(0);
 
       // Verify no process leaks (at most 1 active at a time for sequential)
       expect(activeProcesses).toBeLessThanOrEqual(1);
@@ -833,7 +843,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       );
       const result = await resolveStream(stream);
 
-      expect(result["exit_code"]).toBe(0);
+      expect(result['exit_code']).toBe(0);
       expect(activeProcesses).toBeLessThanOrEqual(1);
     }
 
@@ -926,7 +936,10 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
     // Execute 1000 sequential prompts
     for (let i = 0; i < 1000; i++) {
-      const stream = (ext.value as any).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx);
+      const stream = (ext.value as any).prompt.fn(
+        { text: `Prompt ${i}`, options: {} },
+        ctx
+      );
       await resolveStream(stream);
     }
 

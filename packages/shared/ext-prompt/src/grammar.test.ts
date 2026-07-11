@@ -145,17 +145,26 @@ describe('parseParamGrammar', () => {
     it('parses list(string)', () => {
       const result = parseParamGrammar('items: list(string)');
       expect(result.name).toBe('items');
-      expect(result.type).toEqual({ kind: 'list', element: { kind: 'string' } });
+      expect(result.type).toEqual({
+        kind: 'list',
+        element: { kind: 'string' },
+      });
     });
 
     it('parses list(number)', () => {
       const result = parseParamGrammar('scores: list(number)');
-      expect(result.type).toEqual({ kind: 'list', element: { kind: 'number' } });
+      expect(result.type).toEqual({
+        kind: 'list',
+        element: { kind: 'number' },
+      });
     });
 
     it('parses dict(string)', () => {
       const result = parseParamGrammar('lookup: dict(string)');
-      expect(result.type).toEqual({ kind: 'dict', valueType: { kind: 'string' } });
+      expect(result.type).toEqual({
+        kind: 'dict',
+        valueType: { kind: 'string' },
+      });
     });
 
     it('parses dict(a: string, b: number)', () => {
@@ -170,7 +179,9 @@ describe('parseParamGrammar', () => {
     });
 
     it('parses list(dict(a: string, b: string))', () => {
-      const result = parseParamGrammar('articles: list(dict(a: string, b: string))');
+      const result = parseParamGrammar(
+        'articles: list(dict(a: string, b: string))'
+      );
       expect(result.type).toEqual({
         kind: 'list',
         element: {
@@ -303,7 +314,13 @@ describe('parseParamGrammar', () => {
     });
 
     // Non-renderable types — produce placeholder strings, not prompt text
-    const nonRenderableTypes = ['closure', 'iterator', 'stream', 'vector', 'type'] as const;
+    const nonRenderableTypes = [
+      'closure',
+      'iterator',
+      'stream',
+      'vector',
+      'type',
+    ] as const;
     for (const typeName of nonRenderableTypes) {
       it(`rejects ${typeName} with RILL-R001`, () => {
         try {
@@ -331,7 +348,9 @@ describe('parseParamGrammar', () => {
     });
 
     it('throws RuntimeError when any has a default', () => {
-      expect(() => parseParamGrammar('val: any = something')).toThrow(RuntimeError);
+      expect(() => parseParamGrammar('val: any = something')).toThrow(
+        RuntimeError
+      );
     });
   });
 
@@ -341,11 +360,15 @@ describe('parseParamGrammar', () => {
 
   describe('invalid default values', () => {
     it('throws RuntimeError for non-numeric default on number type', () => {
-      expect(() => parseParamGrammar('count: number = abc')).toThrow(RuntimeError);
+      expect(() => parseParamGrammar('count: number = abc')).toThrow(
+        RuntimeError
+      );
     });
 
     it('throws RuntimeError for mixed-case bool default', () => {
-      expect(() => parseParamGrammar('flag: bool = True')).toThrow(RuntimeError);
+      expect(() => parseParamGrammar('flag: bool = True')).toThrow(
+        RuntimeError
+      );
     });
 
     it('throws RuntimeError for bool default that is not true or false', () => {

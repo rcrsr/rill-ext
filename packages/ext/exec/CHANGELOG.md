@@ -1,5 +1,7 @@
 # Changelog
 
+## [Unreleased]
+
 ## [0.19.2] - 2026-04-30
 
 ### Changed (Breaking)

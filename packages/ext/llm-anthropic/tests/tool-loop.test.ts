@@ -4,12 +4,21 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, callable, isRillStream, type RillValue, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  callable,
+  isRillStream,
+  type RillValue,
+  type ApplicationCallable,
+} from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -92,10 +101,17 @@ vi.mock('@anthropic-ai/sdk', () => {
  * Simulates the Anthropic SDK stream API used by callAPIStreaming.
  * Calls 'text' event handlers with text content, then resolves finalMessage() with the response.
  */
-function createMockMessageStream(response: ReturnType<typeof createMockTextResponse> | ReturnType<typeof createMockToolUseResponse>) {
+function createMockMessageStream(
+  response:
+    | ReturnType<typeof createMockTextResponse>
+    | ReturnType<typeof createMockToolUseResponse>
+) {
   // Extract text content from response to emit via 'text' events
   const textContent = response.content
-    .filter((block: Record<string, unknown>) => block['type'] === 'text' && typeof block['text'] === 'string')
+    .filter(
+      (block: Record<string, unknown>) =>
+        block['type'] === 'text' && typeof block['text'] === 'string'
+    )
     .map((block: Record<string, unknown>) => block['text'] as string)
     .join('');
 
@@ -144,7 +160,8 @@ function makeTool(
       name: p.name,
       type: { kind: p.type },
       defaultValue: undefined,
-      annotations: p.description !== undefined ? { description: p.description } : {},
+      annotations:
+        p.description !== undefined ? { description: p.description } : {},
     }));
   }
   return tool;
@@ -157,15 +174,21 @@ function makeTool(
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  return (stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  return (
+    stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
+  ).__rill_stream_resolve();
 }
 
 /**
  * Consume all chunks from a RillStream by iterating via next() calls.
  * Returns collected dict chunks (text_delta, tool_call, tool_result).
  */
-async function collectChunks(stream: unknown): Promise<Record<string, unknown>[]> {
+async function collectChunks(
+  stream: unknown
+): Promise<Record<string, unknown>[]> {
   const chunks: Record<string, unknown>[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let current: any = stream;
@@ -200,7 +223,9 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      mockStream.mockReturnValue(createMockMessageStream(createMockTextResponse('Hello')));
+      mockStream.mockReturnValue(
+        createMockMessageStream(createMockTextResponse('Hello'))
+      );
 
       const tools = {
         tool: makeTool(() => 'result', { description: 'Tool' }),
@@ -226,18 +251,24 @@ describe('tool_loop() function', () => {
 
       // Mock sequence: tool_use turn -> final text turn
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'get_weather', id: 'tool_1', input: { location: 'SF' } }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('The weather in SF is sunny.')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'get_weather', id: 'tool_1', input: { location: 'SF' } },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockTextResponse('The weather in SF is sunny.')
+          )
+        );
 
       const tools = {
-        get_weather: makeTool(
-          (_args) => 'Sunny, 72°F',
-          { description: 'Get weather', params: [{ name: 'location', type: 'string', description: 'City' }] }
-        ),
+        get_weather: makeTool((_args) => 'Sunny, 72°F', {
+          description: 'Get weather',
+          params: [{ name: 'location', type: 'string', description: 'City' }],
+        }),
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
@@ -265,15 +296,23 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'get_weather', id: 'tool_1', input: { location: 'SF' } }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('The weather in SF is sunny.')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'get_weather', id: 'tool_1', input: { location: 'SF' } },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockTextResponse('The weather in SF is sunny.')
+          )
+        );
 
       const tools = {
-        get_weather: makeTool((_args) => 'Sunny, 72°F', { description: 'Get weather' }),
+        get_weather: makeTool((_args) => 'Sunny, 72°F', {
+          description: 'Get weather',
+        }),
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
@@ -284,9 +323,15 @@ describe('tool_loop() function', () => {
       const result = await resolveStream(stream);
 
       // content field removed; text in messages[last].parts[i].text
-      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const msgs = result['messages'] as Array<{
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+      }>;
       const lastParts = msgs[msgs.length - 1]!.parts;
-      const lastText = lastParts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      const lastText = lastParts
+        .filter((p) => p.type === 'text')
+        .map((p) => p.text ?? '')
+        .join('');
       expect(lastText).toBe('The weather in SF is sunny.');
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
       expect(result['usage']).toEqual({ input: 15, output: 35 }); // 10+5, 20+15
@@ -306,9 +351,11 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       // Final text response with actual text content
-      mockStream.mockReturnValueOnce(createMockMessageStream(
-        createMockTextResponse('Here is the result: 42')
-      ));
+      mockStream.mockReturnValueOnce(
+        createMockMessageStream(
+          createMockTextResponse('Here is the result: 42')
+        )
+      );
 
       const tools = {
         tool: makeTool(() => 'result', { description: 'Tool' }),
@@ -339,14 +386,18 @@ describe('tool_loop() function', () => {
 
       // Mock sequence: tool_use -> final response
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([
-            { name: 'get_weather', id: 'tool_1', input: { location: 'SF' } },
-          ])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('The weather in SF is sunny.')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'get_weather', id: 'tool_1', input: { location: 'SF' } },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockTextResponse('The weather in SF is sunny.')
+          )
+        );
 
       const tools = {
         get_weather: makeTool(
@@ -356,7 +407,9 @@ describe('tool_loop() function', () => {
           },
           {
             description: 'Get weather',
-            params: [{ name: 'location', type: 'string', description: 'City name' }],
+            params: [
+              { name: 'location', type: 'string', description: 'City name' },
+            ],
           }
         ),
       };
@@ -368,8 +421,15 @@ describe('tool_loop() function', () => {
       const result = await resolveStream(stream);
 
       // content field removed; text in messages[last].parts
-      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
-      const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      const msgs = result['messages'] as Array<{
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+      }>;
+      const lastText = msgs[msgs.length - 1]!.parts.filter(
+        (p) => p.type === 'text'
+      )
+        .map((p) => p.text ?? '')
+        .join('');
       expect(lastText).toBe('The weather in SF is sunny.');
       expect(result['turns']).toBe(2);
       expect(result['stop_reason']).toBe('end_turn');
@@ -387,9 +447,11 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      mockStream.mockReturnValueOnce(createMockMessageStream(
-        createMockTextResponse('I can answer that directly: 42')
-      ));
+      mockStream.mockReturnValueOnce(
+        createMockMessageStream(
+          createMockTextResponse('I can answer that directly: 42')
+        )
+      );
 
       const tools = {
         calculator: makeTool(() => 'result', { description: 'Calculate' }),
@@ -402,8 +464,15 @@ describe('tool_loop() function', () => {
       const result = await resolveStream(stream);
 
       // content field removed; verify via messages parts
-      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
-      const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      const msgs = result['messages'] as Array<{
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+      }>;
+      const lastText = msgs[msgs.length - 1]!.parts.filter(
+        (p) => p.type === 'text'
+      )
+        .map((p) => p.text ?? '')
+        .join('');
       expect(lastText).toBe('I can answer that directly: 42');
       expect(result['turns']).toBe(1);
       expect(mockStream).toHaveBeenCalledTimes(1);
@@ -419,11 +488,13 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      mockStream.mockReturnValueOnce(createMockMessageStream(
-        createMockToolUseResponse([
-          { name: 'search', id: 'tool_1', input: { query: 'test' } },
-        ])
-      ));
+      mockStream.mockReturnValueOnce(
+        createMockMessageStream(
+          createMockToolUseResponse([
+            { name: 'search', id: 'tool_1', input: { query: 'test' } },
+          ])
+        )
+      );
 
       const tools = {
         search: makeTool(() => 'results', {
@@ -454,16 +525,18 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([
-            { name: 'tool_a', id: 'tool_1', input: {} },
-            { name: 'tool_b', id: 'tool_2', input: {} },
-            { name: 'tool_c', id: 'tool_3', input: {} },
-          ])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('All tools completed')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'tool_a', id: 'tool_1', input: {} },
+              { name: 'tool_b', id: 'tool_2', input: {} },
+              { name: 'tool_c', id: 'tool_3', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(createMockTextResponse('All tools completed'))
+        );
 
       const executionOrder: string[] = [];
       const makeConcurrentTool = (name: string) =>
@@ -483,7 +556,10 @@ describe('tool_loop() function', () => {
         tool_c: makeConcurrentTool('C'),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Run tools', tools, max_turns: 0 }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Run tools', tools, max_turns: 0 },
+        ctx
+      );
       await resolveStream(stream);
 
       // All tools should start before any finish (parallel execution)
@@ -506,7 +582,14 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       const tools = { tool: makeTool(() => 'result', { description: 'Tool' }) };
-      expectThrowHalt(() => getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools, max_turns: 0 }, ctx), { message: 'prompt string cannot be empty' });
+      expectThrowHalt(
+        () =>
+          getCallable(ext, 'tool_loop').fn(
+            { prompt: '   ', tools, max_turns: 0 },
+            ctx
+          ),
+        { message: 'prompt string cannot be empty' }
+      );
     });
 
     // EC-4: Provider streaming API failure throws RuntimeError RILL-R005
@@ -522,7 +605,9 @@ describe('tool_loop() function', () => {
       // Mock the stream to throw when finalMessage() is called (simulates streaming API failure)
       const errorStream = {
         on: vi.fn().mockReturnThis(),
-        finalMessage: vi.fn().mockRejectedValue(new Error('Connection reset by peer')),
+        finalMessage: vi
+          .fn()
+          .mockRejectedValue(new Error('Connection reset by peer')),
         abort: vi.fn(),
       };
       mockStream.mockReturnValue(errorStream);
@@ -536,7 +621,9 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('Provider API error:') });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: expect.stringContaining('Provider API error:'),
+      });
     });
 
     // EC-5: Consecutive tool errors exceed max — RuntimeError RILL-R005 with exact message
@@ -552,16 +639,26 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'failing_tool', id: 'tool_1', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'failing_tool', id: 'tool_2', input: {} }])
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'failing_tool', id: 'tool_1', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'failing_tool', id: 'tool_2', input: {} },
+            ])
+          )
+        );
 
       const tools = {
         failing_tool: makeTool(
-          () => { throw new Error('Tool error'); },
+          () => {
+            throw new Error('Tool error');
+          },
           { description: 'Failing tool' }
         ),
       };
@@ -571,7 +668,11 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('Tool execution failed: 2 consecutive errors') });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: expect.stringContaining(
+          'Tool execution failed: 2 consecutive errors'
+        ),
+      });
     });
 
     it('error message includes tool name and original message [EC-5]', async () => {
@@ -584,14 +685,19 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'my_tool', id: 'tool_1', input: {} }])
-        ));
+      mockStream.mockReturnValueOnce(
+        createMockMessageStream(
+          createMockToolUseResponse([
+            { name: 'my_tool', id: 'tool_1', input: {} },
+          ])
+        )
+      );
 
       const tools = {
         my_tool: makeTool(
-          () => { throw new Error('Specific failure'); },
+          () => {
+            throw new Error('Specific failure');
+          },
           { description: 'My tool' }
         ),
       };
@@ -601,7 +707,11 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      await expectRejectedHalt(resolveStream(stream), { message: expect.stringMatching(/Tool execution failed: 1 consecutive errors \(last: my_tool: Specific failure\)/) });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: expect.stringMatching(
+          /Tool execution failed: 1 consecutive errors \(last: my_tool: Specific failure\)/
+        ),
+      });
     });
 
     // EC-6: Tool not found in tool map — error includes "Unknown tool: {name}"
@@ -616,9 +726,13 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      mockStream.mockReturnValueOnce(createMockMessageStream(
-        createMockToolUseResponse([{ name: 'nonexistent_tool', id: 'tool_1', input: {} }])
-      ));
+      mockStream.mockReturnValueOnce(
+        createMockMessageStream(
+          createMockToolUseResponse([
+            { name: 'nonexistent_tool', id: 'tool_1', input: {} },
+          ])
+        )
+      );
 
       const tools = {
         known_tool: makeTool(() => 'result', { description: 'Known' }),
@@ -629,7 +743,9 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      await expectRejectedHalt(resolveStream(stream), { message: expect.stringContaining('Unknown tool: nonexistent_tool') });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: expect.stringContaining('Unknown tool: nonexistent_tool'),
+      });
     });
 
     // AC-17: Tool execution error mid-loop yields tool_call chunk; stream resolves with final content
@@ -645,16 +761,24 @@ describe('tool_loop() function', () => {
 
       // First turn: tool is called but fails; second turn: LLM recovers and responds
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'flaky_tool', id: 'tool_1', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('Recovered from tool error.')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'flaky_tool', id: 'tool_1', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockTextResponse('Recovered from tool error.')
+          )
+        );
 
       const tools = {
         flaky_tool: makeTool(
-          () => { throw new Error('Transient failure'); },
+          () => {
+            throw new Error('Transient failure');
+          },
           { description: 'Flaky tool' }
         ),
       };
@@ -672,8 +796,15 @@ describe('tool_loop() function', () => {
 
       // Stream resolves; text in messages[last].parts
       const result = await resolveStream(stream);
-      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
-      const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      const msgs = result['messages'] as Array<{
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+      }>;
+      const lastText = msgs[msgs.length - 1]!.parts.filter(
+        (p) => p.type === 'text'
+      )
+        .map((p) => p.text ?? '')
+        .join('');
       expect(lastText).toBe('Recovered from tool error.');
     });
 
@@ -688,10 +819,16 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, max_turns: 0 },
+        {
+          prompt: 'Test',
+          tools: undefined as unknown as Record<string, unknown>,
+          max_turns: 0,
+        },
         ctx
       );
-      await expectRejectedHalt(resolveStream(stream), { message: 'tools parameter is required' });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'tools parameter is required',
+      });
     });
 
     // EC-15: Unknown tool name in tool loop
@@ -707,21 +844,26 @@ describe('tool_loop() function', () => {
 
       // First API call returns unknown tool, second returns text response (exits loop)
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([
-            { name: 'unknown_tool', id: 'tool_1', input: {} },
-          ])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('Done')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'unknown_tool', id: 'tool_1', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(createMockTextResponse('Done'))
+        );
 
       const tools = {
         known_tool: makeTool(() => 'result', { description: 'Known tool' }),
       };
 
       // Should complete without throwing despite unknown tool error
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 0 }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test', tools, max_turns: 0 },
+        ctx
+      );
       const result = await resolveStream(stream);
 
       // content field removed; check messages and turns
@@ -743,19 +885,33 @@ describe('tool_loop() function', () => {
 
       // Mock 3 consecutive tool_use responses
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'failing_tool', id: 'tool_1', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'failing_tool', id: 'tool_2', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'failing_tool', id: 'tool_3', input: {} }])
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'failing_tool', id: 'tool_1', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'failing_tool', id: 'tool_2', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'failing_tool', id: 'tool_3', input: {} },
+            ])
+          )
+        );
 
       const tools = {
         failing_tool: makeTool(
-          () => { throw new Error('Tool failed'); },
+          () => {
+            throw new Error('Tool failed');
+          },
           { description: 'Failing tool' }
         ),
       };
@@ -764,7 +920,9 @@ describe('tool_loop() function', () => {
         { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
-      await expectRejectedHalt(resolveStream(stream), { message: 'Tool execution failed: 3 consecutive errors' });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'Tool execution failed: 3 consecutive errors',
+      });
     });
 
     it('resets consecutive error count on success', async () => {
@@ -780,18 +938,30 @@ describe('tool_loop() function', () => {
       let callCount = 0;
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'tool', id: 'tool_1', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'tool', id: 'tool_2', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'tool', id: 'tool_3', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('Done')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'tool', id: 'tool_1', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'tool', id: 'tool_2', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'tool', id: 'tool_3', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(createMockTextResponse('Done'))
+        );
 
       const tools = {
         tool: makeTool(
@@ -813,8 +983,15 @@ describe('tool_loop() function', () => {
       const result = await resolveStream(stream);
 
       // content field removed; verify via messages parts
-      const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
-      const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      const msgs = result['messages'] as Array<{
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+      }>;
+      const lastText = msgs[msgs.length - 1]!.parts.filter(
+        (p) => p.type === 'text'
+      )
+        .map((p) => p.text ?? '')
+        .join('');
       expect(lastText).toBe('Done');
       expect(callCount).toBe(3);
     });
@@ -829,21 +1006,30 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'tool', id: 'tool_1', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('Handled error')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'tool', id: 'tool_1', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(createMockTextResponse('Handled error'))
+        );
 
       const tools = {
         tool: makeTool(
-          () => { throw new Error('Custom error message'); },
+          () => {
+            throw new Error('Custom error message');
+          },
           { description: 'Tool' }
         ),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 0 }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test', tools, max_turns: 0 },
+        ctx
+      );
       await resolveStream(stream);
 
       // Check second API call (stream call) includes error in tool_result
@@ -869,9 +1055,9 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      mockStream.mockReturnValueOnce(createMockMessageStream(
-        createMockTextResponse('Response')
-      ));
+      mockStream.mockReturnValueOnce(
+        createMockMessageStream(createMockTextResponse('Response'))
+      );
 
       const tools = {
         tool: makeTool(() => 'result', { description: 'Tool' }),
@@ -917,12 +1103,16 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([{ name: 'tool', id: 'tool_1', input: {} }])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('Final response')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'tool', id: 'tool_1', input: {} },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(createMockTextResponse('Final response'))
+        );
 
       const tools = {
         tool: makeTool(() => 'tool result', { description: 'Tool' }),
@@ -935,12 +1125,21 @@ describe('tool_loop() function', () => {
       const result = await resolveStream(stream);
 
       // messages now use canonical shape {role, parts} not {role, content}
-      const msgs = result['messages'] as Array<{ role: string; parts: unknown[] }>;
+      const msgs = result['messages'] as Array<{
+        role: string;
+        parts: unknown[];
+      }>;
       expect(msgs.length).toBeGreaterThan(0);
       expect(msgs[0]!.role).toBe('user');
       // First message's parts contain the prompt text
-      const firstParts = msgs[0]!.parts as Array<{ type: string; text?: string }>;
-      const firstText = firstParts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      const firstParts = msgs[0]!.parts as Array<{
+        type: string;
+        text?: string;
+      }>;
+      const firstText = firstParts
+        .filter((p) => p.type === 'text')
+        .map((p) => p.text ?? '')
+        .join('');
       expect(firstText).toBe('Test prompt');
     });
   });
@@ -956,16 +1155,20 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream({
-          ...createMockToolUseResponse([
-            { name: 'tool', id: 'tool_1', input: {} },
-          ]),
-          usage: { input_tokens: 100, output_tokens: 50 },
-        }))
-        .mockReturnValueOnce(createMockMessageStream({
-          ...createMockTextResponse('Done'),
-          usage: { input_tokens: 200, output_tokens: 75 },
-        }));
+        .mockReturnValueOnce(
+          createMockMessageStream({
+            ...createMockToolUseResponse([
+              { name: 'tool', id: 'tool_1', input: {} },
+            ]),
+            usage: { input_tokens: 100, output_tokens: 50 },
+          })
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream({
+            ...createMockTextResponse('Done'),
+            usage: { input_tokens: 200, output_tokens: 75 },
+          })
+        );
 
       const tools = {
         tool: makeTool(() => 'result', { description: 'Tool' }),
@@ -994,9 +1197,9 @@ describe('tool_loop() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      mockStream.mockReturnValueOnce(createMockMessageStream(
-        createMockTextResponse('Done')
-      ));
+      mockStream.mockReturnValueOnce(
+        createMockMessageStream(createMockTextResponse('Done'))
+      );
 
       const tools = {
         complex_tool: makeTool(() => 'result', {
@@ -1011,7 +1214,10 @@ describe('tool_loop() function', () => {
         }),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 0 }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test', tools, max_turns: 0 },
+        ctx
+      );
       await resolveStream(stream);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1035,18 +1241,20 @@ describe('tool_loop() function', () => {
       const ctx = createRuntimeContext();
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([
-            {
-              name: 'tool',
-              id: 'tool_1',
-              input: { param_a: 'value_a', param_b: 42 },
-            },
-          ])
-        ))
-        .mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('Done')
-        ));
+        .mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              {
+                name: 'tool',
+                id: 'tool_1',
+                input: { param_a: 'value_a', param_b: 42 },
+              },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(createMockTextResponse('Done'))
+        );
 
       let capturedArgs: Record<string, RillValue> | null = null;
 
@@ -1066,7 +1274,10 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 0 }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test', tools, max_turns: 0 },
+        ctx
+      );
       await resolveStream(stream);
 
       expect(capturedArgs).toEqual({ param_a: 'value_a', param_b: 42 });
@@ -1086,16 +1297,26 @@ describe('tool_loop() function', () => {
       const ctx2 = createRuntimeContext();
 
       mockStream
-        .mockReturnValueOnce(createMockMessageStream(createMockTextResponse('Response 1')))
-        .mockReturnValueOnce(createMockMessageStream(createMockTextResponse('Response 2')));
+        .mockReturnValueOnce(
+          createMockMessageStream(createMockTextResponse('Response 1'))
+        )
+        .mockReturnValueOnce(
+          createMockMessageStream(createMockTextResponse('Response 2'))
+        );
 
       const tools = {
         tool: makeTool(() => 'result', { description: 'Tool' }),
       };
 
       const [stream1, stream2] = [
-        getCallable(ext, 'tool_loop').fn({ prompt: 'Prompt 1', tools, max_turns: 0 }, ctx1),
-        getCallable(ext, 'tool_loop').fn({ prompt: 'Prompt 2', tools, max_turns: 0 }, ctx2),
+        getCallable(ext, 'tool_loop').fn(
+          { prompt: 'Prompt 1', tools, max_turns: 0 },
+          ctx1
+        ),
+        getCallable(ext, 'tool_loop').fn(
+          { prompt: 'Prompt 2', tools, max_turns: 0 },
+          ctx2
+        ),
       ];
 
       const [result1, result2] = await Promise.all([
@@ -1104,11 +1325,25 @@ describe('tool_loop() function', () => {
       ]);
 
       // content field removed; verify via messages parts
-      const msgs1 = result1['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
-      const text1 = msgs1[msgs1.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      const msgs1 = result1['messages'] as Array<{
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+      }>;
+      const text1 = msgs1[msgs1.length - 1]!.parts.filter(
+        (p) => p.type === 'text'
+      )
+        .map((p) => p.text ?? '')
+        .join('');
       expect(text1).toBe('Response 1');
-      const msgs2 = result2['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
-      const text2 = msgs2[msgs2.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+      const msgs2 = result2['messages'] as Array<{
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+      }>;
+      const text2 = msgs2[msgs2.length - 1]!.parts.filter(
+        (p) => p.type === 'text'
+      )
+        .map((p) => p.text ?? '')
+        .join('');
       expect(text2).toBe('Response 2');
     });
   });
@@ -1130,12 +1365,16 @@ describe('tool_loop() function', () => {
         const ctx = createRuntimeContext();
 
         // Single text-only response: no tool_use blocks
-        mockStream.mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('The answer is 42, no tools needed.')
-        ));
+        mockStream.mockReturnValueOnce(
+          createMockMessageStream(
+            createMockTextResponse('The answer is 42, no tools needed.')
+          )
+        );
 
         const tools = {
-          calculator: makeTool(() => 'result', { description: 'Calculate math' }),
+          calculator: makeTool(() => 'result', {
+            description: 'Calculate math',
+          }),
         };
 
         const stream = getCallable(ext, 'tool_loop').fn(
@@ -1162,9 +1401,11 @@ describe('tool_loop() function', () => {
         const ext = createAnthropicExtension(config);
         const ctx = createRuntimeContext();
 
-        mockStream.mockReturnValueOnce(createMockMessageStream(
-          createMockTextResponse('Direct answer without tools.')
-        ));
+        mockStream.mockReturnValueOnce(
+          createMockMessageStream(
+            createMockTextResponse('Direct answer without tools.')
+          )
+        );
 
         const tools = {
           search: makeTool(() => 'results', { description: 'Search' }),
@@ -1178,8 +1419,15 @@ describe('tool_loop() function', () => {
         const result = await resolveStream(stream);
 
         // content field removed; verify via messages parts
-        const msgs = result['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
-        const lastText = msgs[msgs.length - 1]!.parts.filter((p) => p.type === 'text').map((p) => p.text ?? '').join('');
+        const msgs = result['messages'] as Array<{
+          role: string;
+          parts: Array<{ type: string; text?: string }>;
+        }>;
+        const lastText = msgs[msgs.length - 1]!.parts.filter(
+          (p) => p.type === 'text'
+        )
+          .map((p) => p.text ?? '')
+          .join('');
         expect(lastText).toBe('Direct answer without tools.');
         expect(result['stop_reason']).toBe('end_turn');
         expect(result['turns']).toBe(1);
@@ -1199,16 +1447,20 @@ describe('tool_loop() function', () => {
         const ctx = createRuntimeContext();
 
         // LLM wants to call a tool, but maxTurns:1 prevents additional turns
-        mockStream.mockReturnValueOnce(createMockMessageStream(
-          createMockToolUseResponse([
-            { name: 'search', id: 'tool_1', input: { query: 'test query' } },
-          ])
-        ));
+        mockStream.mockReturnValueOnce(
+          createMockMessageStream(
+            createMockToolUseResponse([
+              { name: 'search', id: 'tool_1', input: { query: 'test query' } },
+            ])
+          )
+        );
 
         const tools = {
           search: makeTool(() => 'search results', {
             description: 'Search the web',
-            params: [{ name: 'query', type: 'string', description: 'Search query' }],
+            params: [
+              { name: 'query', type: 'string', description: 'Search query' },
+            ],
           }),
         };
 
@@ -1220,7 +1472,9 @@ describe('tool_loop() function', () => {
 
         // New factory throws RuntimeHaltSignal (INVALID_INPUT / max_turns_exceeded)
         // when max_turns is reached instead of resolving with stop_reason: 'max_turns'
-        await expectRejectedHalt(resolveStream(stream), { code: 'INVALID_INPUT' });
+        await expectRejectedHalt(resolveStream(stream), {
+          code: 'INVALID_INPUT',
+        });
         // Only one API call: the LLM turn that triggered maxTurns
         expect(mockStream).toHaveBeenCalledTimes(1);
       });
@@ -1241,7 +1495,12 @@ describe('tool_loop() function', () => {
           role: 'assistant',
           content: [
             { type: 'text', text: 'Let me search for that.' },
-            { type: 'tool_use', id: 'tool_1', name: 'search', input: { query: 'info' } },
+            {
+              type: 'tool_use',
+              id: 'tool_1',
+              name: 'search',
+              input: { query: 'info' },
+            },
           ],
           model: 'claude-sonnet-4-5-20250929',
           stop_reason: 'tool_use',
@@ -1249,7 +1508,11 @@ describe('tool_loop() function', () => {
           usage: { input_tokens: 8, output_tokens: 12 },
         };
 
-        mockStream.mockReturnValueOnce(createMockMessageStream(toolUseWithText as ReturnType<typeof createMockTextResponse>));
+        mockStream.mockReturnValueOnce(
+          createMockMessageStream(
+            toolUseWithText as ReturnType<typeof createMockTextResponse>
+          )
+        );
 
         const tools = {
           search: makeTool(() => 'results', { description: 'Search' }),
@@ -1263,7 +1526,9 @@ describe('tool_loop() function', () => {
 
         // New factory throws RuntimeHaltSignal (INVALID_INPUT / max_turns_exceeded)
         // when max_turns is reached instead of resolving with stop_reason: 'max_turns'
-        await expectRejectedHalt(resolveStream(stream), { code: 'INVALID_INPUT' });
+        await expectRejectedHalt(resolveStream(stream), {
+          code: 'INVALID_INPUT',
+        });
       });
     });
 
@@ -1278,7 +1543,9 @@ describe('tool_loop() function', () => {
         const ext = createAnthropicExtension(config);
         const ctx = createRuntimeContext();
 
-        const mockSdkStream = createMockMessageStream(createMockTextResponse('Response'));
+        const mockSdkStream = createMockMessageStream(
+          createMockTextResponse('Response')
+        );
         mockStream.mockReturnValue(mockSdkStream);
 
         const tools = {
@@ -1305,7 +1572,9 @@ describe('tool_loop() function', () => {
         const ext = createAnthropicExtension(config);
         const ctx = createRuntimeContext();
 
-        const mockSdkStream = createMockMessageStream(createMockTextResponse('Response'));
+        const mockSdkStream = createMockMessageStream(
+          createMockTextResponse('Response')
+        );
         mockStream.mockReturnValue(mockSdkStream);
 
         const tools = {

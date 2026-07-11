@@ -15,11 +15,7 @@ import {
   isInvalid,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
-import {
-  failInput,
-  failTimeout,
-  mapMcpError,
-} from './errors.js';
+import { failInput, failTimeout, mapMcpError } from './errors.js';
 import { sanitizeNames } from './naming.js';
 import { parseResourceContent } from './parsing.js';
 
@@ -57,7 +53,7 @@ export interface McpResource {
 /**
  * MCP resource read result content block.
  */
-export interface McpResourceContent {
+interface McpResourceContent {
   readonly uri: string;
   readonly text?: string | undefined;
   readonly blob?: string | undefined; // base64
@@ -156,7 +152,7 @@ export function createReadResourceFunction(
 ): RillFunction {
   const fn = async (
     args: Record<string, RillValue>,
-    ctxLike: unknown,
+    ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
 
@@ -257,7 +253,7 @@ function createStaticResourceFunction(
 
   const fn = async (
     _args: Record<string, RillValue>,
-    ctxLike: unknown,
+    ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
 
@@ -331,7 +327,9 @@ export function generateStaticResourceFunctions(
   lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
 ): Record<string, RillFunction> {
   // Prefix resource names with "resource_" before sanitization
-  const prefixedNames = resources.map((resource) => `resource_${resource.name}`);
+  const prefixedNames = resources.map(
+    (resource) => `resource_${resource.name}`
+  );
 
   // Sanitize names with collision detection
   const nameMap = sanitizeNames(prefixedNames);
@@ -391,7 +389,7 @@ function createResourceTemplateFunction(
 
   const fn = async (
     args: Record<string, RillValue>,
-    ctxLike: unknown,
+    ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
 
@@ -410,7 +408,7 @@ function createResourceTemplateFunction(
         throw failInput(
           ctx,
           `expected string for parameter ${varName}, got ${typeof arg}`,
-          { name: template.name, parameter: varName },
+          { name: template.name, parameter: varName }
         );
       }
     }
@@ -418,7 +416,7 @@ function createResourceTemplateFunction(
     const expandedUri = expandUriTemplate(
       template.uriTemplate,
       variables,
-      args,
+      args
     );
 
     emitExtensionEvent(ctx, {

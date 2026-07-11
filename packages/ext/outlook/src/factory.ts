@@ -98,7 +98,7 @@ const PROVIDER = 'outlook';
  */
 export function createOutlookExtension(
   config: OutlookConfig,
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Validate config — throws RuntimeError(RILL-R001) on failure
   validateConfig(config);
@@ -143,11 +143,14 @@ export function createOutlookExtension(
       ctx: RuntimeContext,
       controller: AbortController,
       cfg: ResolvedConfig
-    ) => Promise<RillValue>,
-  ): (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue> {
+    ) => Promise<RillValue>
+  ): (
+    args: Record<string, RillValue>,
+    ctx: RuntimeContext
+  ) => Promise<RillValue> {
     return async (
       args: Record<string, RillValue>,
-      ctx: RuntimeContext,
+      ctx: RuntimeContext
     ): Promise<RillValue> => {
       const startTime = Date.now();
 
@@ -219,7 +222,8 @@ export function createOutlookExtension(
 
   // Mail: inbox — emits outlook:mail:read
   const inboxWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
+    (c) =>
+      checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const messages = dict['messages'] as RillValue[] | undefined;
@@ -234,7 +238,8 @@ export function createOutlookExtension(
 
   // Mail: from — emits outlook:mail:read
   const fromWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
+    (c) =>
+      checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const messages = dict['messages'] as RillValue[] | undefined;
@@ -251,7 +256,11 @@ export function createOutlookExtension(
   const searchWrapped = wrap(
     (c) => {
       checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read');
-      checkCapability(c, resolvedConfig.capabilities.mail.search, 'mail.search');
+      checkCapability(
+        c,
+        resolvedConfig.capabilities.mail.search,
+        'mail.search'
+      );
     },
     (result) => {
       const dict = result as Record<string, RillValue>;
@@ -267,7 +276,8 @@ export function createOutlookExtension(
 
   // Mail: read — emits outlook:mail:read
   const readWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
+    (c) =>
+      checkCapability(c, resolvedConfig.capabilities.mail.read, 'mail.read'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -281,7 +291,8 @@ export function createOutlookExtension(
 
   // Mail: send — emits outlook:mail:send
   const sendWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.mail.send, 'mail.send'),
+    (c) =>
+      checkCapability(c, resolvedConfig.capabilities.mail.send, 'mail.send'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -295,7 +306,8 @@ export function createOutlookExtension(
 
   // Mail: draft — emits outlook:mail:draft
   const draftWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.mail.draft, 'mail.draft'),
+    (c) =>
+      checkCapability(c, resolvedConfig.capabilities.mail.draft, 'mail.draft'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -309,7 +321,8 @@ export function createOutlookExtension(
 
   // Mail: reply — emits outlook:mail:send
   const replyWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.mail.send, 'mail.send'),
+    (c) =>
+      checkCapability(c, resolvedConfig.capabilities.mail.send, 'mail.send'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -323,7 +336,8 @@ export function createOutlookExtension(
 
   // Mail: flag — emits outlook:mail:flag
   const flagWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.mail.flag, 'mail.flag'),
+    (c) =>
+      checkCapability(c, resolvedConfig.capabilities.mail.flag, 'mail.flag'),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -336,7 +350,12 @@ export function createOutlookExtension(
 
   // Calendar: events — emits outlook:calendar:read
   const eventsWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.calendar.read, 'calendar.read'),
+    (c) =>
+      checkCapability(
+        c,
+        resolvedConfig.capabilities.calendar.read,
+        'calendar.read'
+      ),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const eventsArr = dict['events'] as RillValue[] | undefined;
@@ -351,7 +370,12 @@ export function createOutlookExtension(
 
   // Calendar: today — emits outlook:calendar:read
   const todayWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.calendar.read, 'calendar.read'),
+    (c) =>
+      checkCapability(
+        c,
+        resolvedConfig.capabilities.calendar.read,
+        'calendar.read'
+      ),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const eventsArr = dict['events'] as RillValue[] | undefined;
@@ -366,7 +390,12 @@ export function createOutlookExtension(
 
   // Calendar: free_busy — emits outlook:calendar:read
   const freeBusyWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.calendar.read, 'calendar.read'),
+    (c) =>
+      checkCapability(
+        c,
+        resolvedConfig.capabilities.calendar.read,
+        'calendar.read'
+      ),
     (result) => {
       const dict = result as Record<string, RillValue>;
       const schedules = dict['schedules'] as RillValue[] | undefined;
@@ -381,7 +410,12 @@ export function createOutlookExtension(
 
   // Calendar: create_event — emits outlook:calendar:create
   const createEventWrapped = wrap(
-    (c) => checkCapability(c, resolvedConfig.capabilities.calendar.create, 'calendar.create'),
+    (c) =>
+      checkCapability(
+        c,
+        resolvedConfig.capabilities.calendar.create,
+        'calendar.create'
+      ),
     (result) => {
       const dict = result as Record<string, RillValue>;
       return {
@@ -425,34 +459,34 @@ export function createOutlookExtension(
   const MAIL_MESSAGE_DICT: TypeStructure = {
     kind: 'dict',
     fields: {
-      id:               { type: { kind: 'string' } },
-      subject:          { type: { kind: 'string' } },
-      preview:          { type: { kind: 'string' } },
-      from:             { type: { kind: 'string' } },
-      to:               { type: { kind: 'list', element: { kind: 'string' } } },
-      date:             { type: { kind: 'number' } },
-      unread:           { type: { kind: 'bool' } },
-      flagged:          { type: { kind: 'bool' } },
-      has_attachments:  { type: { kind: 'bool' } },
+      id: { type: { kind: 'string' } },
+      subject: { type: { kind: 'string' } },
+      preview: { type: { kind: 'string' } },
+      from: { type: { kind: 'string' } },
+      to: { type: { kind: 'list', element: { kind: 'string' } } },
+      date: { type: { kind: 'number' } },
+      unread: { type: { kind: 'bool' } },
+      flagged: { type: { kind: 'bool' } },
+      has_attachments: { type: { kind: 'bool' } },
     },
   };
   const CALENDAR_EVENT_DICT: TypeStructure = {
     kind: 'dict',
     fields: {
-      id:         { type: { kind: 'string' } },
-      title:      { type: { kind: 'string' } },
-      start:      { type: { kind: 'number' } },
-      end:        { type: { kind: 'number' } },
-      location:   { type: { kind: 'string' } },
-      attendees:  { type: { kind: 'list', element: { kind: 'string' } } },
-      is_online:  { type: { kind: 'bool' } },
+      id: { type: { kind: 'string' } },
+      title: { type: { kind: 'string' } },
+      start: { type: { kind: 'number' } },
+      end: { type: { kind: 'number' } },
+      location: { type: { kind: 'string' } },
+      attendees: { type: { kind: 'list', element: { kind: 'string' } } },
+      is_online: { type: { kind: 'bool' } },
       online_url: { type: { kind: 'string' } },
     },
   };
   const FREE_BUSY_SCHEDULE_DICT: TypeStructure = {
     kind: 'dict',
     fields: {
-      schedule_id:  { type: { kind: 'string' } },
+      schedule_id: { type: { kind: 'string' } },
       availability: { type: { kind: 'string' } },
       items: {
         type: {
@@ -460,10 +494,10 @@ export function createOutlookExtension(
           element: {
             kind: 'dict',
             fields: {
-              status:  { type: { kind: 'string' } },
+              status: { type: { kind: 'string' } },
               subject: { type: { kind: 'string' } },
-              start:   { type: { kind: 'number' } },
-              end:     { type: { kind: 'number' } },
+              start: { type: { kind: 'number' } },
+              end: { type: { kind: 'number' } },
             },
           },
         },
@@ -476,7 +510,7 @@ export function createOutlookExtension(
     kind: 'dict',
     fields: {
       messages: { type: { kind: 'list', element: MAIL_MESSAGE_DICT } },
-      folder:   { type: { kind: 'string' } },
+      folder: { type: { kind: 'string' } },
     },
   });
   const FROM_RT = structureToTypeValue({
@@ -489,14 +523,14 @@ export function createOutlookExtension(
     kind: 'dict',
     fields: {
       messages: { type: { kind: 'list', element: MAIL_MESSAGE_DICT } },
-      query:    { type: { kind: 'string' } },
+      query: { type: { kind: 'string' } },
     },
   });
   const SEND_REPLY_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      sent:    { type: { kind: 'bool' } },
-      to:      { type: { kind: 'list', element: { kind: 'string' } } },
+      sent: { type: { kind: 'bool' } },
+      to: { type: { kind: 'list', element: { kind: 'string' } } },
       subject: { type: { kind: 'string' } },
     },
   });
@@ -504,7 +538,7 @@ export function createOutlookExtension(
     kind: 'dict',
     fields: {
       events: { type: { kind: 'list', element: CALENDAR_EVENT_DICT } },
-      range:  { type: { kind: 'string' } },
+      range: { type: { kind: 'string' } },
     },
   });
   const TODAY_RT = structureToTypeValue({
@@ -517,14 +551,18 @@ export function createOutlookExtension(
     kind: 'dict',
     fields: {
       schedules: { type: { kind: 'list', element: FREE_BUSY_SCHEDULE_DICT } },
-      range:     { type: { kind: 'string' } },
+      range: { type: { kind: 'string' } },
     },
   });
 
   const callableDict = {
     inbox: toCallable({
       fn: inboxWrapped as CallableFn,
-      params: [p.num('top', undefined, DEFAULT_MAX_RESULTS), p.bool('unread'), p.str('folder')],
+      params: [
+        p.num('top', undefined, DEFAULT_MAX_RESULTS),
+        p.bool('unread'),
+        p.str('folder'),
+      ],
       returnType: INBOX_RT,
     }),
     from: toCallable({

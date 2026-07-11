@@ -15,7 +15,12 @@ const config = {
 
       libraries: {
         inlinedLibraries: ['@rcrsr/rill-ext-llm-shared'],
-        importedLibraries: ['undici-types', '@rcrsr/rill', 'openai', '@azure/identity'],
+        importedLibraries: [
+          'undici-types',
+          '@rcrsr/rill',
+          'openai',
+          '@azure/identity',
+        ],
       },
 
       output: {

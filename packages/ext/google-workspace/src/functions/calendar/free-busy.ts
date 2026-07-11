@@ -10,7 +10,9 @@ import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
 import { CAL_BASE, assertIsoTimestamp } from './_shared.js';
-const CAL_FREEBUSY_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
+const CAL_FREEBUSY_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+];
 export interface CalendarFreeBusyDeps {
   readonly auth: GoogleAuth;
   readonly cache: TokenCache;
@@ -21,7 +23,9 @@ export interface CalendarFreeBusyDeps {
  * EC-13: Rejects naive ISO timestamps (no timezone).
  * AC-12: Returns rill primitive dict keyed by email.
  */
-export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
+export function makeCalendarFreeBusy(
+  deps: CalendarFreeBusyDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -36,19 +40,36 @@ export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
     const endTime = args['end_time'];
     // BC-4: Validate emails before fetch
     if (!Array.isArray(emails) || emails.length === 0) {
-      failInput(ctx, 'invalid_arg', 'google: calendar.free_busy: emails must be non-empty');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: calendar.free_busy: emails must be non-empty'
+      );
     }
     // Extract string emails from the list
-    const emailStrings = emails
-      .filter((e): e is string => typeof e === 'string' && e.trim() !== '');
+    const emailStrings = emails.filter(
+      (e): e is string => typeof e === 'string' && e.trim() !== ''
+    );
     if (emailStrings.length === 0) {
-      failInput(ctx, 'invalid_arg', 'google: calendar.free_busy: emails must be non-empty');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: calendar.free_busy: emails must be non-empty'
+      );
     }
     if (typeof startTime !== 'string' || startTime.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: start_time must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: start_time must be a non-empty string'
+      );
     }
     if (typeof endTime !== 'string' || endTime.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: end_time must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: end_time must be a non-empty string'
+      );
     }
     // EC-13: Reject naive ISO timestamps
     assertIsoTimestamp(ctx, startTime, 'start_time');
@@ -83,7 +104,10 @@ export function makeCalendarFreeBusy(deps: CalendarFreeBusyDeps): (
       >;
     } | null;
     const calendars = data?.calendars ?? {};
-    const result: Record<string, { busy: Array<{ start: string; end: string }> }> = {};
+    const result: Record<
+      string,
+      { busy: Array<{ start: string; end: string }> }
+    > = {};
     for (const email of emailStrings) {
       const calData = calendars[email];
       const busySlots = (calData?.busy ?? []).map((slot) => ({

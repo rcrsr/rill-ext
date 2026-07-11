@@ -78,7 +78,11 @@ function mapS3Error(ctx: RuntimeContext, error: unknown): RillValue {
     return ctx.invalidate(error, {
       code: 'NOT_FOUND',
       provider: PROVIDER,
-      raw: { kind: name === 'NoSuchBucket' ? 'bucket_missing' : 'object_missing', name, message },
+      raw: {
+        kind: name === 'NoSuchBucket' ? 'bucket_missing' : 'object_missing',
+        name,
+        message,
+      },
     });
   }
 
@@ -157,26 +161,35 @@ function mapS3Error(ctx: RuntimeContext, error: unknown): RillValue {
  */
 export function createS3FsExtension(
   config: S3FsConfig,
-  ctx: ExtensionFactoryCtx,
+  ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   if (!config.region || config.region.trim() === '') {
-    throw new RuntimeError('RILL-R005', 'S3 configuration requires non-empty region');
+    throw new RuntimeError(
+      'RILL-R005',
+      'S3 configuration requires non-empty region'
+    );
   }
 
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
-    throw new RuntimeError('RILL-R005', 'S3 configuration requires at least one mount');
+    throw new RuntimeError(
+      'RILL-R005',
+      'S3 configuration requires at least one mount'
+    );
   }
 
   if (config.endpoint !== undefined) {
     if (typeof config.endpoint !== 'string' || config.endpoint.trim() === '') {
-      throw new RuntimeError('RILL-R005', 'S3 endpoint must be a non-empty string');
+      throw new RuntimeError(
+        'RILL-R005',
+        'S3 endpoint must be a non-empty string'
+      );
     }
     try {
       new URL(config.endpoint);
     } catch {
       throw new RuntimeError(
         'RILL-R005',
-        `S3 endpoint must be a valid URL: ${config.endpoint}`,
+        `S3 endpoint must be a valid URL: ${config.endpoint}`
       );
     }
   }
@@ -190,9 +203,11 @@ export function createS3FsExtension(
     region: config.region,
   };
 
-  if (config.credentials !== undefined) clientConfig.credentials = config.credentials;
+  if (config.credentials !== undefined)
+    clientConfig.credentials = config.credentials;
   if (config.endpoint !== undefined) clientConfig.endpoint = config.endpoint;
-  if (config.forcePathStyle !== undefined) clientConfig.forcePathStyle = config.forcePathStyle;
+  if (config.forcePathStyle !== undefined)
+    clientConfig.forcePathStyle = config.forcePathStyle;
 
   const s3Client = new S3Client(clientConfig);
 
@@ -212,7 +227,7 @@ export function createS3FsExtension(
         () => {
           void dispose();
         },
-        { once: true },
+        { once: true }
       );
     }
   }
@@ -243,14 +258,25 @@ export function createS3FsExtension(
       }
     | { ok: false; invalid: RillValue };
 
-  const parseMountPath = (runCtx: RuntimeContext, fullPath: string): ParsedPath => {
+  const parseMountPath = (
+    runCtx: RuntimeContext,
+    fullPath: string
+  ): ParsedPath => {
     const normalized = fullPath.startsWith('/') ? fullPath.slice(1) : fullPath;
-    const sortedNames = Object.keys(config.mounts).sort((a, b) => b.length - a.length);
+    const sortedNames = Object.keys(config.mounts).sort(
+      (a, b) => b.length - a.length
+    );
 
     for (const name of sortedNames) {
       if (normalized === name) {
         const mount = config.mounts[name]!;
-        return { ok: true, mount, mountName: name, relativePath: '', key: mount.prefix };
+        return {
+          ok: true,
+          mount,
+          mountName: name,
+          relativePath: '',
+          key: mount.prefix,
+        };
       }
       if (normalized.startsWith(name + '/')) {
         const mount = config.mounts[name]!;
@@ -267,33 +293,38 @@ export function createS3FsExtension(
 
     return {
       ok: false,
-      invalid: runCtx.invalidate(new Error(`unknown mount in path: ${fullPath}`), {
-        code: 'INVALID_INPUT',
-        provider: PROVIDER,
-        raw: {
-          kind: 'unknown_mount',
-          path: fullPath,
-          availableMounts: Object.keys(config.mounts),
-        },
-      }),
+      invalid: runCtx.invalidate(
+        new Error(`unknown mount in path: ${fullPath}`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: {
+            kind: 'unknown_mount',
+            path: fullPath,
+            availableMounts: Object.keys(config.mounts),
+          },
+        }
+      ),
     };
   };
 
   const checkMode = (
     runCtx: RuntimeContext,
     mount: S3FsMountConfig,
-    operation: 'read' | 'write',
+    operation: 'read' | 'write'
   ): RillValue | null => {
     if (mount.mode === 'read-write') return null;
     if (mount.mode === 'read' && operation === 'read') return null;
     if (mount.mode === 'write' && operation === 'write') return null;
     return runCtx.invalidate(
-      new Error(`mount does not permit ${operation} operations (mode: ${mount.mode})`),
+      new Error(
+        `mount does not permit ${operation} operations (mode: ${mount.mode})`
+      ),
       {
         code: 'INVALID_INPUT',
         provider: PROVIDER,
         raw: { kind: 'mode_not_permitted', mode: mount.mode, operation },
-      },
+      }
     );
   };
 
@@ -301,7 +332,7 @@ export function createS3FsExtension(
     runCtx: RuntimeContext,
     size: number,
     mount: S3FsMountConfig,
-    key: string,
+    key: string
   ): RillValue | null => {
     const max = mount.maxFileSize ?? 10485760;
     if (size > max) {
@@ -311,7 +342,7 @@ export function createS3FsExtension(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'file_too_large', size, maxFileSize: max, key },
-        },
+        }
       );
     }
     return null;
@@ -341,7 +372,7 @@ export function createS3FsExtension(
 
   const streamToString = async (
     runCtx: RuntimeContext,
-    output: GetObjectCommandOutput,
+    output: GetObjectCommandOutput
   ): Promise<string | RillValue> => {
     if (!output.Body) {
       return runCtx.invalidate(new Error('S3 response body is empty'), {
@@ -369,7 +400,7 @@ export function createS3FsExtension(
     try {
       const headResult = await s3Client.send(
         new HeadObjectCommand({ Bucket: mount.bucket, Key: key }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       const size = headResult.ContentLength ?? 0;
       const sizeCheck = checkFileSize(runCtx, size, mount, key);
@@ -377,7 +408,7 @@ export function createS3FsExtension(
 
       const getResult = await s3Client.send(
         new GetObjectCommand({ Bucket: mount.bucket, Key: key }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       const content = await streamToString(runCtx, getResult);
       return content;
@@ -407,7 +438,7 @@ export function createS3FsExtension(
           Body: content,
           ContentType: 'text/plain; charset=utf-8',
         }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       return String(contentSize);
     } catch (error) {
@@ -429,7 +460,7 @@ export function createS3FsExtension(
     try {
       const getResult = await s3Client.send(
         new GetObjectCommand({ Bucket: mount.bucket, Key: key }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       const stream = await streamToString(runCtx, getResult);
       if (typeof stream !== 'string') return stream;
@@ -454,7 +485,7 @@ export function createS3FsExtension(
           Body: newContent,
           ContentType: 'text/plain; charset=utf-8',
         }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       return String(Buffer.byteLength(content, 'utf-8'));
     } catch (error) {
@@ -481,7 +512,7 @@ export function createS3FsExtension(
           Prefix: normalizedPrefix,
           Delimiter: '/',
         }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
 
       const items: RillValue[] = [];
@@ -498,7 +529,10 @@ export function createS3FsExtension(
       if (result.CommonPrefixes) {
         for (const cp of result.CommonPrefixes) {
           if (!cp.Prefix) continue;
-          const dirName = cp.Prefix.slice(normalizedPrefix.length).replace(/\/$/, '');
+          const dirName = cp.Prefix.slice(normalizedPrefix.length).replace(
+            /\/$/,
+            ''
+          );
           items.push({ name: dirName, type: 'directory', size: 0 });
         }
       }
@@ -530,7 +564,7 @@ export function createS3FsExtension(
             Prefix: mount.prefix,
             ContinuationToken: continuationToken,
           }),
-          { abortSignal: requestSignal() },
+          { abortSignal: requestSignal() }
         );
 
         if (result.Contents) {
@@ -567,13 +601,14 @@ export function createS3FsExtension(
     try {
       await s3Client.send(
         new HeadObjectCommand({ Bucket: mount.bucket, Key: key }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       return true;
     } catch (error) {
       const name = (error as S3ErrorLike)?.name;
       const status = (error as S3ErrorLike)?.$metadata?.httpStatusCode;
-      if (name === 'NotFound' || name === 'NoSuchKey' || status === 404) return false;
+      if (name === 'NotFound' || name === 'NoSuchKey' || status === 404)
+        return false;
       return mapS3Error(runCtx, error);
     }
   };
@@ -591,18 +626,19 @@ export function createS3FsExtension(
       try {
         await s3Client.send(
           new HeadObjectCommand({ Bucket: mount.bucket, Key: key }),
-          { abortSignal: requestSignal() },
+          { abortSignal: requestSignal() }
         );
       } catch (error) {
         const name = (error as S3ErrorLike)?.name;
         const status = (error as S3ErrorLike)?.$metadata?.httpStatusCode;
-        if (name === 'NotFound' || name === 'NoSuchKey' || status === 404) return false;
+        if (name === 'NotFound' || name === 'NoSuchKey' || status === 404)
+          return false;
         return mapS3Error(runCtx, error);
       }
 
       await s3Client.send(
         new DeleteObjectCommand({ Bucket: mount.bucket, Key: key }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       return true;
     } catch (error) {
@@ -622,7 +658,7 @@ export function createS3FsExtension(
     try {
       const result = await s3Client.send(
         new HeadObjectCommand({ Bucket: mount.bucket, Key: key }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       const filename = getFilename(key);
       return {
@@ -655,7 +691,7 @@ export function createS3FsExtension(
     if (src.mountName !== dest.mountName) {
       return runCtx.invalidate(
         new Error(
-          `copy requires same mount for src and dest (got "${src.mountName}" and "${dest.mountName}")`,
+          `copy requires same mount for src and dest (got "${src.mountName}" and "${dest.mountName}")`
         ),
         {
           code: 'INVALID_INPUT',
@@ -665,7 +701,7 @@ export function createS3FsExtension(
             srcMount: src.mountName,
             destMount: dest.mountName,
           },
-        },
+        }
       );
     }
 
@@ -677,7 +713,7 @@ export function createS3FsExtension(
     try {
       const headResult = await s3Client.send(
         new HeadObjectCommand({ Bucket: src.mount.bucket, Key: src.key }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       const size = headResult.ContentLength ?? 0;
       const sizeCheck = checkFileSize(runCtx, size, dest.mount, dest.key);
@@ -689,7 +725,7 @@ export function createS3FsExtension(
           CopySource: `${src.mount.bucket}/${src.key}`,
           Key: dest.key,
         }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       return true;
     } catch (error) {
@@ -709,7 +745,7 @@ export function createS3FsExtension(
     try {
       await s3Client.send(
         new DeleteObjectCommand({ Bucket: src.mount.bucket, Key: src.key }),
-        { abortSignal: requestSignal() },
+        { abortSignal: requestSignal() }
       );
       return true;
     } catch (error) {
@@ -736,9 +772,18 @@ export function createS3FsExtension(
   // ============================================================
 
   const fnDict: {
-    read: RillFunction; write: RillFunction; append: RillFunction; list: RillFunction;
-    find: RillFunction; exists: RillFunction; remove: RillFunction; stat: RillFunction;
-    mkdir: RillFunction; copy: RillFunction; move: RillFunction; mounts: RillFunction;
+    read: RillFunction;
+    write: RillFunction;
+    append: RillFunction;
+    list: RillFunction;
+    find: RillFunction;
+    exists: RillFunction;
+    remove: RillFunction;
+    stat: RillFunction;
+    mkdir: RillFunction;
+    copy: RillFunction;
+    move: RillFunction;
+    mounts: RillFunction;
   } = {
     read: {
       params: [p.str('path', 'Combined /mount/path')],
@@ -747,13 +792,19 @@ export function createS3FsExtension(
       returnType: structureToTypeValue({ kind: 'string' }),
     },
     write: {
-      params: [p.str('path', 'Combined /mount/path'), p.str('content', 'Content to write')],
+      params: [
+        p.str('path', 'Combined /mount/path'),
+        p.str('content', 'Content to write'),
+      ],
       fn: write,
       annotations: { description: 'Write file to S3, replacing if exists' },
       returnType: structureToTypeValue({ kind: 'string' }),
     },
     append: {
-      params: [p.str('path', 'Combined /mount/path'), p.str('content', 'Content to append')],
+      params: [
+        p.str('path', 'Combined /mount/path'),
+        p.str('content', 'Content to append'),
+      ],
       fn: append,
       annotations: { description: 'Append content to file in S3' },
       returnType: structureToTypeValue({ kind: 'string' }),
@@ -777,11 +828,17 @@ export function createS3FsExtension(
     find: {
       params: [
         p.str('path', 'Combined /mount/path base directory'),
-        { ...p.str('pattern', 'Glob pattern for filtering'), defaultValue: '*' },
+        {
+          ...p.str('pattern', 'Glob pattern for filtering'),
+          defaultValue: '*',
+        },
       ],
       fn: find,
       annotations: { description: 'Recursive file search in S3' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: { kind: 'string' },
+      }),
     },
     exists: {
       params: [p.str('path', 'Combined /mount/path')],

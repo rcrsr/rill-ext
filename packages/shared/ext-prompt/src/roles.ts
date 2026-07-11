@@ -98,13 +98,16 @@ export function splitRoleMessages(body: string): RoleMessage[] {
       if (!(VALID_ROLES as readonly string[]).includes(role)) {
         throw new RuntimeError(
           'RILL-R001',
-          `Invalid role marker '@@ ${role}' at line ${lineNumber}. Valid roles are: system, user, assistant.`,
+          `Invalid role marker '@@ ${role}' at line ${lineNumber}. Valid roles are: system, user, assistant.`
         );
       }
 
       if (currentRole !== null) {
         messages.push({ role: currentRole, content: currentLines.join('\n') });
-      } else if (currentLines.length > 0 && currentLines.some((l) => l.length > 0)) {
+      } else if (
+        currentLines.length > 0 &&
+        currentLines.some((l) => l.length > 0)
+      ) {
         messages.push({ role: 'user', content: currentLines.join('\n') });
       }
       currentRole = role;
@@ -119,12 +122,15 @@ export function splitRoleMessages(body: string): RoleMessage[] {
   if (!sawMarker) {
     throw new RuntimeError(
       'RILL-R001',
-      'prompt body must contain at least one role marker (@@ role)',
+      'prompt body must contain at least one role marker (@@ role)'
     );
   }
 
   // Flush the final role entry
-  messages.push({ role: currentRole as string, content: currentLines.join('\n') });
+  messages.push({
+    role: currentRole as string,
+    content: currentLines.join('\n'),
+  });
 
   return messages;
 }

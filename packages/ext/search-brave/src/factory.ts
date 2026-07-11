@@ -41,7 +41,6 @@ export function createBraveExtension(
   config: BraveConfig,
   _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-
   try {
     assertRequired(config.apiKey, 'apiKey');
     if (config.baseUrl !== undefined) {
@@ -61,10 +60,14 @@ export function createBraveExtension(
   const disposalState = createDisposalState();
   const inFlightState = createInFlightState();
 
-  const wrap = createSearchFunctionWrapper(PROVIDER, disposalState, inFlightState);
+  const wrap = createSearchFunctionWrapper(
+    PROVIDER,
+    disposalState,
+    inFlightState
+  );
 
   const authHeaders = {
-    'Accept': 'application/json',
+    Accept: 'application/json',
     'Accept-Encoding': 'gzip',
     'X-Subscription-Token': apiKey,
     'Cache-Control': 'no-cache',
@@ -87,28 +90,47 @@ export function createBraveExtension(
     requireQuery(callCtx, query);
 
     const params = new URLSearchParams({ q: query });
-    if (options['count'] !== undefined) params.set('count', String(options['count']));
-    if (options['offset'] !== undefined) params.set('offset', String(options['offset']));
-    if (options['country'] !== undefined) params.set('country', String(options['country']));
-    if (options['search_lang'] !== undefined) params.set('search_lang', String(options['search_lang']));
-    if (options['freshness'] !== undefined) params.set('freshness', String(options['freshness']));
-    if (options['safesearch'] !== undefined) params.set('safesearch', String(options['safesearch']));
-    if (options['extra_snippets'] !== undefined) params.set('extra_snippets', String(options['extra_snippets']));
-    if (options['goggles'] !== undefined) params.set('goggles', String(options['goggles']));
+    if (options['count'] !== undefined)
+      params.set('count', String(options['count']));
+    if (options['offset'] !== undefined)
+      params.set('offset', String(options['offset']));
+    if (options['country'] !== undefined)
+      params.set('country', String(options['country']));
+    if (options['search_lang'] !== undefined)
+      params.set('search_lang', String(options['search_lang']));
+    if (options['freshness'] !== undefined)
+      params.set('freshness', String(options['freshness']));
+    if (options['safesearch'] !== undefined)
+      params.set('safesearch', String(options['safesearch']));
+    if (options['extra_snippets'] !== undefined)
+      params.set('extra_snippets', String(options['extra_snippets']));
+    if (options['goggles'] !== undefined)
+      params.set('goggles', String(options['goggles']));
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
-    const response = await fetch(`${baseUrl}/res/v1/web/search?${params.toString()}`, {
-      method: 'GET',
-      headers: authHeaders,
-      signal: requestSignal,
-    });
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
+    const response = await fetch(
+      `${baseUrl}/res/v1/web/search?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: authHeaders,
+        signal: requestSignal,
+      }
+    );
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       query?: unknown;
       web?: unknown;
     };
@@ -134,28 +156,47 @@ export function createBraveExtension(
     requireQuery(callCtx, query);
 
     const params = new URLSearchParams({ q: query });
-    if (options['count'] !== undefined) params.set('count', String(options['count']));
-    if (options['offset'] !== undefined) params.set('offset', String(options['offset']));
-    if (options['country'] !== undefined) params.set('country', String(options['country']));
-    if (options['search_lang'] !== undefined) params.set('search_lang', String(options['search_lang']));
-    if (options['freshness'] !== undefined) params.set('freshness', String(options['freshness']));
-    if (options['safesearch'] !== undefined) params.set('safesearch', String(options['safesearch']));
-    if (options['extra_snippets'] !== undefined) params.set('extra_snippets', String(options['extra_snippets']));
-    if (options['goggles'] !== undefined) params.set('goggles', String(options['goggles']));
+    if (options['count'] !== undefined)
+      params.set('count', String(options['count']));
+    if (options['offset'] !== undefined)
+      params.set('offset', String(options['offset']));
+    if (options['country'] !== undefined)
+      params.set('country', String(options['country']));
+    if (options['search_lang'] !== undefined)
+      params.set('search_lang', String(options['search_lang']));
+    if (options['freshness'] !== undefined)
+      params.set('freshness', String(options['freshness']));
+    if (options['safesearch'] !== undefined)
+      params.set('safesearch', String(options['safesearch']));
+    if (options['extra_snippets'] !== undefined)
+      params.set('extra_snippets', String(options['extra_snippets']));
+    if (options['goggles'] !== undefined)
+      params.set('goggles', String(options['goggles']));
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
-    const response = await fetch(`${baseUrl}/res/v1/news/search?${params.toString()}`, {
-      method: 'GET',
-      headers: authHeaders,
-      signal: requestSignal,
-    });
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
+    const response = await fetch(
+      `${baseUrl}/res/v1/news/search?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: authHeaders,
+        signal: requestSignal,
+      }
+    );
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       results?: unknown[];
     };
 
@@ -173,10 +214,14 @@ export function createBraveExtension(
     requireQuery(callCtx, query);
 
     const searchParams = new URLSearchParams({ q: query, summary: '1' });
-    if (options['count'] !== undefined) searchParams.set('count', String(options['count']));
-    if (options['country'] !== undefined) searchParams.set('country', String(options['country']));
-    if (options['search_lang'] !== undefined) searchParams.set('search_lang', String(options['search_lang']));
-    if (options['safesearch'] !== undefined) searchParams.set('safesearch', String(options['safesearch']));
+    if (options['count'] !== undefined)
+      searchParams.set('count', String(options['count']));
+    if (options['country'] !== undefined)
+      searchParams.set('country', String(options['country']));
+    if (options['search_lang'] !== undefined)
+      searchParams.set('search_lang', String(options['search_lang']));
+    if (options['safesearch'] !== undefined)
+      searchParams.set('safesearch', String(options['safesearch']));
 
     const signal1 = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
     const searchResponse = await fetch(
@@ -190,20 +235,31 @@ export function createBraveExtension(
 
     if (!searchResponse.ok) {
       const responseBody = await searchResponse.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, searchResponse.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        searchResponse.status,
+        responseBody
+      );
     }
 
-    const searchData = await searchResponse.json() as {
+    const searchData = (await searchResponse.json()) as {
       summarizer?: { key?: string };
     };
 
     const summarizerKey = searchData.summarizer?.key;
     if (!summarizerKey) {
-      throw callCtx.invalidate(new Error(`${PROVIDER}: summarizer key not found`), {
-        code: 'UNAVAILABLE',
-        provider: PROVIDER,
-        raw: { kind: 'summarizer_key_missing', message: `${PROVIDER}: summarizer key not found` },
-      });
+      throw callCtx.invalidate(
+        new Error(`${PROVIDER}: summarizer key not found`),
+        {
+          code: 'UNAVAILABLE',
+          provider: PROVIDER,
+          raw: {
+            kind: 'summarizer_key_missing',
+            message: `${PROVIDER}: summarizer key not found`,
+          },
+        }
+      );
     }
 
     const summarizerParams = new URLSearchParams({ key: summarizerKey });
@@ -218,18 +274,21 @@ export function createBraveExtension(
     );
 
     if (!summarizerResponse.ok) {
-      throw callCtx.invalidate(new Error(`${PROVIDER}: summarizer request failed`), {
-        code: 'UNAVAILABLE',
-        provider: PROVIDER,
-        raw: {
-          kind: 'summarizer_request_failed',
-          status: summarizerResponse.status,
-          message: `${PROVIDER}: summarizer request failed`,
-        },
-      });
+      throw callCtx.invalidate(
+        new Error(`${PROVIDER}: summarizer request failed`),
+        {
+          code: 'UNAVAILABLE',
+          provider: PROVIDER,
+          raw: {
+            kind: 'summarizer_request_failed',
+            status: summarizerResponse.status,
+            message: `${PROVIDER}: summarizer request failed`,
+          },
+        }
+      );
     }
 
-    const summaryData = await summarizerResponse.json() as {
+    const summaryData = (await summarizerResponse.json()) as {
       summary?: unknown;
       title?: unknown;
       followups?: unknown;
@@ -264,7 +323,7 @@ export function createBraveExtension(
     kind: 'dict',
     fields: {
       query: { type: { kind: 'any' } },
-      web:   { type: { kind: 'any' } },
+      web: { type: { kind: 'any' } },
     },
   });
   const NEWS_RT = structureToTypeValue({
@@ -276,10 +335,10 @@ export function createBraveExtension(
   const SUMMARIZE_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      summary:   { type: { kind: 'any' } },  // string | null
-      title:     { type: { kind: 'any' } },  // string | null
+      summary: { type: { kind: 'any' } }, // string | null
+      title: { type: { kind: 'any' } }, // string | null
       followups: { type: { kind: 'list', element: { kind: 'any' } } },
-      context:   { type: { kind: 'list', element: { kind: 'any' } } },
+      context: { type: { kind: 'list', element: { kind: 'any' } } },
     },
   });
 

@@ -10,10 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { SpawnError } from '../src/errors.js';
-import {
-  expectInvalidThrow,
-  makeFactoryCtx,
-} from './_helpers.js';
+import { expectInvalidThrow, makeFactoryCtx } from './_helpers.js';
 import {
   createRuntimeContext,
   RuntimeError,
@@ -43,7 +40,9 @@ beforeEach(() => {
 // ============================================================
 
 async function resolveStream(stream: unknown): Promise<RillValue> {
-  return (stream as { __rill_stream_resolve: () => Promise<RillValue> }).__rill_stream_resolve();
+  return (
+    stream as { __rill_stream_resolve: () => Promise<RillValue> }
+  ).__rill_stream_resolve();
 }
 
 async function collectChunks(stream: unknown): Promise<string[]> {
@@ -79,13 +78,18 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
 
     let caught: unknown;
     try {
-      createClaudeCodeExtension({ binaryPath: '/invalid/claude' }, makeFactoryCtx());
+      createClaudeCodeExtension(
+        { binaryPath: '/invalid/claude' },
+        makeFactoryCtx()
+      );
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(RuntimeError);
     expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-    expect((caught as RuntimeError).message).toContain('claude binary not found');
+    expect((caught as RuntimeError).message).toContain(
+      'claude binary not found'
+    );
   });
 
   it('throws for binary not in PATH', async () => {
@@ -95,7 +99,10 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
     });
 
     expect(() =>
-      createClaudeCodeExtension({ binaryPath: 'nonexistent-binary' }, makeFactoryCtx()),
+      createClaudeCodeExtension(
+        { binaryPath: 'nonexistent-binary' },
+        makeFactoryCtx()
+      )
     ).toThrow('claude binary not found');
   });
 });
@@ -112,25 +119,25 @@ describe('EC-2: Invalid defaultTimeout', () => {
 
   it('throws Error for negative timeout', () => {
     expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: -1000 }, makeFactoryCtx()),
+      createClaudeCodeExtension({ defaultTimeout: -1000 }, makeFactoryCtx())
     ).toThrow('Invalid timeout: must be positive integer, max 3600000');
   });
 
   it('throws Error for zero timeout', () => {
     expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 0 }, makeFactoryCtx()),
+      createClaudeCodeExtension({ defaultTimeout: 0 }, makeFactoryCtx())
     ).toThrow('Invalid timeout: must be positive integer, max 3600000');
   });
 
   it('throws Error for non-integer timeout', () => {
     expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 1500.5 }, makeFactoryCtx()),
+      createClaudeCodeExtension({ defaultTimeout: 1500.5 }, makeFactoryCtx())
     ).toThrow('Invalid timeout: must be positive integer, max 3600000');
   });
 
   it('throws Error for timeout exceeding max (3600000)', () => {
     expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 3600001 }, makeFactoryCtx()),
+      createClaudeCodeExtension({ defaultTimeout: 3600001 }, makeFactoryCtx())
     ).toThrow('Invalid timeout: must be positive integer, max 3600000');
   });
 });
@@ -152,7 +159,7 @@ describe('EC-3, AC-11: Empty text to prompt', () => {
     expectInvalidThrow(
       () => (ext.value as any).prompt.fn({ text: '', options: {} }, ctx),
       'INVALID_INPUT',
-      'prompt text cannot be empty',
+      'prompt text cannot be empty'
     );
   });
 
@@ -163,12 +170,12 @@ describe('EC-3, AC-11: Empty text to prompt', () => {
     expectInvalidThrow(
       () => (ext.value as any).prompt.fn({ text: '   ', options: {} }, ctx),
       'INVALID_INPUT',
-      'prompt text cannot be empty',
+      'prompt text cannot be empty'
     );
     expectInvalidThrow(
       () => (ext.value as any).prompt.fn({ text: '\t\n  ', options: {} }, ctx),
       'INVALID_INPUT',
-      'prompt text cannot be empty',
+      'prompt text cannot be empty'
     );
   });
 });
@@ -184,7 +191,9 @@ describe('EC-4, AC-6: Binary not found at spawn (ENOENT)', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new SpawnError('binary_missing', 'claude binary not found', { binary_path: 'claude' });
+      throw new SpawnError('binary_missing', 'claude binary not found', {
+        binary_path: 'claude',
+      });
     });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -193,7 +202,7 @@ describe('EC-4, AC-6: Binary not found at spawn (ENOENT)', () => {
     expectInvalidThrow(
       () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
       'UNAVAILABLE',
-      'claude binary not found',
+      'claude binary not found'
     );
   });
 });
@@ -220,7 +229,7 @@ describe('EC-5, AC-7: Permission denied (EACCES)', () => {
     expectInvalidThrow(
       () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
       'FORBIDDEN',
-      'Permission denied',
+      'Permission denied'
     );
   });
 });
@@ -236,9 +245,13 @@ describe('EC-6: Generic spawn failure', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: Unknown spawn error', {
-        binary_path: 'claude',
-      });
+      throw new SpawnError(
+        'spawn_failed',
+        'Failed to spawn claude binary: Unknown spawn error',
+        {
+          binary_path: 'claude',
+        }
+      );
     });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -247,7 +260,7 @@ describe('EC-6: Generic spawn failure', () => {
     expectInvalidThrow(
       () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
       'UNAVAILABLE',
-      'Failed to spawn claude binary',
+      'Failed to spawn claude binary'
     );
   });
 });
@@ -264,10 +277,19 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
     const { extractResult } = await import('../src/result.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
+    vi.mocked(createStreamParser).mockReturnValue({
+      processChunk: vi.fn(),
+      flush: vi.fn(),
+    });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
+      tokens: {
+        prompt: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
+        output: 0,
+      },
       cost: 0,
       exit_code: 1,
       duration: 0,
@@ -281,7 +303,9 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('cli_timeout', 'Claude CLI timeout after 5000ms', { timeout_ms: 5000 }),
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 5000ms', {
+          timeout_ms: 5000,
+        })
       ),
       dispose: vi.fn(),
     });
@@ -289,7 +313,10 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
+    const stream = (ext.value as any).prompt.fn(
+      { text: 'test', options: {} },
+      ctx
+    );
     await collectChunks(stream);
     const result = await resolveStream(stream);
     expect(isInvalid(result)).toBe(true);
@@ -309,10 +336,19 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     const { extractResult } = await import('../src/result.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
+    vi.mocked(createStreamParser).mockReturnValue({
+      processChunk: vi.fn(),
+      flush: vi.fn(),
+    });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
+      tokens: {
+        prompt: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
+        output: 0,
+      },
       cost: 0,
       exit_code: 1,
       duration: 0,
@@ -326,7 +362,9 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('exit_nonzero', 'Claude CLI exited with code 1', { exit_code: 1 }),
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 1', {
+          exit_code: 1,
+        })
       ),
       dispose: vi.fn(),
     });
@@ -334,7 +372,10 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
+    const stream = (ext.value as any).prompt.fn(
+      { text: 'test', options: {} },
+      ctx
+    );
     const chunks = await collectChunks(stream);
 
     const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
@@ -353,10 +394,19 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     const { extractResult } = await import('../src/result.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
+    vi.mocked(createStreamParser).mockReturnValue({
+      processChunk: vi.fn(),
+      flush: vi.fn(),
+    });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
+      tokens: {
+        prompt: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
+        output: 0,
+      },
       cost: 0,
       exit_code: 127,
       duration: 0,
@@ -370,7 +420,9 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('exit_nonzero', 'Claude CLI exited with code 127', { exit_code: 127 }),
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 127', {
+          exit_code: 127,
+        })
       ),
       dispose: vi.fn(),
     });
@@ -378,7 +430,10 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx);
+    const stream = (ext.value as any).prompt.fn(
+      { text: 'test', options: {} },
+      ctx
+    );
     const chunks = await collectChunks(stream);
     expect(chunks.some((c) => c.includes('127'))).toBe(true);
 
@@ -405,7 +460,7 @@ describe('EC-10: Empty skill name', () => {
     expectInvalidThrow(
       () => (ext.value as any).skill.fn({ name: '', args: {} }, ctx),
       'INVALID_INPUT',
-      'skill name cannot be empty',
+      'skill name cannot be empty'
     );
   });
 
@@ -416,7 +471,7 @@ describe('EC-10: Empty skill name', () => {
     expectInvalidThrow(
       () => (ext.value as any).skill.fn({ name: '   ', args: {} }, ctx),
       'INVALID_INPUT',
-      'skill name cannot be empty',
+      'skill name cannot be empty'
     );
   });
 });
@@ -433,10 +488,19 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
     const { extractResult } = await import('../src/result.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
+    vi.mocked(createStreamParser).mockReturnValue({
+      processChunk: vi.fn(),
+      flush: vi.fn(),
+    });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
+      tokens: {
+        prompt: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
+        output: 0,
+      },
       cost: 0,
       exit_code: 2,
       duration: 0,
@@ -450,7 +514,9 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('exit_nonzero', 'Claude CLI exited with code 2', { exit_code: 2 }),
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 2', {
+          exit_code: 2,
+        })
       ),
       dispose: vi.fn(),
     });
@@ -458,7 +524,10 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).skill.fn({ name: 'invalid-skill', args: {} }, ctx);
+    const stream = (ext.value as any).skill.fn(
+      { name: 'invalid-skill', args: {} },
+      ctx
+    );
     const chunks = await collectChunks(stream);
 
     const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
@@ -482,9 +551,13 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new SpawnError('spawn_failed', 'Failed to spawn claude binary: test error', {
-        binary_path: 'claude',
-      });
+      throw new SpawnError(
+        'spawn_failed',
+        'Failed to spawn claude binary: test error',
+        {
+          binary_path: 'claude',
+        }
+      );
     });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -493,7 +566,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     expectInvalidThrow(
       () => (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx),
       'UNAVAILABLE',
-      'Failed to spawn claude binary',
+      'Failed to spawn claude binary'
     );
   });
 
@@ -504,10 +577,19 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     const { extractResult } = await import('../src/result.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
+    vi.mocked(createStreamParser).mockReturnValue({
+      processChunk: vi.fn(),
+      flush: vi.fn(),
+    });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
+      tokens: {
+        prompt: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
+        output: 0,
+      },
       cost: 0,
       exit_code: 1,
       duration: 0,
@@ -521,7 +603,9 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('cli_timeout', 'Claude CLI timeout after 10000ms', { timeout_ms: 10000 }),
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 10000ms', {
+          timeout_ms: 10000,
+        })
       ),
       dispose: vi.fn(),
     });
@@ -529,7 +613,10 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx);
+    const stream = (ext.value as any).skill.fn(
+      { name: 'test-skill', args: {} },
+      ctx
+    );
     await collectChunks(stream);
     const result = await resolveStream(stream);
     expect(isInvalid(result)).toBe(true);
@@ -554,7 +641,7 @@ describe('EC-13: Empty command name', () => {
     expectInvalidThrow(
       () => (ext.value as any).command.fn({ name: '', args: {} }, ctx),
       'INVALID_INPUT',
-      'command name cannot be empty',
+      'command name cannot be empty'
     );
   });
 
@@ -565,7 +652,7 @@ describe('EC-13: Empty command name', () => {
     expectInvalidThrow(
       () => (ext.value as any).command.fn({ name: '\t\n', args: {} }, ctx),
       'INVALID_INPUT',
-      'command name cannot be empty',
+      'command name cannot be empty'
     );
   });
 });
@@ -582,10 +669,19 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
     const { extractResult } = await import('../src/result.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
+    vi.mocked(createStreamParser).mockReturnValue({
+      processChunk: vi.fn(),
+      flush: vi.fn(),
+    });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
+      tokens: {
+        prompt: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
+        output: 0,
+      },
       cost: 0,
       exit_code: 3,
       duration: 0,
@@ -599,7 +695,9 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('exit_nonzero', 'Claude CLI exited with code 3', { exit_code: 3 }),
+        new SpawnError('exit_nonzero', 'Claude CLI exited with code 3', {
+          exit_code: 3,
+        })
       ),
       dispose: vi.fn(),
     });
@@ -607,7 +705,10 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).command.fn({ name: 'invalid-command', args: {} }, ctx);
+    const stream = (ext.value as any).command.fn(
+      { name: 'invalid-command', args: {} },
+      ctx
+    );
     const chunks = await collectChunks(stream);
     const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
     expect(errorChunks.length).toBeGreaterThan(0);
@@ -630,16 +731,19 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      throw new SpawnError('binary_missing', 'claude binary not found', { binary_path: 'claude' });
+      throw new SpawnError('binary_missing', 'claude binary not found', {
+        binary_path: 'claude',
+      });
     });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
+      () =>
+        (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
       'UNAVAILABLE',
-      'claude binary not found',
+      'claude binary not found'
     );
   });
 
@@ -650,10 +754,19 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const { extractResult } = await import('../src/result.js');
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({ processChunk: vi.fn(), flush: vi.fn() });
+    vi.mocked(createStreamParser).mockReturnValue({
+      processChunk: vi.fn(),
+      flush: vi.fn(),
+    });
     vi.mocked(extractResult).mockReturnValue({
       result: '',
-      tokens: { prompt: 0, cache_write_5m: 0, cache_write_1h: 0, cache_read: 0, output: 0 },
+      tokens: {
+        prompt: 0,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
+        output: 0,
+      },
       cost: 0,
       exit_code: 1,
       duration: 0,
@@ -667,7 +780,9 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
         kill: vi.fn(),
       } as any,
       exitCode: Promise.reject(
-        new SpawnError('cli_timeout', 'Claude CLI timeout after 15000ms', { timeout_ms: 15000 }),
+        new SpawnError('cli_timeout', 'Claude CLI timeout after 15000ms', {
+          timeout_ms: 15000,
+        })
       ),
       dispose: vi.fn(),
     });
@@ -675,7 +790,10 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx);
+    const stream = (ext.value as any).command.fn(
+      { name: 'test-command', args: {} },
+      ctx
+    );
     await collectChunks(stream);
     const result = await resolveStream(stream);
     expect(isInvalid(result)).toBe(true);
@@ -697,9 +815,10 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
+      () =>
+        (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
       'FORBIDDEN',
-      'Permission denied',
+      'Permission denied'
     );
   });
 });

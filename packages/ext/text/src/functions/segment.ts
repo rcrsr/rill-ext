@@ -90,7 +90,7 @@ export function truncate(
   text: string,
   max: number,
   wordBoundary: boolean,
-  ellipsis: string,
+  ellipsis: string
 ): string {
   if (text.length <= max) {
     return text;

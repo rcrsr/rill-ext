@@ -16,10 +16,19 @@ import {
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { TextExtensionConfig } from './types.js';
-import { htmlToText, htmlToMarkdown, extractContent, decodeEntities } from './functions/html.js';
+import {
+  htmlToText,
+  htmlToMarkdown,
+  extractContent,
+  decodeEntities,
+} from './functions/html.js';
 import { decodeQuotedPrintable } from './functions/mime.js';
 import { stripDiacritics } from './functions/unicode.js';
-import { collapseWhitespace, dedent, trimLines } from './functions/whitespace.js';
+import {
+  collapseWhitespace,
+  dedent,
+  trimLines,
+} from './functions/whitespace.js';
 import { extractUrls, extractEmails } from './functions/extract.js';
 import { splitParagraphs, windowFn, truncate } from './functions/segment.js';
 
@@ -43,7 +52,10 @@ const ellipsisParam: RillParam = {
   name: 'ellipsis',
   type: { kind: 'string' },
   defaultValue: undefined,
-  annotations: { description: 'Ellipsis string appended when text is truncated; pass "" for none' },
+  annotations: {
+    description:
+      'Ellipsis string appended when text is truncated; pass "" for none',
+  },
 };
 
 // ============================================================
@@ -61,7 +73,7 @@ const ellipsisParam: RillParam = {
  */
 export function createTextExtension(
   config: TextExtensionConfig = {},
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // config has no fields; destructure to satisfy noUnusedLocals via void
   void config;
@@ -82,53 +94,72 @@ export function createTextExtension(
         const runCtx = ctx as RuntimeContext;
         const html = args['html'];
         if (typeof html !== 'string') {
-          return runCtx.invalidate(
-            new Error('html must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('html must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         const rawIncludeLinks = args['include_links'];
-        const includeLinks = rawIncludeLinks === undefined ? false : rawIncludeLinks;
+        const includeLinks =
+          rawIncludeLinks === undefined ? false : rawIncludeLinks;
         if (typeof includeLinks !== 'boolean') {
           return runCtx.invalidate(
             new Error('include_links must be a boolean'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_option_type' } },
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'invalid_option_type' },
+            }
           );
         }
         const rawWordWrap = args['word_wrap'];
         const wordWrap = rawWordWrap === undefined ? true : rawWordWrap;
         if (typeof wordWrap !== 'boolean') {
-          return runCtx.invalidate(
-            new Error('word_wrap must be a boolean'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_option_type' } },
-          );
+          return runCtx.invalidate(new Error('word_wrap must be a boolean'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'invalid_option_type' },
+          });
         }
         const rawWordWrapWidth = args['word_wrap_width'];
-        const wordWrapWidth = rawWordWrapWidth === undefined ? 80 : rawWordWrapWidth;
-        if (!Number.isInteger(wordWrapWidth) || (wordWrapWidth as number) <= 0) {
+        const wordWrapWidth =
+          rawWordWrapWidth === undefined ? 80 : rawWordWrapWidth;
+        if (
+          !Number.isInteger(wordWrapWidth) ||
+          (wordWrapWidth as number) <= 0
+        ) {
           return runCtx.invalidate(
             new Error('word_wrap_width must be a positive integer'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_word_wrap_width' } },
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'invalid_word_wrap_width' },
+            }
           );
         }
-        return htmlToText(html, includeLinks, wordWrap, wordWrapWidth as number);
+        return htmlToText(
+          html,
+          includeLinks,
+          wordWrap,
+          wordWrapWidth as number
+        );
       },
       annotations: { description: 'Convert HTML to plain text' },
       returnType: stringReturn,
     },
 
     html_to_markdown: {
-      params: [
-        p.str('html', 'HTML string to convert'),
-      ],
+      params: [p.str('html', 'HTML string to convert')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const html = args['html'];
         if (typeof html !== 'string') {
-          return runCtx.invalidate(
-            new Error('html must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('html must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return htmlToMarkdown(html);
       },
@@ -137,36 +168,36 @@ export function createTextExtension(
     },
 
     extract_content: {
-      params: [
-        p.str('html', 'HTML document to extract main content from'),
-      ],
+      params: [p.str('html', 'HTML document to extract main content from')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const html = args['html'];
         if (typeof html !== 'string') {
-          return runCtx.invalidate(
-            new Error('html must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('html must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return await extractContent(html);
       },
-      annotations: { description: 'Extract main readable content from HTML using defuddle' },
+      annotations: {
+        description: 'Extract main readable content from HTML using defuddle',
+      },
       returnType: stringReturn,
     },
 
     decode_entities: {
-      params: [
-        p.str('text', 'Text containing HTML entities to decode'),
-      ],
+      params: [p.str('text', 'Text containing HTML entities to decode')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return decodeEntities(text);
       },
@@ -175,17 +206,16 @@ export function createTextExtension(
     },
 
     decode_quoted_printable: {
-      params: [
-        p.str('text', 'Quoted-printable encoded text to decode'),
-      ],
+      params: [p.str('text', 'Quoted-printable encoded text to decode')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return decodeQuotedPrintable(text);
       },
@@ -194,17 +224,16 @@ export function createTextExtension(
     },
 
     strip_diacritics: {
-      params: [
-        p.str('text', 'Text from which to remove diacritics'),
-      ],
+      params: [p.str('text', 'Text from which to remove diacritics')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return stripDiacritics(text);
       },
@@ -221,75 +250,84 @@ export function createTextExtension(
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         const rawPreserveNewlines = args['preserve_newlines'];
-        const preserveNewlines = rawPreserveNewlines === undefined ? false : rawPreserveNewlines;
+        const preserveNewlines =
+          rawPreserveNewlines === undefined ? false : rawPreserveNewlines;
         if (typeof preserveNewlines !== 'boolean') {
           return runCtx.invalidate(
             new Error('preserve_newlines must be a boolean'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_option_type' } },
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'invalid_option_type' },
+            }
           );
         }
         return collapseWhitespace(text, preserveNewlines);
       },
-      annotations: { description: 'Collapse runs of whitespace to a single space' },
+      annotations: {
+        description: 'Collapse runs of whitespace to a single space',
+      },
       returnType: stringReturn,
     },
 
     dedent: {
-      params: [
-        p.str('text', 'Indented text to dedent'),
-      ],
+      params: [p.str('text', 'Indented text to dedent')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return dedent(text);
       },
-      annotations: { description: 'Remove common leading indentation from all lines' },
+      annotations: {
+        description: 'Remove common leading indentation from all lines',
+      },
       returnType: stringReturn,
     },
 
     trim_lines: {
-      params: [
-        p.str('text', 'Text whose lines should be trimmed'),
-      ],
+      params: [p.str('text', 'Text whose lines should be trimmed')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return trimLines(text);
       },
-      annotations: { description: 'Trim whitespace from each line and return line list' },
+      annotations: {
+        description: 'Trim whitespace from each line and return line list',
+      },
       returnType: stringListReturn,
     },
 
     extract_urls: {
-      params: [
-        p.str('text', 'Text to extract URLs from'),
-      ],
+      params: [p.str('text', 'Text to extract URLs from')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return extractUrls(text);
       },
@@ -298,17 +336,16 @@ export function createTextExtension(
     },
 
     extract_emails: {
-      params: [
-        p.str('text', 'Text to extract email addresses from'),
-      ],
+      params: [p.str('text', 'Text to extract email addresses from')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return extractEmails(text);
       },
@@ -317,17 +354,16 @@ export function createTextExtension(
     },
 
     split_paragraphs: {
-      params: [
-        p.str('text', 'Text to split into paragraphs'),
-      ],
+      params: [p.str('text', 'Text to split into paragraphs')],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         return splitParagraphs(text);
       },
@@ -339,22 +375,30 @@ export function createTextExtension(
       params: [
         p.str('text', 'Text to slide a window over'),
         p.num('size', 'Window size in characters'),
-        p.num('step', 'Step size between windows; defaults to size when omitted'),
+        p.num(
+          'step',
+          'Step size between windows; defaults to size when omitted'
+        ),
       ],
       fn: async (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         const size = args['size'] as number;
         if (!Number.isInteger(size) || size <= 0) {
           return runCtx.invalidate(
             new Error('size must be a positive integer'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_window_size' } },
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'invalid_window_size' },
+            }
           );
         }
         const rawStep = args['step'];
@@ -362,12 +406,19 @@ export function createTextExtension(
         if (!Number.isInteger(step) || step <= 0) {
           return runCtx.invalidate(
             new Error('step must be a positive integer'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_window_step' } },
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'invalid_window_step' },
+            }
           );
         }
         return windowFn(text, size, step);
       },
-      annotations: { description: 'Slide a fixed-size window over text and return overlapping chunks' },
+      annotations: {
+        description:
+          'Slide a fixed-size window over text and return overlapping chunks',
+      },
       returnType: stringListReturn,
     },
 
@@ -382,33 +433,44 @@ export function createTextExtension(
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
-          return runCtx.invalidate(
-            new Error('text must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'non_string_input' } },
-          );
+          return runCtx.invalidate(new Error('text must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'non_string_input' },
+          });
         }
         const max = args['max'] as number;
         if (!Number.isInteger(max) || max <= 0) {
           return runCtx.invalidate(
             new Error('max must be a positive integer'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_max' } },
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'invalid_max' },
+            }
           );
         }
         const rawWordBoundary = args['word_boundary'];
-        const wordBoundary = rawWordBoundary === undefined ? false : rawWordBoundary;
+        const wordBoundary =
+          rawWordBoundary === undefined ? false : rawWordBoundary;
         if (typeof wordBoundary !== 'boolean') {
           return runCtx.invalidate(
             new Error('word_boundary must be a boolean'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_option_type' } },
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'invalid_option_type' },
+            }
           );
         }
         const rawEllipsis = args['ellipsis'];
         const ellipsis = rawEllipsis === undefined ? '' : rawEllipsis;
         if (typeof ellipsis !== 'string') {
-          return runCtx.invalidate(
-            new Error('ellipsis must be a string'),
-            { code: 'INVALID_INPUT', provider: PROVIDER, raw: { kind: 'invalid_option_type' } },
-          );
+          return runCtx.invalidate(new Error('ellipsis must be a string'), {
+            code: 'INVALID_INPUT',
+            provider: PROVIDER,
+            raw: { kind: 'invalid_option_type' },
+          });
         }
         return truncate(text, max, wordBoundary, ellipsis);
       },

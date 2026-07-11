@@ -25,7 +25,10 @@ describe('splitRoleMessages', () => {
       const result = splitRoleMessages(body);
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({ role: 'system', content: 'You are a helpful assistant.' });
+      expect(result[0]).toEqual({
+        role: 'system',
+        content: 'You are a helpful assistant.',
+      });
       expect(result[1]).toEqual({ role: 'user', content: 'Hello!' });
     });
 
@@ -75,7 +78,8 @@ describe('splitRoleMessages', () => {
     });
 
     it('does not create an extra role entry for a ## heading', () => {
-      const body = '@@ system\nSetup.\n## Note\nThis is context.\n@@ user\nHello!';
+      const body =
+        '@@ system\nSetup.\n## Note\nThis is context.\n@@ user\nHello!';
       const result = splitRoleMessages(body);
 
       expect(result).toHaveLength(2);
@@ -101,7 +105,10 @@ describe('splitRoleMessages', () => {
       const result = splitRoleMessages(body);
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({ role: 'user', content: 'preamble line 1\npreamble line 2' });
+      expect(result[0]).toEqual({
+        role: 'user',
+        content: 'preamble line 1\npreamble line 2',
+      });
       expect(result[1]).toEqual({ role: 'assistant', content: 'reply' });
     });
 
@@ -202,7 +209,7 @@ describe('splitRoleMessages', () => {
     it('error message contains the valid roles list', () => {
       const body = '@@ model\noutput';
       expect(() => splitRoleMessages(body)).toThrow(
-        'Valid roles are: system, user, assistant.',
+        'Valid roles are: system, user, assistant.'
       );
     });
 

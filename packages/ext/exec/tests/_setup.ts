@@ -8,9 +8,7 @@ import {
   type RuntimeContext,
 } from '@rcrsr/rill';
 
-export function makeFactoryCtx(
-  signal?: AbortSignal,
-): ExtensionFactoryCtx {
+export function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
   return {
     signal: signal ?? new AbortController().signal,
     registerErrorCode: () => {},

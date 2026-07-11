@@ -90,7 +90,7 @@ const SUBSYSTEM = `extension:${PROVIDER}` as const;
  */
 export function createGoogleWorkspaceExtension(
   config: GoogleWorkspaceConfig,
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Validate config — throws RuntimeError(RILL-R001) on failure
   validateConfig(config);
@@ -137,12 +137,15 @@ export function createGoogleWorkspaceExtension(
     fn: (
       args: Record<string, RillValue>,
       ctx: RuntimeContext,
-      controller: AbortController,
-    ) => Promise<RillValue>,
-  ): (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue> {
+      controller: AbortController
+    ) => Promise<RillValue>
+  ): (
+    args: Record<string, RillValue>,
+    ctx: RuntimeContext
+  ) => Promise<RillValue> {
     return async (
       args: Record<string, RillValue>,
-      ctx: RuntimeContext,
+      ctx: RuntimeContext
     ): Promise<RillValue> => {
       const disposed = (): RillValue =>
         ctx.invalidate(new Error('google: operation cancelled'), {
@@ -380,7 +383,8 @@ export function createGoogleWorkspaceExtension(
     'calendar_free_busy',
     'calendar',
     'free_busy',
-    (c) => checkCapability(c, capabilities.calendar.freeBusy, 'calendar.freeBusy'),
+    (c) =>
+      checkCapability(c, capabilities.calendar.freeBusy, 'calendar.freeBusy'),
     makeCalendarFreeBusy({ auth, cache: tokenCache })
   );
 
@@ -405,7 +409,7 @@ export function createGoogleWorkspaceExtension(
           element: {
             kind: 'dict',
             fields: {
-              id:        { type: { kind: 'string' } },
+              id: { type: { kind: 'string' } },
               thread_id: { type: { kind: 'string' } },
             },
           },
@@ -416,16 +420,16 @@ export function createGoogleWorkspaceExtension(
   const GMAIL_READ_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      id:        { type: { kind: 'string' } },
+      id: { type: { kind: 'string' } },
       thread_id: { type: { kind: 'string' } },
       headers: {
         type: {
           kind: 'dict',
           fields: {
-            from:    { type: { kind: 'string' } },
-            to:      { type: { kind: 'string' } },
+            from: { type: { kind: 'string' } },
+            to: { type: { kind: 'string' } },
             subject: { type: { kind: 'string' } },
-            date:    { type: { kind: 'string' } },
+            date: { type: { kind: 'string' } },
           },
         },
       },
@@ -436,9 +440,9 @@ export function createGoogleWorkspaceExtension(
           element: {
             kind: 'dict',
             fields: {
-              filename:  { type: { kind: 'string' } },
+              filename: { type: { kind: 'string' } },
               mime_type: { type: { kind: 'string' } },
-              size:      { type: { kind: 'number' } },
+              size: { type: { kind: 'number' } },
             },
           },
         },
@@ -448,23 +452,23 @@ export function createGoogleWorkspaceExtension(
   // Drive file metadata shape, shared between drive_list (each element of `files`)
   // and drive_get_metadata (top-level dict).
   const DRIVE_FILE_FIELDS: Record<string, { type: TypeStructure }> = {
-    id:            { type: { kind: 'string' } },
-    name:          { type: { kind: 'string' } },
-    mime_type:     { type: { kind: 'string' } },
-    size:          { type: { kind: 'any' } },  // number | null
+    id: { type: { kind: 'string' } },
+    name: { type: { kind: 'string' } },
+    mime_type: { type: { kind: 'string' } },
+    size: { type: { kind: 'any' } }, // number | null
     owners: {
       type: {
         kind: 'list',
         element: {
           kind: 'dict',
           fields: {
-            display_name:  { type: { kind: 'string' } },
+            display_name: { type: { kind: 'string' } },
             email_address: { type: { kind: 'string' } },
           },
         },
       },
     },
-    created_time:  { type: { kind: 'string' } },
+    created_time: { type: { kind: 'string' } },
     modified_time: { type: { kind: 'string' } },
   };
   const DRIVE_LIST_RT = structureToTypeValue({
@@ -485,11 +489,11 @@ export function createGoogleWorkspaceExtension(
   const DRIVE_UPLOAD_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      id:        { type: { kind: 'string' } },
-      name:      { type: { kind: 'string' } },
+      id: { type: { kind: 'string' } },
+      name: { type: { kind: 'string' } },
       mime_type: { type: { kind: 'string' } },
-      size:      { type: { kind: 'number' } },
-      owner:     { type: { kind: 'any' } },  // string | null
+      size: { type: { kind: 'number' } },
+      owner: { type: { kind: 'any' } }, // string | null
     },
   });
   // Calendar event shape, shared between calendar_events and calendar_today.
@@ -497,26 +501,26 @@ export function createGoogleWorkspaceExtension(
   // timeZone }) with camelCase keys; typed as `any` to avoid encoding the
   // boundary violation. Snake_case remapping is a separate boundary fix.
   const CALENDAR_EVENT_FIELDS: Record<string, { type: TypeStructure }> = {
-    id:          { type: { kind: 'string' } },
-    summary:     { type: { kind: 'string' } },
-    start:       { type: { kind: 'any' } },
-    end:         { type: { kind: 'any' } },
+    id: { type: { kind: 'string' } },
+    summary: { type: { kind: 'string' } },
+    start: { type: { kind: 'any' } },
+    end: { type: { kind: 'any' } },
     attendees: {
       type: {
         kind: 'list',
         element: {
           kind: 'dict',
           fields: {
-            email:           { type: { kind: 'string' } },
-            display_name:    { type: { kind: 'string' } },
+            email: { type: { kind: 'string' } },
+            display_name: { type: { kind: 'string' } },
             response_status: { type: { kind: 'string' } },
           },
         },
       },
     },
     description: { type: { kind: 'string' } },
-    location:    { type: { kind: 'string' } },
-    status:      { type: { kind: 'string' } },
+    location: { type: { kind: 'string' } },
+    status: { type: { kind: 'string' } },
   };
   const CALENDAR_EVENTS_RT = structureToTypeValue({
     kind: 'dict',
@@ -542,7 +546,7 @@ export function createGoogleWorkspaceExtension(
               kind: 'dict',
               fields: {
                 start: { type: { kind: 'string' } },
-                end:   { type: { kind: 'string' } },
+                end: { type: { kind: 'string' } },
               },
             },
           },
@@ -565,10 +569,7 @@ export function createGoogleWorkspaceExtension(
     // Gmail (7)
     gmail_search: toCallable({
       fn: gmailSearchWrapped as CallableFn,
-      params: [
-        p.str('query'),
-        p.dict('options', undefined, {}),
-      ],
+      params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: GMAIL_SEARCH_RT,
     }),
     gmail_read: toCallable({
@@ -618,10 +619,7 @@ export function createGoogleWorkspaceExtension(
     // Drive (6)
     drive_list: toCallable({
       fn: driveListWrapped as CallableFn,
-      params: [
-        folderIdOptionalParam,
-        p.dict('options', undefined, {}),
-      ],
+      params: [folderIdOptionalParam, p.dict('options', undefined, {})],
       returnType: DRIVE_LIST_RT,
     }),
     drive_upload: toCallable({
@@ -641,11 +639,7 @@ export function createGoogleWorkspaceExtension(
     }),
     drive_share: toCallable({
       fn: driveShareWrapped as CallableFn,
-      params: [
-        p.str('file_id'),
-        p.str('email'),
-        p.str('role'),
-      ],
+      params: [p.str('file_id'), p.str('email'), p.str('role')],
       returnType: boolReturnType,
     }),
     drive_delete: toCallable({

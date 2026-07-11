@@ -63,7 +63,10 @@ vi.mock('openai', () => {
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -72,7 +75,11 @@ function getCallable(ext: { value: unknown }, name: string): ApplicationCallable
  * The foundry callAPIStreaming remaps usage to { input_tokens, output_tokens }.
  */
 function createMockToolCallResponse(
-  toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }>,
+  toolCalls: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, unknown>;
+  }>,
   model = 'gpt-4o'
 ) {
   return {
@@ -133,11 +140,12 @@ function createMockTextResponse(content: string, model = 'gpt-4o') {
  *   .finalChatCompletion()  - resolves with final response
  */
 function createMockStreamRunner(
-  response: ReturnType<typeof createMockTextResponse> | ReturnType<typeof createMockToolCallResponse>
+  response:
+    | ReturnType<typeof createMockTextResponse>
+    | ReturnType<typeof createMockToolCallResponse>
 ) {
   // Extract text content from the response to emit via 'content' events
-  const textContent =
-    response.choices[0]?.message?.content ?? '';
+  const textContent = response.choices[0]?.message?.content ?? '';
 
   const eventHandlers: Record<string, Array<(...args: unknown[]) => void>> = {};
 
@@ -167,15 +175,21 @@ function createMockStreamRunner(
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve callback.
  */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  const resolve = (stream as Record<string, unknown>)['__rill_stream_resolve'] as () => Promise<unknown>;
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  const resolve = (stream as Record<string, unknown>)[
+    '__rill_stream_resolve'
+  ] as () => Promise<unknown>;
   return (await resolve()) as Record<string, unknown>;
 }
 
 /**
  * Collect all dict chunks from a RillStream via next() iteration.
  */
-async function collectChunks(stream: unknown): Promise<Record<string, unknown>[]> {
+async function collectChunks(
+  stream: unknown
+): Promise<Record<string, unknown>[]> {
   const chunks: Record<string, unknown>[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let current: any = stream;
@@ -263,7 +277,9 @@ describe('tool_loop() function', () => {
     // AC-7: text_delta chunks appear when LLM emits text
     it('yields text_delta chunks when LLM emits text content', async () => {
       mockStream.mockReturnValueOnce(
-        createMockStreamRunner(createMockTextResponse('Here is your answer: 42'))
+        createMockStreamRunner(
+          createMockTextResponse('Here is your answer: 42')
+        )
       );
 
       const ext = await createFoundryExtension(baseConfig);
@@ -281,9 +297,7 @@ describe('tool_loop() function', () => {
       const chunks = await collectChunks(stream);
       const textDeltas = chunks.filter((c) => c['type'] === 'text_delta');
       expect(textDeltas.length).toBeGreaterThan(0);
-      expect(
-        textDeltas.every((c) => typeof c['text'] === 'string')
-      ).toBe(true);
+      expect(textDeltas.every((c) => typeof c['text'] === 'string')).toBe(true);
     });
 
     // AC-7: tool_call and tool_result chunks appear during tool execution
@@ -292,25 +306,28 @@ describe('tool_loop() function', () => {
         .mockReturnValueOnce(
           createMockStreamRunner(
             createMockToolCallResponse([
-              { id: 'tc_1', name: 'get_weather', arguments: { location: 'SF' } },
+              {
+                id: 'tc_1',
+                name: 'get_weather',
+                arguments: { location: 'SF' },
+              },
             ])
           )
         )
         .mockReturnValueOnce(
-          createMockStreamRunner(createMockTextResponse('The weather is sunny.'))
+          createMockStreamRunner(
+            createMockTextResponse('The weather is sunny.')
+          )
         );
 
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
 
       const tools = {
-        get_weather: makeTool(
-          (_args) => 'Sunny, 72F',
-          {
-            description: 'Get weather',
-            params: [{ name: 'location', type: 'string', description: 'City' }],
-          }
-        ),
+        get_weather: makeTool((_args) => 'Sunny, 72F', {
+          description: 'Get weather',
+          params: [{ name: 'location', type: 'string', description: 'City' }],
+        }),
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
@@ -332,22 +349,27 @@ describe('tool_loop() function', () => {
         .mockReturnValueOnce(
           createMockStreamRunner(
             createMockToolCallResponse([
-              { id: 'tc_1', name: 'get_weather', arguments: { location: 'SF' } },
+              {
+                id: 'tc_1',
+                name: 'get_weather',
+                arguments: { location: 'SF' },
+              },
             ])
           )
         )
         .mockReturnValueOnce(
-          createMockStreamRunner(createMockTextResponse('The weather in SF is sunny.'))
+          createMockStreamRunner(
+            createMockTextResponse('The weather in SF is sunny.')
+          )
         );
 
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
 
       const tools = {
-        get_weather: makeTool(
-          (_args) => 'Sunny, 72F',
-          { description: 'Get weather' }
-        ),
+        get_weather: makeTool((_args) => 'Sunny, 72F', {
+          description: 'Get weather',
+        }),
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
@@ -361,7 +383,7 @@ describe('tool_loop() function', () => {
       expect(result['model']).toBe('gpt-4o');
       expect(result['stop_reason']).toBe('stop');
       expect(typeof result['turns']).toBe('number');
-      expect((result['turns'] as number)).toBe(2);
+      expect(result['turns'] as number).toBe(2);
       expect(Array.isArray(result['messages'])).toBe(true);
 
       const usage = result['usage'] as Record<string, unknown>;
@@ -412,7 +434,9 @@ describe('tool_loop() function', () => {
     // AC-7: returns immediately when no tool calls are made
     it('returns immediately when LLM makes no tool calls', async () => {
       mockStream.mockReturnValueOnce(
-        createMockStreamRunner(createMockTextResponse('I can answer directly: 42'))
+        createMockStreamRunner(
+          createMockTextResponse('I can answer directly: 42')
+        )
       );
 
       const ext = await createFoundryExtension(baseConfig);
@@ -513,12 +537,15 @@ describe('tool_loop() function', () => {
         tool: makeTool(() => 'result', { description: 'Tool' }),
       };
 
-      expectThrowHalt(() => {
-        getCallable(ext, 'tool_loop').fn(
-          { prompt: '', tools, options: {} },
-          ctx
-        );
-      }, { code: 'INVALID_INPUT', message: 'prompt string cannot be empty' });
+      expectThrowHalt(
+        () => {
+          getCallable(ext, 'tool_loop').fn(
+            { prompt: '', tools, options: {} },
+            ctx
+          );
+        },
+        { code: 'INVALID_INPUT', message: 'prompt string cannot be empty' }
+      );
     });
   });
 });

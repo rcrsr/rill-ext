@@ -15,7 +15,11 @@ const config = {
 
       libraries: {
         inlinedLibraries: ['@rcrsr/rill-ext-vector-shared'],
-        importedLibraries: ['undici-types', '@rcrsr/rill', '@qdrant/js-client-rest'],
+        importedLibraries: [
+          'undici-types',
+          '@rcrsr/rill',
+          '@qdrant/js-client-rest',
+        ],
       },
 
       output: {

@@ -9,7 +9,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createRuntimeContext, RuntimeHaltSignal, getStatus, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  RuntimeHaltSignal,
+  getStatus,
+  type ApplicationCallable,
+} from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 import { expectThrowHalt } from './_halt-helpers.js';
@@ -48,7 +53,10 @@ vi.mock('@anthropic-ai/sdk', () => {
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -67,7 +75,10 @@ function createMockStream(content: string) {
   return {
     [Symbol.asyncIterator]: async function* () {
       if (content.length > 0) {
-        yield { type: 'content_block_delta', delta: { type: 'text_delta', text: content } };
+        yield {
+          type: 'content_block_delta',
+          delta: { type: 'text_delta', text: content },
+        };
       }
     },
     finalMessage: vi.fn().mockResolvedValue(response),
@@ -107,7 +118,10 @@ describe('boundary conditions', () => {
       const ctx = createRuntimeContext();
 
       const prompt = [
-        { role: 'system', parts: [{ type: 'text', text: 'You are a helpful assistant' }] },
+        {
+          role: 'system',
+          parts: [{ type: 'text', text: 'You are a helpful assistant' }],
+        },
       ];
 
       // normalizePrompt does not reject this — no user-turn required at this layer.
@@ -189,7 +203,9 @@ describe('boundary conditions', () => {
       }>;
 
       expect(messages[0]!.role).toBe('user');
-      const imageBlock = (messages[0]!.content as Array<{ type: string }>).find((b) => b.type === 'image');
+      const imageBlock = (messages[0]!.content as Array<{ type: string }>).find(
+        (b) => b.type === 'image'
+      );
       expect(imageBlock).toBeDefined();
     });
   });
@@ -366,7 +382,9 @@ describe('error cases', () => {
               prompt: [
                 {
                   role: 'user',
-                  parts: [{ type: 'audio', data: 'base64audiodata', format: 'mp3' }],
+                  parts: [
+                    { type: 'audio', data: 'base64audiodata', format: 'mp3' },
+                  ],
                 },
               ],
             },
@@ -446,8 +464,7 @@ describe('error cases', () => {
       const ctx = createRuntimeContext();
 
       const thrown = expectThrowHalt(
-        () =>
-          getCallable(ext, 'message').fn({ prompt: 123 }, ctx),
+        () => getCallable(ext, 'message').fn({ prompt: 123 }, ctx),
         { code: 'INVALID_INPUT' }
       );
 
@@ -477,8 +494,7 @@ describe('error cases', () => {
       const ctx = createRuntimeContext();
 
       const thrown = expectThrowHalt(
-        () =>
-          getCallable(ext, 'message').fn({ prompt: [] }, ctx),
+        () => getCallable(ext, 'message').fn({ prompt: [] }, ctx),
         { code: 'INVALID_INPUT' }
       );
 
@@ -497,8 +513,7 @@ describe('error cases', () => {
       const ctx = createRuntimeContext();
 
       const thrown = expectThrowHalt(
-        () =>
-          getCallable(ext, 'message').fn({ prompt: '' }, ctx),
+        () => getCallable(ext, 'message').fn({ prompt: '' }, ctx),
         { code: 'INVALID_INPUT' }
       );
 
@@ -512,8 +527,7 @@ describe('error cases', () => {
       const ctx = createRuntimeContext();
 
       const thrown = expectThrowHalt(
-        () =>
-          getCallable(ext, 'message').fn({ prompt: '   ' }, ctx),
+        () => getCallable(ext, 'message').fn({ prompt: '   ' }, ctx),
         { code: 'INVALID_INPUT' }
       );
 

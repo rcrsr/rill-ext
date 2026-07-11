@@ -110,24 +110,28 @@ export function spawnClaudeCli(
       const code = (error as Error & { code?: string }).code;
 
       if (code === 'ENOENT') {
-        throw new SpawnError('binary_missing', 'claude binary not found', { binary_path: binaryPath });
+        throw new SpawnError('binary_missing', 'claude binary not found', {
+          binary_path: binaryPath,
+        });
       }
 
       if (code === 'EACCES') {
-        throw new SpawnError('binary_eacces', 'Permission denied: claude', { binary_path: binaryPath });
+        throw new SpawnError('binary_eacces', 'Permission denied: claude', {
+          binary_path: binaryPath,
+        });
       }
 
       throw new SpawnError(
         'spawn_failed',
         `Failed to spawn claude binary: ${error.message}`,
-        { binary_path: binaryPath, original_error: error.message },
+        { binary_path: binaryPath, original_error: error.message }
       );
     }
 
     throw new SpawnError(
       'spawn_failed',
       'Failed to spawn claude binary: Unknown error',
-      { binary_path: binaryPath },
+      { binary_path: binaryPath }
     );
   }
 
@@ -138,9 +142,13 @@ export function spawnClaudeCli(
         disposed = true;
         ptyProcess.kill();
         rejectExit(
-          new SpawnError('cli_timeout', `Claude CLI timeout after ${timeoutMs}ms`, {
-            timeout_ms: timeoutMs,
-          }),
+          new SpawnError(
+            'cli_timeout',
+            `Claude CLI timeout after ${timeoutMs}ms`,
+            {
+              timeout_ms: timeoutMs,
+            }
+          )
         );
       }
     }, timeoutMs);
@@ -159,9 +167,13 @@ export function spawnClaudeCli(
       // EC-9: Non-zero exit code
       if (code !== 0) {
         rejectExit(
-          new SpawnError('exit_nonzero', `Claude CLI exited with code ${code}`, {
-            exit_code: code,
-          }),
+          new SpawnError(
+            'exit_nonzero',
+            `Claude CLI exited with code ${code}`,
+            {
+              exit_code: code,
+            }
+          )
         );
       } else {
         resolveExit(code);

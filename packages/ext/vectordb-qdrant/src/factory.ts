@@ -53,7 +53,12 @@ export function createQdrantExtension(
   // surfacing as `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog"
   // was pending` and failing release CI even when every test passes. Real
   // version mismatches still surface at the first API call.
-  const clientConfig: { url: string; apiKey?: string; timeout?: number; checkCompatibility: boolean } = {
+  const clientConfig: {
+    url: string;
+    apiKey?: string;
+    timeout?: number;
+    checkCompatibility: boolean;
+  } = {
     url: config.url,
     checkCompatibility: false,
   };
@@ -111,15 +116,22 @@ export function createQdrantExtension(
         return withEventEmission(ctx, PROVIDER, 'upsert', { id }, async () => {
           await client.upsert(factoryCollection, {
             wait: true,
-            points: [{ id, vector: Array.from(vector.data), payload: metadata }],
+            points: [
+              { id, vector: Array.from(vector.data), payload: metadata },
+            ],
           });
           return { id, success: true } as RillValue;
         });
       },
-      annotations: { description: 'Insert or update single vector with metadata' },
+      annotations: {
+        description: 'Insert or update single vector with metadata',
+      },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { id: { type: { kind: 'string' } }, success: { type: { kind: 'bool' } } },
+        fields: {
+          id: { type: { kind: 'string' } },
+          success: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -152,12 +164,17 @@ export function createQdrantExtension(
 
               const id = item['id'] as string;
               const vector = item['vector'] as RillVector;
-              const metadata = (item['metadata'] ?? {}) as Record<string, unknown>;
+              const metadata = (item['metadata'] ?? {}) as Record<
+                string,
+                unknown
+              >;
 
               try {
                 await client.upsert(factoryCollection, {
                   wait: true,
-                  points: [{ id, vector: Array.from(vector.data), payload: metadata }],
+                  points: [
+                    { id, vector: Array.from(vector.data), payload: metadata },
+                  ],
                 });
                 succeeded++;
               } catch (error: unknown) {
@@ -188,11 +205,16 @@ export function createQdrantExtension(
     search: {
       params: [
         vectorParam('vector'),
-        p.dict('options', undefined, {}, {
-          k: { type: { kind: 'number' }, defaultValue: 10 },
-          filter: { type: { kind: 'dict' }, defaultValue: {} },
-          score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            k: { type: { kind: 'number' }, defaultValue: 10 },
+            filter: { type: { kind: 'dict' }, defaultValue: {} },
+            score_threshold: { type: { kind: 'number' }, defaultValue: 0 },
+          }
+        ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
@@ -210,33 +232,42 @@ export function createQdrantExtension(
 
         const eventMetadata = { k, result_count: 0 };
 
-        return withEventEmission(ctx, PROVIDER, 'search', eventMetadata, async () => {
-          const searchRequest: {
-            vector: number[];
-            limit: number;
-            with_payload: boolean;
-            filter?: Record<string, unknown>;
-            score_threshold?: number;
-          } = {
-            vector: Array.from(vector.data),
-            limit: k,
-            with_payload: true,
-          };
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'search',
+          eventMetadata,
+          async () => {
+            const searchRequest: {
+              vector: number[];
+              limit: number;
+              with_payload: boolean;
+              filter?: Record<string, unknown>;
+              score_threshold?: number;
+            } = {
+              vector: Array.from(vector.data),
+              limit: k,
+              with_payload: true,
+            };
 
-          if (Object.keys(filter).length > 0) searchRequest.filter = filter;
-          if (scoreThreshold !== undefined) {
-            searchRequest.score_threshold = scoreThreshold;
+            if (Object.keys(filter).length > 0) searchRequest.filter = filter;
+            if (scoreThreshold !== undefined) {
+              searchRequest.score_threshold = scoreThreshold;
+            }
+
+            const response = await client.search(
+              factoryCollection,
+              searchRequest
+            );
+            const results = response.map((hit) => ({
+              id: String(hit.id),
+              score: hit.score,
+              metadata: hit.payload ?? {},
+            }));
+            eventMetadata.result_count = results.length;
+            return results as RillValue;
           }
-
-          const response = await client.search(factoryCollection, searchRequest);
-          const results = response.map((hit) => ({
-            id: String(hit.id),
-            score: hit.score,
-            metadata: hit.payload ?? {},
-          }));
-          eventMetadata.result_count = results.length;
-          return results as RillValue;
-        });
+        );
       },
       annotations: { description: 'Search k nearest neighbors' },
       returnType: structureToTypeValue({
@@ -288,7 +319,10 @@ export function createQdrantExtension(
             throw new Error('qdrant: invalid vector format');
           }
 
-          const vector = createVector(new Float32Array(vectorArray), factoryCollection);
+          const vector = createVector(
+            new Float32Array(vectorArray),
+            factoryCollection
+          );
           return {
             id: String(point.id),
             vector,
@@ -326,7 +360,10 @@ export function createQdrantExtension(
       annotations: { description: 'Delete vector by ID' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { id: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } },
+        fields: {
+          id: { type: { kind: 'string' } },
+          deleted: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -397,10 +434,15 @@ export function createQdrantExtension(
     create_collection: {
       params: [
         p.str('name'),
-        p.dict('options', undefined, {}, {
-          dimensions: { type: { kind: 'number' } },
-          distance: { type: { kind: 'string' }, defaultValue: 'cosine' },
-        }),
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            dimensions: { type: { kind: 'number' } },
+            distance: { type: { kind: 'string' }, defaultValue: 'cosine' },
+          }
+        ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
@@ -413,22 +455,31 @@ export function createQdrantExtension(
         const distance =
           (options['distance'] as 'cosine' | 'euclidean' | 'dot') ?? 'cosine';
 
-        return withEventEmission(ctx, PROVIDER, 'create_collection', { name }, async () => {
-          let qdrantDistance: 'Cosine' | 'Euclid' | 'Dot';
-          if (distance === 'cosine') qdrantDistance = 'Cosine';
-          else if (distance === 'euclidean') qdrantDistance = 'Euclid';
-          else qdrantDistance = 'Dot';
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'create_collection',
+          { name },
+          async () => {
+            let qdrantDistance: 'Cosine' | 'Euclid' | 'Dot';
+            if (distance === 'cosine') qdrantDistance = 'Cosine';
+            else if (distance === 'euclidean') qdrantDistance = 'Euclid';
+            else qdrantDistance = 'Dot';
 
-          await client.createCollection(name, {
-            vectors: { size: dimensions, distance: qdrantDistance },
-          });
-          return { name, created: true } as RillValue;
-        });
+            await client.createCollection(name, {
+              vectors: { size: dimensions, distance: qdrantDistance },
+            });
+            return { name, created: true } as RillValue;
+          }
+        );
       },
       annotations: { description: 'Create new vector collection' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { name: { type: { kind: 'string' } }, created: { type: { kind: 'bool' } } },
+        fields: {
+          name: { type: { kind: 'string' } },
+          created: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -440,15 +491,24 @@ export function createQdrantExtension(
         if (disposed !== null) return disposed;
 
         const name = args['name'] as string;
-        return withEventEmission(ctx, PROVIDER, 'delete_collection', { name }, async () => {
-          await client.deleteCollection(name);
-          return { name, deleted: true } as RillValue;
-        });
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'delete_collection',
+          { name },
+          async () => {
+            await client.deleteCollection(name);
+            return { name, deleted: true } as RillValue;
+          }
+        );
       },
       annotations: { description: 'Delete vector collection' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { name: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } },
+        fields: {
+          name: { type: { kind: 'string' } },
+          deleted: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -459,13 +519,22 @@ export function createQdrantExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) return disposed;
 
-        return withEventEmission(ctx, PROVIDER, 'list_collections', {}, async () => {
-          const response = await client.getCollections();
-          return response.collections.map((col) => col.name) as RillValue;
-        });
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'list_collections',
+          {},
+          async () => {
+            const response = await client.getCollections();
+            return response.collections.map((col) => col.name) as RillValue;
+          }
+        );
       },
       annotations: { description: 'List all collection names' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: { kind: 'string' },
+      }),
     },
 
     describe: {
@@ -475,31 +544,37 @@ export function createQdrantExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) return disposed;
 
-        return withEventEmission(ctx, PROVIDER, 'describe', { name: factoryCollection }, async () => {
-          const response = await client.getCollection(factoryCollection);
-          const vectorConfig = response.config?.params?.vectors;
-          let dimensions = 0;
-          let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
+        return withEventEmission(
+          ctx,
+          PROVIDER,
+          'describe',
+          { name: factoryCollection },
+          async () => {
+            const response = await client.getCollection(factoryCollection);
+            const vectorConfig = response.config?.params?.vectors;
+            let dimensions = 0;
+            let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
 
-          if (
-            vectorConfig &&
-            typeof vectorConfig === 'object' &&
-            'size' in vectorConfig
-          ) {
-            dimensions = (vectorConfig as { size: number }).size;
-            const dist = (vectorConfig as { distance: string }).distance;
-            if (dist === 'Cosine') distance = 'cosine';
-            else if (dist === 'Euclid') distance = 'euclidean';
-            else if (dist === 'Dot') distance = 'dot';
+            if (
+              vectorConfig &&
+              typeof vectorConfig === 'object' &&
+              'size' in vectorConfig
+            ) {
+              dimensions = (vectorConfig as { size: number }).size;
+              const dist = (vectorConfig as { distance: string }).distance;
+              if (dist === 'Cosine') distance = 'cosine';
+              else if (dist === 'Euclid') distance = 'euclidean';
+              else if (dist === 'Dot') distance = 'dot';
+            }
+
+            return {
+              name: factoryCollection,
+              count: response.points_count ?? 0,
+              dimensions,
+              distance,
+            } as RillValue;
           }
-
-          return {
-            name: factoryCollection,
-            count: response.points_count ?? 0,
-            dimensions,
-            distance,
-          } as RillValue;
-        });
+        );
       },
       annotations: { description: 'Describe configured collection' },
       returnType: structureToTypeValue({

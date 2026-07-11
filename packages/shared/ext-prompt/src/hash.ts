@@ -18,6 +18,12 @@ import { createHash } from 'node:crypto';
  * Byte-identical inputs always produce the same 64-character lowercase hex
  * string. Never throws.
  */
-export function computeContentHash(params: string, output: string, body: string): string {
-  return createHash('sha256').update(`${params}\n${output}\n${body}`).digest('hex');
+export function computeContentHash(
+  params: string,
+  output: string,
+  body: string
+): string {
+  return createHash('sha256')
+    .update(`${params}\n${output}\n${body}`)
+    .digest('hex');
 }

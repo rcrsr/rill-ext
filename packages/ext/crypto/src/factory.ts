@@ -29,9 +29,8 @@ const PROVIDER = 'crypto';
  */
 export function createCryptoExtension(
   config: CryptoExtensionConfig = {},
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-
   const defaultAlgorithm = config.defaultAlgorithm ?? 'sha256';
   const hmacKey = config.hmacKey;
 
@@ -43,7 +42,7 @@ export function createCryptoExtension(
 
   function checkAlgorithm(
     algorithm: string,
-    runCtx: RuntimeContext,
+    runCtx: RuntimeContext
   ): RillValue | null {
     if (!supportedAlgorithms.has(algorithm)) {
       return runCtx.invalidate(
@@ -56,7 +55,7 @@ export function createCryptoExtension(
             algorithm,
             supported: Array.from(supportedAlgorithms),
           },
-        },
+        }
       );
     }
     return null;
@@ -87,7 +86,7 @@ export function createCryptoExtension(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'missing_hmac_key' },
-        },
+        }
       );
     }
     const input = args['input'] as string;
@@ -116,7 +115,7 @@ export function createCryptoExtension(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'invalid_bytes', bytes },
-        },
+        }
       );
     }
     if (bytes > MAX_RANDOM_BYTES) {
@@ -126,7 +125,7 @@ export function createCryptoExtension(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'bytes_too_large', bytes, max: MAX_RANDOM_BYTES },
-        },
+        }
       );
     }
     return crypto.randomBytes(bytes).toString('hex');
@@ -157,7 +156,9 @@ export function createCryptoExtension(
     hmac: {
       params: [p.str('input', 'Content to authenticate'), algorithmParam],
       fn: hmac,
-      annotations: { description: 'Generate HMAC signature, returns hex output' },
+      annotations: {
+        description: 'Generate HMAC signature, returns hex output',
+      },
       returnType: stringReturn,
     },
     uuid: {

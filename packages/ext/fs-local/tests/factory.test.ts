@@ -18,7 +18,9 @@ describe('createLocalFsExtension - factory', () => {
   let testMount: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rill-fs-local-factory-'));
+    tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'rill-fs-local-factory-')
+    );
     testMount = path.join(tempDir, 'workspace');
     await fs.mkdir(testMount, { recursive: true });
   });
@@ -35,7 +37,7 @@ describe('createLocalFsExtension - factory', () => {
     it('throws when mounts is empty object', async () => {
       const config: FsLocalExtensionConfig = { mounts: {} };
       await expect(
-        createLocalFsExtension(config, makeFactoryCtx()),
+        createLocalFsExtension(config, makeFactoryCtx())
       ).rejects.toThrow('at least one mount');
     });
 
@@ -46,7 +48,7 @@ describe('createLocalFsExtension - factory', () => {
         },
       };
       await expect(
-        createLocalFsExtension(config, makeFactoryCtx()),
+        createLocalFsExtension(config, makeFactoryCtx())
       ).rejects.toThrow();
     });
   });
@@ -59,7 +61,7 @@ describe('createLocalFsExtension - factory', () => {
             workspace: { path: testMount, mode: 'read-write' },
           },
         },
-        makeFactoryCtx(),
+        makeFactoryCtx()
       );
 
       const value = ext.value as Record<string, unknown>;
@@ -84,7 +86,7 @@ describe('createLocalFsExtension - factory', () => {
             workspace: { path: testMount, mode: 'read-write' },
           },
         },
-        makeFactoryCtx(),
+        makeFactoryCtx()
       );
 
       expect(typeof ext.dispose).toBe('function');
@@ -99,18 +101,23 @@ describe('createLocalFsExtension - factory', () => {
             workspace: { path: testMount, mode: 'read-write' },
           },
         },
-        makeFactoryCtx(),
+        makeFactoryCtx()
       );
 
-      const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown> }>;
+      const value = ext.value as Record<
+        string,
+        {
+          fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+        }
+      >;
 
       // Write content just under 10MB (should succeed)
       const content = 'x'.repeat(10485760 - 100);
       await expect(
         value['write']!.fn(
           { path: '/workspace/large.txt', content },
-          makeRuntimeCtx(),
-        ),
+          makeRuntimeCtx()
+        )
       ).resolves.toBeDefined();
     });
 
@@ -122,15 +129,20 @@ describe('createLocalFsExtension - factory', () => {
           },
           maxFileSize: 1000,
         },
-        makeFactoryCtx(),
+        makeFactoryCtx()
       );
 
-      const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown> }>;
+      const value = ext.value as Record<
+        string,
+        {
+          fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+        }
+      >;
       const content = 'x'.repeat(1001);
 
       const result = await value['write']!.fn(
         { path: '/workspace/too-large.txt', content },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result as never);
       expect(status.code.name).toBe('UNAVAILABLE');

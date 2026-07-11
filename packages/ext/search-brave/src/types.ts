@@ -3,7 +3,7 @@
  * Defines configuration and contract types for the Brave Search API integration.
  */
 
-import type { ApplicationCallable, ExtensionFactoryResult } from '@rcrsr/rill';
+import type { ApplicationCallable } from '@rcrsr/rill';
 
 // ============================================================
 // CONFIGURATION
@@ -52,8 +52,3 @@ export type BraveExtensionContract = {
   readonly news: ApplicationCallable;
   readonly summarize: ApplicationCallable;
 };
-
-/**
- * Re-export for satisfies check usage.
- */
-export type { ExtensionFactoryResult };

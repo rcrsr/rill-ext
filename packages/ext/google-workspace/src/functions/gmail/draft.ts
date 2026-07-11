@@ -21,7 +21,9 @@ export interface GmailDraftDeps {
  * POSTs base64url-encoded RFC 2822 MIME to /users/me/drafts.
  * Returns the draft ID string per IR-5.
  */
-export function makeGmailDraft(deps: GmailDraftDeps): (
+export function makeGmailDraft(
+  deps: GmailDraftDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -37,7 +39,11 @@ export function makeGmailDraft(deps: GmailDraftDeps): (
     }
     const subject = args['subject'];
     if (typeof subject !== 'string' || subject.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: subject must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: subject must be a non-empty string'
+      );
     }
     const body = args['body'];
     if (typeof body !== 'string') {

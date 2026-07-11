@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RuntimeError, createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
-import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
+import { expectRejectedHalt, expectHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MODULE MOCK
@@ -62,7 +62,10 @@ function getHostFn(ext: { value: unknown }, name: string) {
 }
 
 /** Build a fetch mock returning a JSON response with the given status. */
-function mockFetchJson(status: number, body: unknown): ReturnType<typeof vi.fn> {
+function mockFetchJson(
+  status: number,
+  body: unknown
+): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -346,7 +349,10 @@ describe('search() host function', () => {
       const ext = await createFoundryExtension(configWithSearch());
       const ctx = createRuntimeContext();
 
-      await getHostFn(ext, 'search').fn({ query: 'my query', options: {} }, ctx);
+      await getHostFn(ext, 'search').fn(
+        { query: 'my query', options: {} },
+        ctx
+      );
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string) as Record<string, unknown>;
@@ -376,8 +382,9 @@ describe('search() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      , { message: 'foundry: search not configured' });
+        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
+        { message: 'foundry: search not configured' }
+      );
     });
 
     it('fetch is not called when search not configured [AC-21]', async () => {
@@ -405,7 +412,9 @@ describe('search() host function', () => {
       globalThis.fetch = mockFetchJson(404, {});
 
       const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithSearch('missing-index'));
+      const ext = await createFoundryExtension(
+        configWithSearch('missing-index')
+      );
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
@@ -418,7 +427,9 @@ describe('search() host function', () => {
       globalThis.fetch = mockFetchJson(404, {});
 
       const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithSearch('missing-index'));
+      const ext = await createFoundryExtension(
+        configWithSearch('missing-index')
+      );
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
@@ -438,7 +449,9 @@ describe('search() host function', () => {
       globalThis.fetch = mockFetch;
 
       const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithSearch('default-index'));
+      const ext = await createFoundryExtension(
+        configWithSearch('default-index')
+      );
       const ctx = createRuntimeContext();
 
       await getHostFn(ext, 'search').fn(
@@ -455,7 +468,9 @@ describe('search() host function', () => {
       globalThis.fetch = mockFetch;
 
       const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithSearch('default-index'));
+      const ext = await createFoundryExtension(
+        configWithSearch('default-index')
+      );
       const ctx = createRuntimeContext();
 
       await getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx);
@@ -468,7 +483,9 @@ describe('search() host function', () => {
       globalThis.fetch = mockFetchJson(404, {});
 
       const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithSearch('default-index'));
+      const ext = await createFoundryExtension(
+        configWithSearch('default-index')
+      );
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
@@ -604,8 +621,9 @@ describe('search() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      , { message: 'foundry: authentication failed' });
+        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
+        { message: 'foundry: authentication failed' }
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded', async () => {
@@ -616,8 +634,9 @@ describe('search() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      , { message: 'foundry: rate limit exceeded' });
+        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
+        { message: 'foundry: rate limit exceeded' }
+      );
     });
   });
 });

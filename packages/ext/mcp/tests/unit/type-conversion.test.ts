@@ -359,7 +359,10 @@ describe('AC-8: Type conversion', () => {
         isError: true,
       };
 
-      await expectRejectsInvalid(testParseToolResult(result), 'Custom error message');
+      await expectRejectsInvalid(
+        testParseToolResult(result),
+        'Custom error message'
+      );
     });
 
     it('handles isError with empty content', async () => {

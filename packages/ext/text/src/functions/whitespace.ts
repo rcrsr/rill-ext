@@ -24,7 +24,10 @@
  *   collapseWhitespace('\t\t\t', false)           → ' '
  *   collapseWhitespace('para1\n\npara2', true)    → 'para1\n\npara2'
  */
-export function collapseWhitespace(text: string, preserveNewlines: boolean): string {
+export function collapseWhitespace(
+  text: string,
+  preserveNewlines: boolean
+): string {
   if (!preserveNewlines) {
     // Collapse every whitespace run (including newlines and tabs) to one space.
     return text.replace(/\s+/g, ' ');
@@ -82,7 +85,9 @@ export function dedent(text: string): string {
   }
 
   return lines
-    .map((line) => (line.startsWith(commonPrefix) ? line.slice(commonPrefix.length) : line))
+    .map((line) =>
+      line.startsWith(commonPrefix) ? line.slice(commonPrefix.length) : line
+    )
     .join('\n');
 }
 

@@ -9,7 +9,11 @@ import {
   getStatus,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import { createDisposalState, checkDisposed, dispose } from '../src/disposal.js';
+import {
+  createDisposalState,
+  checkDisposed,
+  dispose,
+} from '../src/disposal.js';
 
 describe('createDisposalState', () => {
   it('returns initial state with isDisposed false', () => {
@@ -45,7 +49,9 @@ describe('checkDisposed', () => {
   it('includes provider name in disposed message', () => {
     const state = { isDisposed: true };
     const result = checkDisposed(ctx, state, 'my-custom-provider');
-    expect(getStatus(result!).message).toBe('my-custom-provider: operation cancelled');
+    expect(getStatus(result!).message).toBe(
+      'my-custom-provider: operation cancelled'
+    );
   });
 
   it('emits #DISPOSED atom code', () => {

@@ -62,7 +62,7 @@ describe('kv-file extension factory', () => {
 
     it('throws when neither mounts nor store provided', () => {
       expect(() => createFileKvExtension({}, makeFactoryCtx())).toThrow(
-        'KV file extension requires either "mounts" or "store" configuration',
+        'KV file extension requires either "mounts" or "store" configuration'
       );
     });
 
@@ -73,7 +73,7 @@ describe('kv-file extension factory', () => {
             user: { mode: 'read-write', store: storePath },
           },
         },
-        makeFactoryCtx(),
+        makeFactoryCtx()
       );
       expect(ext).toBeDefined();
     });

@@ -41,7 +41,7 @@ export function splitFrontmatter(source: string): FrontmatterSplit {
   if (lines[0] !== '---') {
     throw new RuntimeError(
       'RILL-R001',
-      'prompt file must begin with a frontmatter fence (---)',
+      'prompt file must begin with a frontmatter fence (---)'
     );
   }
 
@@ -52,7 +52,7 @@ export function splitFrontmatter(source: string): FrontmatterSplit {
   if (closingIndex === -1) {
     throw new RuntimeError(
       'RILL-R001',
-      'frontmatter block is not closed — missing closing fence (---)',
+      'frontmatter block is not closed — missing closing fence (---)'
     );
   }
 

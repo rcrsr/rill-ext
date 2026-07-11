@@ -14,7 +14,10 @@ import {
 import Anthropic from '@anthropic-ai/sdk';
 import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -31,7 +34,9 @@ function createEventCollector(): ExtensionEvent[] {
  * This triggers the resolve callback which emits extension events.
  */
 async function resolveStream(stream: unknown): Promise<unknown> {
-  return (stream as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve();
+  return (
+    stream as { __rill_stream_resolve: () => Promise<unknown> }
+  ).__rill_stream_resolve();
 }
 
 /**
@@ -46,9 +51,10 @@ function createMockMessageStream(response: {
   usage: { input_tokens: number; output_tokens: number };
 }) {
   const text = response.content.find((c) => c.type === 'text')?.text ?? '';
-  const asyncEvents = text.length > 0
-    ? [{ type: 'content_block_delta', delta: { type: 'text_delta', text } }]
-    : [];
+  const asyncEvents =
+    text.length > 0
+      ? [{ type: 'content_block_delta', delta: { type: 'text_delta', text } }]
+      : [];
 
   const eventHandlers: Record<string, Array<(...args: unknown[]) => void>> = {};
 
@@ -156,7 +162,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Events are emitted in the resolve callback, not during stream creation
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello Claude' }, ctx);
+      const stream = getCallable(ext, 'message').fn(
+        { prompt: 'Hello Claude' },
+        ctx
+      );
       await resolveStream(stream);
 
       // Verify event was emitted
@@ -213,7 +222,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         { role: 'user', content: 'How are you?' },
       ];
 
-      const stream = getCallable(ext, 'message').fn({ prompt: promptList }, ctx);
+      const stream = getCallable(ext, 'message').fn(
+        { prompt: promptList },
+        ctx
+      );
       await resolveStream(stream);
 
       expect(events).toHaveLength(1);
@@ -248,7 +260,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // embed() throws "embeddings API not available"
-      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'test text' }, ctx), { message: 'embeddings API not available' });
+      await expectRejectedHalt(
+        getCallable(ext, 'embed').fn({ text: 'test text' }, ctx),
+        { message: 'embeddings API not available' }
+      );
 
       // Should emit error event
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -279,8 +294,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx)
-      , { message: 'embeddings API not available' });
+        getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx),
+        { message: 'embeddings API not available' }
+      );
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -343,15 +359,32 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Define tool
-      const weatherFn = callable(vi.fn().mockReturnValue('18°C, partly cloudy'));
-      (weatherFn as Record<string, unknown>)['description'] = 'Get weather for location';
+      const weatherFn = callable(
+        vi.fn().mockReturnValue('18°C, partly cloudy')
+      );
+      (weatherFn as Record<string, unknown>)['description'] =
+        'Get weather for location';
       (weatherFn as Record<string, unknown>)['params'] = [
-        { name: 'location', type: { kind: 'string' }, defaultValue: undefined, annotations: { description: 'City name' } },
-        { name: 'unit', type: { kind: 'string' }, defaultValue: undefined, annotations: { description: 'Temperature unit' } },
+        {
+          name: 'location',
+          type: { kind: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'City name' },
+        },
+        {
+          name: 'unit',
+          type: { kind: 'string' },
+          defaultValue: undefined,
+          annotations: { description: 'Temperature unit' },
+        },
       ];
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'What is the weather in San Francisco?', tools: { get_weather: weatherFn }, options: {} },
+        {
+          prompt: 'What is the weather in San Francisco?',
+          tools: { get_weather: weatherFn },
+          options: {},
+        },
         ctx
       );
       await resolveStream(stream);
@@ -424,14 +457,29 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       const calculateFn = callable(vi.fn().mockReturnValue(8));
-      (calculateFn as Record<string, unknown>)['description'] = 'Add two numbers';
+      (calculateFn as Record<string, unknown>)['description'] =
+        'Add two numbers';
       (calculateFn as Record<string, unknown>)['params'] = [
-        { name: 'a', type: { kind: 'number' }, defaultValue: undefined, annotations: {} },
-        { name: 'b', type: { kind: 'number' }, defaultValue: undefined, annotations: {} },
+        {
+          name: 'a',
+          type: { kind: 'number' },
+          defaultValue: undefined,
+          annotations: {},
+        },
+        {
+          name: 'b',
+          type: { kind: 'number' },
+          defaultValue: undefined,
+          annotations: {},
+        },
       ];
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Calculate 5 + 3', tools: { calculate: calculateFn }, options: {} },
+        {
+          prompt: 'Calculate 5 + 3',
+          tools: { calculate: calculateFn },
+          options: {},
+        },
         ctx
       );
       await resolveStream(stream);
@@ -503,7 +551,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       (failingTool as Record<string, unknown>)['description'] = 'Always fails';
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test failing tool', tools: { failing_tool: failingTool }, options: {} },
+        {
+          prompt: 'Test failing tool',
+          tools: { failing_tool: failingTool },
+          options: {},
+        },
         ctx
       );
       await resolveStream(stream);
@@ -554,7 +606,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const dummyTool = callable(() => 'ok');
       (dummyTool as Record<string, unknown>)['description'] = 'Dummy tool';
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Simple question', tools: { dummy: dummyTool }, options: {} }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Simple question', tools: { dummy: dummyTool }, options: {} },
+        ctx
+      );
       await resolveStream(stream);
 
       // Find tool_loop event
@@ -646,7 +701,11 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       (step2Fn as Record<string, unknown>)['description'] = 'Second step';
 
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Multi-step task', tools: { step1: step1Fn, step2: step2Fn }, options: {} },
+        {
+          prompt: 'Multi-step task',
+          tools: { step1: step1Fn, step2: step2Fn },
+          options: {},
+        },
         ctx
       );
       await resolveStream(stream);
@@ -731,7 +790,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Empty string prompt triggers synchronous validation error before stream creation
-      expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '' }, ctx), { message: 'prompt string cannot be empty' });
+      expectThrowHalt(
+        () => getCallable(ext, 'message').fn({ prompt: '' }, ctx),
+        { message: 'prompt string cannot be empty' }
+      );
 
       // No error event emitted for pre-stream validation errors
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
@@ -754,10 +816,16 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       // Missing tools argument triggers validation error inside the shared loop promise
       const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools: undefined as unknown as Record<string, unknown>, options: {} },
+        {
+          prompt: 'Test',
+          tools: undefined as unknown as Record<string, unknown>,
+          options: {},
+        },
         ctx
       );
-      await expectRejectedHalt(resolveStream(stream), { message: 'tools parameter is required' });
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'tools parameter is required',
+      });
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
@@ -866,11 +934,20 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const dummyTool = callable(() => 'ok');
       (dummyTool as Record<string, unknown>)['description'] = 'Dummy tool';
 
-      const stream1 = getCallable(ext, 'message').fn({ prompt: 'Test message' }, ctx);
+      const stream1 = getCallable(ext, 'message').fn(
+        { prompt: 'Test message' },
+        ctx
+      );
       await resolveStream(stream1);
-      const stream2 = getCallable(ext, 'message').fn({ prompt: [{ role: 'user', content: 'Test' }] }, ctx);
+      const stream2 = getCallable(ext, 'message').fn(
+        { prompt: [{ role: 'user', content: 'Test' }] },
+        ctx
+      );
       await resolveStream(stream2);
-      const stream3 = getCallable(ext, 'tool_loop').fn({ prompt: 'Test tool loop', tools: { dummy: dummyTool }, max_turns: 0 }, ctx);
+      const stream3 = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test tool loop', tools: { dummy: dummyTool }, max_turns: 0 },
+        ctx
+      );
       await resolveStream(stream3);
 
       expect(mockStream).toHaveBeenCalledTimes(3);

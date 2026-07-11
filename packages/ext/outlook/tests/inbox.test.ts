@@ -4,7 +4,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  createRuntimeContext,
+  type ApplicationCallable,
+  isInvalid,
+  getStatus,
+  type RillValue,
+} from '@rcrsr/rill';
 import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
 
@@ -12,11 +19,17 @@ import { createOutlookExtension } from '../src/factory.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
-function mockFetchJson(status: number, body: unknown): ReturnType<typeof vi.fn> {
+function mockFetchJson(
+  status: number,
+  body: unknown
+): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -77,7 +90,10 @@ describe('inbox() host function', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<string, unknown>;
+      const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<
+        string,
+        unknown
+      >;
       const messages = result['messages'] as Record<string, unknown>[];
 
       expect(Array.isArray(messages)).toBe(true);
@@ -100,7 +116,10 @@ describe('inbox() host function', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<string, unknown>;
+      const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<
+        string,
+        unknown
+      >;
       const msg = (result['messages'] as Record<string, unknown>[])[0]!;
 
       expect(msg['id']).toBe('msg-001');
@@ -124,7 +143,10 @@ describe('inbox() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<string, unknown>;
+    const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<
+      string,
+      unknown
+    >;
     const messages = result['messages'] as unknown[];
 
     expect(Array.isArray(messages)).toBe(true);
@@ -154,7 +176,10 @@ describe('inbox() host function', () => {
   it('caps top at configured maxResults [AC-32]', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension({ ...BEARER_CONFIG, mail: { maxResults: 10 } });
+    const ext = createOutlookExtension({
+      ...BEARER_CONFIG,
+      mail: { maxResults: 10 },
+    });
     const ctx = createRuntimeContext();
 
     // Request 999, but maxResults is 10
@@ -242,10 +267,13 @@ describe('inbox() host function', () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
 
-    const ext = createOutlookExtension({
-      ...BEARER_CONFIG,
-      mailbox: 'shared@example.com',
-    }, makeFactoryCtx());
+    const ext = createOutlookExtension(
+      {
+        ...BEARER_CONFIG,
+        mailbox: 'shared@example.com',
+      },
+      makeFactoryCtx()
+    );
     const ctx = createRuntimeContext();
 
     await getCallable(ext, 'inbox').fn({}, ctx);
@@ -311,10 +339,15 @@ describe('inbox() host function', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const caught = (await getCallable(ext, 'inbox').fn({ folder: 'drafts' }, ctx)) as RillValue;
+      const caught = (await getCallable(ext, 'inbox').fn(
+        { folder: 'drafts' },
+        ctx
+      )) as RillValue;
       expect(isInvalid(caught)).toBe(true);
       expect(getStatus(caught).code.name).toBe('FORBIDDEN');
-    expect(getStatus(caught).message).toContain("folder 'drafts' not accessible");
+      expect(getStatus(caught).message).toContain(
+        "folder 'drafts' not accessible"
+      );
     });
 
     it('does not call fetch when folder is not in allowlist', async () => {
@@ -399,7 +432,10 @@ describe('read() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'read').fn({ message_id: '' }, ctx)) as RillValue;
+    const caught = (await getCallable(ext, 'read').fn(
+      { message_id: '' },
+      ctx
+    )) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('message_id is required');

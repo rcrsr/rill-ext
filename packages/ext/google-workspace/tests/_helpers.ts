@@ -4,13 +4,7 @@
  * invalid-RillValue assertion pattern.
  */
 
-import { expect } from 'vitest';
-import {
-  isInvalid,
-  getStatus,
-  type ExtensionFactoryCtx,
-  type RillValue,
-} from '@rcrsr/rill';
+import type { ExtensionFactoryCtx } from '@rcrsr/rill';
 
 /**
  * Build a no-op ExtensionFactoryCtx for tests. Generic atoms are pre-registered
@@ -21,18 +15,4 @@ export function makeFactoryCtx(): ExtensionFactoryCtx {
     signal: new AbortController().signal,
     registerErrorCode: () => {},
   };
-}
-
-export function expectInvalid(
-  result: unknown,
-  atom: string,
-  needle?: string,
-): void {
-  const value = result as RillValue;
-  expect(isInvalid(value)).toBe(true);
-  const status = getStatus(value);
-  expect(status.code.name).toBe(atom);
-  if (needle !== undefined) {
-    expect(status.message).toContain(needle);
-  }
 }

@@ -70,7 +70,10 @@ export function mapProviderError(
     return ctx.invalidate(error, {
       code: 'TIMEOUT',
       provider,
-      raw: { kind: 'request_cancelled', message: `${provider}: request cancelled` },
+      raw: {
+        kind: 'request_cancelled',
+        message: `${provider}: request cancelled`,
+      },
     });
   }
 

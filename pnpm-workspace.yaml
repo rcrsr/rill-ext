@@ -2,3 +2,23 @@ packages:
   - 'packages/ext/*'
   - 'packages/shared/*'
   - 'packages/apps/*'
+
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  lefthook: true
+  node-pty: true
+  protobufjs: true
+
+onlyBuiltDependencies:
+  - better-sqlite3
+  - lefthook
+  - esbuild
+
+# dts-bundle-generator@9.5.1 (latest) consumes the classic TypeScript compiler
+# API (ts.sys, ts.createProgram) which TypeScript 7's native compiler no
+# longer ships. Pin dts-bundle-generator's own nested typescript resolution
+# to the last classic-API release so it keeps working; the workspace-wide
+# `typescript` devDependency stays on ^7.0.2 for typecheck/tsup.
+overrides:
+  'dts-bundle-generator>typescript': '6.0.3'

@@ -5,7 +5,13 @@
  * RillParam descriptors used in extension host function parameter lists.
  */
 
-import { RuntimeError, type RillFieldDef, type RillParam, type TypeStructure, type RillValue } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  type RillFieldDef,
+  type RillParam,
+  type TypeStructure,
+  type RillValue,
+} from '@rcrsr/rill';
 
 // ============================================================
 // NAME VALIDATION
@@ -26,7 +32,10 @@ function validateParamName(name: string): void {
 
   // EC-2: whitespace in name → RuntimeError RILL-R001: "param name must be a valid identifier"
   if (/\s/.test(name)) {
-    throw new RuntimeError('RILL-R001', 'param name must be a valid identifier');
+    throw new RuntimeError(
+      'RILL-R001',
+      'param name must be a valid identifier'
+    );
   }
 }
 
@@ -113,11 +122,15 @@ export const p = {
    * @param fields - Optional structural field definitions (RillFieldDef with type and optional defaultValue)
    * @returns RillParam with type 'dict' (with fields if provided)
    */
-  dict(name: string, desc?: string, def?: RillValue, fields?: Record<string, RillFieldDef>): RillParam {
+  dict(
+    name: string,
+    desc?: string,
+    def?: RillValue,
+    fields?: Record<string, RillFieldDef>
+  ): RillParam {
     validateParamName(name);
-    const type: TypeStructure = fields !== undefined
-      ? { kind: 'dict', fields }
-      : { kind: 'dict' };
+    const type: TypeStructure =
+      fields !== undefined ? { kind: 'dict', fields } : { kind: 'dict' };
     return {
       name,
       type,
@@ -136,9 +149,10 @@ export const p = {
    */
   list(name: string, itemType?: TypeStructure, desc?: string): RillParam {
     validateParamName(name);
-    const type: TypeStructure = itemType !== undefined
-      ? { kind: 'list', element: itemType }
-      : { kind: 'list' };
+    const type: TypeStructure =
+      itemType !== undefined
+        ? { kind: 'list', element: itemType }
+        : { kind: 'list' };
     return {
       name,
       type,

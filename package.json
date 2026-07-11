@@ -3,7 +3,7 @@
   "version": "0.19.7",
   "description": "rill extension ecosystem — official extensions for rill",
   "private": true,
-  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8",
+  "packageManager": "pnpm@11.11.0+sha512.4463f65fd80ed80d69bc1d4bf163ee94f605c7380fc318bb5b2ebe15f8cd12d49c51a4d59e951b401e764d3b6ca751cbf51bc50ed7001a6bcb4935e684c34882",
   "type": "module",
   "repository": {
     "type": "git",
@@ -16,30 +16,26 @@
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
-    "typecheck": "pnpm -r run typecheck",
-    "lint": "pnpm -r run lint",
-    "check": "pnpm -r run check"
+    "check:types": "pnpm -r run typecheck",
+    "check:lint": "pnpm -r run lint",
+    "check:format": "oxfmt --check",
+    "check:deps": "knip",
+    "fix:lint": "oxlint --fix",
+    "fix:format": "oxfmt",
+    "check": "pnpm run check:types && pnpm run check:lint && pnpm run check:format && pnpm run check:deps && pnpm run build && pnpm run test"
   },
   "author": "Andre Bremer",
   "license": "MIT",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
-  },
   "engines": {
     "node": ">=22.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/node": "^25.5.2",
-    "@typescript-eslint/eslint-plugin": "^8.58.0",
-    "@typescript-eslint/parser": "^8.58.0",
-    "eslint": "^10.2.0",
-    "globals": "^17.4.0",
-    "prettier": "^3.8.1",
-    "tsc-files": "^1.1.4",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "@types/node": "^26.1.1",
+    "knip": "^6.25.0",
+    "lefthook": "^2.1.10",
+    "oxfmt": "^0.58.0",
+    "oxlint": "^1.73.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }

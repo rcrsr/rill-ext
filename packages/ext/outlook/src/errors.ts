@@ -29,7 +29,7 @@ const PROVIDER = 'outlook';
 export function failInput(
   ctx: RuntimeContext,
   kind: string,
-  message: string,
+  message: string
 ): never {
   throw ctx.invalidate(new Error(message), {
     code: 'INVALID_INPUT',
@@ -46,7 +46,7 @@ export function mapGraphError(
   ctx: RuntimeContext,
   status: number,
   operation: string,
-  id?: string | undefined,
+  id?: string | undefined
 ): RillValue {
   if (status === 401) {
     const message = 'outlook: authentication failed (401)';

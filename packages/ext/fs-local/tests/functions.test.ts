@@ -14,12 +14,15 @@ import type { FsLocalExtensionConfig } from '../src/types.js';
 import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 // Helper to extract the callable dict from the extension value
-type CallableDict = Record<string, {
-  fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
-  params: unknown[];
-  annotations?: Record<string, unknown>;
-  returnType?: unknown;
-}>;
+type CallableDict = Record<
+  string,
+  {
+    fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+    params: unknown[];
+    annotations?: Record<string, unknown>;
+    returnType?: unknown;
+  }
+>;
 
 async function makeExt(config: FsLocalExtensionConfig): Promise<CallableDict> {
   const ext = await createLocalFsExtension(config, makeFactoryCtx());
@@ -62,9 +65,16 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read-write' } },
       });
 
-      await fs.writeFile(path.join(testMount, 'test.txt'), 'hello world', 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'test.txt'),
+        'hello world',
+        'utf-8'
+      );
 
-      const result = await ext['read']!.fn({ path: '/workspace/test.txt' }, makeRuntimeCtx());
+      const result = await ext['read']!.fn(
+        { path: '/workspace/test.txt' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe('hello world');
     });
 
@@ -76,7 +86,10 @@ describe('fs-local extension functions', () => {
       const content = 'Hello 世界 🌍';
       await fs.writeFile(path.join(testMount, 'unicode.txt'), content, 'utf-8');
 
-      const result = await ext['read']!.fn({ path: '/workspace/unicode.txt' }, makeRuntimeCtx());
+      const result = await ext['read']!.fn(
+        { path: '/workspace/unicode.txt' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(content);
     });
 
@@ -87,7 +100,7 @@ describe('fs-local extension functions', () => {
 
       const result = await ext['read']!.fn(
         { path: '/workspace/nonexistent.txt' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expectInvalid(result, /file not found/);
     });
@@ -101,7 +114,7 @@ describe('fs-local extension functions', () => {
 
       const result = await extWriteOnly['read']!.fn(
         { path: '/workspace/test.txt' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result as RillValue);
       expect(status.code.name).toBe('FORBIDDEN');
@@ -115,11 +128,15 @@ describe('fs-local extension functions', () => {
         maxFileSize: 100,
       });
 
-      await fs.writeFile(path.join(testMount, 'large.txt'), 'x'.repeat(200), 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'large.txt'),
+        'x'.repeat(200),
+        'utf-8'
+      );
 
       const result = await ext['read']!.fn(
         { path: '/workspace/large.txt' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expectInvalid(result, /exceeds size limit/);
     });
@@ -132,11 +149,15 @@ describe('fs-local extension functions', () => {
         maxFileSize: 1000,
       });
 
-      await fs.writeFile(path.join(testMount, 'test.txt'), 'x'.repeat(60), 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'test.txt'),
+        'x'.repeat(60),
+        'utf-8'
+      );
 
       const result = await ext['read']!.fn(
         { path: '/workspace/test.txt' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expectInvalid(result, /exceeds size limit/);
     });
@@ -154,11 +175,14 @@ describe('fs-local extension functions', () => {
 
       const bytesWritten = await ext['write']!.fn(
         { path: '/workspace/output.txt', content: 'test content' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
 
       expect(bytesWritten).toBe('12');
-      const content = await fs.readFile(path.join(testMount, 'output.txt'), 'utf-8');
+      const content = await fs.readFile(
+        path.join(testMount, 'output.txt'),
+        'utf-8'
+      );
       expect(content).toBe('test content');
     });
 
@@ -167,13 +191,20 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read-write' } },
       });
 
-      await fs.writeFile(path.join(testMount, 'replace.txt'), 'old content', 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'replace.txt'),
+        'old content',
+        'utf-8'
+      );
       await ext['write']!.fn(
         { path: '/workspace/replace.txt', content: 'new content' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
 
-      const content = await fs.readFile(path.join(testMount, 'replace.txt'), 'utf-8');
+      const content = await fs.readFile(
+        path.join(testMount, 'replace.txt'),
+        'utf-8'
+      );
       expect(content).toBe('new content');
     });
 
@@ -184,7 +215,7 @@ describe('fs-local extension functions', () => {
 
       const result = await ext['write']!.fn(
         { path: '/workspace/bytes.txt', content: 'Hello 世界' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
 
       expect(result).toBe('12');
@@ -198,7 +229,7 @@ describe('fs-local extension functions', () => {
 
       const result = await ext['write']!.fn(
         { path: '/workspace/large.txt', content: 'x'.repeat(100) },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expectInvalid(result, /exceeds size limit/);
     });
@@ -214,13 +245,20 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read-write' } },
       });
 
-      await fs.writeFile(path.join(testMount, 'append.txt'), 'line1\n', 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'append.txt'),
+        'line1\n',
+        'utf-8'
+      );
       await ext['append']!.fn(
         { path: '/workspace/append.txt', content: 'line2\n' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
 
-      const content = await fs.readFile(path.join(testMount, 'append.txt'), 'utf-8');
+      const content = await fs.readFile(
+        path.join(testMount, 'append.txt'),
+        'utf-8'
+      );
       expect(content).toBe('line1\nline2\n');
     });
 
@@ -231,10 +269,13 @@ describe('fs-local extension functions', () => {
 
       await ext['append']!.fn(
         { path: '/workspace/new.txt', content: 'content' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
 
-      const content = await fs.readFile(path.join(testMount, 'new.txt'), 'utf-8');
+      const content = await fs.readFile(
+        path.join(testMount, 'new.txt'),
+        'utf-8'
+      );
       expect(content).toBe('content');
     });
 
@@ -245,7 +286,7 @@ describe('fs-local extension functions', () => {
 
       const result = await ext['append']!.fn(
         { path: '/workspace/log.txt', content: 'new entry' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
 
       expect(result).toBe('9');
@@ -257,11 +298,15 @@ describe('fs-local extension functions', () => {
         maxFileSize: 100,
       });
 
-      await fs.writeFile(path.join(testMount, 'growing.txt'), 'x'.repeat(80), 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'growing.txt'),
+        'x'.repeat(80),
+        'utf-8'
+      );
 
       const result = await ext['append']!.fn(
         { path: '/workspace/growing.txt', content: 'x'.repeat(30) },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expectInvalid(result, /exceeds size limit/);
     });
@@ -281,14 +326,21 @@ describe('fs-local extension functions', () => {
       await fs.writeFile(path.join(testMount, 'file2.txt'), 'data', 'utf-8');
       await fs.mkdir(path.join(testMount, 'subdir'));
 
-      const result = await ext['list']!.fn({ path: '/workspace' }, makeRuntimeCtx()) as Array<Record<string, unknown>>;
+      const result = (await ext['list']!.fn(
+        { path: '/workspace' },
+        makeRuntimeCtx()
+      )) as Array<Record<string, unknown>>;
 
       expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(3);
 
       const file1 = result.find((item) => item['name'] === 'file1.txt');
       expect(file1).toBeDefined();
-      expect(file1).toMatchObject({ name: 'file1.txt', type: 'file', size: expect.any(Number) });
+      expect(file1).toMatchObject({
+        name: 'file1.txt',
+        type: 'file',
+        size: expect.any(Number),
+      });
 
       const subdir = result.find((item) => item['name'] === 'subdir');
       expect(subdir).toMatchObject({ name: 'subdir', type: 'directory' });
@@ -300,9 +352,16 @@ describe('fs-local extension functions', () => {
       });
 
       await fs.mkdir(path.join(testMount, 'subdir'));
-      await fs.writeFile(path.join(testMount, 'subdir', 'nested.txt'), 'data', 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'subdir', 'nested.txt'),
+        'data',
+        'utf-8'
+      );
 
-      const result = await ext['list']!.fn({ path: '/workspace/subdir' }, makeRuntimeCtx()) as Array<Record<string, unknown>>;
+      const result = (await ext['list']!.fn(
+        { path: '/workspace/subdir' },
+        makeRuntimeCtx()
+      )) as Array<Record<string, unknown>>;
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({ name: 'nested.txt', type: 'file' });
@@ -321,11 +380,22 @@ describe('fs-local extension functions', () => {
 
       await fs.writeFile(path.join(testMount, 'root.txt'), 'data', 'utf-8');
       await fs.mkdir(path.join(testMount, 'dir1'));
-      await fs.writeFile(path.join(testMount, 'dir1', 'nested.txt'), 'data', 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'dir1', 'nested.txt'),
+        'data',
+        'utf-8'
+      );
       await fs.mkdir(path.join(testMount, 'dir1', 'dir2'));
-      await fs.writeFile(path.join(testMount, 'dir1', 'dir2', 'deep.txt'), 'data', 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'dir1', 'dir2', 'deep.txt'),
+        'data',
+        'utf-8'
+      );
 
-      const result = await ext['find']!.fn({ path: '/workspace' }, makeRuntimeCtx()) as string[];
+      const result = (await ext['find']!.fn(
+        { path: '/workspace' },
+        makeRuntimeCtx()
+      )) as string[];
 
       expect(Array.isArray(result)).toBe(true);
       expect(result).toContain('root.txt');
@@ -341,9 +411,16 @@ describe('fs-local extension functions', () => {
       await fs.writeFile(path.join(testMount, 'doc.txt'), 'data', 'utf-8');
       await fs.writeFile(path.join(testMount, 'data.json'), 'data', 'utf-8');
       await fs.mkdir(path.join(testMount, 'subdir'));
-      await fs.writeFile(path.join(testMount, 'subdir', 'nested.txt'), 'data', 'utf-8');
+      await fs.writeFile(
+        path.join(testMount, 'subdir', 'nested.txt'),
+        'data',
+        'utf-8'
+      );
 
-      const result = await ext['find']!.fn({ path: '/workspace', pattern: '*.txt' }, makeRuntimeCtx()) as string[];
+      const result = (await ext['find']!.fn(
+        { path: '/workspace', pattern: '*.txt' },
+        makeRuntimeCtx()
+      )) as string[];
 
       expect(result).toContain('doc.txt');
       expect(result).not.toContain('data.json');
@@ -363,7 +440,10 @@ describe('fs-local extension functions', () => {
 
       await fs.writeFile(path.join(testMount, 'exists.txt'), 'data', 'utf-8');
 
-      const result = await ext['exists']!.fn({ path: '/workspace/exists.txt' }, makeRuntimeCtx());
+      const result = await ext['exists']!.fn(
+        { path: '/workspace/exists.txt' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(true);
     });
 
@@ -372,7 +452,10 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read' } },
       });
 
-      const result = await ext['exists']!.fn({ path: '/workspace/missing.txt' }, makeRuntimeCtx());
+      const result = await ext['exists']!.fn(
+        { path: '/workspace/missing.txt' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(false);
     });
 
@@ -381,7 +464,10 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read' } },
       });
 
-      const result = await ext['exists']!.fn({ path: '/workspace/../../etc/passwd' }, makeRuntimeCtx());
+      const result = await ext['exists']!.fn(
+        { path: '/workspace/../../etc/passwd' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(false);
     });
   });
@@ -398,10 +484,15 @@ describe('fs-local extension functions', () => {
 
       await fs.writeFile(path.join(testMount, 'todelete.txt'), 'data', 'utf-8');
 
-      const result = await ext['remove']!.fn({ path: '/workspace/todelete.txt' }, makeRuntimeCtx());
+      const result = await ext['remove']!.fn(
+        { path: '/workspace/todelete.txt' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(true);
 
-      await expect(fs.stat(path.join(testMount, 'todelete.txt'))).rejects.toThrow();
+      await expect(
+        fs.stat(path.join(testMount, 'todelete.txt'))
+      ).rejects.toThrow();
     });
 
     it('returns false when file does not exist', async () => {
@@ -409,7 +500,10 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read-write' } },
       });
 
-      const result = await ext['remove']!.fn({ path: '/workspace/nonexistent.txt' }, makeRuntimeCtx());
+      const result = await ext['remove']!.fn(
+        { path: '/workspace/nonexistent.txt' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(false);
     });
 
@@ -420,7 +514,10 @@ describe('fs-local extension functions', () => {
 
       await fs.writeFile(path.join(testMount, 'file.txt'), 'data', 'utf-8');
 
-      const result = await ext['remove']!.fn({ path: '/workspace/file.txt' }, makeRuntimeCtx());
+      const result = await ext['remove']!.fn(
+        { path: '/workspace/file.txt' },
+        makeRuntimeCtx()
+      );
       expectInvalid(result, /does not permit/);
     });
   });
@@ -437,7 +534,10 @@ describe('fs-local extension functions', () => {
 
       await fs.writeFile(path.join(testMount, 'info.txt'), 'hello', 'utf-8');
 
-      const result = await ext['stat']!.fn({ path: '/workspace/info.txt' }, makeRuntimeCtx()) as Record<string, unknown>;
+      const result = (await ext['stat']!.fn(
+        { path: '/workspace/info.txt' },
+        makeRuntimeCtx()
+      )) as Record<string, unknown>;
 
       expect(result['name']).toBe('info.txt');
       expect(result['type']).toBe('file');
@@ -451,7 +551,10 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read' } },
       });
 
-      const result = await ext['stat']!.fn({ path: '/workspace/missing.txt' }, makeRuntimeCtx());
+      const result = await ext['stat']!.fn(
+        { path: '/workspace/missing.txt' },
+        makeRuntimeCtx()
+      );
       expectInvalid(result, /file not found/);
     });
 
@@ -462,7 +565,10 @@ describe('fs-local extension functions', () => {
 
       await fs.mkdir(path.join(testMount, 'mydir'));
 
-      const result = await ext['stat']!.fn({ path: '/workspace/mydir' }, makeRuntimeCtx()) as Record<string, unknown>;
+      const result = (await ext['stat']!.fn(
+        { path: '/workspace/mydir' },
+        makeRuntimeCtx()
+      )) as Record<string, unknown>;
       expect(result['type']).toBe('directory');
     });
   });
@@ -477,7 +583,10 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read-write' } },
       });
 
-      const result = await ext['mkdir']!.fn({ path: '/workspace/newdir' }, makeRuntimeCtx());
+      const result = await ext['mkdir']!.fn(
+        { path: '/workspace/newdir' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(true);
 
       const stats = await fs.stat(path.join(testMount, 'newdir'));
@@ -491,7 +600,10 @@ describe('fs-local extension functions', () => {
 
       await fs.mkdir(path.join(testMount, 'existing'));
 
-      const result = await ext['mkdir']!.fn({ path: '/workspace/existing' }, makeRuntimeCtx());
+      const result = await ext['mkdir']!.fn(
+        { path: '/workspace/existing' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(false);
     });
 
@@ -500,7 +612,10 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read-write' } },
       });
 
-      const result = await ext['mkdir']!.fn({ path: '/workspace/a/b/c' }, makeRuntimeCtx());
+      const result = await ext['mkdir']!.fn(
+        { path: '/workspace/a/b/c' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(true);
 
       const stats = await fs.stat(path.join(testMount, 'a', 'b', 'c'));
@@ -512,7 +627,10 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read' } },
       });
 
-      const result = await ext['mkdir']!.fn({ path: '/workspace/newdir' }, makeRuntimeCtx());
+      const result = await ext['mkdir']!.fn(
+        { path: '/workspace/newdir' },
+        makeRuntimeCtx()
+      );
       expectInvalid(result, /does not permit/);
     });
 
@@ -521,7 +639,10 @@ describe('fs-local extension functions', () => {
         mounts: { workspace: { path: testMount, mode: 'read-write' } },
       });
 
-      const result = await ext['mkdir']!.fn({ path: '/workspace/../../escaped' }, makeRuntimeCtx());
+      const result = await ext['mkdir']!.fn(
+        { path: '/workspace/../../escaped' },
+        makeRuntimeCtx()
+      );
       expectInvalid(result, /escapes mount boundary/);
     });
   });
@@ -540,11 +661,14 @@ describe('fs-local extension functions', () => {
 
       const result = await ext['copy']!.fn(
         { src: '/workspace/src.txt', dest: '/workspace/dest.txt' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expect(result).toBe(true);
 
-      const content = await fs.readFile(path.join(testMount, 'dest.txt'), 'utf-8');
+      const content = await fs.readFile(
+        path.join(testMount, 'dest.txt'),
+        'utf-8'
+      );
       expect(content).toBe('copy me');
     });
 
@@ -563,7 +687,7 @@ describe('fs-local extension functions', () => {
 
       const result = await ext['copy']!.fn(
         { src: '/workspace/src.txt', dest: '/other/dest.txt' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expectInvalid(result, /same mount/);
     });
@@ -583,12 +707,17 @@ describe('fs-local extension functions', () => {
 
       const result = await ext['move']!.fn(
         { src: '/workspace/original.txt', dest: '/workspace/moved.txt' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expect(result).toBe(true);
 
-      await expect(fs.stat(path.join(testMount, 'original.txt'))).rejects.toThrow();
-      const content = await fs.readFile(path.join(testMount, 'moved.txt'), 'utf-8');
+      await expect(
+        fs.stat(path.join(testMount, 'original.txt'))
+      ).rejects.toThrow();
+      const content = await fs.readFile(
+        path.join(testMount, 'moved.txt'),
+        'utf-8'
+      );
       expect(content).toBe('data');
     });
 
@@ -607,7 +736,7 @@ describe('fs-local extension functions', () => {
 
       const result = await ext['move']!.fn(
         { src: '/workspace/src.txt', dest: '/other/dest.txt' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       expectInvalid(result, /same mount/);
     });
@@ -625,7 +754,9 @@ describe('fs-local extension functions', () => {
         },
       });
 
-      const result = await ext['mounts']!.fn({}, makeRuntimeCtx()) as Array<Record<string, unknown>>;
+      const result = (await ext['mounts']!.fn({}, makeRuntimeCtx())) as Array<
+        Record<string, unknown>
+      >;
 
       expect(Array.isArray(result)).toBe(true);
       expect(result).toHaveLength(1);
@@ -643,7 +774,9 @@ describe('fs-local extension functions', () => {
         },
       });
 
-      const result = await ext['mounts']!.fn({}, makeRuntimeCtx()) as Array<Record<string, unknown>>;
+      const result = (await ext['mounts']!.fn({}, makeRuntimeCtx())) as Array<
+        Record<string, unknown>
+      >;
       expect(result[0]).toMatchObject({ glob: '*.csv' });
     });
   });

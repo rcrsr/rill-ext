@@ -87,14 +87,6 @@ export type ProviderErrorDetector = (error: unknown) => {
 } | null;
 
 /**
- * Parameter metadata for tool descriptors
- */
-export interface ToolParamMetadata {
-  readonly type: string;
-  readonly description: string;
-}
-
-/**
  * Callbacks for tool loop orchestration
  */
 export interface ToolLoopCallbacks {
@@ -125,7 +117,11 @@ export interface ToolLoopCallbacks {
   /**
    * Call the provider API with messages and tools
    */
-  callAPI: (messages: unknown[], tools: unknown, signal?: AbortSignal) => Promise<unknown>;
+  callAPI: (
+    messages: unknown[],
+    tools: unknown,
+    signal?: AbortSignal
+  ) => Promise<unknown>;
 
   /**
    * Call the provider API with streaming text deltas.

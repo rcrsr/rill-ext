@@ -21,7 +21,9 @@ export interface GmailSendDeps {
  * POSTs base64url-encoded RFC 2822 MIME to /users/me/messages/send.
  * Returns the sent message ID string per IR-4.
  */
-export function makeGmailSend(deps: GmailSendDeps): (
+export function makeGmailSend(
+  deps: GmailSendDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -37,7 +39,11 @@ export function makeGmailSend(deps: GmailSendDeps): (
     }
     const subject = args['subject'];
     if (typeof subject !== 'string' || subject.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: subject must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: subject must be a non-empty string'
+      );
     }
     const body = args['body'];
     if (typeof body !== 'string') {
