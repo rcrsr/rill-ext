@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.3] - 2026-07-11
+
+### Security
+
+- `@anthropic-ai/sdk` bumped from `^0.82.0` to `^0.111.0`. Resolves GHSA-p7fg-763f-g4gf (moderate: insecure default file permissions in the SDK's local-filesystem memory tool, fixed in 0.91.1). This extension does not use the memory-tool surface, but the `^0.82.0` range blocked downstream consumers from clearing the advisory in their own audits.
+
 ## [0.19.2] - 2026-05-01
 
 ### Changed (Breaking)

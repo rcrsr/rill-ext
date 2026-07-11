@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `@rcrsr/rill-ext-anthropic` bumped to `0.19.3`. `@anthropic-ai/sdk` dependency raised from `^0.82.0` to `^0.111.0`, clearing GHSA-p7fg-763f-g4gf (moderate: insecure default file permissions in the SDK's local-filesystem memory tool, fixed in 0.91.1). The extension does not use the memory-tool surface; the old `^0.82.0` range blocked downstream consumers from resolving the advisory.
+
 ## [0.19.7] - 2026-05-03
 
 ### Added
