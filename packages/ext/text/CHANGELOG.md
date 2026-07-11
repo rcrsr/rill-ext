@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Bumps `defuddle` to `^0.19.1` (from `^0.18.1`). In-use API surface unchanged. ([#57](https://github.com/rcrsr/rill-ext/pull/57))
+
 ## [0.19.0] - 2026-05-02
 
 ### Added

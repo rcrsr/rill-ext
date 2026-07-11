@@ -104,7 +104,9 @@ To release:
 
 The `release.yml` workflow triggers on the tag push, builds, tests, then publishes every non-private `packages/ext/*` whose `name@version` is not yet on npm (already-published versions are skipped). It then creates a GitHub Release with auto-generated notes.
 
-Version bumps and all `CHANGELOG.md` updates (root and per-package) are release-time actions handled through the release and changelog tooling, never ad-hoc. A feature or fix PR changes code only; it does not edit any `version` field or any `CHANGELOG.md`.
+Version numbers are release-time actions: the release tooling bumps every `version` field and stamps the `[Unreleased]` changelog section as `[X.Y.Z] - <date>`. A feature or fix PR never edits a `version` field.
+
+Changelog `[Unreleased]` entries are authored at PR time, not release time. Every PR that changes published behavior adds a bullet under the `## [Unreleased]` section of the root `CHANGELOG.md` and of each affected package `CHANGELOG.md`; `/conduct:open-pr` does this automatically. The release tooling only stamps those accumulated entries with the version and date, it does not write them.
 
 ## Architecture
 

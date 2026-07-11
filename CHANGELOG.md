@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **GitHub label taxonomy:** Adds automated area labeling for issues and PRs via labeler.yml, workflows, templates, and sync script. ([#56](https://github.com/rcrsr/rill-ext/pull/56))
 
+### Changed
+
+- **TypeScript 7 toolchain:** Adopts TypeScript `7`, replaces ESLint/Prettier with oxlint/oxfmt, and adds knip and lefthook. Standardizes root `check:*`/`fix:*` scripts and sweeps in-range dependencies (`@types/node` to `26`, `@anthropic-ai/sdk` to `0.111`, `defuddle` to `0.19`). No published extension runtime surface changes. ([#57](https://github.com/rcrsr/rill-ext/pull/57))
+
 ## [0.19.7] - 2026-05-03
 
 ### Added
