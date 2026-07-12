@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
+
 ### Changed
 
 - Bumps `defuddle` to `^0.19.1` (from `^0.18.1`). In-use API surface unchanged. ([#57](https://github.com/rcrsr/rill-ext/pull/57))

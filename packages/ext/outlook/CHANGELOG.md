@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
+
 ## [0.19.2] - 2026-04-30
 
 ### Changed (Breaking)
