@@ -6,6 +6,10 @@
 
 - **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
+### Changed
+
+- **@google/genai 2.x:** Upgrades dependency range from 1.x to 2.x; the v2 API surface remains unchanged, requiring no code adaptation. ([#59](https://github.com/rcrsr/rill-ext/pull/59))
+
 ## [0.19.2] - 2026-05-01
 
 ### Changed (Breaking)

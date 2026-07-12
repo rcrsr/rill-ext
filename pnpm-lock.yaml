@@ -363,8 +363,8 @@ importers:
   packages/ext/llm-gemini:
     dependencies:
       '@google/genai':
-        specifier: ^1.48.0
-        version: 1.48.0(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))
+        specifier: ^2.11.0
+        version: 2.11.0(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))
     devDependencies:
       '@rcrsr/rill':
         specifier: ~0.19.0
@@ -475,8 +475,8 @@ importers:
         specifier: ^0.111.0
         version: 0.111.0(zod@4.3.6)
       '@google/genai':
-        specifier: ^1.48.0
-        version: 1.48.0(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))
+        specifier: ^2.11.0
+        version: 2.11.0(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))
       '@rcrsr/rill':
         specifier: ~0.19.0
         version: 0.19.0
@@ -1195,8 +1195,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@google/genai@1.48.0':
-    resolution: {integrity: sha512-plonYK4ML2PrxsRD9SeqmFt76eREWkQdPCglOA6aYDzL1AAbE+7PUnT54SvpWGfws13L0AZEqGSpL7+1IPnTxQ==}
+  '@google/genai@2.11.0':
+    resolution: {integrity: sha512-d2Csf29vS0GfHc52H0MG25ccY4FKvvbDgqDlEovLrPLF8sPegWr/GGO+LMOy85/1SnX0iV0zDAW7R8SsvWg8Vg==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.25.2
@@ -4455,7 +4455,7 @@ snapshots:
   '@esbuild/win32-x64@0.27.7':
     optional: true
 
-  '@google/genai@1.48.0(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))':
+  '@google/genai@2.11.0(@modelcontextprotocol/sdk@1.29.0(zod@4.3.6))':
     dependencies:
       google-auth-library: 10.6.2
       p-retry: 4.6.2
