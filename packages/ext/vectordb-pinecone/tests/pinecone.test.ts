@@ -157,7 +157,7 @@ vi.mock('@pinecone-database/pinecone', () => {
   return {
     Pinecone: class MockPinecone {
       constructor(_config: unknown) {}
-      Index = vi.fn(() => createIndexMock());
+      index = vi.fn(() => createIndexMock());
       describeIndex = mockDescribeIndex;
       createIndex = mockCreateIndex;
       deleteIndex = mockDeleteIndex;
