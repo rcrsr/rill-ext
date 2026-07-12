@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-mcp",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "description": "rill extension for Model Context Protocol (MCP) integration",
   "license": "MIT",
   "author": "Andre Bremer",

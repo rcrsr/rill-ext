@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-crypto",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "description": "rill extension for cryptographic operations (hash, hmac, uuid, random)",
   "license": "MIT",
   "author": "Andre Bremer",

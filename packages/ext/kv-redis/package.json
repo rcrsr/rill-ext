@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-kv-redis",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "description": "rill extension for Redis kv backend implementation",
   "license": "MIT",
   "author": "Andre Bremer",

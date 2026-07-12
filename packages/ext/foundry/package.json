@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-foundry",
-  "version": "0.19.2",
+  "version": "0.19.3",
   "description": "rill extension for Azure AI Foundry integration",
   "license": "MIT",
   "author": "Andre Bremer",

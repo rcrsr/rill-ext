@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-exec",
-  "version": "0.19.2",
+  "version": "0.19.3",
   "description": "rill extension for sandboxed command execution",
   "license": "MIT",
   "author": "Andre Bremer",

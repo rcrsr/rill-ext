@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-text",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "description": "rill extension for text processing (HTML-to-text, Markdown conversion, web content extraction, segmentation, MIME, Unicode)",
   "license": "MIT",
   "author": "Andre Bremer",
