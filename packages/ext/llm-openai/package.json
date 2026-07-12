@@ -54,6 +54,6 @@
     "access": "public"
   },
   "dependencies": {
-    "openai": "^6.33.0"
+    "openai": "^6.46.0"
   }
 }

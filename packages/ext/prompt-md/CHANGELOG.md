@@ -6,6 +6,10 @@
 
 - **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
+### Changed
+
+- **yaml 2.9.0:** Bumps yaml to ^2.9.0 and the openai dev dependency to ^6.46.0. ([#61](https://github.com/rcrsr/rill-ext/pull/61))
+
 ## [0.19.3] - 2026-05-01
 
 ### Changed

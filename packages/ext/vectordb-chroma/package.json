@@ -55,6 +55,6 @@
     "access": "public"
   },
   "dependencies": {
-    "chromadb": "^3.4.0"
+    "chromadb": "^3.5.0"
   }
 }

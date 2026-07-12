@@ -6,6 +6,10 @@
 
 - **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
+### Changed
+
+- **better-sqlite3 12.11.1:** Bumps better-sqlite3 to ^12.11.1. ([#61](https://github.com/rcrsr/rill-ext/pull/61))
+
 ## [0.19.1] - 2026-04-30
 
 ### Changed (Breaking)
