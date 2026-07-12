@@ -54,6 +54,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@qdrant/js-client-rest": "^1.17.0"
+    "@qdrant/js-client-rest": "^1.18.0"
   }
 }

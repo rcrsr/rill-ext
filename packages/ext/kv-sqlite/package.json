@@ -54,6 +54,6 @@
     "access": "public"
   },
   "dependencies": {
-    "better-sqlite3": "^12.8.0"
+    "better-sqlite3": "^12.11.1"
   }
 }
