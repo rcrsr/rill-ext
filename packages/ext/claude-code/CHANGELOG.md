@@ -6,6 +6,10 @@
 
 - **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
+### Changed
+
+- **which 7.x:** Upgrade which from ^6.0.1 to ^7.0.0 (no source changes; which.sync shape unchanged). ([#60](https://github.com/rcrsr/rill-ext/pull/60))
+
 ## [0.19.1] - 2026-04-30
 
 ### Changed (Breaking)
