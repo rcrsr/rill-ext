@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **GitHub label taxonomy:** Adds automated area labeling for issues and PRs via labeler.yml, workflows, templates, and sync script. ([#56](https://github.com/rcrsr/rill-ext/pull/56))
+- **rill.role declaration:** All public extensions now declare rill.role in package.json, satisfying rill-cli install gate requirements. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
 ### Changed
 
