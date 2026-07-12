@@ -54,6 +54,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@google/genai": "^1.48.0"
+    "@google/genai": "^2.11.0"
   }
 }
