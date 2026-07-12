@@ -116,7 +116,7 @@ export function createPineconeExtension(
         const metadata = convertMetadata(metadataArg);
 
         return withEventEmission(ctx, PROVIDER, 'upsert', { id }, async () => {
-          const index = client.Index(factoryIndex);
+          const index = client.index({ name: factoryIndex });
           await index.namespace(factoryNamespace).upsert({
             records: [{ id, values: Array.from(vector.data), metadata }],
           });
@@ -146,7 +146,7 @@ export function createPineconeExtension(
         try {
           const items = args['items'] as Array<Record<string, RillValue>>;
           let succeeded = 0;
-          const index = client.Index(factoryIndex);
+          const index = client.index({ name: factoryIndex });
 
           for (let i = 0; i < items.length; i++) {
             const item = items[i];
@@ -251,7 +251,7 @@ export function createPineconeExtension(
 
         const startTime = Date.now();
         try {
-          const index = client.Index(factoryIndex);
+          const index = client.index({ name: factoryIndex });
 
           const searchRequest: {
             vector: number[];
@@ -331,7 +331,7 @@ export function createPineconeExtension(
         const id = args['id'] as string;
 
         return withEventEmission(ctx, PROVIDER, 'get', { id }, async () => {
-          const index = client.Index(factoryIndex);
+          const index = client.index({ name: factoryIndex });
           const response = await index
             .namespace(factoryNamespace)
             .fetch({ ids: [id] });
@@ -380,7 +380,7 @@ export function createPineconeExtension(
 
         const id = args['id'] as string;
         return withEventEmission(ctx, PROVIDER, 'delete', { id }, async () => {
-          const index = client.Index(factoryIndex);
+          const index = client.index({ name: factoryIndex });
           await index.namespace(factoryNamespace || '').deleteOne({ id });
           return { id, deleted: true } as RillValue;
         });
@@ -406,7 +406,7 @@ export function createPineconeExtension(
         try {
           const ids = args['ids'] as Array<string>;
           let succeeded = 0;
-          const index = client.Index(factoryIndex);
+          const index = client.index({ name: factoryIndex });
 
           for (let i = 0; i < ids.length; i++) {
             const id = ids[i]!;
@@ -462,7 +462,7 @@ export function createPineconeExtension(
         if (disposed !== null) return disposed;
 
         return withEventEmission(ctx, PROVIDER, 'count', {}, async () => {
-          const index = client.Index(factoryIndex);
+          const index = client.index({ name: factoryIndex });
           const stats = await index.describeIndexStats();
           const count = stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
           return count as RillValue;
@@ -610,7 +610,7 @@ export function createPineconeExtension(
           'describe',
           { name: factoryIndex },
           async () => {
-            const index = client.Index(factoryIndex);
+            const index = client.index({ name: factoryIndex });
             const stats = await index.describeIndexStats();
             const indexInfo = await client.describeIndex(factoryIndex);
 

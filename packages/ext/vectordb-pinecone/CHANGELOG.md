@@ -6,6 +6,10 @@
 
 - **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
+### Changed
+
+- **Pinecone SDK 8.x:** Extension is now compatible with @pinecone-database/pinecone 8.x. ([#60](https://github.com/rcrsr/rill-ext/pull/60))
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)
