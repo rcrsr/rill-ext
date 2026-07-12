@@ -27,13 +27,16 @@ interface ErrorWithCode {
 export function mapKvError(
   ctx: RuntimeContext,
   provider: string,
-  error: unknown,
+  error: unknown
 ): RillValue {
   if (error instanceof RuntimeHaltSignal) {
     return ctx.invalidate(error, {
       code: 'TIMEOUT',
       provider,
-      raw: { kind: 'request_cancelled', message: `${provider}: request cancelled` },
+      raw: {
+        kind: 'request_cancelled',
+        message: `${provider}: request cancelled`,
+      },
     });
   }
 
@@ -49,7 +52,11 @@ export function mapKvError(
   const message = err?.message ?? String(error);
 
   // ioredis / Node connection errors
-  if (err?.code === 'ECONNREFUSED' || err?.code === 'ETIMEDOUT' || err?.code === 'ENOTFOUND') {
+  if (
+    err?.code === 'ECONNREFUSED' ||
+    err?.code === 'ETIMEDOUT' ||
+    err?.code === 'ENOTFOUND'
+  ) {
     return ctx.invalidate(error, {
       code: 'UNAVAILABLE',
       provider,
@@ -67,7 +74,10 @@ export function mapKvError(
   }
 
   // Redis auth errors come back as messages prefixed NOAUTH / WRONGPASS
-  if (typeof message === 'string' && (message.includes('NOAUTH') || message.includes('WRONGPASS'))) {
+  if (
+    typeof message === 'string' &&
+    (message.includes('NOAUTH') || message.includes('WRONGPASS'))
+  ) {
     return ctx.invalidate(error, {
       code: 'AUTH',
       provider,

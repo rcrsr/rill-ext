@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Bumps `@anthropic-ai/sdk` to `^0.111.0` (from `^0.82.0`). In-use API surface unchanged. ([#57](https://github.com/rcrsr/rill-ext/pull/57))
+
 ## [0.19.2] - 2026-05-01
 
 ### Changed (Breaking)

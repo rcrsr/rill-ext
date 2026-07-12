@@ -38,12 +38,18 @@ async function expectInvalidWithMessage(
   return result;
 }
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /** Build a fetch mock that returns a JSON response with given status. */
-function mockFetchJson(status: number, body: unknown): ReturnType<typeof vi.fn> {
+function mockFetchJson(
+  status: number,
+  body: unknown
+): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -61,7 +67,9 @@ function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
-    json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
+    json: vi
+      .fn()
+      .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
   });
 }
 
@@ -89,7 +97,12 @@ const CONTENTS_RESPONSE = {
 const FIND_SIMILAR_RESPONSE = {
   requestId: 'req-sim',
   results: [
-    { id: 's1', url: 'https://similar.com/1', title: 'Similar page', score: 0.95 },
+    {
+      id: 's1',
+      url: 'https://similar.com/1',
+      title: 'Similar page',
+      score: 0.95,
+    },
   ],
 };
 
@@ -173,7 +186,9 @@ describe('Exa extension host functions', () => {
       expect(mockFetch).toHaveBeenCalledOnce();
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('https://api.exa.ai/search');
-      expect((init.headers as Record<string, string>)['x-api-key']).toBe('exa-test-key');
+      expect((init.headers as Record<string, string>)['x-api-key']).toBe(
+        'exa-test-key'
+      );
       expect(init.method).toBe('POST');
     });
 
@@ -193,7 +208,10 @@ describe('Exa extension host functions', () => {
     it('respects custom baseUrl', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createExaExtension({ apiKey: 'test-key', baseUrl: 'https://custom.exa.ai' }, makeFactoryCtx());
+      const ext = createExaExtension(
+        { apiKey: 'test-key', baseUrl: 'https://custom.exa.ai' },
+        makeFactoryCtx()
+      );
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
@@ -206,7 +224,13 @@ describe('Exa extension host functions', () => {
       const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'search').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'search').fn({ query: '' }, ctx),
@@ -324,7 +348,13 @@ describe('Exa extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'search').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -367,7 +397,9 @@ describe('Exa extension host functions', () => {
     });
 
     it('omits statuses when not in response [AC-38]', async () => {
-      const responseWithoutStatuses = { results: [{ url: 'https://example.com/1', text: 'content' }] };
+      const responseWithoutStatuses = {
+        results: [{ url: 'https://example.com/1', text: 'content' }],
+      };
       globalThis.fetch = mockFetchJson(200, responseWithoutStatuses);
       const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
@@ -394,7 +426,10 @@ describe('Exa extension host functions', () => {
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('https://api.exa.ai/contents');
       const body = JSON.parse(init.body as string) as Record<string, unknown>;
-      expect(body['urls']).toEqual(['https://example.com/1', 'https://example.com/2']);
+      expect(body['urls']).toEqual([
+        'https://example.com/1',
+        'https://example.com/2',
+      ]);
     });
 
     it('handles mixed URL partial results [AC-36]', async () => {
@@ -402,7 +437,11 @@ describe('Exa extension host functions', () => {
         results: [{ url: 'https://example.com/1', text: 'content' }],
         statuses: [
           { url: 'https://example.com/1', status: 'success' },
-          { url: 'https://example.com/bad', status: 'error', error: 'Not found' },
+          {
+            url: 'https://example.com/bad',
+            status: 'error',
+            error: 'Not found',
+          },
         ],
       };
       globalThis.fetch = mockFetchJson(200, mixedResponse);
@@ -504,7 +543,10 @@ describe('Exa extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await getCallable(ext, 'contents').fn({ urls: ['https://example.com/1'] }, ctx);
+      await getCallable(ext, 'contents').fn(
+        { urls: ['https://example.com/1'] },
+        ctx
+      );
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -581,7 +623,10 @@ describe('Exa extension host functions', () => {
       const ctx = createRuntimeContext();
 
       await expectInvalidWithMessage(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        getCallable(ext, 'find_similar').fn(
+          { url: 'https://example.com' },
+          ctx
+        ),
         'exa: authentication failed'
       );
     });
@@ -592,7 +637,10 @@ describe('Exa extension host functions', () => {
       const ctx = createRuntimeContext();
 
       await expectInvalidWithMessage(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        getCallable(ext, 'find_similar').fn(
+          { url: 'https://example.com' },
+          ctx
+        ),
         'exa: rate limit exceeded'
       );
     });
@@ -603,7 +651,10 @@ describe('Exa extension host functions', () => {
       const ctx = createRuntimeContext();
 
       await expectInvalidWithMessage(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        getCallable(ext, 'find_similar').fn(
+          { url: 'https://example.com' },
+          ctx
+        ),
         'exa: server error (500)'
       );
     });
@@ -614,7 +665,10 @@ describe('Exa extension host functions', () => {
       const ctx = createRuntimeContext();
 
       await expectInvalidWithMessage(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        getCallable(ext, 'find_similar').fn(
+          { url: 'https://example.com' },
+          ctx
+        ),
         'exa: connection failed'
       );
     });
@@ -627,7 +681,10 @@ describe('Exa extension host functions', () => {
       const ctx = createRuntimeContext();
 
       await expectInvalidWithMessage(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        getCallable(ext, 'find_similar').fn(
+          { url: 'https://example.com' },
+          ctx
+        ),
         'exa: request timeout'
       );
     });
@@ -638,7 +695,10 @@ describe('Exa extension host functions', () => {
       const ctx = createRuntimeContext();
 
       await expectInvalidWithMessage(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        getCallable(ext, 'find_similar').fn(
+          { url: 'https://example.com' },
+          ctx
+        ),
         'exa: credits depleted'
       );
     });
@@ -650,7 +710,10 @@ describe('Exa extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await getCallable(ext, 'find_similar').fn({ url: 'https://example.com/source' }, ctx);
+      await getCallable(ext, 'find_similar').fn(
+        { url: 'https://example.com/source' },
+        ctx
+      );
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -666,7 +729,10 @@ describe('Exa extension host functions', () => {
       await ext.dispose!();
 
       await expectInvalidWithMessage(
-        getCallable(ext, 'find_similar').fn({ url: 'https://example.com' }, ctx),
+        getCallable(ext, 'find_similar').fn(
+          { url: 'https://example.com' },
+          ctx
+        ),
         'exa: operation cancelled'
       );
     });
@@ -688,7 +754,9 @@ describe('Exa extension host functions', () => {
       )) as Record<string, unknown>;
 
       expect(typeof result['answer']).toBe('string');
-      expect(result['answer']).toBe('TypeScript is a typed superset of JavaScript.');
+      expect(result['answer']).toBe(
+        'TypeScript is a typed superset of JavaScript.'
+      );
       expect(Array.isArray(result['citations'])).toBe(true);
     });
 
@@ -698,7 +766,10 @@ describe('Exa extension host functions', () => {
       const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'answer').fn({ query: 'What is TypeScript?' }, ctx);
+      await getCallable(ext, 'answer').fn(
+        { query: 'What is TypeScript?' },
+        ctx
+      );
 
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('https://api.exa.ai/answer');
@@ -710,7 +781,13 @@ describe('Exa extension host functions', () => {
       const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'answer').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'answer').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'answer').fn({ query: '' }, ctx),
@@ -804,7 +881,10 @@ describe('Exa extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await getCallable(ext, 'answer').fn({ query: 'What is TypeScript?' }, ctx);
+      await getCallable(ext, 'answer').fn(
+        { query: 'What is TypeScript?' },
+        ctx
+      );
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -822,7 +902,13 @@ describe('Exa extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'answer').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'answer').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -852,24 +938,26 @@ describe('Exa extension host functions', () => {
   describe('dispose with in-flight requests [AC-22]', () => {
     it('dispose cancels in-flight search request [AC-22]', async () => {
       // Mock fetch that hangs until its signal is aborted
-      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-        return new Promise((_resolve, reject) => {
-          const signal = init?.signal;
-          if (signal) {
-            if (signal.aborted) {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-              return;
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              if (signal.aborted) {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+                return;
+              }
+              signal.addEventListener('abort', () => {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+              });
             }
-            signal.addEventListener('abort', () => {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-            });
-          }
+          });
         });
-      });
 
       const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();

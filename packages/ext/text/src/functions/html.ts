@@ -49,7 +49,7 @@ export function htmlToText(
   html: string,
   includeLinks: boolean,
   wordWrap: boolean,
-  wordWrapWidth: number,
+  wordWrapWidth: number
 ): string {
   return convert(html, {
     wordwrap: wordWrap ? wordWrapWidth : false,

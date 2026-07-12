@@ -31,13 +31,18 @@ export interface IntrospectionDicts {
  * @param functions - RillFunctions keyed by sanitized name
  * @returns Record mapping name to callable RillValue
  */
-function buildCallableDict(functions: Record<string, RillFunction>): Record<string, RillValue> {
+function buildCallableDict(
+  functions: Record<string, RillFunction>
+): Record<string, RillValue> {
   const dict: Record<string, RillValue> = {};
   for (const [name, rillFn] of Object.entries(functions)) {
     // Ensure description annotation is set for introspection
     const withDescription: RillFunction = {
       ...rillFn,
-      annotations: { ...rillFn.annotations, description: rillFn.annotations?.['description'] ?? '' },
+      annotations: {
+        ...rillFn.annotations,
+        description: rillFn.annotations?.['description'] ?? '',
+      },
     };
     dict[name] = toCallable(withDescription) as unknown as RillValue;
   }

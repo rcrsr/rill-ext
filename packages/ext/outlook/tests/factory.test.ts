@@ -5,7 +5,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, createRuntimeContext, type ApplicationCallable, isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  createRuntimeContext,
+  type ApplicationCallable,
+  isInvalid,
+  getStatus,
+  type RillValue,
+} from '@rcrsr/rill';
 import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
 import type { OutlookConfig } from '../src/types.js';
@@ -14,7 +21,10 @@ import type { OutlookConfig } from '../src/types.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -46,21 +56,29 @@ describe('createOutlookExtension', () => {
     it('throws RILL-R001 when auth is missing', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({ auth: undefined as unknown as OutlookConfig['auth'] }, makeFactoryCtx());
+        createOutlookExtension(
+          { auth: undefined as unknown as OutlookConfig['auth'] },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe('outlook: auth is required');
+      expect((caught as RuntimeError).message).toBe(
+        'outlook: auth is required'
+      );
     });
 
     it('throws RILL-R001 for invalid auth.type', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({
-          auth: { type: 'oauth' as unknown as 'bearer', token: 'tok' },
-        }, makeFactoryCtx());
+        createOutlookExtension(
+          {
+            auth: { type: 'oauth' as unknown as 'bearer', token: 'tok' },
+          },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
@@ -74,13 +92,18 @@ describe('createOutlookExtension', () => {
     it('throws RILL-R001 for empty bearer token', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({ auth: { type: 'bearer', token: '' } }, makeFactoryCtx());
+        createOutlookExtension(
+          { auth: { type: 'bearer', token: '' } },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe('outlook: auth.token is required');
+      expect((caught as RuntimeError).message).toBe(
+        'outlook: auth.token is required'
+      );
     });
 
     it('accepts whitespace-only bearer token at config time', () => {
@@ -88,121 +111,165 @@ describe('createOutlookExtension', () => {
       // A whitespace-only token passes config validation (resolved to the token string)
       // This test documents the current behavior: whitespace is accepted at config time
       expect(() =>
-        createOutlookExtension({ auth: { type: 'bearer', token: '   ' } }, makeFactoryCtx())
+        createOutlookExtension(
+          { auth: { type: 'bearer', token: '   ' } },
+          makeFactoryCtx()
+        )
       ).not.toThrow();
     });
 
     it('throws RILL-R001 for empty session tokenVar', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({ auth: { type: 'session', tokenVar: '' } }, makeFactoryCtx());
+        createOutlookExtension(
+          { auth: { type: 'session', tokenVar: '' } },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe('outlook: auth.tokenVar is required');
+      expect((caught as RuntimeError).message).toBe(
+        'outlook: auth.tokenVar is required'
+      );
     });
 
     it('throws RILL-R001 when session tokenVar is missing', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({
-          auth: { type: 'session', tokenVar: undefined as unknown as string },
-        }, makeFactoryCtx());
+        createOutlookExtension(
+          {
+            auth: { type: 'session', tokenVar: undefined as unknown as string },
+          },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-  expect((caught as RuntimeError).message).toBe('outlook: auth.tokenVar is required');
+      expect((caught as RuntimeError).message).toBe(
+        'outlook: auth.tokenVar is required'
+      );
     });
 
     it('throws RILL-R001 when maxResults is 0', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({
-          auth: { type: 'bearer', token: 'tok' },
-          mail: { maxResults: 0 },
-        }, makeFactoryCtx());
+        createOutlookExtension(
+          {
+            auth: { type: 'bearer', token: 'tok' },
+            mail: { maxResults: 0 },
+          },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-  expect((caught as RuntimeError).message).toBe('outlook: maxResults must be 1-1000');
+      expect((caught as RuntimeError).message).toBe(
+        'outlook: maxResults must be 1-1000'
+      );
     });
 
     it('throws RILL-R001 when maxResults is 1001', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({
-          auth: { type: 'bearer', token: 'tok' },
-          mail: { maxResults: 1001 },
-        }, makeFactoryCtx());
+        createOutlookExtension(
+          {
+            auth: { type: 'bearer', token: 'tok' },
+            mail: { maxResults: 1001 },
+          },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-  expect((caught as RuntimeError).message).toBe('outlook: maxResults must be 1-1000');
+      expect((caught as RuntimeError).message).toBe(
+        'outlook: maxResults must be 1-1000'
+      );
     });
 
     it('throws RILL-R001 when maxResults is negative', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({
-          auth: { type: 'bearer', token: 'tok' },
-          mail: { maxResults: -5 },
-        }, makeFactoryCtx());
+        createOutlookExtension(
+          {
+            auth: { type: 'bearer', token: 'tok' },
+            mail: { maxResults: -5 },
+          },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-  expect((caught as RuntimeError).message).toBe('outlook: maxResults must be 1-1000');
+      expect((caught as RuntimeError).message).toBe(
+        'outlook: maxResults must be 1-1000'
+      );
     });
 
     it('throws RILL-R001 when folders array is empty', () => {
       let caught: unknown;
       try {
-        createOutlookExtension({
-          auth: { type: 'bearer', token: 'tok' },
-          mail: { folders: [] },
-        }, makeFactoryCtx());
+        createOutlookExtension(
+          {
+            auth: { type: 'bearer', token: 'tok' },
+            mail: { folders: [] },
+          },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-  expect((caught as RuntimeError).message).toBe('outlook: folders must be non-empty');
+      expect((caught as RuntimeError).message).toBe(
+        'outlook: folders must be non-empty'
+      );
     });
 
     it('accepts maxResults at boundary 1', () => {
       expect(() =>
-        createOutlookExtension({
-          auth: { type: 'bearer', token: 'tok' },
-          mail: { maxResults: 1 },
-        }, makeFactoryCtx())
+        createOutlookExtension(
+          {
+            auth: { type: 'bearer', token: 'tok' },
+            mail: { maxResults: 1 },
+          },
+          makeFactoryCtx()
+        )
       ).not.toThrow();
     });
 
     it('accepts maxResults at boundary 1000', () => {
       expect(() =>
-        createOutlookExtension({
-          auth: { type: 'bearer', token: 'tok' },
-          mail: { maxResults: 1000 },
-        }, makeFactoryCtx())
+        createOutlookExtension(
+          {
+            auth: { type: 'bearer', token: 'tok' },
+            mail: { maxResults: 1000 },
+          },
+          makeFactoryCtx()
+        )
       ).not.toThrow();
     });
 
     it('accepts bearer config with token', () => {
-      expect(() => createOutlookExtension(BEARER_CONFIG, makeFactoryCtx())).not.toThrow();
+      expect(() =>
+        createOutlookExtension(BEARER_CONFIG, makeFactoryCtx())
+      ).not.toThrow();
     });
 
     it('accepts session config with tokenVar', () => {
       expect(() =>
-        createOutlookExtension({ auth: { type: 'session', tokenVar: 'MY_TOKEN' } }, makeFactoryCtx())
+        createOutlookExtension(
+          { auth: { type: 'session', tokenVar: 'MY_TOKEN' } },
+          makeFactoryCtx()
+        )
       ).not.toThrow();
     });
 
@@ -210,7 +277,10 @@ describe('createOutlookExtension', () => {
       // Must be synchronous — no async needed
       let threw = false;
       try {
-        createOutlookExtension({ auth: undefined as unknown as OutlookConfig['auth'] }, makeFactoryCtx());
+        createOutlookExtension(
+          { auth: undefined as unknown as OutlookConfig['auth'] },
+          makeFactoryCtx()
+        );
       } catch {
         threw = true;
       }
@@ -232,33 +302,72 @@ describe('createOutlookExtension', () => {
     it('returns all 12 named callable entries', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const names = [
-        'inbox', 'from', 'search', 'read', 'send', 'reply',
-        'draft', 'flag', 'events', 'today', 'free_busy', 'create_event',
+        'inbox',
+        'from',
+        'search',
+        'read',
+        'send',
+        'reply',
+        'draft',
+        'flag',
+        'events',
+        'today',
+        'free_busy',
+        'create_event',
       ];
       for (const name of names) {
-        expect(getCallable(ext, name), `${name} should be defined`).toBeDefined();
+        expect(
+          getCallable(ext, name),
+          `${name} should be defined`
+        ).toBeDefined();
       }
     });
 
     it('each callable has a fn function', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const names = [
-        'inbox', 'from', 'search', 'read', 'send', 'reply',
-        'draft', 'flag', 'events', 'today', 'free_busy', 'create_event',
+        'inbox',
+        'from',
+        'search',
+        'read',
+        'send',
+        'reply',
+        'draft',
+        'flag',
+        'events',
+        'today',
+        'free_busy',
+        'create_event',
       ];
       for (const name of names) {
-        expect(typeof getCallable(ext, name).fn, `${name}.fn should be function`).toBe('function');
+        expect(
+          typeof getCallable(ext, name).fn,
+          `${name}.fn should be function`
+        ).toBe('function');
       }
     });
 
     it('each callable has a params array', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const names = [
-        'inbox', 'from', 'search', 'read', 'send', 'reply',
-        'draft', 'flag', 'events', 'today', 'free_busy', 'create_event',
+        'inbox',
+        'from',
+        'search',
+        'read',
+        'send',
+        'reply',
+        'draft',
+        'flag',
+        'events',
+        'today',
+        'free_busy',
+        'create_event',
       ];
       for (const name of names) {
-        expect(Array.isArray(getCallable(ext, name).params), `${name}.params should be array`).toBe(true);
+        expect(
+          Array.isArray(getCallable(ext, name).params),
+          `${name}.params should be array`
+        ).toBe(true);
       }
     });
 
@@ -276,31 +385,61 @@ describe('createOutlookExtension', () => {
     it('inbox has top (num) and unread (bool) params', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const fn = getCallable(ext, 'inbox');
-      expect(fn.params[0]).toMatchObject({ name: 'top', type: { kind: 'number' } });
-      expect(fn.params[1]).toMatchObject({ name: 'unread', type: { kind: 'bool' } });
+      expect(fn.params[0]).toMatchObject({
+        name: 'top',
+        type: { kind: 'number' },
+      });
+      expect(fn.params[1]).toMatchObject({
+        name: 'unread',
+        type: { kind: 'bool' },
+      });
     });
 
     it('from has address (str) and top (num) params', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const fn = getCallable(ext, 'from');
-      expect(fn.params[0]).toMatchObject({ name: 'address', type: { kind: 'string' } });
-      expect(fn.params[1]).toMatchObject({ name: 'top', type: { kind: 'number' } });
+      expect(fn.params[0]).toMatchObject({
+        name: 'address',
+        type: { kind: 'string' },
+      });
+      expect(fn.params[1]).toMatchObject({
+        name: 'top',
+        type: { kind: 'number' },
+      });
     });
 
     it('events has start (num) and end (num) params', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const fn = getCallable(ext, 'events');
-      expect(fn.params[0]).toMatchObject({ name: 'start', type: { kind: 'number' } });
-      expect(fn.params[1]).toMatchObject({ name: 'end', type: { kind: 'number' } });
+      expect(fn.params[0]).toMatchObject({
+        name: 'start',
+        type: { kind: 'number' },
+      });
+      expect(fn.params[1]).toMatchObject({
+        name: 'end',
+        type: { kind: 'number' },
+      });
     });
 
     it('create_event has title (str), start (num), end (num), options (dict) params', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const fn = getCallable(ext, 'create_event');
-      expect(fn.params[0]).toMatchObject({ name: 'title', type: { kind: 'string' } });
-      expect(fn.params[1]).toMatchObject({ name: 'start', type: { kind: 'number' } });
-      expect(fn.params[2]).toMatchObject({ name: 'end', type: { kind: 'number' } });
-      expect(fn.params[3]).toMatchObject({ name: 'options', type: { kind: 'dict' } });
+      expect(fn.params[0]).toMatchObject({
+        name: 'title',
+        type: { kind: 'string' },
+      });
+      expect(fn.params[1]).toMatchObject({
+        name: 'start',
+        type: { kind: 'number' },
+      });
+      expect(fn.params[2]).toMatchObject({
+        name: 'end',
+        type: { kind: 'number' },
+      });
+      expect(fn.params[3]).toMatchObject({
+        name: 'options',
+        type: { kind: 'dict' },
+      });
     });
   });
 
@@ -331,7 +470,7 @@ describe('createOutlookExtension', () => {
       const ctx = createRuntimeContext();
       const result = (await getCallable(ext, 'send').fn(
         { to: ['a@b.com'], subject: 'Hi', body: 'Hello' },
-        ctx,
+        ctx
       )) as RillValue;
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('FORBIDDEN');
@@ -348,7 +487,10 @@ describe('createOutlookExtension', () => {
       const ctx = createRuntimeContext();
       // draft is enabled by default — should not throw a capability error
       await expect(
-        getCallable(ext, 'draft').fn({ to: ['a@b.com'], subject: 'Hi', body: 'Hello' }, ctx)
+        getCallable(ext, 'draft').fn(
+          { to: ['a@b.com'], subject: 'Hi', body: 'Hello' },
+          ctx
+        )
       ).resolves.toBeDefined();
     });
 
@@ -396,11 +538,13 @@ describe('createOutlookExtension', () => {
       const ctx = createRuntimeContext();
       const result = (await getCallable(ext, 'create_event').fn(
         { title: 'Meeting', start: 0, end: 1000, options: {} },
-        ctx,
+        ctx
       )) as RillValue;
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('FORBIDDEN');
-      expect(getStatus(result).message).toContain('calendar.create not enabled');
+      expect(getStatus(result).message).toContain(
+        'calendar.create not enabled'
+      );
     });
   });
 
@@ -432,27 +576,35 @@ describe('createOutlookExtension', () => {
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      const result = (await getCallable(ext, 'inbox').fn({ top: 10 }, ctx)) as RillValue;
+      const result = (await getCallable(ext, 'inbox').fn(
+        { top: 10 },
+        ctx
+      )) as RillValue;
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('DISPOSED');
       expect(getStatus(result).message).toBe('outlook: operation cancelled');
     });
 
     it('post-dispose send call emits #DISPOSED [EC-13]', async () => {
-      const ext = createOutlookExtension({
-        auth: { type: 'bearer', token: 'tok' },
-        capabilities: { mail: { send: true } },
-      }, makeFactoryCtx());
+      const ext = createOutlookExtension(
+        {
+          auth: { type: 'bearer', token: 'tok' },
+          capabilities: { mail: { send: true } },
+        },
+        makeFactoryCtx()
+      );
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
       const result = (await getCallable(ext, 'send').fn(
         { to: ['a@b.com'], subject: 'Hi', body: 'Hello' },
-        ctx,
+        ctx
       )) as RillValue;
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('DISPOSED');
-      expect(getStatus(result).message).toContain('outlook: operation cancelled');
+      expect(getStatus(result).message).toContain(
+        'outlook: operation cancelled'
+      );
     });
 
     it('post-dispose events call emits #DISPOSED [EC-13]', async () => {
@@ -462,11 +614,13 @@ describe('createOutlookExtension', () => {
 
       const result = (await getCallable(ext, 'events').fn(
         { start: 0, end: 1000 },
-        ctx,
+        ctx
       )) as RillValue;
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('DISPOSED');
-      expect(getStatus(result).message).toContain('outlook: operation cancelled');
+      expect(getStatus(result).message).toContain(
+        'outlook: operation cancelled'
+      );
     });
 
     it('post-dispose error carries the #DISPOSED atom [AC-29]', async () => {

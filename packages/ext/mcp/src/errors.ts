@@ -28,7 +28,7 @@ const PROVIDER = 'mcp';
  */
 export function factoryError(
   message: string,
-  context?: Record<string, unknown>,
+  context?: Record<string, unknown>
 ): RuntimeError {
   return new RuntimeError('RILL-R001', `mcp: ${message}`, undefined, context);
 }
@@ -37,7 +37,9 @@ export function factoryError(
  * Stdio-only: server process exited with the given code.
  */
 export function processExitError(exitCode: number): RuntimeError {
-  return factoryError(`server process exited with code ${exitCode}`, { exitCode });
+  return factoryError(`server process exited with code ${exitCode}`, {
+    exitCode,
+  });
 }
 
 /**
@@ -53,7 +55,7 @@ export function connectionRefusedError(url: string): RuntimeError {
 export function authRequiredError(): RuntimeError {
   return factoryError(
     'server requires authentication -- complete OAuth flow before connecting',
-    { kind: 'auth_required' },
+    { kind: 'auth_required' }
   );
 }
 
@@ -65,7 +67,7 @@ export function authRequiredError(): RuntimeError {
 export function failTool(
   ctx: RuntimeContext,
   toolName: string,
-  errorText: string,
+  errorText: string
 ): RillValue {
   return ctx.invalidate(new Error(`mcp tool "${toolName}": ${errorText}`), {
     code: 'UNAVAILABLE',
@@ -78,7 +80,7 @@ export function failTool(
 export function failNotFound(
   ctx: RuntimeContext,
   callableName: string,
-  detail?: string,
+  detail?: string
 ): RillValue {
   return ctx.invalidate(
     new Error(`mcp: not found "${callableName}"${detail ? `: ${detail}` : ''}`),
@@ -86,7 +88,7 @@ export function failNotFound(
       code: 'NOT_FOUND',
       provider: PROVIDER,
       raw: { kind: 'not_found', name: callableName, detail },
-    },
+    }
   );
 }
 
@@ -103,7 +105,7 @@ export function failProtocol(ctx: RuntimeContext, message: string): RillValue {
 export function failTimeout(
   ctx: RuntimeContext,
   callableName: string,
-  timeoutMs: number,
+  timeoutMs: number
 ): RillValue {
   return ctx.invalidate(
     new Error(`mcp tool "${callableName}": timeout after ${timeoutMs}ms`),
@@ -111,7 +113,7 @@ export function failTimeout(
       code: 'TIMEOUT',
       provider: PROVIDER,
       raw: { kind: 'tool_timeout', name: callableName, timeoutMs },
-    },
+    }
   );
 }
 
@@ -132,7 +134,7 @@ export function failAuth(ctx: RuntimeContext): RillValue {
       code: 'AUTH',
       provider: PROVIDER,
       raw: { kind: 'auth_failed' },
-    },
+    }
   );
 }
 
@@ -140,7 +142,7 @@ export function failAuth(ctx: RuntimeContext): RillValue {
 export function failInput(
   ctx: RuntimeContext,
   message: string,
-  raw: Record<string, unknown> = {},
+  raw: Record<string, unknown> = {}
 ): RillValue {
   return ctx.invalidate(new Error(`mcp: ${message}`), {
     code: 'INVALID_INPUT',
@@ -153,7 +155,7 @@ export function failInput(
 export function failUnavailable(
   ctx: RuntimeContext,
   message: string,
-  raw: Record<string, unknown> = {},
+  raw: Record<string, unknown> = {}
 ): RillValue {
   return ctx.invalidate(new Error(`mcp: ${message}`), {
     code: 'UNAVAILABLE',
@@ -173,7 +175,7 @@ export function failUnavailable(
 export function mapMcpError(
   ctx: RuntimeContext,
   error: unknown,
-  callableName: string,
+  callableName: string
 ): RillValue {
   // Already an invalid RillValue thrown by an inner helper: pass through.
   if (isInvalid(error as RillValue)) {

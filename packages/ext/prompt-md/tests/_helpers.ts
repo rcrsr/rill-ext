@@ -3,9 +3,7 @@
  * Provides a factory-context fixture for the post-rill-0.19 factory signature.
  */
 
-import {
-  type ExtensionFactoryCtx,
-} from '@rcrsr/rill';
+import { type ExtensionFactoryCtx } from '@rcrsr/rill';
 
 /**
  * Build a no-op ExtensionFactoryCtx for tests. Extensions in this

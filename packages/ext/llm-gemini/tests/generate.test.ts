@@ -26,7 +26,10 @@ import { expectRejectedHalt } from './_halt-helpers.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -45,7 +48,11 @@ function createGenerateMockResponse(jsonContent: string) {
 
 /** Build a RillTypeValue from a TypeStructure for test usage. */
 function typeVal(structure: TypeStructure): RillTypeValue {
-  return { __rill_type: true, typeName: structure.kind, structure } as unknown as RillTypeValue;
+  return {
+    __rill_type: true,
+    typeName: structure.kind,
+    structure,
+  } as unknown as RillTypeValue;
 }
 
 // Mock the Google GenAI SDK at module level
@@ -84,8 +91,17 @@ describe('generate() function', () => {
     mockGenerateContent.mockReset();
   });
 
-  const PERSON_SCHEMA = typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } }, age: { type: { kind: 'number' } } } });
-  const NAME_SCHEMA = typeVal({ kind: 'dict', fields: { name: { type: { kind: 'string' } } } });
+  const PERSON_SCHEMA = typeVal({
+    kind: 'dict',
+    fields: {
+      name: { type: { kind: 'string' } },
+      age: { type: { kind: 'number' } },
+    },
+  });
+  const NAME_SCHEMA = typeVal({
+    kind: 'dict',
+    fields: { name: { type: { kind: 'string' } } },
+  });
 
   describe('success cases', () => {
     // AC-1: data field contains schema-matching keys
@@ -146,7 +162,14 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'rate something', schema: typeVal({ kind: 'dict', fields: { score: { type: { kind: 'number' } } } }), options: {} },
+        {
+          prompt: 'rate something',
+          schema: typeVal({
+            kind: 'dict',
+            fields: { score: { type: { kind: 'number' } } },
+          }),
+          options: {},
+        },
         ctx
       )) as Record<string, unknown>;
 
@@ -194,7 +217,10 @@ describe('generate() function', () => {
       await getCallable(ext, 'generate').fn(
         {
           prompt: 'question',
-          schema: typeVal({ kind: 'dict', fields: { answer: { type: { kind: 'string' } } } }),
+          schema: typeVal({
+            kind: 'dict',
+            fields: { answer: { type: { kind: 'string' } } },
+          }),
         },
         ctx
       );
@@ -225,7 +251,10 @@ describe('generate() function', () => {
       await getCallable(ext, 'generate').fn(
         {
           prompt: 'prompt',
-          schema: typeVal({ kind: 'dict', fields: { result: { type: { kind: 'string' } } } }),
+          schema: typeVal({
+            kind: 'dict',
+            fields: { result: { type: { kind: 'string' } } },
+          }),
         },
         ctx
       );
@@ -258,7 +287,10 @@ describe('generate() function', () => {
       await getCallable(ext, 'generate').fn(
         {
           prompt: promptMessages,
-          schema: typeVal({ kind: 'dict', fields: { summary: { type: { kind: 'string' } } } }),
+          schema: typeVal({
+            kind: 'dict',
+            fields: { summary: { type: { kind: 'string' } } },
+          }),
         },
         ctx
       );
@@ -299,7 +331,10 @@ describe('generate() function', () => {
       await getCallable(ext, 'generate').fn(
         {
           prompt: 'prompt',
-          schema: typeVal({ kind: 'dict', fields: { value: { type: { kind: 'number' } } } }),
+          schema: typeVal({
+            kind: 'dict',
+            fields: { value: { type: { kind: 'number' } } },
+          }),
         },
         ctx
       );
@@ -320,7 +355,10 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx), { message: 'generate requires a type expression as schema' });
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx),
+        { message: 'generate requires a type expression as schema' }
+      );
     });
 
     // AC-18/EC-3: Missing schema throws RuntimeError
@@ -330,13 +368,18 @@ describe('generate() function', () => {
 
       let thrown: unknown;
       try {
-        await getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx);
+        await getCallable(ext, 'generate').fn(
+          { prompt: 'prompt', options: {} },
+          ctx
+        );
       } catch (err) {
         thrown = err;
       }
 
       expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
-      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe('INVALID_INPUT');
+      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
+        'INVALID_INPUT'
+      );
     });
 
     // AC-25/EC-3: No HTTP call when schema is missing
@@ -344,7 +387,9 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx));
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
+      );
 
       expect(mockGenerateContent).not.toHaveBeenCalled();
     });
@@ -358,12 +403,16 @@ describe('generate() function', () => {
         getCallable(ext, 'generate').fn(
           {
             prompt: 'prompt',
-            schema: typeVal({ kind: 'dict', fields: { field: { type: { kind: 'unsupported_type' } } } }),
+            schema: typeVal({
+              kind: 'dict',
+              fields: { field: { type: { kind: 'unsupported_type' } } },
+            }),
             options: {},
           },
           ctx
-        )
-      , { message: 'unsupported type: unsupported_type' });
+        ),
+        { message: 'unsupported type: unsupported_type' }
+      );
 
       expect(mockGenerateContent).not.toHaveBeenCalled();
     });
@@ -379,10 +428,18 @@ describe('generate() function', () => {
 
       await expectRejectedHalt(
         getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          {
+            prompt: 'prompt',
+            schema: typeVal({
+              kind: 'dict',
+              fields: { x: { type: { kind: 'number' } } },
+            }),
+            options: {},
+          },
           ctx
-        )
-      , { message: 'generate: failed to parse response JSON:' });
+        ),
+        { message: 'generate: failed to parse response JSON:' }
+      );
     });
 
     // AC-22/EC-5: "{broken" response throws with original parse error detail
@@ -397,7 +454,14 @@ describe('generate() function', () => {
       let thrown: unknown;
       try {
         await getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          {
+            prompt: 'prompt',
+            schema: typeVal({
+              kind: 'dict',
+              fields: { x: { type: { kind: 'number' } } },
+            }),
+            options: {},
+          },
           ctx
         );
       } catch (err) {
@@ -424,7 +488,14 @@ describe('generate() function', () => {
       let thrown: unknown;
       try {
         await getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+          {
+            prompt: 'prompt',
+            schema: typeVal({
+              kind: 'dict',
+              fields: { x: { type: { kind: 'number' } } },
+            }),
+            options: {},
+          },
           ctx
         );
       } catch (err) {
@@ -432,7 +503,9 @@ describe('generate() function', () => {
       }
 
       expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
-      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe('PROTOCOL');
+      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
+        'PROTOCOL'
+      );
     });
 
     // AC-24/EC-5: Parse failure returns no partial dict
@@ -444,10 +517,19 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn(
+          {
+            prompt: 'prompt',
+            schema: typeVal({
+              kind: 'dict',
+              fields: { x: { type: { kind: 'number' } } },
+            }),
+            options: {},
+          },
           ctx
-        ));
+        )
+      );
     });
 
     // AC-27/EC-6: Provider API error emits gemini:error
@@ -467,10 +549,19 @@ describe('generate() function', () => {
         },
       });
 
-      await expectRejectedHalt(getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn(
+          {
+            prompt: 'prompt',
+            schema: typeVal({
+              kind: 'dict',
+              fields: { x: { type: { kind: 'number' } } },
+            }),
+            options: {},
+          },
           ctx
-        ));
+        )
+      );
 
       const errorEvent = events.find((e) => e['event'] === 'gemini:error');
       expect(errorEvent).toBeDefined();
@@ -528,10 +619,19 @@ describe('generate() function', () => {
         },
       });
 
-      await expectRejectedHalt(getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', schema: typeVal({ kind: 'dict', fields: { x: { type: { kind: 'number' } } } }), options: {} },
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn(
+          {
+            prompt: 'prompt',
+            schema: typeVal({
+              kind: 'dict',
+              fields: { x: { type: { kind: 'number' } } },
+            }),
+            options: {},
+          },
           ctx
-        ));
+        )
+      );
 
       expect(events).toHaveLength(1);
       expect(events[0]).toMatchObject({
@@ -555,7 +655,9 @@ describe('generate() function', () => {
         },
       });
 
-      await expectRejectedHalt(getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx));
+      await expectRejectedHalt(
+        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
+      );
 
       const errorEvent = events.find((e) => e['event'] === 'gemini:error');
       expect(errorEvent).toBeDefined();

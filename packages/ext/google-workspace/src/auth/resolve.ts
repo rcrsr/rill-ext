@@ -17,7 +17,7 @@ import { exchangeJwtForToken, exchangeRefreshToken } from './exchange.js';
  * Cached access token slot with millisecond expiry timestamp.
  * expiresAtMs = Date.now() + (expires_in - 300) * 1000 (AC-10).
  */
-export interface TokenCacheSlot {
+interface TokenCacheSlot {
   readonly accessToken: string;
   readonly expiresAtMs: number;
 }
@@ -106,7 +106,7 @@ export async function resolveToken(
       ctx,
       'session_token_missing',
       `google: session token '${tokenVar}' not found`,
-      { tokenVar },
+      { tokenVar }
     );
   }
 
@@ -126,12 +126,16 @@ export async function resolveToken(
       failAuth(
         ctx,
         'service_account_key_invalid',
-        `google: service account key parse failed: ${reason}`,
+        `google: service account key parse failed: ${reason}`
       );
     }
 
     const assertion = signServiceAccountJwt(ctx, key, scopes, auth.subject);
-    const { accessToken, expiresIn } = await exchangeJwtForToken(ctx, assertion, signal);
+    const { accessToken, expiresIn } = await exchangeJwtForToken(
+      ctx,
+      assertion,
+      signal
+    );
 
     // AC-10: cache with TTL = expires_in - 300 seconds
     cache.slot = {
@@ -154,7 +158,7 @@ export async function resolveToken(
     auth.client_secret,
     auth.refresh_token,
     ctx,
-    signal,
+    signal
   );
 
   // AC-10: cache with TTL = expires_in - 300 seconds

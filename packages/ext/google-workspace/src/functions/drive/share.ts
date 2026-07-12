@@ -22,7 +22,9 @@ export interface DriveShareDeps {
  * EC-10: Rejects role not in {reader, commenter, writer}.
  * AC-12: Returns boolean true on success.
  */
-export function makeDriveShare(deps: DriveShareDeps): (
+export function makeDriveShare(
+  deps: DriveShareDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -34,7 +36,11 @@ export function makeDriveShare(deps: DriveShareDeps): (
   ): Promise<RillValue> => {
     const fileId = args['file_id'];
     if (typeof fileId !== 'string' || fileId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: file_id must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: file_id must be a non-empty string'
+      );
     }
     const email = args['email'];
     if (typeof email !== 'string' || email.trim() === '') {
@@ -47,7 +53,11 @@ export function makeDriveShare(deps: DriveShareDeps): (
         ? (rawRole as DriveRole)
         : 'reader';
     if (!VALID_ROLES.includes(role)) {
-      failInput(ctx, 'invalid_arg', "google: drive.share role must be 'reader', 'commenter', or 'writer'");
+      failInput(
+        ctx,
+        'invalid_arg',
+        "google: drive.share role must be 'reader', 'commenter', or 'writer'"
+      );
     }
     const path = `/files/${encodeURIComponent(fileId)}/permissions`;
     const body = {

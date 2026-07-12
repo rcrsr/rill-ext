@@ -23,7 +23,7 @@
     "build": "tsup && dts-bundle-generator --config dts-bundle-generator.config.cjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --config ../../../eslint.config.js src/",
+    "lint": "oxlint --config ../../../.oxlintrc.json src/",
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "engines": {
@@ -35,7 +35,7 @@
   "dependencies": {
     "html-to-text": "^10.0.0",
     "turndown": "^7.2.4",
-    "defuddle": "^0.18.1",
+    "defuddle": "^0.19.1",
     "linkedom": "^0.18.12",
     "entities": "^8.0.0",
     "linkify-it": "^5.0.0"
@@ -45,11 +45,11 @@
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/html-to-text": "^9.0.4",
     "@types/linkify-it": "^5.0.0",
-    "@types/node": "^25.5.2",
+    "@types/node": "^26.1.1",
     "@types/turndown": "^5.0.6",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
-    "undici-types": "^8.0.2"
+    "undici-types": "^8.7.0"
   },
   "files": [
     "dist"

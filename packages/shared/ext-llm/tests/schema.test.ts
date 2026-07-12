@@ -218,7 +218,12 @@ describe('buildJsonSchemaFromStructuralType', () => {
       const result = buildJsonSchemaFromStructuralType(
         {
           kind: 'closure',
-          params: [{ name: 'tags', type: { kind: 'list', element: { kind: 'string' } } }],
+          params: [
+            {
+              name: 'tags',
+              type: { kind: 'list', element: { kind: 'string' } },
+            },
+          ],
         },
         params
       );
@@ -238,7 +243,15 @@ describe('buildJsonSchemaFromStructuralType', () => {
     it('nested list element type recurses correctly', () => {
       const result = buildJsonSchemaFromStructuralType({
         kind: 'closure',
-        params: [{ name: 'matrix', type: { kind: 'list', element: { kind: 'list', element: { kind: 'number' } } } }],
+        params: [
+          {
+            name: 'matrix',
+            type: {
+              kind: 'list',
+              element: { kind: 'list', element: { kind: 'number' } },
+            },
+          },
+        ],
       });
       expect(result.properties['matrix']?.type).toBe('array');
       expect(result.properties['matrix']?.items?.type).toBe('array');
@@ -251,9 +264,7 @@ describe('buildJsonSchemaFromStructuralType', () => {
       try {
         buildJsonSchemaFromStructuralType({
           kind: 'closure',
-          params: [
-            { name: 'fn', type: { kind: 'closure', params: [] } },
-          ],
+          params: [{ name: 'fn', type: { kind: 'closure', params: [] } }],
         });
       } catch (e) {
         thrown = e as RuntimeError;
@@ -351,7 +362,9 @@ describe('buildJsonSchemaFromStructuralType', () => {
           },
         },
       });
-      expect(result.properties['name']?.description).toBe("The user's full name");
+      expect(result.properties['name']?.description).toBe(
+        "The user's full name"
+      );
     });
 
     it('marks fields with defaultValue as optional', () => {
@@ -374,7 +387,10 @@ describe('buildJsonSchemaFromStructuralType', () => {
     });
 
     it('returns empty properties for dict with empty fields', () => {
-      const result = buildJsonSchemaFromStructuralType({ kind: 'dict', fields: {} });
+      const result = buildJsonSchemaFromStructuralType({
+        kind: 'dict',
+        fields: {},
+      });
       expect(result.type).toBe('object');
       expect(result.properties).toEqual({});
       expect(result.required).toEqual([]);

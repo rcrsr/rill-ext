@@ -16,7 +16,10 @@ import { createIntrospectionDicts } from '../../src/introspection.js';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 // Helper to create a minimal RillFunction for testing
-function makeRillFn(description: string, params: ReturnType<typeof p.str>[] = []): RillFunction {
+function makeRillFn(
+  description: string,
+  params: ReturnType<typeof p.str>[] = []
+): RillFunction {
   return {
     fn: async () => 'result',
     params,
@@ -56,7 +59,10 @@ describe('createIntrospectionDicts', () => {
 
       // Assert
       const echoCallable = result['echo'] as Record<string, unknown>;
-      const annotations = echoCallable['annotations'] as Record<string, unknown>;
+      const annotations = echoCallable['annotations'] as Record<
+        string,
+        unknown
+      >;
       expect(annotations['description']).toBe('Echo tool');
     });
 
@@ -77,7 +83,10 @@ describe('createIntrospectionDicts', () => {
 
       // Assert
       const toolCallable = result['no_desc'] as Record<string, unknown>;
-      const annotations = toolCallable['annotations'] as Record<string, unknown>;
+      const annotations = toolCallable['annotations'] as Record<
+        string,
+        unknown
+      >;
       expect(annotations['description']).toBe('');
     });
 
@@ -135,7 +144,10 @@ describe('createIntrospectionDicts', () => {
       const result = dicts.resources as Record<string, unknown>;
 
       // Assert
-      expect(Object.keys(result)).toEqual(['read_resource', 'resource_template1']);
+      expect(Object.keys(result)).toEqual([
+        'read_resource',
+        'resource_template1',
+      ]);
       expect(isCallable(result['read_resource'] as RillValue)).toBe(true);
       expect(isCallable(result['resource_template1'] as RillValue)).toBe(true);
     });

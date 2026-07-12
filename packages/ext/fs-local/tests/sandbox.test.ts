@@ -9,7 +9,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { RuntimeError, getStatus, isInvalid, type RillValue } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  getStatus,
+  isInvalid,
+  type RillValue,
+} from '@rcrsr/rill';
 import {
   resolvePath,
   matchesGlob,
@@ -37,7 +42,10 @@ beforeEach(async () => {
   await fs.writeFile(path.join(tempDir, 'csv_only', 'data.json'), '{}');
 
   await fs.mkdir(path.join(tempDir, 'data', 'subdir'), { recursive: true });
-  await fs.writeFile(path.join(tempDir, 'data', 'subdir', 'nested.txt'), 'nested');
+  await fs.writeFile(
+    path.join(tempDir, 'data', 'subdir', 'nested.txt'),
+    'nested'
+  );
 
   mounts = {
     data: {
@@ -80,27 +88,58 @@ afterEach(async () => {
 
 describe('resolvePath - 9-step path resolution sequence', () => {
   it('resolves simple path within mount', async () => {
-    const resolved = await resolvePath('data', 'test.txt', mounts, 'read', makeRuntimeCtx());
+    const resolved = await resolvePath(
+      'data',
+      'test.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(resolved).toBe(path.join(tempDir, 'data', 'test.txt'));
   });
 
   it('resolves nested path with subdirectories', async () => {
-    const resolved = await resolvePath('data', 'subdir/nested.txt', mounts, 'read', makeRuntimeCtx());
+    const resolved = await resolvePath(
+      'data',
+      'subdir/nested.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(resolved).toBe(path.join(tempDir, 'data', 'subdir', 'nested.txt'));
   });
 
   it('collapses .. segments with path.resolve()', async () => {
-    const resolved = await resolvePath('data', 'subdir/../test.txt', mounts, 'read', makeRuntimeCtx());
+    const resolved = await resolvePath(
+      'data',
+      'subdir/../test.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(resolved).toBe(path.join(tempDir, 'data', 'test.txt'));
   });
 
   it('resolves path for write operation (existing file)', async () => {
-    const resolved = await resolvePath('data', 'test.txt', mounts, 'write', makeRuntimeCtx());
+    const resolved = await resolvePath(
+      'data',
+      'test.txt',
+      mounts,
+      'write',
+      makeRuntimeCtx()
+    );
     expect(resolved).toBe(path.join(tempDir, 'data', 'test.txt'));
   });
 
   it('handles createMode for new file write', async () => {
-    const resolved = await resolvePath('data', 'newfile.txt', mounts, 'write', makeRuntimeCtx(), true);
+    const resolved = await resolvePath(
+      'data',
+      'newfile.txt',
+      mounts,
+      'write',
+      makeRuntimeCtx(),
+      true
+    );
     expect(resolved).toBe(path.join(tempDir, 'data', 'newfile.txt'));
   });
 });
@@ -111,7 +150,13 @@ describe('resolvePath - 9-step path resolution sequence', () => {
 
 describe('resolvePath - EC-1: unknown mount name', () => {
   it('returns invalid for unknown mount', async () => {
-    const result = await resolvePath('unknown', 'file.txt', mounts, 'read', makeRuntimeCtx());
+    const result = await resolvePath(
+      'unknown',
+      'file.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(isInvalid(result as RillValue)).toBe(true);
     const status = getStatus(result as RillValue);
     expect(status.code.name).toBe('FORBIDDEN');
@@ -125,14 +170,28 @@ describe('resolvePath - EC-1: unknown mount name', () => {
 
 describe('resolvePath - EC-2: path escapes mount boundary', () => {
   it('returns invalid for path traversal with ..', async () => {
-    const result = await resolvePath('data', '../../etc/passwd', mounts, 'read', makeRuntimeCtx());
+    const result = await resolvePath(
+      'data',
+      '../../etc/passwd',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(isInvalid(result as RillValue)).toBe(true);
   });
 
   it('returns invalid with proper message', async () => {
-    const result = await resolvePath('data', '../../../outside.txt', mounts, 'read', makeRuntimeCtx());
+    const result = await resolvePath(
+      'data',
+      '../../../outside.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(/path escapes mount boundary/);
+    expect(getStatus(result as RillValue).message).toMatch(
+      /path escapes mount boundary/
+    );
   });
 });
 
@@ -142,15 +201,27 @@ describe('resolvePath - EC-2: path escapes mount boundary', () => {
 
 describe('resolvePath - EC-3: glob mismatch', () => {
   it('allows matching file extension', async () => {
-    const resolved = await resolvePath('csv_only', 'data.csv', mounts, 'read', makeRuntimeCtx());
+    const resolved = await resolvePath(
+      'csv_only',
+      'data.csv',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(resolved).toBe(path.join(tempDir, 'csv_only', 'data.csv'));
   });
 
   it('returns invalid for non-matching extension', async () => {
-    const result = await resolvePath('csv_only', 'data.json', mounts, 'read', makeRuntimeCtx());
+    const result = await resolvePath(
+      'csv_only',
+      'data.json',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(isInvalid(result as RillValue)).toBe(true);
     expect(getStatus(result as RillValue).message).toMatch(
-      /file type not permitted in mount "csv_only"/,
+      /file type not permitted in mount "csv_only"/
     );
   });
 });
@@ -161,32 +232,62 @@ describe('resolvePath - EC-3: glob mismatch', () => {
 
 describe('resolvePath - EC-4: mode violation', () => {
   it('allows read on read-only mount', async () => {
-    const resolved = await resolvePath('readonly', 'file.txt', mounts, 'read', makeRuntimeCtx());
+    const resolved = await resolvePath(
+      'readonly',
+      'file.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(resolved).toBe(path.join(tempDir, 'readonly', 'file.txt'));
   });
 
   it('returns invalid for write to read-only mount', async () => {
-    const result = await resolvePath('readonly', 'file.txt', mounts, 'write', makeRuntimeCtx());
+    const result = await resolvePath(
+      'readonly',
+      'file.txt',
+      mounts,
+      'write',
+      makeRuntimeCtx()
+    );
     expect(isInvalid(result as RillValue)).toBe(true);
     expect(getStatus(result as RillValue).message).toMatch(
-      /mount "readonly" does not permit write/,
+      /mount "readonly" does not permit write/
     );
   });
 
   it('returns invalid for read from write-only mount', async () => {
     await fs.writeFile(path.join(tempDir, 'writeonly', 'file.txt'), 'data');
-    const result = await resolvePath('writeonly', 'file.txt', mounts, 'read', makeRuntimeCtx());
+    const result = await resolvePath(
+      'writeonly',
+      'file.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(isInvalid(result as RillValue)).toBe(true);
     expect(getStatus(result as RillValue).message).toMatch(
-      /mount "writeonly" does not permit read/,
+      /mount "writeonly" does not permit read/
     );
   });
 
   it('allows both read and write on read-write mount', async () => {
-    const readResolved = await resolvePath('data', 'test.txt', mounts, 'read', makeRuntimeCtx());
+    const readResolved = await resolvePath(
+      'data',
+      'test.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(readResolved).toBe(path.join(tempDir, 'data', 'test.txt'));
 
-    const writeResolved = await resolvePath('data', 'test.txt', mounts, 'write', makeRuntimeCtx());
+    const writeResolved = await resolvePath(
+      'data',
+      'test.txt',
+      mounts,
+      'write',
+      makeRuntimeCtx()
+    );
     expect(writeResolved).toBe(path.join(tempDir, 'data', 'test.txt'));
   });
 });
@@ -197,7 +298,13 @@ describe('resolvePath - EC-4: mode violation', () => {
 
 describe('resolvePath - EC-7: permission denied / not found', () => {
   it('returns invalid for non-existent file in read mode', async () => {
-    const result = await resolvePath('data', 'nonexistent.txt', mounts, 'read', makeRuntimeCtx());
+    const result = await resolvePath(
+      'data',
+      'nonexistent.txt',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(isInvalid(result as RillValue)).toBe(true);
     expect(getStatus(result as RillValue).message).toMatch(/file not found/);
   });
@@ -209,10 +316,12 @@ describe('resolvePath - EC-7: permission denied / not found', () => {
       mounts,
       'write',
       makeRuntimeCtx(),
-      true,
+      true
     );
     expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(/parent directory does not exist/);
+    expect(getStatus(result as RillValue).message).toMatch(
+      /parent directory does not exist/
+    );
   });
 });
 
@@ -227,9 +336,17 @@ describe('resolvePath - symlink cannot escape sandbox', () => {
     await fs.writeFile(outsidePath, 'escape');
     await fs.symlink(outsidePath, symlinkPath);
 
-    const result = await resolvePath('data', 'escape_link', mounts, 'read', makeRuntimeCtx());
+    const result = await resolvePath(
+      'data',
+      'escape_link',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(/path escapes mount boundary/);
+    expect(getStatus(result as RillValue).message).toMatch(
+      /path escapes mount boundary/
+    );
   });
 
   it('allows symlink pointing inside mount', async () => {
@@ -237,7 +354,13 @@ describe('resolvePath - symlink cannot escape sandbox', () => {
     const targetPath = path.join(tempDir, 'data', 'test.txt');
     await fs.symlink(targetPath, symlinkPath);
 
-    const resolved = await resolvePath('data', 'internal_link', mounts, 'read', makeRuntimeCtx());
+    const resolved = await resolvePath(
+      'data',
+      'internal_link',
+      mounts,
+      'read',
+      makeRuntimeCtx()
+    );
     expect(resolved).toBe(path.join(tempDir, 'data', 'test.txt'));
   });
 });
@@ -329,7 +452,9 @@ describe('initializeMount - mount initialization', () => {
     };
 
     await expect(initializeMount(mount)).rejects.toThrow(RuntimeError);
-    await expect(initializeMount(mount)).rejects.toThrow('mount path does not exist');
+    await expect(initializeMount(mount)).rejects.toThrow(
+      'mount path does not exist'
+    );
   });
 
   it('throws RILL-R005 error code for non-existent path', async () => {

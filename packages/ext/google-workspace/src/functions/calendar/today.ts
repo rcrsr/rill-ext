@@ -27,7 +27,9 @@ export interface CalendarTodayDeps {
  * EC-11: Validates calendarId against allowedCalendarIds.
  * AC-12: Returns rill primitive dict { events: list[dict] }.
  */
-export function makeCalendarToday(deps: CalendarTodayDeps): (
+export function makeCalendarToday(
+  deps: CalendarTodayDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -91,7 +93,11 @@ export function makeCalendarToday(deps: CalendarTodayDeps): (
         summary?: string;
         start?: { dateTime?: string; date?: string; timeZone?: string };
         end?: { dateTime?: string; date?: string; timeZone?: string };
-        attendees?: Array<{ email?: string; displayName?: string; responseStatus?: string }>;
+        attendees?: Array<{
+          email?: string;
+          displayName?: string;
+          responseStatus?: string;
+        }>;
         description?: string;
         location?: string;
         status?: string;

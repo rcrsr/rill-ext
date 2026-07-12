@@ -33,7 +33,6 @@ export function createTavilyExtension(
   config: TavilyConfig,
   _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-
   // Validate required config fields. Factory-time validation throws using the
   // built-in `RILL-R001` validation atom; the 'INVALID_INPUT' atom is
   // reserved for runtime invalid values surfaced through `ctx.invalidate`.
@@ -56,7 +55,11 @@ export function createTavilyExtension(
   const disposalState = createDisposalState();
   const inFlightState = createInFlightState();
 
-  const wrap = createSearchFunctionWrapper(PROVIDER, disposalState, inFlightState);
+  const wrap = createSearchFunctionWrapper(
+    PROVIDER,
+    disposalState,
+    inFlightState
+  );
 
   const authHeaders = {
     'Content-Type': 'application/json',
@@ -76,18 +79,29 @@ export function createTavilyExtension(
     }
 
     const body: Record<string, unknown> = { query };
-    if (options['search_depth'] !== undefined) body['search_depth'] = options['search_depth'];
-    if (options['max_results'] !== undefined) body['max_results'] = options['max_results'];
+    if (options['search_depth'] !== undefined)
+      body['search_depth'] = options['search_depth'];
+    if (options['max_results'] !== undefined)
+      body['max_results'] = options['max_results'];
     if (options['topic'] !== undefined) body['topic'] = options['topic'];
-    if (options['time_range'] !== undefined) body['time_range'] = options['time_range'];
-    if (options['include_answer'] !== undefined) body['include_answer'] = options['include_answer'];
-    if (options['include_raw_content'] !== undefined) body['include_raw_content'] = options['include_raw_content'];
-    if (options['include_images'] !== undefined) body['include_images'] = options['include_images'];
-    if (options['include_domains'] !== undefined) body['include_domains'] = options['include_domains'];
-    if (options['exclude_domains'] !== undefined) body['exclude_domains'] = options['exclude_domains'];
+    if (options['time_range'] !== undefined)
+      body['time_range'] = options['time_range'];
+    if (options['include_answer'] !== undefined)
+      body['include_answer'] = options['include_answer'];
+    if (options['include_raw_content'] !== undefined)
+      body['include_raw_content'] = options['include_raw_content'];
+    if (options['include_images'] !== undefined)
+      body['include_images'] = options['include_images'];
+    if (options['include_domains'] !== undefined)
+      body['include_domains'] = options['include_domains'];
+    if (options['exclude_domains'] !== undefined)
+      body['exclude_domains'] = options['exclude_domains'];
     if (options['country'] !== undefined) body['country'] = options['country'];
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/search`, {
       method: 'POST',
       headers: authHeaders,
@@ -97,10 +111,15 @@ export function createTavilyExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       query: string;
       results: unknown[];
       answer?: string;
@@ -128,12 +147,17 @@ export function createTavilyExtension(
     const options = (args['options'] ?? {}) as Record<string, unknown>;
 
     const body: Record<string, unknown> = { urls };
-    if (options['extract_depth'] !== undefined) body['extract_depth'] = options['extract_depth'];
+    if (options['extract_depth'] !== undefined)
+      body['extract_depth'] = options['extract_depth'];
     if (options['format'] !== undefined) body['format'] = options['format'];
-    if (options['chunks_per_source'] !== undefined) body['chunks_per_source'] = options['chunks_per_source'];
+    if (options['chunks_per_source'] !== undefined)
+      body['chunks_per_source'] = options['chunks_per_source'];
     if (options['query'] !== undefined) body['query'] = options['query'];
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/extract`, {
       method: 'POST',
       headers: authHeaders,
@@ -143,10 +167,15 @@ export function createTavilyExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       results: unknown[];
       failed_results: unknown[];
     };
@@ -176,17 +205,20 @@ export function createTavilyExtension(
   const SEARCH_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      query:         { type: { kind: 'string' } },
-      results:       { type: { kind: 'list', element: { kind: 'any' } } },
+      query: { type: { kind: 'string' } },
+      results: { type: { kind: 'list', element: { kind: 'any' } } },
       response_time: { type: { kind: 'number' } },
-      answer:        { type: { kind: 'string' }, defaultValue: '' },                              // optional: include_answer flag
-      images:        { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },      // optional: include_images flag
+      answer: { type: { kind: 'string' }, defaultValue: '' }, // optional: include_answer flag
+      images: {
+        type: { kind: 'list', element: { kind: 'any' } },
+        defaultValue: [],
+      }, // optional: include_images flag
     },
   });
   const EXTRACT_RT = structureToTypeValue({
     kind: 'dict',
     fields: {
-      results:        { type: { kind: 'list', element: { kind: 'any' } } },
+      results: { type: { kind: 'list', element: { kind: 'any' } } },
       failed_results: { type: { kind: 'list', element: { kind: 'any' } } },
     },
   });
@@ -200,7 +232,12 @@ export function createTavilyExtension(
     extract: toCallable({
       fn: extract as CallableFn,
       params: [
-        { name: 'urls', type: { kind: 'tuple' as const }, defaultValue: undefined, annotations: {} },
+        {
+          name: 'urls',
+          type: { kind: 'tuple' as const },
+          defaultValue: undefined,
+          annotations: {},
+        },
         p.dict('options', undefined, {}),
       ],
       returnType: EXTRACT_RT,

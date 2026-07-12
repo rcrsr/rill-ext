@@ -15,7 +15,11 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import type { FetchExtensionConfig, EndpointConfig, EndpointParam } from './types.js';
+import type {
+  FetchExtensionConfig,
+  EndpointConfig,
+  EndpointParam,
+} from './types.js';
 import {
   buildRequest,
   executeRequest,
@@ -136,7 +140,7 @@ function processArguments(
  */
 export function createFetchExtension(
   config: FetchExtensionConfig,
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Failures emit rill-core generic atoms (#TIMEOUT, #UNAVAILABLE, #AUTH,
   // #FORBIDDEN, #RATE_LIMIT, #PROTOCOL, etc.) directly via ctx.invalidate.
@@ -147,7 +151,9 @@ export function createFetchExtension(
   const retryDelay = config.retryDelay ?? 1000;
   const defaultResponseShape = config.responseShape ?? 'body';
 
-  const semaphore: Semaphore | undefined = createSemaphore(config.maxConcurrent);
+  const semaphore: Semaphore | undefined = createSemaphore(
+    config.maxConcurrent
+  );
   const activeControllers = new Set<AbortController>();
 
   const internalConfig: InternalFetchConfig = {
@@ -171,7 +177,9 @@ export function createFetchExtension(
 
   const functions: Record<string, RillFunction> = {};
 
-  for (const [endpointName, endpointConfig] of Object.entries(config.endpoints)) {
+  for (const [endpointName, endpointConfig] of Object.entries(
+    config.endpoints
+  )) {
     const params = endpointConfig.params ?? [];
 
     const endpointFn: CallableFn = async (args, runCtxLike) => {
@@ -179,7 +187,7 @@ export function createFetchExtension(
       const processedArgs = processArguments(
         args as Record<string, RillValue>,
         params,
-        endpointName,
+        endpointName
       );
 
       const { url, options, responseShape } = buildRequest(
@@ -199,7 +207,7 @@ export function createFetchExtension(
           endpointName,
           responseShape,
           runCtx,
-          semaphore,
+          semaphore
         );
 
         return result;
@@ -231,9 +239,11 @@ export function createFetchExtension(
         ? structureToTypeValue({
             kind: 'dict',
             fields: {
-              status:  { type: { kind: 'number' } },
-              headers: { type: { kind: 'dict', valueType: { kind: 'string' } } },
-              body:    { type: { kind: 'any' } },
+              status: { type: { kind: 'number' } },
+              headers: {
+                type: { kind: 'dict', valueType: { kind: 'string' } },
+              },
+              body: { type: { kind: 'any' } },
             },
           })
         : structureToTypeValue({ kind: 'any' });
@@ -278,9 +288,9 @@ export function createFetchExtension(
       element: {
         kind: 'dict',
         fields: {
-          name:        { type: { kind: 'string' } },
-          method:      { type: { kind: 'string' } },
-          path:        { type: { kind: 'string' } },
+          name: { type: { kind: 'string' } },
+          method: { type: { kind: 'string' } },
+          path: { type: { kind: 'string' } },
           description: { type: { kind: 'string' } },
         },
       },

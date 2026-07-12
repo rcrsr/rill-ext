@@ -140,10 +140,15 @@ export function createChromaExtension(
           return emitError(ctx, error, startTime);
         }
       },
-      annotations: { description: 'Insert or update single vector with metadata' },
+      annotations: {
+        description: 'Insert or update single vector with metadata',
+      },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { id: { type: { kind: 'string' } }, success: { type: { kind: 'bool' } } },
+        fields: {
+          id: { type: { kind: 'string' } },
+          success: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -184,13 +189,18 @@ export function createChromaExtension(
 
             const id = item['id'] as string;
             const vector = item['vector'] as RillVector;
-            const metadata = (item['metadata'] ?? {}) as Record<string, unknown>;
+            const metadata = (item['metadata'] ?? {}) as Record<
+              string,
+              unknown
+            >;
 
             try {
               await collection.upsert({
                 ids: [id],
                 embeddings: [Array.from(vector.data)],
-                metadatas: [metadata as Record<string, string | number | boolean>],
+                metadatas: [
+                  metadata as Record<string, string | number | boolean>,
+                ],
               });
               succeeded++;
             } catch (error: unknown) {
@@ -237,10 +247,15 @@ export function createChromaExtension(
     search: {
       params: [
         vectorParam('vector'),
-        p.dict('options', undefined, {}, {
-          k: { type: { kind: 'number' }, defaultValue: 10 },
-          filter: { type: { kind: 'dict' }, defaultValue: {} },
-        }),
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            k: { type: { kind: 'number' }, defaultValue: 10 },
+            filter: { type: { kind: 'dict' }, defaultValue: {} },
+          }
+        ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
@@ -324,7 +339,11 @@ export function createChromaExtension(
             return ctx.invalidate(err, {
               code: 'NOT_FOUND',
               provider: PROVIDER,
-              raw: { kind: 'id_not_found', id, message: 'chroma: id not found' },
+              raw: {
+                kind: 'id_not_found',
+                id,
+                message: 'chroma: id not found',
+              },
             });
           }
 
@@ -343,7 +362,10 @@ export function createChromaExtension(
             });
           }
 
-          const vector = createVector(new Float32Array(embedding), factoryCollection);
+          const vector = createVector(
+            new Float32Array(embedding),
+            factoryCollection
+          );
           const result = {
             id: String(response.ids[0]),
             vector,
@@ -401,7 +423,10 @@ export function createChromaExtension(
       annotations: { description: 'Delete vector by ID' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { id: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } },
+        fields: {
+          id: { type: { kind: 'string' } },
+          deleted: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -498,9 +523,14 @@ export function createChromaExtension(
     create_collection: {
       params: [
         p.str('name'),
-        p.dict('options', undefined, {}, {
-          metadata: { type: { kind: 'dict' }, defaultValue: {} },
-        }),
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            metadata: { type: { kind: 'dict' }, defaultValue: {} },
+          }
+        ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
@@ -511,7 +541,10 @@ export function createChromaExtension(
         try {
           const name = args['name'] as string;
           const options = (args['options'] ?? {}) as Record<string, unknown>;
-          const metadata = (options['metadata'] ?? {}) as Record<string, unknown>;
+          const metadata = (options['metadata'] ?? {}) as Record<
+            string,
+            unknown
+          >;
 
           await client.createCollection({
             name,
@@ -532,7 +565,10 @@ export function createChromaExtension(
       annotations: { description: 'Create new vector collection' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { name: { type: { kind: 'string' } }, created: { type: { kind: 'bool' } } },
+        fields: {
+          name: { type: { kind: 'string' } },
+          created: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -561,7 +597,10 @@ export function createChromaExtension(
       annotations: { description: 'Delete vector collection' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { name: { type: { kind: 'string' } }, deleted: { type: { kind: 'bool' } } },
+        fields: {
+          name: { type: { kind: 'string' } },
+          deleted: { type: { kind: 'bool' } },
+        },
       }),
     },
 
@@ -587,7 +626,10 @@ export function createChromaExtension(
         }
       },
       annotations: { description: 'List all collection names' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: { kind: 'string' },
+      }),
     },
 
     describe: {
@@ -617,7 +659,10 @@ export function createChromaExtension(
       annotations: { description: 'Describe configured collection' },
       returnType: structureToTypeValue({
         kind: 'dict',
-        fields: { name: { type: { kind: 'string' } }, count: { type: { kind: 'number' } } },
+        fields: {
+          name: { type: { kind: 'string' } },
+          count: { type: { kind: 'number' } },
+        },
       }),
     },
   };

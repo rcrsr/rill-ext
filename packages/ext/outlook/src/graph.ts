@@ -31,12 +31,11 @@ export async function graphFetch(
   ctx: RuntimeContext,
   controller: AbortController,
   body?: unknown,
-  extraHeaders?: Record<string, string>,
+  extraHeaders?: Record<string, string>
 ): Promise<unknown> {
   const token = resolveToken(auth, ctx);
 
-  const mailboxSegment =
-    mailbox !== undefined ? `/users/${mailbox}` : '/me';
+  const mailboxSegment = mailbox !== undefined ? `/users/${mailbox}` : '/me';
   const url = `${GRAPH_BASE_URL}${mailboxSegment}/${path}`;
 
   // Compose lifecycle (ctx.signal), per-request controller, and 30s timeout.
@@ -74,7 +73,7 @@ export async function graphFetch(
     throw mapGraphError(
       ctx,
       response.status,
-      path.split('?')[0] ?? path,
+      path.split('?')[0] ?? path
     ) as unknown as RillValue;
   }
 

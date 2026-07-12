@@ -17,7 +17,10 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import { mapKvError, type KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
+import {
+  mapKvError,
+  type KvExtensionContract,
+} from '@rcrsr/rill-ext-kv-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { RedisKvMountConfig } from './types.js';
 
@@ -45,27 +48,30 @@ export interface RedisKvExtensionConfig {
  */
 export function createRedisKvExtension(
   config: RedisKvExtensionConfig,
-  ctx: ExtensionFactoryCtx,
+  ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Factory-time config validation
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new RuntimeError(
       'RILL-R005',
-      'Redis kv extension requires at least one mount in configuration',
+      'Redis kv extension requires at least one mount in configuration'
     );
   }
 
   if (!config.url || typeof config.url !== 'string') {
     throw new RuntimeError(
       'RILL-R005',
-      'Redis kv extension requires a valid connection URL',
+      'Redis kv extension requires a valid connection URL'
     );
   }
 
-  if (!config.url.startsWith('redis://') && !config.url.startsWith('rediss://')) {
+  if (
+    !config.url.startsWith('redis://') &&
+    !config.url.startsWith('rediss://')
+  ) {
     throw new RuntimeError(
       'RILL-R005',
-      `Invalid Redis connection URL: must start with redis:// or rediss:// (got: ${config.url})`,
+      `Invalid Redis connection URL: must start with redis:// or rediss:// (got: ${config.url})`
     );
   }
 
@@ -81,7 +87,7 @@ export function createRedisKvExtension(
       if (a.prefix.startsWith(b.prefix) || b.prefix.startsWith(a.prefix)) {
         throw new RuntimeError(
           'RILL-R005',
-          `Mount prefix overlap detected: "${a.name}" (${a.prefix}) and "${b.name}" (${b.prefix})`,
+          `Mount prefix overlap detected: "${a.name}" (${a.prefix}) and "${b.name}" (${b.prefix})`
         );
       }
     }
@@ -93,7 +99,7 @@ export function createRedisKvExtension(
   } catch (error: unknown) {
     throw new RuntimeError(
       'RILL-R005',
-      `Failed to create Redis client: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to create Redis client: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 
@@ -121,7 +127,7 @@ export function createRedisKvExtension(
         () => {
           void dispose();
         },
-        { once: true },
+        { once: true }
       );
     }
   }
@@ -158,7 +164,9 @@ export function createRedisKvExtension(
   function unknownMount(runCtx: RuntimeContext, mountName: string): RillValue {
     const available = Object.keys(config.mounts);
     return runCtx.invalidate(
-      new Error(`Mount '${mountName}' not found. Available mounts: ${available.join(', ')}`),
+      new Error(
+        `Mount '${mountName}' not found. Available mounts: ${available.join(', ')}`
+      ),
       {
         code: 'INVALID_INPUT',
         provider: PROVIDER,
@@ -167,18 +175,22 @@ export function createRedisKvExtension(
           mountName,
           availableMounts: available,
         },
-      },
+      }
     );
   }
 
-  function readonlyMount(runCtx: RuntimeContext, mountName: string, mode: string): RillValue {
+  function readonlyMount(
+    runCtx: RuntimeContext,
+    mountName: string,
+    mode: string
+  ): RillValue {
     return runCtx.invalidate(
       new Error(`Mount '${mountName}' is read-only (mode: ${mode})`),
       {
         code: 'INVALID_INPUT',
         provider: PROVIDER,
         raw: { kind: 'readonly_mount', mountName, mode },
-      },
+      }
     );
   }
 
@@ -194,7 +206,13 @@ export function createRedisKvExtension(
     const keys: string[] = [];
     let cursor = '0';
     do {
-      const [nextCursor, foundKeys] = await client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      const [nextCursor, foundKeys] = await client.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        100
+      );
       cursor = nextCursor;
       keys.push(...foundKeys);
     } while (cursor !== '0');
@@ -214,11 +232,14 @@ export function createRedisKvExtension(
     if (!mountConfig) return unknownMount(runCtx, mountName);
 
     if (mountConfig.schema && !(key in mountConfig.schema)) {
-      return runCtx.invalidate(new Error(`key "${key}" not declared in schema`), {
-        code: 'INVALID_INPUT',
-        provider: PROVIDER,
-        raw: { kind: 'schema_violation', mount: mountName, key },
-      });
+      return runCtx.invalidate(
+        new Error(`key "${key}" not declared in schema`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'schema_violation', mount: mountName, key },
+        }
+      );
     }
 
     try {
@@ -267,11 +288,14 @@ export function createRedisKvExtension(
     }
 
     if (mountConfig.schema && !(key in mountConfig.schema)) {
-      return runCtx.invalidate(new Error(`key "${key}" not declared in schema`), {
-        code: 'INVALID_INPUT',
-        provider: PROVIDER,
-        raw: { kind: 'schema_violation', mount: mountName, key },
-      });
+      return runCtx.invalidate(
+        new Error(`key "${key}" not declared in schema`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'schema_violation', mount: mountName, key },
+        }
+      );
     }
 
     if (mountConfig.schema && key in mountConfig.schema) {
@@ -284,7 +308,7 @@ export function createRedisKvExtension(
             code: 'TYPE_MISMATCH',
             provider: PROVIDER,
             raw: { kind: 'type_mismatch', key, expected, actual },
-          },
+          }
         );
       }
     }
@@ -293,12 +317,14 @@ export function createRedisKvExtension(
     const valueSize = calculateValueSize(value);
     if (valueSize > maxValueSize) {
       return runCtx.invalidate(
-        new Error(`value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`),
+        new Error(
+          `value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`
+        ),
         {
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'value_too_large', key, valueSize, maxValueSize },
-        },
+        }
       );
     }
 
@@ -312,12 +338,18 @@ export function createRedisKvExtension(
         const keys = await scanKeys(pattern);
         if (keys.length >= maxEntries) {
           return runCtx.invalidate(
-            new Error(`store exceeds entry limit (${keys.length + 1} > ${maxEntries})`),
+            new Error(
+              `store exceeds entry limit (${keys.length + 1} > ${maxEntries})`
+            ),
             {
               code: 'INVALID_INPUT',
               provider: PROVIDER,
-              raw: { kind: 'entry_limit_exceeded', count: keys.length + 1, maxEntries },
-            },
+              raw: {
+                kind: 'entry_limit_exceeded',
+                count: keys.length + 1,
+                maxEntries,
+              },
+            }
           );
         }
       }
@@ -365,8 +397,12 @@ export function createRedisKvExtension(
               {
                 code: 'INVALID_INPUT',
                 provider: PROVIDER,
-                raw: { kind: 'merge_non_dict', key, currentType: typeof currentValue },
-              },
+                raw: {
+                  kind: 'merge_non_dict',
+                  key,
+                  currentType: typeof currentValue,
+                },
+              }
             );
           }
         }
@@ -387,7 +423,7 @@ export function createRedisKvExtension(
                 code: 'TYPE_MISMATCH',
                 provider: PROVIDER,
                 raw: { kind: 'type_mismatch', key, expected, actual },
-              },
+              }
             );
           }
         }
@@ -398,13 +434,13 @@ export function createRedisKvExtension(
           await client.unwatch();
           return runCtx.invalidate(
             new Error(
-              `merged value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`,
+              `merged value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`
             ),
             {
               code: 'INVALID_INPUT',
               provider: PROVIDER,
               raw: { kind: 'value_too_large', key, valueSize, maxValueSize },
-            },
+            }
           );
         }
 
@@ -420,12 +456,14 @@ export function createRedisKvExtension(
       }
 
       return runCtx.invalidate(
-        new Error(`Failed to merge after ${MAX_RETRIES} retries due to concurrent modifications`),
+        new Error(
+          `Failed to merge after ${MAX_RETRIES} retries due to concurrent modifications`
+        ),
         {
           code: 'CONFLICT',
           provider: PROVIDER,
           raw: { kind: 'merge_retry_exhausted', key, retries: MAX_RETRIES },
-        },
+        }
       );
     } catch (error) {
       try {
@@ -569,7 +607,11 @@ export function createRedisKvExtension(
 
     const result: RillValue[] = [];
     for (const [key, entry] of Object.entries(mountConfig.schema)) {
-      result.push({ key, type: entry.type, description: entry.description ?? '' });
+      result.push({
+        key,
+        type: entry.type,
+        description: entry.description ?? '',
+      });
     }
     return result;
   };
@@ -595,9 +637,17 @@ export function createRedisKvExtension(
   // ============================================================
 
   const fnDict: {
-    get: RillFunction; get_or: RillFunction; set: RillFunction; merge: RillFunction;
-    delete: RillFunction; keys: RillFunction; has: RillFunction; clear: RillFunction;
-    getAll: RillFunction; schema: RillFunction; mounts: RillFunction;
+    get: RillFunction;
+    get_or: RillFunction;
+    set: RillFunction;
+    merge: RillFunction;
+    delete: RillFunction;
+    keys: RillFunction;
+    has: RillFunction;
+    clear: RillFunction;
+    getAll: RillFunction;
+    schema: RillFunction;
+    mounts: RillFunction;
   } = {
     get: {
       params: [p.str('mount', 'Mount name'), p.str('key', 'Key to retrieve')],
@@ -612,7 +662,9 @@ export function createRedisKvExtension(
         p.dict('fallback', 'Fallback value if key missing'),
       ],
       fn: get_or,
-      annotations: { description: 'Get value or return fallback if key missing' },
+      annotations: {
+        description: 'Get value or return fallback if key missing',
+      },
       returnType: anyTypeValue,
     },
     set: {
@@ -632,7 +684,9 @@ export function createRedisKvExtension(
         p.dict('partial', 'Partial dict to merge'),
       ],
       fn: merge,
-      annotations: { description: 'Merge partial dict into existing dict value' },
+      annotations: {
+        description: 'Merge partial dict into existing dict value',
+      },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
     delete: {
@@ -645,7 +699,10 @@ export function createRedisKvExtension(
       params: [p.str('mount', 'Mount name')],
       fn: keys,
       annotations: { description: 'Get all keys in mount' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: { kind: 'string' },
+      }),
     },
     has: {
       params: [p.str('mount', 'Mount name'), p.str('key', 'Key to check')],
@@ -666,7 +723,10 @@ export function createRedisKvExtension(
       // Homogeneous-value dict per §EXT.8.2: keys are arbitrary user-chosen
       // strings; values are user-stored RillValues whose schema is set by the
       // caller (§EXT.8.3 case 1), so the value type is `any`.
-      returnType: structureToTypeValue({ kind: 'dict', valueType: { kind: 'any' } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        valueType: { kind: 'any' },
+      }),
     },
     schema: {
       params: [p.str('mount', 'Mount name')],

@@ -758,9 +758,7 @@ describe('mcp:error event', () => {
     const functions = generatePromptFunctions(prompts, mockClient, 30000);
     const ctx = createMockContext();
 
-    await expect(
-      functions['test_prompt']!.fn({}, ctx)
-    ).rejects.toThrow();
+    await expect(functions['test_prompt']!.fn({}, ctx)).rejects.toThrow();
 
     // Verify mcp:error emitted
     const errorEvents = vi

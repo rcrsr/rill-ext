@@ -36,7 +36,10 @@ export async function inbox(
     config.maxResults
   );
 
-  const base = folder !== undefined ? `mailFolders/${encodeURIComponent(folder)}/messages` : 'messages';
+  const base =
+    folder !== undefined
+      ? `mailFolders/${encodeURIComponent(folder)}/messages`
+      : 'messages';
 
   let path: string;
   if (unread === true) {

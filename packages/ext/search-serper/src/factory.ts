@@ -34,7 +34,6 @@ export function createSerperExtension(
   config: SerperConfig,
   _ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-
   try {
     assertRequired(config.apiKey, 'apiKey');
     if (config.baseUrl !== undefined) {
@@ -54,7 +53,11 @@ export function createSerperExtension(
   const disposalState = createDisposalState();
   const inFlightState = createInFlightState();
 
-  const wrap = createSearchFunctionWrapper(PROVIDER, disposalState, inFlightState);
+  const wrap = createSearchFunctionWrapper(
+    PROVIDER,
+    disposalState,
+    inFlightState
+  );
 
   const authHeaders = {
     'Content-Type': 'application/json',
@@ -83,11 +86,16 @@ export function createSerperExtension(
     if (options['gl'] !== undefined) body['gl'] = options['gl'];
     if (options['hl'] !== undefined) body['hl'] = options['hl'];
     if (options['tbs'] !== undefined) body['tbs'] = options['tbs'];
-    if (options['autocorrect'] !== undefined) body['autocorrect'] = options['autocorrect'];
+    if (options['autocorrect'] !== undefined)
+      body['autocorrect'] = options['autocorrect'];
     if (options['safe'] !== undefined) body['safe'] = options['safe'];
-    if (options['location'] !== undefined) body['location'] = options['location'];
+    if (options['location'] !== undefined)
+      body['location'] = options['location'];
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/search`, {
       method: 'POST',
       headers: authHeaders,
@@ -97,10 +105,15 @@ export function createSerperExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       searchParameters: unknown;
       organic: unknown[];
       answerBox?: unknown;
@@ -113,10 +126,14 @@ export function createSerperExtension(
       search_parameters: data.searchParameters as RillValue,
       organic: data.organic as RillValue,
     };
-    if (data.answerBox !== undefined) result['answer_box'] = data.answerBox as RillValue;
-    if (data.knowledgeGraph !== undefined) result['knowledge_graph'] = data.knowledgeGraph as RillValue;
-    if (data.peopleAlsoAsk !== undefined) result['people_also_ask'] = data.peopleAlsoAsk as RillValue;
-    if (data.relatedSearches !== undefined) result['related_searches'] = data.relatedSearches as RillValue;
+    if (data.answerBox !== undefined)
+      result['answer_box'] = data.answerBox as RillValue;
+    if (data.knowledgeGraph !== undefined)
+      result['knowledge_graph'] = data.knowledgeGraph as RillValue;
+    if (data.peopleAlsoAsk !== undefined)
+      result['people_also_ask'] = data.peopleAlsoAsk as RillValue;
+    if (data.relatedSearches !== undefined)
+      result['related_searches'] = data.relatedSearches as RillValue;
 
     return {
       result: result as RillValue,
@@ -137,7 +154,10 @@ export function createSerperExtension(
     if (options['gl'] !== undefined) body['gl'] = options['gl'];
     if (options['hl'] !== undefined) body['hl'] = options['hl'];
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/news`, {
       method: 'POST',
       headers: authHeaders,
@@ -147,10 +167,15 @@ export function createSerperExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       news: unknown[];
     };
 
@@ -172,7 +197,10 @@ export function createSerperExtension(
     if (options['gl'] !== undefined) body['gl'] = options['gl'];
     if (options['hl'] !== undefined) body['hl'] = options['hl'];
 
-    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
+    const requestSignal = AbortSignal.any([
+      signal,
+      AbortSignal.timeout(timeout),
+    ]);
     const response = await fetch(`${baseUrl}/images`, {
       method: 'POST',
       headers: authHeaders,
@@ -182,10 +210,15 @@ export function createSerperExtension(
 
     if (!response.ok) {
       const responseBody = await response.json().catch(() => null);
-      throw mapProviderSearchError(callCtx, PROVIDER, response.status, responseBody);
+      throw mapProviderSearchError(
+        callCtx,
+        PROVIDER,
+        response.status,
+        responseBody
+      );
     }
 
-    const data = await response.json() as {
+    const data = (await response.json()) as {
       images: Array<{
         title: string;
         imageUrl: string;
@@ -222,11 +255,17 @@ export function createSerperExtension(
     kind: 'dict',
     fields: {
       search_parameters: { type: { kind: 'any' } },
-      organic:           { type: { kind: 'list', element: { kind: 'any' } } },
-      answer_box:        { type: { kind: 'any' }, defaultValue: null },                          // optional
-      knowledge_graph:   { type: { kind: 'any' }, defaultValue: null },                          // optional
-      people_also_ask:   { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
-      related_searches:  { type: { kind: 'list', element: { kind: 'any' } }, defaultValue: [] },  // optional
+      organic: { type: { kind: 'list', element: { kind: 'any' } } },
+      answer_box: { type: { kind: 'any' }, defaultValue: null }, // optional
+      knowledge_graph: { type: { kind: 'any' }, defaultValue: null }, // optional
+      people_also_ask: {
+        type: { kind: 'list', element: { kind: 'any' } },
+        defaultValue: [],
+      }, // optional
+      related_searches: {
+        type: { kind: 'list', element: { kind: 'any' } },
+        defaultValue: [],
+      }, // optional
     },
   });
   const NEWS_RT = structureToTypeValue({

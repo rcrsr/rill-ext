@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --config ../../../eslint.config.js src/",
+    "lint": "oxlint --config ../../../.oxlintrc.json src/",
     "check": "pnpm run build && pnpm run lint"
   },
   "peerDependencies": {

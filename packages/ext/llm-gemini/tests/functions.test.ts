@@ -5,7 +5,16 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { expectHalt, expectRejectedHalt } from './_halt-helpers.js';
-import { createRuntimeContext, callable, isRillStream, isInvalid, getStatus, type ApplicationCallable, type RillStream, type RillValue } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  callable,
+  isRillStream,
+  isInvalid,
+  getStatus,
+  type ApplicationCallable,
+  type RillStream,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
 
@@ -13,7 +22,10 @@ import type { GeminiExtensionConfig } from '../src/types.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -23,7 +35,10 @@ function getCallable(ext: { value: unknown }, name: string): ApplicationCallable
  * instead of { content: string }.
  */
 function extractLastMessageText(resolved: Record<string, unknown>): string {
-  const messages = resolved['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+  const messages = resolved['messages'] as Array<{
+    role: string;
+    parts: Array<{ type: string; text?: string }>;
+  }>;
   const last = messages[messages.length - 1];
   if (!last) return '';
   return last.parts
@@ -36,7 +51,9 @@ function extractLastMessageText(resolved: Record<string, unknown>): string {
  * Build an async iterable that yields chunks from an array of text strings.
  * Simulates the Gemini streaming response format.
  */
-async function* makeChunksIterable(chunks: string[]): AsyncGenerator<{ text: string }> {
+async function* makeChunksIterable(
+  chunks: string[]
+): AsyncGenerator<{ text: string }> {
   for (const text of chunks) {
     yield { text };
   }
@@ -76,7 +93,9 @@ async function collectStream(
   }
 
   // Call the hidden resolve function to get the dict result
-  const resolved = await (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve();
+  const resolved = await (
+    stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+  ).__rill_stream_resolve();
   return { chunks, resolved: resolved as Record<string, unknown> };
 }
 
@@ -143,7 +162,9 @@ describe('message() function', () => {
   describe('success cases', () => {
     // AC-2: message("prompt") returns RillStream that resolves to dict with required fields
     it('returns RillStream', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Hello', ' from', ' Google!']));
+      mockGenerateContentStream.mockResolvedValue(
+        makeChunksIterable(['Hello', ' from', ' Google!'])
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -153,14 +174,19 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Hello' },
+        ctx
+      );
 
       expect(isRillStream(stream)).toBe(true);
     });
 
     // AC-3: Iterating message() stream yields string chunks
     it('iterating stream yields string text chunks', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Hello', ' from', ' Google!']));
+      mockGenerateContentStream.mockResolvedValue(
+        makeChunksIterable(['Hello', ' from', ' Google!'])
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -170,7 +196,10 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Hello' },
+        ctx
+      );
       const { chunks } = await collectStream(stream, ctx);
 
       expect(chunks).toEqual(['Hello', ' from', ' Google!']);
@@ -178,7 +207,9 @@ describe('message() function', () => {
 
     // AC-5: message() resolve dict has messages, model, usage, stop_reason, id
     it('resolved dict has messages, model, usage, stop_reason, id', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Hello from Google!']));
+      mockGenerateContentStream.mockResolvedValue(
+        makeChunksIterable(['Hello from Google!'])
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -188,7 +219,10 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Hello' },
+        ctx
+      );
       const { resolved } = await collectStream(stream, ctx);
 
       expect(extractLastMessageText(resolved)).toBe('Hello from Google!');
@@ -197,14 +231,19 @@ describe('message() function', () => {
       expect(resolved['stop_reason']).toBe('stop');
       expect(resolved['id']).toBe('');
       // messages is a parts-shaped list: last entry is assistant reply
-      const messages = resolved['messages'] as Array<{ role: string; parts: unknown[] }>;
+      const messages = resolved['messages'] as Array<{
+        role: string;
+        parts: unknown[];
+      }>;
       expect(Array.isArray(messages)).toBe(true);
       const last = messages[messages.length - 1]!;
       expect(last.role).toBe('assistant');
     });
 
     it('sends correct parameters to Google streaming API without system prompt', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Response']));
+      mockGenerateContentStream.mockResolvedValue(
+        makeChunksIterable(['Response'])
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -215,7 +254,10 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'What is 2+2?' },
+        ctx
+      );
       await collectStream(stream, ctx);
 
       expect(mockGenerateContentStream).toHaveBeenCalledWith({
@@ -234,7 +276,9 @@ describe('message() function', () => {
     });
 
     it('sends system instruction via config parameter', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Response']));
+      mockGenerateContentStream.mockResolvedValue(
+        makeChunksIterable(['Response'])
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -246,7 +290,10 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'What is 2+2?' },
+        ctx
+      );
       await collectStream(stream, ctx);
 
       expect(mockGenerateContentStream).toHaveBeenCalledWith({
@@ -266,7 +313,9 @@ describe('message() function', () => {
     });
 
     it('uses default max_tokens when not specified', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Response']));
+      mockGenerateContentStream.mockResolvedValue(
+        makeChunksIterable(['Response'])
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -276,7 +325,10 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
       await collectStream(stream, ctx);
 
       expect(mockGenerateContentStream).toHaveBeenCalledWith(
@@ -289,7 +341,9 @@ describe('message() function', () => {
     });
 
     it('includes user message and assistant reply in resolved messages', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Response']));
+      mockGenerateContentStream.mockResolvedValue(
+        makeChunksIterable(['Response'])
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -300,10 +354,16 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
       const { resolved } = await collectStream(stream, ctx);
 
-      const messages = resolved['messages'] as Array<{ role: string; parts: Array<{ type: string; text?: string }> }>;
+      const messages = resolved['messages'] as Array<{
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+      }>;
       // system → user → assistant
       expect(messages.length).toBeGreaterThanOrEqual(2);
       const lastMsg = messages[messages.length - 1]!;
@@ -312,7 +372,9 @@ describe('message() function', () => {
     });
 
     it('sends multi-turn messages when prompt is a list', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['Response']));
+      mockGenerateContentStream.mockResolvedValue(
+        makeChunksIterable(['Response'])
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -329,7 +391,10 @@ describe('message() function', () => {
         { role: 'user', content: 'How are you?' },
       ];
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: inputMessages }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: inputMessages },
+        ctx
+      );
       await collectStream(stream, ctx);
 
       // Wire: assistant → model rename happens only in vendor format
@@ -358,7 +423,9 @@ describe('message() function', () => {
 
       const result = await getCallable(ext, 'message').fn({ prompt: '' }, ctx);
       expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).message).toContain('prompt string cannot be empty');
+      expect(getStatus(result).message).toContain(
+        'prompt string cannot be empty'
+      );
     });
 
     it('returns invalid RillValue for whitespace-only prompt text', async () => {
@@ -370,9 +437,14 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = await getCallable(ext, 'message').fn({ prompt: '   ' }, ctx);
+      const result = await getCallable(ext, 'message').fn(
+        { prompt: '   ' },
+        ctx
+      );
       expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).message).toContain('prompt string cannot be empty');
+      expect(getStatus(result).message).toContain(
+        'prompt string cannot be empty'
+      );
     });
 
     // EC-2: Provider API error during stream
@@ -389,13 +461,20 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error (HTTP 401): authentication failed (401)' });
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
+      await expectRejectedHalt(collectStream(stream, ctx), {
+        message: 'Gemini API error (HTTP 401): authentication failed (401)',
+      });
     });
 
     // EC-2: Provider API error during stream
     it('throws RuntimeError for 429 rate limit error when iterating stream', async () => {
-      mockGenerateContentStream.mockRejectedValue(new Error('rate limit exceeded'));
+      mockGenerateContentStream.mockRejectedValue(
+        new Error('rate limit exceeded')
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -405,8 +484,13 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error: rate limit exceeded' });
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
+      await expectRejectedHalt(collectStream(stream, ctx), {
+        message: 'Gemini API error: rate limit exceeded',
+      });
     });
 
     // EC-2: Network timeout error during stream
@@ -421,8 +505,13 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error: Request timeout' });
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
+      await expectRejectedHalt(collectStream(stream, ctx), {
+        message: 'Gemini API error: Request timeout',
+      });
     });
 
     // EC-2: Generic API error with status during stream
@@ -439,8 +528,13 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-      await expectRejectedHalt(collectStream(stream, ctx), { message: 'Gemini API error (HTTP 500): Internal server error (500)' });
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
+      await expectRejectedHalt(collectStream(stream, ctx), {
+        message: 'Gemini API error (HTTP 500): Internal server error (500)',
+      });
     });
 
     // EC-3/AC-16: Provider disconnect mid-stream — error thrown during iteration
@@ -458,7 +552,10 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
 
       const { error } = await collectStreamUntilError(stream, ctx);
       expectHalt(error, { message: 'Gemini API error' });
@@ -478,7 +575,10 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
 
       const { chunks } = await collectStreamUntilError(stream, ctx);
       expect(chunks).toEqual(['Hello', ' world']);
@@ -499,13 +599,19 @@ describe('message() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'Test' },
+        ctx
+      );
 
       // Drain the stream first (it will throw)
       await collectStreamUntilError(stream, ctx);
 
       // Resolve also throws because streamError is set
-      await expectRejectedHalt((stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
+      await expectRejectedHalt(
+        (
+          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+        ).__rill_stream_resolve()
       );
     });
   });
@@ -537,7 +643,10 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = (await getCallable(ext, 'embed').fn({ text: 'Hello world' }, ctx)) as {
+      const result = (await getCallable(ext, 'embed').fn(
+        { text: 'Hello world' },
+        ctx
+      )) as {
         __rill_vector: true;
         data: Float32Array;
         model: string;
@@ -587,7 +696,10 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: '' }, ctx), { message: 'embed text cannot be empty' });
+      await expectRejectedHalt(
+        getCallable(ext, 'embed').fn({ text: '' }, ctx),
+        { message: 'embed text cannot be empty' }
+      );
     });
 
     // EC-16: No embed_model configured
@@ -600,7 +712,10 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx), { message: 'embed_model not configured' });
+      await expectRejectedHalt(
+        getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx),
+        { message: 'embed_model not configured' }
+      );
     });
 
     // EC-17: API errors
@@ -618,7 +733,10 @@ describe('embed() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx), { message: 'Gemini API error: 401: authentication failed' });
+      await expectRejectedHalt(
+        getCallable(ext, 'embed').fn({ text: 'Hello' }, ctx),
+        { message: 'Gemini API error: 401: authentication failed' }
+      );
     });
   });
 });
@@ -680,7 +798,10 @@ describe('embed_batch() function', () => {
       const ext = createGeminiExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = await getCallable(ext, 'embed_batch').fn({ texts: [] }, ctx);
+      const result = await getCallable(ext, 'embed_batch').fn(
+        { texts: [] },
+        ctx
+      );
 
       expect(result).toEqual([]);
       expect(mockEmbedContent).not.toHaveBeenCalled();
@@ -700,8 +821,12 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn({ texts: ['Hello', 123, 'World'] }, ctx)
-      , { message: 'embed_batch requires list of strings' });
+        getCallable(ext, 'embed_batch').fn(
+          { texts: ['Hello', 123, 'World'] },
+          ctx
+        ),
+        { message: 'embed_batch requires list of strings' }
+      );
     });
 
     // EC-19: Empty string in list
@@ -716,8 +841,12 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn({ texts: ['Hello', '', 'World'] }, ctx)
-      , { message: 'embed text cannot be empty at index 1' });
+        getCallable(ext, 'embed_batch').fn(
+          { texts: ['Hello', '', 'World'] },
+          ctx
+        ),
+        { message: 'embed text cannot be empty at index 1' }
+      );
     });
 
     // EC-20: No embed_model configured
@@ -731,8 +860,9 @@ describe('embed_batch() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn({ texts: ['Hello', 'World'] }, ctx)
-      , { message: 'embed_model not configured' });
+        getCallable(ext, 'embed_batch').fn({ texts: ['Hello', 'World'] }, ctx),
+        { message: 'embed_model not configured' }
+      );
     });
   });
 });
@@ -756,7 +886,8 @@ function makeTool(
       name: p.name,
       type: { kind: p.type },
       defaultValue: undefined,
-      annotations: p.description !== undefined ? { description: p.description } : {},
+      annotations:
+        p.description !== undefined ? { description: p.description } : {},
     }));
   }
   return tool;
@@ -771,8 +902,16 @@ function makeTool(
  * The last item in the array is returned as the final response object by callAPIStreaming.
  */
 async function* makeToolLoopStream(
-  chunks: Array<{ text?: string; functionCalls?: Array<{ name: string; args: object; id: string }>; candidates?: unknown[] }>
-): AsyncGenerator<{ text?: string; functionCalls?: unknown[]; candidates?: unknown[] }> {
+  chunks: Array<{
+    text?: string;
+    functionCalls?: Array<{ name: string; args: object; id: string }>;
+    candidates?: unknown[];
+  }>
+): AsyncGenerator<{
+  text?: string;
+  functionCalls?: unknown[];
+  candidates?: unknown[];
+}> {
   for (const chunk of chunks) {
     yield chunk;
   }
@@ -785,7 +924,10 @@ async function* makeToolLoopStream(
 async function collectToolLoopStream(
   stream: RillValue,
   ctx: ReturnType<typeof createRuntimeContext>
-): Promise<{ chunks: Array<Record<string, unknown>>; resolved: Record<string, unknown> }> {
+): Promise<{
+  chunks: Array<Record<string, unknown>>;
+  resolved: Record<string, unknown>;
+}> {
   const chunks: Array<Record<string, unknown>> = [];
   let current = stream as RillStream;
 
@@ -797,7 +939,9 @@ async function collectToolLoopStream(
     }
   }
 
-  const resolved = await (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve();
+  const resolved = await (
+    stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+  ).__rill_stream_resolve();
   return { chunks, resolved: resolved as Record<string, unknown> };
 }
 
@@ -824,7 +968,10 @@ describe('tool_loop() function', () => {
 
       const tools = { tool: makeTool(vi.fn(), { description: 'Tool' }) };
 
-      const result = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello', tools }, ctx);
+      const result = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Hello', tools },
+        ctx
+      );
 
       expect(isRillStream(result)).toBe(true);
     });
@@ -833,10 +980,7 @@ describe('tool_loop() function', () => {
     it('iterating stream yields text_delta dict chunks from final turn', async () => {
       // Single turn: LLM returns text directly (no tool calls)
       mockGenerateContentStream.mockResolvedValue(
-        makeToolLoopStream([
-          { text: 'Hello ' },
-          { text: 'world' },
-        ])
+        makeToolLoopStream([{ text: 'Hello ' }, { text: 'world' }])
       );
 
       const config: GeminiExtensionConfig = {
@@ -849,7 +993,10 @@ describe('tool_loop() function', () => {
 
       const tools = { tool: makeTool(vi.fn(), { description: 'Tool' }) };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello', tools }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Hello', tools },
+        ctx
+      );
       const { chunks } = await collectToolLoopStream(stream, ctx);
 
       // text_delta chunks are yielded by executeToolLoop via yieldChunk
@@ -865,7 +1012,16 @@ describe('tool_loop() function', () => {
       mockGenerateContentStream
         .mockResolvedValueOnce(
           makeToolLoopStream([
-            { text: '', functionCalls: [{ name: 'get_weather', args: { location: 'NYC' }, id: 'call_1' }] },
+            {
+              text: '',
+              functionCalls: [
+                {
+                  name: 'get_weather',
+                  args: { location: 'NYC' },
+                  id: 'call_1',
+                },
+              ],
+            },
           ])
         )
         .mockResolvedValueOnce(
@@ -885,11 +1041,16 @@ describe('tool_loop() function', () => {
         get_weather: makeTool(mockToolFn, { description: 'Get weather' }),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'What is the weather in NYC?', tools }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'What is the weather in NYC?', tools },
+        ctx
+      );
       const { chunks } = await collectToolLoopStream(stream, ctx);
 
       const toolCallChunks = chunks.filter((c) => c['type'] === 'tool_call');
-      const toolResultChunks = chunks.filter((c) => c['type'] === 'tool_result');
+      const toolResultChunks = chunks.filter(
+        (c) => c['type'] === 'tool_result'
+      );
 
       expect(toolCallChunks.length).toBe(1);
       expect(toolCallChunks[0]!['name']).toBe('get_weather');
@@ -914,7 +1075,10 @@ describe('tool_loop() function', () => {
 
       const tools = { tool: makeTool(vi.fn(), { description: 'Tool' }) };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello', tools }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Hello', tools },
+        ctx
+      );
       const { resolved } = await collectToolLoopStream(stream, ctx);
 
       expect(extractLastMessageText(resolved)).toBe('Final answer.');
@@ -933,7 +1097,16 @@ describe('tool_loop() function', () => {
       mockGenerateContentStream
         .mockResolvedValueOnce(
           makeToolLoopStream([
-            { text: '', functionCalls: [{ name: 'get_weather', args: { location: 'NYC' }, id: 'call_1' }] },
+            {
+              text: '',
+              functionCalls: [
+                {
+                  name: 'get_weather',
+                  args: { location: 'NYC' },
+                  id: 'call_1',
+                },
+              ],
+            },
           ])
         )
         // Turn 2: LLM returns final text
@@ -962,7 +1135,9 @@ describe('tool_loop() function', () => {
       );
       const { resolved } = await collectToolLoopStream(stream, ctx);
 
-      expect(extractLastMessageText(resolved)).toBe('The weather in NYC is sunny.');
+      expect(extractLastMessageText(resolved)).toBe(
+        'The weather in NYC is sunny.'
+      );
       // turns is no longer in the resolved dict (emitted in gemini:tool_loop event instead)
       expect(resolved['stop_reason']).toBe('stop');
       expect(mockToolFn).toHaveBeenCalledTimes(1);
@@ -1005,7 +1180,10 @@ describe('tool_loop() function', () => {
     it('resolve rejects when max_turns is 1 and tool calls require a second turn', async () => {
       mockGenerateContentStream.mockResolvedValue(
         makeToolLoopStream([
-          { text: '', functionCalls: [{ name: 'get_weather', args: {}, id: 'call_1' }] },
+          {
+            text: '',
+            functionCalls: [{ name: 'get_weather', args: {}, id: 'call_1' }],
+          },
         ])
       );
 
@@ -1022,10 +1200,15 @@ describe('tool_loop() function', () => {
       };
 
       // max_turns is the 3rd positional arg (number), not options dict
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools, max_turns: 1 }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test', tools, max_turns: 1 },
+        ctx
+      );
 
       await expectRejectedHalt(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve()
+        (
+          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+        ).__rill_stream_resolve()
       );
     });
   });
@@ -1043,9 +1226,14 @@ describe('tool_loop() function', () => {
 
       const tools = { test: makeTool(vi.fn()) };
 
-      const result = getCallable(ext, 'tool_loop').fn({ prompt: '   ', tools }, ctx);
+      const result = getCallable(ext, 'tool_loop').fn(
+        { prompt: '   ', tools },
+        ctx
+      );
       expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result as RillValue).message).toContain('prompt string cannot be empty');
+      expect(getStatus(result as RillValue).message).toContain(
+        'prompt string cannot be empty'
+      );
     });
 
     // EC-23: Missing tools argument — error surfaces via stream resolve
@@ -1061,7 +1249,9 @@ describe('tool_loop() function', () => {
       const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello' }, ctx);
 
       await expectRejectedHalt(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
+        (
+          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+        ).__rill_stream_resolve(),
         { message: 'tools parameter is required' }
       );
     });
@@ -1071,9 +1261,14 @@ describe('tool_loop() function', () => {
     it('stream resolve rejects for unknown tool after max_errors', async () => {
       // Each call to generateContentStream returns a fresh generator (not the same instance)
       mockGenerateContentStream.mockImplementation(() =>
-        Promise.resolve(makeToolLoopStream([
-          { text: '', functionCalls: [{ name: 'unknown_tool', args: {}, id: 'call_1' }] },
-        ]))
+        Promise.resolve(
+          makeToolLoopStream([
+            {
+              text: '',
+              functionCalls: [{ name: 'unknown_tool', args: {}, id: 'call_1' }],
+            },
+          ])
+        )
       );
 
       const config: GeminiExtensionConfig = {
@@ -1089,10 +1284,15 @@ describe('tool_loop() function', () => {
         get_weather: makeTool(vi.fn()),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test', tools },
+        ctx
+      );
 
       await expectRejectedHalt(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
+        (
+          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+        ).__rill_stream_resolve(),
         { message: 'Tool execution failed: 3 consecutive errors' }
       );
     });
@@ -1102,9 +1302,14 @@ describe('tool_loop() function', () => {
     it('stream resolve rejects after max_errors consecutive errors', async () => {
       // Each call to generateContentStream returns a fresh generator
       mockGenerateContentStream.mockImplementation(() =>
-        Promise.resolve(makeToolLoopStream([
-          { text: '', functionCalls: [{ name: 'failing_tool', args: {}, id: 'call_1' }] },
-        ]))
+        Promise.resolve(
+          makeToolLoopStream([
+            {
+              text: '',
+              functionCalls: [{ name: 'failing_tool', args: {}, id: 'call_1' }],
+            },
+          ])
+        )
       );
 
       const config: GeminiExtensionConfig = {
@@ -1122,17 +1327,24 @@ describe('tool_loop() function', () => {
         ),
       };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Test', tools }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Test', tools },
+        ctx
+      );
 
       await expectRejectedHalt(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
+        (
+          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+        ).__rill_stream_resolve(),
         { message: 'Tool execution failed: 2 consecutive errors' }
       );
     });
 
     // EC-4/EC-12: Provider streaming API failure surfaces via stream resolve
     it('stream resolve rejects on provider streaming API failure [EC-4]', async () => {
-      mockGenerateContentStream.mockRejectedValue(new Error('API rate limit exceeded'));
+      mockGenerateContentStream.mockRejectedValue(
+        new Error('API rate limit exceeded')
+      );
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -1144,11 +1356,16 @@ describe('tool_loop() function', () => {
 
       const tools = { tool: makeTool(vi.fn(), { description: 'Tool' }) };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello', tools }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Hello', tools },
+        ctx
+      );
 
       await expectRejectedHalt(
-        (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve(),
-        { message: 'Provider API error:' },
+        (
+          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+        ).__rill_stream_resolve(),
+        { message: 'Provider API error:' }
       );
     });
 
@@ -1160,7 +1377,10 @@ describe('tool_loop() function', () => {
         .mockResolvedValueOnce(
           makeToolLoopStream([
             { text: '' },
-            { text: '', functionCalls: [{ name: 'flaky_tool', args: {}, id: 'call_1' }] },
+            {
+              text: '',
+              functionCalls: [{ name: 'flaky_tool', args: {}, id: 'call_1' }],
+            },
           ])
         )
         .mockResolvedValueOnce(
@@ -1195,8 +1415,14 @@ describe('tool_loop() function', () => {
       expect(toolCallChunks.length).toBeGreaterThan(0);
 
       // Stream resolves with final content after the tool error
-      const resolved = await (stream as unknown as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
-      expect(extractLastMessageText(resolved)).toBe('Recovered from tool error.');
+      const resolved = await (
+        stream as unknown as {
+          __rill_stream_resolve: () => Promise<Record<string, unknown>>;
+        }
+      ).__rill_stream_resolve();
+      expect(extractLastMessageText(resolved)).toBe(
+        'Recovered from tool error.'
+      );
     });
   });
 
@@ -1204,7 +1430,9 @@ describe('tool_loop() function', () => {
     // AC-16: After mid-stream provider disconnect, resolve() returns partial content
     it('resolve() returns dict with accumulated content after mid-stream disconnect [AC-16]', async () => {
       // Simulate a stream that yields partial text then throws mid-iteration
-      async function* makePartialStreamThenThrow(): AsyncGenerator<{ text?: string }> {
+      async function* makePartialStreamThenThrow(): AsyncGenerator<{
+        text?: string;
+      }> {
         yield { text: 'Partial content' };
         throw new Error('Connection reset by peer');
       }
@@ -1221,7 +1449,10 @@ describe('tool_loop() function', () => {
 
       const tools = { tool: makeTool(vi.fn(), { description: 'Tool' }) };
 
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello', tools }, ctx);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Hello', tools },
+        ctx
+      );
 
       // Drain the stream (chunks may include partial text_delta before error)
       let current = stream as RillStream;
@@ -1235,7 +1466,11 @@ describe('tool_loop() function', () => {
       }
 
       // resolve() must return partial dict with accumulated content rather than rethrowing
-      const resolved = await (stream as unknown as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+      const resolved = await (
+        stream as unknown as {
+          __rill_stream_resolve: () => Promise<Record<string, unknown>>;
+        }
+      ).__rill_stream_resolve();
       expect(extractLastMessageText(resolved)).toContain('Partial content');
     });
   });
@@ -1261,8 +1496,14 @@ describe('tool_loop() function', () => {
         tool: makeTool(vi.fn(), { description: 'Tool' }),
       };
 
-      const stream1 = getCallable(ext1, 'tool_loop').fn({ prompt: 'Prompt 1', tools }, ctx1);
-      const stream2 = getCallable(ext2, 'tool_loop').fn({ prompt: 'Prompt 2', tools }, ctx2);
+      const stream1 = getCallable(ext1, 'tool_loop').fn(
+        { prompt: 'Prompt 1', tools },
+        ctx1
+      );
+      const stream2 = getCallable(ext2, 'tool_loop').fn(
+        { prompt: 'Prompt 2', tools },
+        ctx2
+      );
 
       const [r1, r2] = await Promise.all([
         collectToolLoopStream(stream1, ctx1),

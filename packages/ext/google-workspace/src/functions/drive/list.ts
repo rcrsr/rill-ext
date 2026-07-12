@@ -22,7 +22,9 @@ export interface DriveListDeps {
  * EC-7: Rejects folderId not in allowedFolderIds (when defined).
  * AC-12: Returns rill primitive dict { files: list[dict] }.
  */
-export function makeDriveList(deps: DriveListDeps): (
+export function makeDriveList(
+  deps: DriveListDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -34,14 +36,20 @@ export function makeDriveList(deps: DriveListDeps): (
   ): Promise<RillValue> => {
     const folderId = args['folder_id'];
     const folderIdStr =
-      folderId !== undefined && folderId !== null && typeof folderId === 'string'
+      folderId !== undefined &&
+      folderId !== null &&
+      typeof folderId === 'string'
         ? folderId
         : undefined;
     // EC-7: Validate folderId against allowedFolderIds when defined
     if (folderIdStr !== undefined && folderIdStr !== '') {
       const allowed = deps.driveConfig?.allowedFolderIds;
       if (allowed !== undefined && !allowed.includes(folderIdStr)) {
-        failForbidden(ctx, 'forbidden', `google: folder '${folderIdStr}' not in allowed set`);
+        failForbidden(
+          ctx,
+          'forbidden',
+          `google: folder '${folderIdStr}' not in allowed set`
+        );
       }
     }
     // Build query: list files in the given folder, or all files

@@ -70,7 +70,10 @@ describePerf('performance', () => {
 
       for (let i = 0; i < CALL_COUNT; i++) {
         const start = performance.now();
-        await parseFn({ str: FORMATTED_STR, pattern: PATTERN }, makeRuntimeCtx());
+        await parseFn(
+          { str: FORMATTED_STR, pattern: PATTERN },
+          makeRuntimeCtx()
+        );
         durations.push(performance.now() - start);
       }
 

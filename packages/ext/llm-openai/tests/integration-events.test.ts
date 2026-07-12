@@ -12,7 +12,10 @@ import type { OpenAIExtensionConfig } from '../src/types.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -39,10 +42,20 @@ function createMockFinalCompletion(content: string, model = 'gpt-4-turbo') {
 /**
  * Build a mock stream runner with async iteration and finalChatCompletion().
  */
-function createMockStreamRunner(finalCompletion: ReturnType<typeof createMockFinalCompletion>) {
+function createMockStreamRunner(
+  finalCompletion: ReturnType<typeof createMockFinalCompletion>
+) {
   async function* asyncChunks() {
     yield {
-      choices: [{ delta: { content: finalCompletion.choices[0]?.message?.content ?? '' }, finish_reason: null, index: 0 }],
+      choices: [
+        {
+          delta: {
+            content: finalCompletion.choices[0]?.message?.content ?? '',
+          },
+          finish_reason: null,
+          index: 0,
+        },
+      ],
       id: finalCompletion.id,
       object: 'chat.completion.chunk',
       created: finalCompletion.created,
@@ -76,7 +89,8 @@ function createErrorStreamRunner(error: unknown) {
  * Trigger the resolve callback on a RillStream to emit events.
  */
 async function resolveStream(stream: unknown): Promise<unknown> {
-  const resolve = (stream as any).__rill_stream_resolve as () => Promise<unknown>;
+  const resolve = (stream as any)
+    .__rill_stream_resolve as () => Promise<unknown>;
   return resolve();
 }
 
@@ -125,7 +139,9 @@ describe('extension event emission', () => {
 
   describe('message() events', () => {
     it('emits openai:message event on success', async () => {
-      const runner = createMockStreamRunner(createMockFinalCompletion('Response'));
+      const runner = createMockStreamRunner(
+        createMockFinalCompletion('Response')
+      );
       mockStream.mockReturnValue(runner);
 
       const config: OpenAIExtensionConfig = {
@@ -196,6 +212,4 @@ describe('extension event emission', () => {
       expect(typeof events[0]?.['duration']).toBe('number');
     });
   });
-
 });
-

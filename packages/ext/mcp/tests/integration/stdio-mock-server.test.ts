@@ -63,21 +63,26 @@ afterEach(async () => {
 });
 
 /** Helper to get the value dict from an ExtensionFactoryResult */
-function fns(ext: Awaited<ReturnType<typeof createMcpExtension>>): Record<string, any> {
+function fns(
+  ext: Awaited<ReturnType<typeof createMcpExtension>>
+): Record<string, any> {
   return ext.value as Record<string, any>;
 }
 
 describe('Integration: stdio mock server', () => {
   describe('AC-1: Connect stdio transport, call tool [AC-1]', () => {
     it('connects to stdio server and discovers capabilities', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -102,36 +107,39 @@ describe('Integration: stdio mock server', () => {
     }, 15000);
 
     it.skip('calls tool and receives response', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
       // Call echo tool
-      const result = await v.echo.fn(
-        { message: 'Hello, MCP!' },
-        mockContext
-      );
+      const result = await v.echo.fn({ message: 'Hello, MCP!' }, mockContext);
 
       // Verify result
       expect(result).toBe('Hello, MCP!');
     }, 15000);
 
     it.skip('calls tool with parameters', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -145,14 +153,17 @@ describe('Integration: stdio mock server', () => {
 
   describe('AC-8: Result type conversion', () => {
     it.skip('converts JSON text content to dict', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -168,14 +179,17 @@ describe('Integration: stdio mock server', () => {
     }, 15000);
 
     it.skip('returns plain text as string', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -188,14 +202,17 @@ describe('Integration: stdio mock server', () => {
     }, 15000);
 
     it.skip('converts image content to dict with type/data/mime', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -213,14 +230,17 @@ describe('Integration: stdio mock server', () => {
 
   describe('Resource read end-to-end', () => {
     it('lists available resources', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -235,14 +255,17 @@ describe('Integration: stdio mock server', () => {
     }, 15000);
 
     it.skip('reads static resource', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -268,14 +291,17 @@ describe('Integration: stdio mock server', () => {
     }, 15000);
 
     it.skip('reads resource template with variables', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -300,14 +326,17 @@ describe('Integration: stdio mock server', () => {
 
   describe('Prompt get end-to-end', () => {
     it('lists available prompts', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -325,14 +354,17 @@ describe('Integration: stdio mock server', () => {
     }, 15000);
 
     it.skip('gets prompt without arguments', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -355,14 +387,17 @@ describe('Integration: stdio mock server', () => {
     }, 15000);
 
     it.skip('gets prompt with arguments', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext);
       const v = fns(ext);
 
@@ -397,24 +432,30 @@ describe('Integration: stdio mock server', () => {
     it.skip('combines functions from multiple servers', async () => {
       // Create two extension instances to the same server
       // (In real usage, these would be different servers)
-      const ext1 = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext1 = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext1);
 
-      const ext2 = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext2 = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       activeExtensions.push(ext2);
 
       const v1 = fns(ext1);
@@ -442,14 +483,17 @@ describe('Integration: stdio mock server', () => {
 
   describe('Connection lifecycle', () => {
     it.skip('disposes extension cleanly', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       const v = fns(ext);
 
       // Verify extension works
@@ -467,14 +511,17 @@ describe('Integration: stdio mock server', () => {
     }, 15000);
 
     it('handles multiple dispose calls (idempotent)', async () => {
-      const ext = await createMcpExtension({
-        transport: {
-          type: 'stdio',
-          command: 'node',
-          args: [MOCK_SERVER_PATH],
+      const ext = await createMcpExtension(
+        {
+          transport: {
+            type: 'stdio',
+            command: 'node',
+            args: [MOCK_SERVER_PATH],
+          },
+          timeout: 10000,
         },
-        timeout: 10000,
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
 
       // First dispose
       await ext.dispose();

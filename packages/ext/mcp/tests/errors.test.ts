@@ -46,7 +46,9 @@ describe('Factory-time helpers (RILL-R001)', () => {
 
   it('connectionRefusedError includes URL', () => {
     const err = connectionRefusedError('http://localhost:8080');
-    expect(err.message).toContain('connection refused at http://localhost:8080');
+    expect(err.message).toContain(
+      'connection refused at http://localhost:8080'
+    );
   });
 
   it('authRequiredError mentions OAuth', () => {
@@ -65,17 +67,29 @@ describe('Runtime helpers emit invalid RillValues', () => {
 
   it('failTool maps to #UNAVAILABLE with tool_error kind', () => {
     const ctx = makeRuntimeCtx();
-    expectAtom(failTool(ctx, 'read_file', 'file not found'), 'UNAVAILABLE', 'read_file');
+    expectAtom(
+      failTool(ctx, 'read_file', 'file not found'),
+      'UNAVAILABLE',
+      'read_file'
+    );
   });
 
   it('failNotFound maps to #NOT_FOUND', () => {
     const ctx = makeRuntimeCtx();
-    expectAtom(failNotFound(ctx, 'missing_tool', 'no such tool'), 'NOT_FOUND', 'missing_tool');
+    expectAtom(
+      failNotFound(ctx, 'missing_tool', 'no such tool'),
+      'NOT_FOUND',
+      'missing_tool'
+    );
   });
 
   it('failProtocol maps to #PROTOCOL', () => {
     const ctx = makeRuntimeCtx();
-    expectAtom(failProtocol(ctx, 'invalid message format'), 'PROTOCOL', 'invalid message format');
+    expectAtom(
+      failProtocol(ctx, 'invalid message format'),
+      'PROTOCOL',
+      'invalid message format'
+    );
   });
 
   it('failTimeout maps to #TIMEOUT and includes timeoutMs', () => {
@@ -95,12 +109,20 @@ describe('Runtime helpers emit invalid RillValues', () => {
 
   it('failInput maps to #INVALID_INPUT', () => {
     const ctx = makeRuntimeCtx();
-    expectAtom(failInput(ctx, 'bad parameter'), 'INVALID_INPUT', 'bad parameter');
+    expectAtom(
+      failInput(ctx, 'bad parameter'),
+      'INVALID_INPUT',
+      'bad parameter'
+    );
   });
 
   it('failUnavailable maps to #UNAVAILABLE', () => {
     const ctx = makeRuntimeCtx();
-    expectAtom(failUnavailable(ctx, 'server unreachable'), 'UNAVAILABLE', 'server unreachable');
+    expectAtom(
+      failUnavailable(ctx, 'server unreachable'),
+      'UNAVAILABLE',
+      'server unreachable'
+    );
   });
 });
 
@@ -114,7 +136,11 @@ describe('mapMcpError detector', () => {
 
   it('detects connection-lost messages', () => {
     const ctx = makeRuntimeCtx();
-    const mapped = mapMcpError(ctx, new Error('connection closed unexpectedly'), 'tool');
+    const mapped = mapMcpError(
+      ctx,
+      new Error('connection closed unexpectedly'),
+      'tool'
+    );
     expect(getStatus(mapped).code.name).toBe('UNAVAILABLE');
   });
 
@@ -126,7 +152,11 @@ describe('mapMcpError detector', () => {
 
   it('detects protocol messages', () => {
     const ctx = makeRuntimeCtx();
-    const mapped = mapMcpError(ctx, new Error('malformed JSON-RPC response'), 'tool');
+    const mapped = mapMcpError(
+      ctx,
+      new Error('malformed JSON-RPC response'),
+      'tool'
+    );
     expect(getStatus(mapped).code.name).toBe('PROTOCOL');
   });
 

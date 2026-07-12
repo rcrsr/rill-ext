@@ -62,14 +62,14 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
   } catch {
     throw new RuntimeError(
       'RILL-R001',
-      "google: auth.keyJson is invalid: not valid JSON"
+      'google: auth.keyJson is invalid: not valid JSON'
     );
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
     throw new RuntimeError(
       'RILL-R001',
-      "google: auth.keyJson is invalid: not valid JSON"
+      'google: auth.keyJson is invalid: not valid JSON'
     );
   }
 
@@ -159,10 +159,16 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
       throw new RuntimeError('RILL-R001', 'google: auth.client_id is required');
     }
     if (!config.auth.client_secret || config.auth.client_secret === '') {
-      throw new RuntimeError('RILL-R001', 'google: auth.client_secret is required');
+      throw new RuntimeError(
+        'RILL-R001',
+        'google: auth.client_secret is required'
+      );
     }
     if (!config.auth.refresh_token || config.auth.refresh_token === '') {
-      throw new RuntimeError('RILL-R001', 'google: auth.refresh_token is required');
+      throw new RuntimeError(
+        'RILL-R001',
+        'google: auth.refresh_token is required'
+      );
     }
   }
 

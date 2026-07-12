@@ -13,7 +13,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { createMcpExtension } from '../src/factory.js';
-import { makeFactoryCtx, makeRuntimeCtx, expectRejectsInvalid } from './_helpers.js';
+import {
+  makeFactoryCtx,
+  makeRuntimeCtx,
+  expectRejectsInvalid,
+} from './_helpers.js';
 import type { McpExtensionConfig } from '../src/types.js';
 
 describe('Integration: Dispose and Connection Lifecycle', () => {
@@ -306,7 +310,10 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       const tools = fns.tools as Record<string, any>;
 
       // Tool call before dispose works
-      const resultBefore = await tools.test_tool!.fn({ param1: 'value' }, makeRuntimeCtx());
+      const resultBefore = await tools.test_tool!.fn(
+        { param1: 'value' },
+        makeRuntimeCtx()
+      );
       expect(resultBefore).toBe('success');
       expect(mockCallTool).toHaveBeenCalledTimes(1);
 
@@ -317,7 +324,10 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       mockCallTool.mockRejectedValue(new Error('connection closed'));
 
       // Tool call after dispose should throw connection lost error
-      await expectRejectsInvalid(tools.test_tool!.fn({ param1: 'value' }, makeRuntimeCtx()), 'mcp: connection lost');
+      await expectRejectsInvalid(
+        tools.test_tool!.fn({ param1: 'value' }, makeRuntimeCtx()),
+        'mcp: connection lost'
+      );
     });
 
     it('resource reads after dispose throw connection lost error', async () => {
@@ -375,7 +385,13 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       mockReadResource.mockRejectedValue(new Error('connection lost'));
 
       // Resource read after dispose should throw
-      await expectRejectsInvalid(resources.read_resource!.fn({ uri: 'test://resource' }, makeRuntimeCtx()), 'mcp: connection lost');
+      await expectRejectsInvalid(
+        resources.read_resource!.fn(
+          { uri: 'test://resource' },
+          makeRuntimeCtx()
+        ),
+        'mcp: connection lost'
+      );
     });
 
     it('prompt calls after dispose throw connection lost error', async () => {
@@ -436,7 +452,10 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       mockGetPrompt.mockRejectedValue(new Error('connection lost'));
 
       // Prompt call after dispose should throw
-      await expectRejectsInvalid(prompts.test!.fn({}, makeRuntimeCtx()), 'mcp: connection lost');
+      await expectRejectsInvalid(
+        prompts.test!.fn({}, makeRuntimeCtx()),
+        'mcp: connection lost'
+      );
     });
   });
 

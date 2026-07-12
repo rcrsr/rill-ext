@@ -18,7 +18,7 @@ const PROVIDER = 'outlook';
 export function checkCapability(
   ctx: RuntimeContext,
   enabled: boolean,
-  name: string,
+  name: string
 ): void {
   if (!enabled) {
     const message = `outlook: ${name} not enabled`;
@@ -37,7 +37,7 @@ export function checkCapability(
 export function checkFolder(
   ctx: RuntimeContext,
   folders: readonly string[],
-  name: string,
+  name: string
 ): void {
   if (!folders.includes(name)) {
     const message = `outlook: folder '${name}' not accessible`;

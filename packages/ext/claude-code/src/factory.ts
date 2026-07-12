@@ -215,13 +215,18 @@ function createPtyStream(
     kind: 'dict' as const,
     fields: {
       result: { type: { kind: 'string' as const } },
-      tokens: { type: { kind: 'dict' as const, fields: {
-        prompt: { type: { kind: 'number' as const } },
-        cache_write_5m: { type: { kind: 'number' as const } },
-        cache_write_1h: { type: { kind: 'number' as const } },
-        cache_read: { type: { kind: 'number' as const } },
-        output: { type: { kind: 'number' as const } },
-      } } },
+      tokens: {
+        type: {
+          kind: 'dict' as const,
+          fields: {
+            prompt: { type: { kind: 'number' as const } },
+            cache_write_5m: { type: { kind: 'number' as const } },
+            cache_write_1h: { type: { kind: 'number' as const } },
+            cache_read: { type: { kind: 'number' as const } },
+            output: { type: { kind: 'number' as const } },
+          },
+        },
+      },
       cost: { type: { kind: 'number' as const } },
       exit_code: { type: { kind: 'number' as const } },
       duration: { type: { kind: 'number' as const } },
@@ -338,7 +343,7 @@ function validateTimeout(timeout: number): void {
  */
 export function createClaudeCodeExtension(
   config: ClaudeCodeConfig = {},
-  factoryCtx: ExtensionFactoryCtx,
+  factoryCtx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Extract config with defaults
   const binaryPath = config.binaryPath ?? DEFAULT_BINARY_PATH;
@@ -353,7 +358,12 @@ export function createClaudeCodeExtension(
   try {
     which.sync(binaryPath);
   } catch {
-    throw new RuntimeError('RILL-R001', `claude-code: claude binary not found: ${binaryPath}`, undefined, { binaryPath });
+    throw new RuntimeError(
+      'RILL-R001',
+      `claude-code: claude binary not found: ${binaryPath}`,
+      undefined,
+      { binaryPath }
+    );
   }
 
   // Track active processes for cleanup
@@ -380,14 +390,23 @@ export function createClaudeCodeExtension(
   factoryCtx.signal.addEventListener('abort', () => dispose(), { once: true });
 
   // Return extension result with implementations
-  const fnDict: { prompt: RillFunction; skill: RillFunction; command: RillFunction } = {
+  const fnDict: {
+    prompt: RillFunction;
+    skill: RillFunction;
+    command: RillFunction;
+  } = {
     // IR-2: claude-code::prompt
     prompt: {
       params: [
         p.str('text'),
-        p.dict('options', undefined, {}, {
-          timeout: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        p.dict(
+          'options',
+          undefined,
+          {},
+          {
+            timeout: { type: { kind: 'number' }, defaultValue: 0 },
+          }
+        ),
       ],
       fn: (args, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
@@ -428,7 +447,10 @@ export function createClaudeCodeExtension(
           eventData: { prompt: truncateText(text) },
         });
       },
-      annotations: { description: 'Execute Claude Code prompt and return result text and token usage' },
+      annotations: {
+        description:
+          'Execute Claude Code prompt and return result text and token usage',
+      },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'string' },
@@ -436,13 +458,18 @@ export function createClaudeCodeExtension(
           kind: 'dict',
           fields: {
             result: { type: { kind: 'string' } },
-            tokens: { type: { kind: 'dict', fields: {
-              prompt: { type: { kind: 'number' } },
-              cache_write_5m: { type: { kind: 'number' } },
-              cache_write_1h: { type: { kind: 'number' } },
-              cache_read: { type: { kind: 'number' } },
-              output: { type: { kind: 'number' } },
-            } } },
+            tokens: {
+              type: {
+                kind: 'dict',
+                fields: {
+                  prompt: { type: { kind: 'number' } },
+                  cache_write_5m: { type: { kind: 'number' } },
+                  cache_write_1h: { type: { kind: 'number' } },
+                  cache_read: { type: { kind: 'number' } },
+                  output: { type: { kind: 'number' } },
+                },
+              },
+            },
             cost: { type: { kind: 'number' } },
             exit_code: { type: { kind: 'number' } },
             duration: { type: { kind: 'number' } },
@@ -455,9 +482,14 @@ export function createClaudeCodeExtension(
     skill: {
       params: [
         p.str('name'),
-        p.dict('args', undefined, {}, {
-          timeout: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        p.dict(
+          'args',
+          undefined,
+          {},
+          {
+            timeout: { type: { kind: 'number' }, defaultValue: 0 },
+          }
+        ),
       ],
       fn: (fnArgs, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
@@ -502,7 +534,10 @@ export function createClaudeCodeExtension(
           eventData: { name, args },
         });
       },
-      annotations: { description: 'Execute Claude Code skill with instruction and return structured result' },
+      annotations: {
+        description:
+          'Execute Claude Code skill with instruction and return structured result',
+      },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'string' },
@@ -510,13 +545,18 @@ export function createClaudeCodeExtension(
           kind: 'dict',
           fields: {
             result: { type: { kind: 'string' } },
-            tokens: { type: { kind: 'dict', fields: {
-              prompt: { type: { kind: 'number' } },
-              cache_write_5m: { type: { kind: 'number' } },
-              cache_write_1h: { type: { kind: 'number' } },
-              cache_read: { type: { kind: 'number' } },
-              output: { type: { kind: 'number' } },
-            } } },
+            tokens: {
+              type: {
+                kind: 'dict',
+                fields: {
+                  prompt: { type: { kind: 'number' } },
+                  cache_write_5m: { type: { kind: 'number' } },
+                  cache_write_1h: { type: { kind: 'number' } },
+                  cache_read: { type: { kind: 'number' } },
+                  output: { type: { kind: 'number' } },
+                },
+              },
+            },
             cost: { type: { kind: 'number' } },
             exit_code: { type: { kind: 'number' } },
             duration: { type: { kind: 'number' } },
@@ -529,9 +569,14 @@ export function createClaudeCodeExtension(
     command: {
       params: [
         p.str('name'),
-        p.dict('args', undefined, {}, {
-          timeout: { type: { kind: 'number' }, defaultValue: 0 },
-        }),
+        p.dict(
+          'args',
+          undefined,
+          {},
+          {
+            timeout: { type: { kind: 'number' }, defaultValue: 0 },
+          }
+        ),
       ],
       fn: (fnArgs, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
@@ -576,7 +621,10 @@ export function createClaudeCodeExtension(
           eventData: { name, args },
         });
       },
-      annotations: { description: 'Execute Claude Code command with task description and return execution summary' },
+      annotations: {
+        description:
+          'Execute Claude Code command with task description and return execution summary',
+      },
       returnType: structureToTypeValue({
         kind: 'stream',
         chunk: { kind: 'string' },
@@ -584,13 +632,18 @@ export function createClaudeCodeExtension(
           kind: 'dict',
           fields: {
             result: { type: { kind: 'string' } },
-            tokens: { type: { kind: 'dict', fields: {
-              prompt: { type: { kind: 'number' } },
-              cache_write_5m: { type: { kind: 'number' } },
-              cache_write_1h: { type: { kind: 'number' } },
-              cache_read: { type: { kind: 'number' } },
-              output: { type: { kind: 'number' } },
-            } } },
+            tokens: {
+              type: {
+                kind: 'dict',
+                fields: {
+                  prompt: { type: { kind: 'number' } },
+                  cache_write_5m: { type: { kind: 'number' } },
+                  cache_write_1h: { type: { kind: 'number' } },
+                  cache_read: { type: { kind: 'number' } },
+                  output: { type: { kind: 'number' } },
+                },
+              },
+            },
             cost: { type: { kind: 'number' } },
             exit_code: { type: { kind: 'number' } },
             duration: { type: { kind: 'number' } },
@@ -606,5 +659,8 @@ export function createClaudeCodeExtension(
     command: toCallable(fnDict.command),
   };
 
-  return { value: callableDict as unknown as RillValue, dispose } satisfies ExtensionFactoryResult;
+  return {
+    value: callableDict as unknown as RillValue,
+    dispose,
+  } satisfies ExtensionFactoryResult;
 }

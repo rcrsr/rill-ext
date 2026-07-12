@@ -72,7 +72,11 @@ function validConfig(): FoundryConfig {
 /**
  * Build a mock stream runner that returns a final chat completion with token usage.
  */
-function createMockStreamRunner(content: string, promptTokens: number, completionTokens: number) {
+function createMockStreamRunner(
+  content: string,
+  promptTokens: number,
+  completionTokens: number
+) {
   const finalCompletion = {
     id: 'chatcmpl-test',
     object: 'chat.completion' as const,
@@ -113,7 +117,9 @@ function createMockStreamRunner(content: string, promptTokens: number, completio
  * Resolve a RillStream by calling its internal resolve callback.
  */
 async function resolveStream(stream: unknown): Promise<unknown> {
-  return (stream as { __rill_stream_resolve: () => Promise<unknown> }).__rill_stream_resolve();
+  return (
+    stream as { __rill_stream_resolve: () => Promise<unknown> }
+  ).__rill_stream_resolve();
 }
 
 // ============================================================
@@ -131,7 +137,10 @@ describe('usage accumulator', () => {
     const { createFoundryExtension } = await import('../src/factory.js');
     const ext = await createFoundryExtension(validConfig());
 
-    const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
+    const value = ext.value as Record<
+      string,
+      { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
+    >;
     const usageFn = value['usage']!;
 
     const result = usageFn.fn({}, {}) as Record<string, number>;
@@ -144,7 +153,10 @@ describe('usage accumulator', () => {
     const { createFoundryExtension } = await import('../src/factory.js');
     const ext = await createFoundryExtension(validConfig());
 
-    const value = ext.value as Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }>;
+    const value = ext.value as Record<
+      string,
+      { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
+    >;
     const usageFn = value['usage']!;
 
     const result = usageFn.fn({}, {}) as Record<string, unknown>;
@@ -162,7 +174,9 @@ describe('usage accumulator', () => {
     const { createFoundryExtension } = await import('../src/factory.js');
     const ext = await createFoundryExtension(validConfig());
 
-    const ctx = createRuntimeContext({ callbacks: { onLog: vi.fn(), onLogEvent: vi.fn() } });
+    const ctx = createRuntimeContext({
+      callbacks: { onLog: vi.fn(), onLogEvent: vi.fn() },
+    });
     const value = ext.value as Record<
       string,
       { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
@@ -187,7 +201,9 @@ describe('usage accumulator', () => {
     const { createFoundryExtension } = await import('../src/factory.js');
     const ext = await createFoundryExtension(validConfig());
 
-    const ctx = createRuntimeContext({ callbacks: { onLog: vi.fn(), onLogEvent: vi.fn() } });
+    const ctx = createRuntimeContext({
+      callbacks: { onLog: vi.fn(), onLogEvent: vi.fn() },
+    });
     const value = ext.value as Record<
       string,
       { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }

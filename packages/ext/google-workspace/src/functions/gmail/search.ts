@@ -25,7 +25,9 @@ export interface GmailSearchDeps {
  * BC-1: Truncates options.maxResults to gmailConfig.maxResults ceiling (default 50).
  * AC-12: Returns rill primitive dict { messages: list[dict] }.
  */
-export function makeGmailSearch(deps: GmailSearchDeps): (
+export function makeGmailSearch(
+  deps: GmailSearchDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -67,7 +69,9 @@ export function makeGmailSearch(deps: GmailSearchDeps): (
       undefined
     );
     // Project response to { messages: [{ id, thread_id }, ...] } per AC-12
-    const data = response as { messages?: Array<{ id?: string; threadId?: string }> } | null;
+    const data = response as {
+      messages?: Array<{ id?: string; threadId?: string }>;
+    } | null;
     const rawMessages = data?.messages ?? [];
     const messages = rawMessages.map((m) => ({
       id: m.id ?? '',

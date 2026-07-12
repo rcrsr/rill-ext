@@ -3,7 +3,7 @@
  * Defines configuration and contract types for the Tavily API integration.
  */
 
-import type { ApplicationCallable, ExtensionFactoryResult } from '@rcrsr/rill';
+import type { ApplicationCallable } from '@rcrsr/rill';
 
 // ============================================================
 // CONFIGURATION
@@ -51,8 +51,3 @@ export type TavilyExtensionContract = {
   readonly search: ApplicationCallable;
   readonly extract: ApplicationCallable;
 };
-
-/**
- * Re-export for satisfies check usage.
- */
-export type { ExtensionFactoryResult };

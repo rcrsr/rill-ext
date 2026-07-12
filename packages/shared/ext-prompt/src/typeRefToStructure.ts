@@ -1,4 +1,10 @@
-import { RuntimeError, type FieldArg, type RillFieldDef, type TypeRef, type TypeStructure } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  type FieldArg,
+  type RillFieldDef,
+  type TypeRef,
+  type TypeStructure,
+} from '@rcrsr/rill';
 
 /**
  * Type names that are valid rill identifiers but have no useful text rendering
@@ -6,7 +12,13 @@ import { RuntimeError, type FieldArg, type RillFieldDef, type TypeRef, type Type
  * `vector(model, Nd)`) via formatValue and are rejected at grammar time so the
  * failure is declarative rather than latent garbage in the rendered prompt.
  */
-const NON_RENDERABLE_TYPE_NAMES = new Set(['closure', 'iterator', 'stream', 'vector', 'type']);
+const NON_RENDERABLE_TYPE_NAMES = new Set([
+  'closure',
+  'iterator',
+  'stream',
+  'vector',
+  'type',
+]);
 
 /**
  * Converts a static rill TypeRef AST node to a TypeStructure.
@@ -25,13 +37,13 @@ export function typeRefToStructure(ref: TypeRef): TypeStructure {
   if (ref.kind === 'dynamic') {
     throw new RuntimeError(
       'RILL-R001',
-      `dynamic type refs ($${ref.varName}) are not allowed in prompt-md param grammar`,
+      `dynamic type refs ($${ref.varName}) are not allowed in prompt-md param grammar`
     );
   }
   if (ref.kind === 'union') {
     throw new RuntimeError(
       'RILL-R001',
-      `union types (a | b) are not supported in prompt-md param grammar (v0)`,
+      `union types (a | b) are not supported in prompt-md param grammar (v0)`
     );
   }
   // static
@@ -40,7 +52,7 @@ export function typeRefToStructure(ref: TypeRef): TypeStructure {
   if (NON_RENDERABLE_TYPE_NAMES.has(typeName)) {
     throw new RuntimeError(
       'RILL-R001',
-      `"${typeName}" params are not supported in prompt-md — prompts render text, not ${typeName}-shaped values`,
+      `"${typeName}" params are not supported in prompt-md — prompts render text, not ${typeName}-shaped values`
     );
   }
 
@@ -53,7 +65,10 @@ export function typeRefToStructure(ref: TypeRef): TypeStructure {
   if (typeName === 'list') {
     // list(T): single positional arg
     if (args.length !== 1 || args[0]!.name !== undefined) {
-      throw new RuntimeError('RILL-R001', `list(...) takes exactly one positional type argument`);
+      throw new RuntimeError(
+        'RILL-R001',
+        `list(...) takes exactly one positional type argument`
+      );
     }
     return { kind: 'list', element: typeRefToStructure(args[0]!.value) };
   }
@@ -65,7 +80,10 @@ export function typeRefToStructure(ref: TypeRef): TypeStructure {
     const allPositional = args.every((a: FieldArg) => a.name === undefined);
     if (allPositional) {
       if (args.length !== 1) {
-        throw new RuntimeError('RILL-R001', `dict(T) takes exactly one positional type argument`);
+        throw new RuntimeError(
+          'RILL-R001',
+          `dict(T) takes exactly one positional type argument`
+        );
       }
       return { kind: 'dict', valueType: typeRefToStructure(args[0]!.value) };
     }
@@ -78,13 +96,13 @@ export function typeRefToStructure(ref: TypeRef): TypeStructure {
     }
     throw new RuntimeError(
       'RILL-R001',
-      `dict(...) arguments must be all named (a: T, b: T) or one positional (T)`,
+      `dict(...) arguments must be all named (a: T, b: T) or one positional (T)`
     );
   }
 
   // Any other parameterized form — reject in v0. Extend as needs arise.
   throw new RuntimeError(
     'RILL-R001',
-    `parameterized type "${typeName}(...)" is not supported in prompt-md param grammar (v0)`,
+    `parameterized type "${typeName}(...)" is not supported in prompt-md param grammar (v0)`
   );
 }

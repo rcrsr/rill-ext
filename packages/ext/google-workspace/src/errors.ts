@@ -35,7 +35,7 @@ export function mapGoogleError(
   status: number,
   service: 'gmail' | 'drive' | 'calendar',
   operation: string,
-  id?: string | undefined,
+  id?: string | undefined
 ): RillValue {
   const svc = capitalizeService(service);
 
@@ -107,7 +107,7 @@ export function mapGoogleError(
 export function mapFetchError(
   ctx: RuntimeContext,
   error: unknown,
-  service: string,
+  service: string
 ): RillValue {
   if (
     error instanceof RuntimeHaltSignal &&
@@ -155,7 +155,7 @@ export function mapFetchError(
 export function failInput(
   ctx: RuntimeContext,
   kind: string,
-  message: string,
+  message: string
 ): never {
   throw ctx.invalidate(new Error(message), {
     code: 'INVALID_INPUT',
@@ -171,7 +171,7 @@ export function failInput(
 export function failForbidden(
   ctx: RuntimeContext,
   kind: string,
-  message: string,
+  message: string
 ): never {
   throw ctx.invalidate(new Error(message), {
     code: 'FORBIDDEN',
@@ -188,7 +188,7 @@ export function failAuth(
   ctx: RuntimeContext,
   kind: string,
   message: string,
-  raw?: Record<string, unknown>,
+  raw?: Record<string, unknown>
 ): never {
   throw ctx.invalidate(new Error(message), {
     code: 'AUTH',

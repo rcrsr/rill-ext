@@ -28,7 +28,12 @@ describe('mapProviderError', () => {
         status: 401,
         message: 'Invalid API key',
       });
-      const result = mapProviderError(ctx, 'anthropic', new Error('e'), detector);
+      const result = mapProviderError(
+        ctx,
+        'anthropic',
+        new Error('e'),
+        detector
+      );
       expect(isInvalid(result)).toBe(true);
       const status = getStatus(result);
       expect(status.code.name).toBe('AUTH');

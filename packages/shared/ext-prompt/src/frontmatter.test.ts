@@ -18,7 +18,8 @@ import { splitFrontmatter } from './frontmatter.js';
 describe('splitFrontmatter', () => {
   describe('happy path (IR-2)', () => {
     it('splits frontmatter and body from a well-formed source', () => {
-      const source = '---\ndescription: test prompt\n---\nbody line 1\nbody line 2';
+      const source =
+        '---\ndescription: test prompt\n---\nbody line 1\nbody line 2';
       const result = splitFrontmatter(source);
 
       expect(result.frontmatter).toBe('description: test prompt');

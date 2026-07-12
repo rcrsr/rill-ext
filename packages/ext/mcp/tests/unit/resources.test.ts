@@ -204,7 +204,10 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expectRejectsInvalid(func.fn({ uri: 123 }, makeRuntimeCtx()), 'mcp: expected string uri, got number');
+    await expectRejectsInvalid(
+      func.fn({ uri: 123 }, makeRuntimeCtx()),
+      'mcp: expected string uri, got number'
+    );
   });
 
   it('handles timeout during read operation', async () => {
@@ -217,7 +220,10 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expectRejectsInvalid(func.fn({ uri: 'slow://resource' }, makeRuntimeCtx()), 'mcp tool "read_resource": timeout after 100ms');
+    await expectRejectsInvalid(
+      func.fn({ uri: 'slow://resource' }, makeRuntimeCtx()),
+      'mcp tool "read_resource": timeout after 100ms'
+    );
   });
 
   it('handles connection lost error', async () => {
@@ -229,7 +235,10 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expectRejectsInvalid(func.fn({ uri: 'config://app' }, makeRuntimeCtx()), 'mcp: connection lost');
+    await expectRejectsInvalid(
+      func.fn({ uri: 'config://app' }, makeRuntimeCtx()),
+      'mcp: connection lost'
+    );
   });
 
   it('handles authentication failed error', async () => {
@@ -241,7 +250,10 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expectRejectsInvalid(func.fn({ uri: 'config://app' }, makeRuntimeCtx()), 'mcp: authentication failed');
+    await expectRejectsInvalid(
+      func.fn({ uri: 'config://app' }, makeRuntimeCtx()),
+      'mcp: authentication failed'
+    );
   });
 
   it('handles protocol error', async () => {
@@ -253,7 +265,10 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expectRejectsInvalid(func.fn({ uri: 'config://app' }, makeRuntimeCtx()), 'mcp: protocol error');
+    await expectRejectsInvalid(
+      func.fn({ uri: 'config://app' }, makeRuntimeCtx()),
+      'mcp: protocol error'
+    );
   });
 
   it('handles generic read error', async () => {
@@ -265,7 +280,10 @@ describe('createReadResourceFunction', () => {
       connectEmitted: false,
     });
 
-    await expectRejectsInvalid(func.fn({ uri: 'config://app' }, makeRuntimeCtx()), 'mcp tool "read_resource": resource not found');
+    await expectRejectsInvalid(
+      func.fn({ uri: 'config://app' }, makeRuntimeCtx()),
+      'mcp tool "read_resource": resource not found'
+    );
   });
 });
 
@@ -446,7 +464,10 @@ describe('generateResourceTemplateFunctions', () => {
 
     const func = functions.resource_table!;
 
-    await expectRejectsInvalid(func.fn({ tableName: 123 }, makeRuntimeCtx()), 'mcp: expected string for parameter tableName, got number');
+    await expectRejectsInvalid(
+      func.fn({ tableName: 123 }, makeRuntimeCtx()),
+      'mcp: expected string for parameter tableName, got number'
+    );
   });
 
   it('handles timeout during template expansion', async () => {
@@ -465,7 +486,10 @@ describe('generateResourceTemplateFunctions', () => {
     );
     const func = functions.resource_slow_resource!;
 
-    await expectRejectsInvalid(func.fn({ id: 'test' }, makeRuntimeCtx()), 'mcp tool "slow_resource": timeout after 100ms');
+    await expectRejectsInvalid(
+      func.fn({ id: 'test' }, makeRuntimeCtx()),
+      'mcp tool "slow_resource": timeout after 100ms'
+    );
   });
 
   it('handles connection lost during template read', async () => {
@@ -485,7 +509,10 @@ describe('generateResourceTemplateFunctions', () => {
 
     const func = functions.resource_table!;
 
-    await expectRejectsInvalid(func.fn({ table: 'users' }, makeRuntimeCtx()), 'mcp: connection lost');
+    await expectRejectsInvalid(
+      func.fn({ table: 'users' }, makeRuntimeCtx()),
+      'mcp: connection lost'
+    );
   });
 
   it('returns empty object for templates array', () => {
@@ -513,7 +540,10 @@ describe('generateResourceTemplateFunctions', () => {
     const func = functions.resource_item!;
 
     // This should throw because we validate string types
-    await expectRejectsInvalid(func.fn({ id: 42 }, makeRuntimeCtx()), 'mcp: expected string for parameter id, got number');
+    await expectRejectsInvalid(
+      func.fn({ id: 42 }, makeRuntimeCtx()),
+      'mcp: expected string for parameter id, got number'
+    );
   });
 
   it('handles templates without description field', () => {
@@ -551,7 +581,11 @@ describe('generateStaticResourceFunctions', () => {
       { uri: 'config://db', name: 'db_config', description: 'DB config' },
     ];
 
-    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const functions = generateStaticResourceFunctions(
+      resources,
+      mockClient,
+      30000
+    );
 
     expect(Object.keys(functions)).toHaveLength(2);
     expect(functions).toHaveProperty('resource_app_config');
@@ -571,12 +605,18 @@ describe('generateStaticResourceFunctions', () => {
 
     vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
 
-    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const functions = generateStaticResourceFunctions(
+      resources,
+      mockClient,
+      30000
+    );
     const func = functions['resource_app_config']!;
 
     await func.fn({}, makeRuntimeCtx());
 
-    expect(mockClient.readResource).toHaveBeenCalledWith({ uri: 'config://app' });
+    expect(mockClient.readResource).toHaveBeenCalledWith({
+      uri: 'config://app',
+    });
   });
 
   it('uses resource description as annotation', () => {
@@ -584,18 +624,24 @@ describe('generateStaticResourceFunctions', () => {
       { uri: 'data://source', name: 'source', description: 'My data source' },
     ];
 
-    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const functions = generateStaticResourceFunctions(
+      resources,
+      mockClient,
+      30000
+    );
     const func = functions['resource_source']!;
 
     expect(func.annotations?.description).toBe('My data source');
   });
 
   it('falls back to default description when none provided', () => {
-    const resources: McpResource[] = [
-      { uri: 'data://raw', name: 'raw_data' },
-    ];
+    const resources: McpResource[] = [{ uri: 'data://raw', name: 'raw_data' }];
 
-    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const functions = generateStaticResourceFunctions(
+      resources,
+      mockClient,
+      30000
+    );
     const func = functions['resource_raw_data']!;
 
     expect(func.annotations?.description).toMatch(/^Read resource:/);
@@ -611,7 +657,11 @@ describe('generateStaticResourceFunctions', () => {
       },
     ];
 
-    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const functions = generateStaticResourceFunctions(
+      resources,
+      mockClient,
+      30000
+    );
     const func = functions['resource_settings']!;
 
     expect(func.annotations?.description).toContain('application/json');
@@ -623,11 +673,13 @@ describe('generateStaticResourceFunctions', () => {
   });
 
   it('applies name sanitization', () => {
-    const resources: McpResource[] = [
-      { uri: 'data://x', name: 'my-resource' },
-    ];
+    const resources: McpResource[] = [{ uri: 'data://x', name: 'my-resource' }];
 
-    const functions = generateStaticResourceFunctions(resources, mockClient, 30000);
+    const functions = generateStaticResourceFunctions(
+      resources,
+      mockClient,
+      30000
+    );
 
     expect(functions).toHaveProperty('resource_my_resource');
   });

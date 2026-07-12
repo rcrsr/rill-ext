@@ -32,108 +32,190 @@ describe('kv-file functions', () => {
   describe('open mode (no schema)', () => {
     it('get() returns empty string for missing key', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      const result = await ext.value.get.fn({ mount: 'default', key: 'missing' }, makeRuntimeCtx());
+      const result = await ext.value.get.fn(
+        { mount: 'default', key: 'missing' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe('');
     });
 
     it('set() stores value and get() retrieves it', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'k1', value: 'v1' }, makeRuntimeCtx());
-      const result = await ext.value.get.fn({ mount: 'default', key: 'k1' }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        { mount: 'default', key: 'k1', value: 'v1' },
+        makeRuntimeCtx()
+      );
+      const result = await ext.value.get.fn(
+        { mount: 'default', key: 'k1' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe('v1');
     });
 
     it('delete() removes key', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'k1', value: 'v1' }, makeRuntimeCtx());
-      const deleted = await ext.value.delete.fn({ mount: 'default', key: 'k1' }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        { mount: 'default', key: 'k1', value: 'v1' },
+        makeRuntimeCtx()
+      );
+      const deleted = await ext.value.delete.fn(
+        { mount: 'default', key: 'k1' },
+        makeRuntimeCtx()
+      );
       expect(deleted).toBe(true);
-      const result = await ext.value.get.fn({ mount: 'default', key: 'k1' }, makeRuntimeCtx());
+      const result = await ext.value.get.fn(
+        { mount: 'default', key: 'k1' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe('');
     });
 
     it('delete() returns false for missing key', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      const result = await ext.value.delete.fn({ mount: 'default', key: 'missing' }, makeRuntimeCtx());
+      const result = await ext.value.delete.fn(
+        { mount: 'default', key: 'missing' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(false);
     });
 
     it('keys() returns all keys', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'a', value: 1 }, makeRuntimeCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'b', value: 2 }, makeRuntimeCtx());
-      const result = await ext.value.keys.fn({ mount: 'default' }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        { mount: 'default', key: 'a', value: 1 },
+        makeRuntimeCtx()
+      );
+      await ext.value.set.fn(
+        { mount: 'default', key: 'b', value: 2 },
+        makeRuntimeCtx()
+      );
+      const result = await ext.value.keys.fn(
+        { mount: 'default' },
+        makeRuntimeCtx()
+      );
       expect(result).toEqual(expect.arrayContaining(['a', 'b']));
       expect(result).toHaveLength(2);
     });
 
     it('has() checks key existence', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'k1', value: 'v1' }, makeRuntimeCtx());
-      expect(await ext.value.has.fn({ mount: 'default', key: 'k1' }, makeRuntimeCtx())).toBe(true);
-      expect(await ext.value.has.fn({ mount: 'default', key: 'missing' }, makeRuntimeCtx())).toBe(false);
+      await ext.value.set.fn(
+        { mount: 'default', key: 'k1', value: 'v1' },
+        makeRuntimeCtx()
+      );
+      expect(
+        await ext.value.has.fn(
+          { mount: 'default', key: 'k1' },
+          makeRuntimeCtx()
+        )
+      ).toBe(true);
+      expect(
+        await ext.value.has.fn(
+          { mount: 'default', key: 'missing' },
+          makeRuntimeCtx()
+        )
+      ).toBe(false);
     });
 
     it('clear() removes all keys', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'a', value: 1 }, makeRuntimeCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'b', value: 2 }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        { mount: 'default', key: 'a', value: 1 },
+        makeRuntimeCtx()
+      );
+      await ext.value.set.fn(
+        { mount: 'default', key: 'b', value: 2 },
+        makeRuntimeCtx()
+      );
       await ext.value.clear.fn({ mount: 'default' }, makeRuntimeCtx());
-      const keys = await ext.value.keys.fn({ mount: 'default' }, makeRuntimeCtx());
+      const keys = await ext.value.keys.fn(
+        { mount: 'default' },
+        makeRuntimeCtx()
+      );
       expect(keys).toHaveLength(0);
     });
 
     it('getAll() returns all entries', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'a', value: 1 }, makeRuntimeCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'b', value: 'text' }, makeRuntimeCtx());
-      const result = await ext.value.getAll.fn({ mount: 'default' }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        { mount: 'default', key: 'a', value: 1 },
+        makeRuntimeCtx()
+      );
+      await ext.value.set.fn(
+        { mount: 'default', key: 'b', value: 'text' },
+        makeRuntimeCtx()
+      );
+      const result = await ext.value.getAll.fn(
+        { mount: 'default' },
+        makeRuntimeCtx()
+      );
       expect(result).toEqual({ a: 1, b: 'text' });
     });
 
     it('get_or() returns fallback for missing key', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      const result = await ext.value.get_or.fn({
-        mount: 'default',
-        key: 'missing',
-        fallback: 'default_val',
-      }, makeRuntimeCtx());
+      const result = await ext.value.get_or.fn(
+        {
+          mount: 'default',
+          key: 'missing',
+          fallback: 'default_val',
+        },
+        makeRuntimeCtx()
+      );
       expect(result).toBe('default_val');
     });
 
     it('get_or() returns value when key exists', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'k1', value: 'actual' }, makeRuntimeCtx());
-      const result = await ext.value.get_or.fn({
-        mount: 'default',
-        key: 'k1',
-        fallback: 'default_val',
-      }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        { mount: 'default', key: 'k1', value: 'actual' },
+        makeRuntimeCtx()
+      );
+      const result = await ext.value.get_or.fn(
+        {
+          mount: 'default',
+          key: 'k1',
+          fallback: 'default_val',
+        },
+        makeRuntimeCtx()
+      );
       expect(result).toBe('actual');
     });
 
     it('merge() shallow-merges into dict', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({
-        mount: 'default',
-        key: 'user',
-        value: { name: 'Alice', age: 30 },
-      }, makeRuntimeCtx());
-      await ext.value.merge.fn({
-        mount: 'default',
-        key: 'user',
-        partial: { age: 31, role: 'admin' },
-      }, makeRuntimeCtx());
-      const result = await ext.value.get.fn({ mount: 'default', key: 'user' }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        {
+          mount: 'default',
+          key: 'user',
+          value: { name: 'Alice', age: 30 },
+        },
+        makeRuntimeCtx()
+      );
+      await ext.value.merge.fn(
+        {
+          mount: 'default',
+          key: 'user',
+          partial: { age: 31, role: 'admin' },
+        },
+        makeRuntimeCtx()
+      );
+      const result = await ext.value.get.fn(
+        { mount: 'default', key: 'user' },
+        makeRuntimeCtx()
+      );
       expect(result).toEqual({ name: 'Alice', age: 31, role: 'admin' });
     });
 
     it('returns invalid value when merge target is not a dict', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'k1', value: 'string' }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        { mount: 'default', key: 'k1', value: 'string' },
+        makeRuntimeCtx()
+      );
       const result = await ext.value.merge.fn(
         { mount: 'default', key: 'k1', partial: { a: 1 } },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
@@ -143,27 +225,39 @@ describe('kv-file functions', () => {
 
   describe('declared mode (with schema)', () => {
     it('initializes with schema defaults', async () => {
-      const ext = createFileKvExtension({
-        store: storePath,
-        schema: {
-          count: { type: 'number', default: 0 },
-          name: { type: 'string', default: '' },
+      const ext = createFileKvExtension(
+        {
+          store: storePath,
+          schema: {
+            count: { type: 'number', default: 0 },
+            name: { type: 'string', default: '' },
+          },
         },
-      }, makeFactoryCtx());
-      const count = await ext.value.get.fn({ mount: 'default', key: 'count' }, makeRuntimeCtx());
+        makeFactoryCtx()
+      );
+      const count = await ext.value.get.fn(
+        { mount: 'default', key: 'count' },
+        makeRuntimeCtx()
+      );
       expect(count).toBe(0);
-      const name = await ext.value.get.fn({ mount: 'default', key: 'name' }, makeRuntimeCtx());
+      const name = await ext.value.get.fn(
+        { mount: 'default', key: 'name' },
+        makeRuntimeCtx()
+      );
       expect(name).toBe('');
     });
 
     it('returns invalid value for undeclared key on get()', async () => {
-      const ext = createFileKvExtension({
-        store: storePath,
-        schema: { count: { type: 'number', default: 0 } },
-      }, makeFactoryCtx());
+      const ext = createFileKvExtension(
+        {
+          store: storePath,
+          schema: { count: { type: 'number', default: 0 } },
+        },
+        makeFactoryCtx()
+      );
       const result = await ext.value.get.fn(
         { mount: 'default', key: 'unknown' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
@@ -171,13 +265,16 @@ describe('kv-file functions', () => {
     });
 
     it('returns invalid value for undeclared key on set()', async () => {
-      const ext = createFileKvExtension({
-        store: storePath,
-        schema: { count: { type: 'number', default: 0 } },
-      }, makeFactoryCtx());
+      const ext = createFileKvExtension(
+        {
+          store: storePath,
+          schema: { count: { type: 'number', default: 0 } },
+        },
+        makeFactoryCtx()
+      );
       const result = await ext.value.set.fn(
         { mount: 'default', key: 'unknown', value: 1 },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
@@ -185,13 +282,16 @@ describe('kv-file functions', () => {
     });
 
     it('returns invalid value for type mismatch', async () => {
-      const ext = createFileKvExtension({
-        store: storePath,
-        schema: { count: { type: 'number', default: 0 } },
-      }, makeFactoryCtx());
+      const ext = createFileKvExtension(
+        {
+          store: storePath,
+          schema: { count: { type: 'number', default: 0 } },
+        },
+        makeFactoryCtx()
+      );
       const result = await ext.value.set.fn(
         { mount: 'default', key: 'count', value: 'not a number' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
@@ -199,13 +299,22 @@ describe('kv-file functions', () => {
     });
 
     it('clear() restores schema defaults', async () => {
-      const ext = createFileKvExtension({
-        store: storePath,
-        schema: { count: { type: 'number', default: 0 } },
-      }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'count', value: 42 }, makeRuntimeCtx());
+      const ext = createFileKvExtension(
+        {
+          store: storePath,
+          schema: { count: { type: 'number', default: 0 } },
+        },
+        makeFactoryCtx()
+      );
+      await ext.value.set.fn(
+        { mount: 'default', key: 'count', value: 42 },
+        makeRuntimeCtx()
+      );
       await ext.value.clear.fn({ mount: 'default' }, makeRuntimeCtx());
-      const result = await ext.value.get.fn({ mount: 'default', key: 'count' }, makeRuntimeCtx());
+      const result = await ext.value.get.fn(
+        { mount: 'default', key: 'count' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe(0);
     });
   });
@@ -215,7 +324,7 @@ describe('kv-file functions', () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
       const result = await ext.value.get.fn(
         { mount: 'nonexistent', key: 'k1' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
@@ -223,51 +332,75 @@ describe('kv-file functions', () => {
     });
 
     it('mounts() returns mount metadata', async () => {
-      const ext = createFileKvExtension({
-        mounts: {
-          user: { mode: 'read-write', store: storePath },
+      const ext = createFileKvExtension(
+        {
+          mounts: {
+            user: { mode: 'read-write', store: storePath },
+          },
         },
-      }, makeFactoryCtx());
+        makeFactoryCtx()
+      );
       const result = await ext.value.mounts.fn({}, makeRuntimeCtx());
       expect(result).toEqual([
-        expect.objectContaining({ name: 'user', mode: 'read-write', schema: 'open' }),
+        expect.objectContaining({
+          name: 'user',
+          mode: 'read-write',
+          schema: 'open',
+        }),
       ]);
     });
 
     it('schema() returns empty for open mode', async () => {
-      const ext = createFileKvExtension({
-        mounts: { data: { mode: 'read-write', store: storePath } },
-      }, makeFactoryCtx());
-      const result = await ext.value.schema.fn({ mount: 'data' }, makeRuntimeCtx());
+      const ext = createFileKvExtension(
+        {
+          mounts: { data: { mode: 'read-write', store: storePath } },
+        },
+        makeFactoryCtx()
+      );
+      const result = await ext.value.schema.fn(
+        { mount: 'data' },
+        makeRuntimeCtx()
+      );
       expect(result).toEqual([]);
     });
 
     it('schema() returns entries for declared mode', async () => {
-      const ext = createFileKvExtension({
-        mounts: {
-          data: {
-            mode: 'read-write',
-            store: storePath,
-            schema: {
-              count: { type: 'number', default: 0, description: 'Counter' },
+      const ext = createFileKvExtension(
+        {
+          mounts: {
+            data: {
+              mode: 'read-write',
+              store: storePath,
+              schema: {
+                count: { type: 'number', default: 0, description: 'Counter' },
+              },
             },
           },
         },
-      }, makeFactoryCtx());
-      const result = await ext.value.schema.fn({ mount: 'data' }, makeRuntimeCtx());
-      expect(result).toEqual([{ key: 'count', type: 'number', description: 'Counter' }]);
+        makeFactoryCtx()
+      );
+      const result = await ext.value.schema.fn(
+        { mount: 'data' },
+        makeRuntimeCtx()
+      );
+      expect(result).toEqual([
+        { key: 'count', type: 'number', description: 'Counter' },
+      ]);
     });
   });
 
   describe('read-only mode', () => {
     it('returns invalid value on set() in read-only mount', async () => {
       await fs.writeFile(storePath, JSON.stringify({ k: 'v' }));
-      const ext = createFileKvExtension({
-        mounts: { ro: { mode: 'read', store: storePath } },
-      }, makeFactoryCtx());
+      const ext = createFileKvExtension(
+        {
+          mounts: { ro: { mode: 'read', store: storePath } },
+        },
+        makeFactoryCtx()
+      );
       const result = await ext.value.set.fn(
         { mount: 'ro', key: 'k', value: 'new' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
@@ -278,7 +411,10 @@ describe('kv-file functions', () => {
   describe('persistence', () => {
     it('flushes to disk on dispose', async () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'k1', value: 'v1' }, makeRuntimeCtx());
+      await ext.value.set.fn(
+        { mount: 'default', key: 'k1', value: 'v1' },
+        makeRuntimeCtx()
+      );
       await ext.dispose!();
 
       const content = JSON.parse(await fs.readFile(storePath, 'utf-8'));
@@ -288,7 +424,10 @@ describe('kv-file functions', () => {
     it('loads existing store on creation', async () => {
       await fs.writeFile(storePath, JSON.stringify({ existing: 'data' }));
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
-      const result = await ext.value.get.fn({ mount: 'default', key: 'existing' }, makeRuntimeCtx());
+      const result = await ext.value.get.fn(
+        { mount: 'default', key: 'existing' },
+        makeRuntimeCtx()
+      );
       expect(result).toBe('data');
     });
 
@@ -297,7 +436,7 @@ describe('kv-file functions', () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
       const result = await ext.value.get.fn(
         { mount: 'default', key: 'k1' },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('UNAVAILABLE');
@@ -307,13 +446,16 @@ describe('kv-file functions', () => {
 
   describe('size limits', () => {
     it('returns invalid value when value exceeds maxValueSize', async () => {
-      const ext = createFileKvExtension({
-        store: storePath,
-        maxValueSize: 10,
-      }, makeFactoryCtx());
+      const ext = createFileKvExtension(
+        {
+          store: storePath,
+          maxValueSize: 10,
+        },
+        makeFactoryCtx()
+      );
       const result = await ext.value.set.fn(
         { mount: 'default', key: 'k1', value: 'a'.repeat(100) },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
@@ -321,15 +463,24 @@ describe('kv-file functions', () => {
     });
 
     it('returns invalid value when entry count exceeds maxEntries', async () => {
-      const ext = createFileKvExtension({
-        store: storePath,
-        maxEntries: 2,
-      }, makeFactoryCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'a', value: 1 }, makeRuntimeCtx());
-      await ext.value.set.fn({ mount: 'default', key: 'b', value: 2 }, makeRuntimeCtx());
+      const ext = createFileKvExtension(
+        {
+          store: storePath,
+          maxEntries: 2,
+        },
+        makeFactoryCtx()
+      );
+      await ext.value.set.fn(
+        { mount: 'default', key: 'a', value: 1 },
+        makeRuntimeCtx()
+      );
+      await ext.value.set.fn(
+        { mount: 'default', key: 'b', value: 2 },
+        makeRuntimeCtx()
+      );
       const result = await ext.value.set.fn(
         { mount: 'default', key: 'c', value: 3 },
-        makeRuntimeCtx(),
+        makeRuntimeCtx()
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');

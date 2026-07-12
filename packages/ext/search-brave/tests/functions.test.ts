@@ -14,7 +14,7 @@ import {
   type ApplicationCallable,
   type ExtensionFactoryCtx,
   type RillValue,
-} from "@rcrsr/rill";
+} from '@rcrsr/rill';
 import { createBraveExtension } from '../src/factory.js';
 
 function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
@@ -38,12 +38,18 @@ async function expectInvalidWithMessage(
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /** Build a fetch mock that returns a JSON response with given status. */
-function mockFetchJson(status: number, body: unknown): ReturnType<typeof vi.fn> {
+function mockFetchJson(
+  status: number,
+  body: unknown
+): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -61,7 +67,9 @@ function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
-    json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
+    json: vi
+      .fn()
+      .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
   });
 }
 
@@ -76,16 +84,32 @@ const SEARCH_RESPONSE = {
   web: {
     type: 'search',
     results: [
-      { title: 'TypeScript Guide', url: 'https://example.com/1', description: 'Learn TypeScript' },
-      { title: 'TypeScript Docs', url: 'https://example.com/2', description: 'Official docs' },
+      {
+        title: 'TypeScript Guide',
+        url: 'https://example.com/1',
+        description: 'Learn TypeScript',
+      },
+      {
+        title: 'TypeScript Docs',
+        url: 'https://example.com/2',
+        description: 'Official docs',
+      },
     ],
   },
 };
 
 const NEWS_RESPONSE = {
   results: [
-    { title: 'TypeScript 5.0 Released', url: 'https://news.example.com/1', description: 'New version' },
-    { title: 'TypeScript Updates', url: 'https://news.example.com/2', description: 'Latest changes' },
+    {
+      title: 'TypeScript 5.0 Released',
+      url: 'https://news.example.com/1',
+      description: 'New version',
+    },
+    {
+      title: 'TypeScript Updates',
+      url: 'https://news.example.com/2',
+      description: 'Latest changes',
+    },
   ],
 };
 
@@ -98,7 +122,10 @@ const SUMMARIZE_STEP1_RESPONSE = {
 const SUMMARIZE_STEP2_RESPONSE = {
   summary: 'TypeScript is a typed superset of JavaScript.',
   title: 'TypeScript Overview',
-  followups: ['What are TypeScript generics?', 'How does TypeScript differ from JavaScript?'],
+  followups: [
+    'What are TypeScript generics?',
+    'How does TypeScript differ from JavaScript?',
+  ],
   context: [{ url: 'https://typescriptlang.org', title: 'TypeScript Docs' }],
 };
 
@@ -176,7 +203,9 @@ describe('Brave extension host functions', () => {
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect((init.headers as Record<string, string>)['X-Subscription-Token']).toBe('brave-test-key');
+      expect(
+        (init.headers as Record<string, string>)['X-Subscription-Token']
+      ).toBe('brave-test-key');
     });
 
     it('sends Cache-Control: no-cache header', async () => {
@@ -188,26 +217,39 @@ describe('Brave extension host functions', () => {
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect((init.headers as Record<string, string>)['Cache-Control']).toBe('no-cache');
+      expect((init.headers as Record<string, string>)['Cache-Control']).toBe(
+        'no-cache'
+      );
     });
 
     it('respects custom baseUrl', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createBraveExtension({ apiKey: 'test-key', baseUrl: 'https://custom.search.brave.com' }, makeFactoryCtx());
+      const ext = createBraveExtension(
+        { apiKey: 'test-key', baseUrl: 'https://custom.search.brave.com' },
+        makeFactoryCtx()
+      );
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
 
       const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(url).toContain('https://custom.search.brave.com/res/v1/web/search');
+      expect(url).toContain(
+        'https://custom.search.brave.com/res/v1/web/search'
+      );
     });
 
     it('throws #INVALID_INPUT for empty query [EC-17, AC-16]', async () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'search').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'search').fn({ query: '' }, ctx),
@@ -229,7 +271,12 @@ describe('Brave extension host functions', () => {
     it('maps HTTP 403 with code to access denied [EC-11, AC-28]', async () => {
       globalThis.fetch = mockFetchJson(403, {
         type: 'ErrorResponse',
-        error: { id: 'err-1', status: 403, detail: 'Plan restricted', code: 'PLAN_RESTRICTED' },
+        error: {
+          id: 'err-1',
+          status: 403,
+          detail: 'Plan restricted',
+          code: 'PLAN_RESTRICTED',
+        },
       });
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
@@ -337,7 +384,13 @@ describe('Brave extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'search').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -397,7 +450,13 @@ describe('Brave extension host functions', () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'news').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'news').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'news').fn({ query: '' }, ctx),
@@ -419,7 +478,12 @@ describe('Brave extension host functions', () => {
     it('maps HTTP 403 with code to access denied [EC-11, AC-28]', async () => {
       globalThis.fetch = mockFetchJson(403, {
         type: 'ErrorResponse',
-        error: { id: 'err-2', status: 403, detail: 'Plan restricted', code: 'SUBSCRIPTION_EXPIRED' },
+        error: {
+          id: 'err-2',
+          status: 403,
+          detail: 'Plan restricted',
+          code: 'SUBSCRIPTION_EXPIRED',
+        },
       });
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
@@ -513,7 +577,13 @@ describe('Brave extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'news').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'news').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -543,7 +613,8 @@ describe('Brave extension host functions', () => {
   describe('summarize()', () => {
     it('returns summary dict with summary, title, followups, context [AC-8]', async () => {
       // First call returns summarizer key, second call returns summary
-      globalThis.fetch = vi.fn()
+      globalThis.fetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -562,14 +633,17 @@ describe('Brave extension host functions', () => {
         ctx
       )) as Record<string, unknown>;
 
-      expect(result['summary']).toBe('TypeScript is a typed superset of JavaScript.');
+      expect(result['summary']).toBe(
+        'TypeScript is a typed superset of JavaScript.'
+      );
       expect(result['title']).toBe('TypeScript Overview');
       expect(Array.isArray(result['followups'])).toBe(true);
       expect(Array.isArray(result['context'])).toBe(true);
     });
 
     it('step 1 calls /res/v1/web/search with summary=1 param', async () => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -584,7 +658,10 @@ describe('Brave extension host functions', () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'summarize').fn({ query: 'What is TypeScript?' }, ctx);
+      await getCallable(ext, 'summarize').fn(
+        { query: 'What is TypeScript?' },
+        ctx
+      );
 
       const [firstUrl] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(firstUrl).toContain('/res/v1/web/search');
@@ -592,7 +669,8 @@ describe('Brave extension host functions', () => {
     });
 
     it('step 2 calls /res/v1/summarizer/search with key param', async () => {
-      const mockFetch = vi.fn()
+      const mockFetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -607,7 +685,10 @@ describe('Brave extension host functions', () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'summarize').fn({ query: 'What is TypeScript?' }, ctx);
+      await getCallable(ext, 'summarize').fn(
+        { query: 'What is TypeScript?' },
+        ctx
+      );
 
       const [secondUrl] = mockFetch.mock.calls[1] as [string, RequestInit];
       expect(secondUrl).toContain('/res/v1/summarizer/search');
@@ -618,7 +699,13 @@ describe('Brave extension host functions', () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'summarize').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'summarize').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'summarize').fn({ query: '' }, ctx),
@@ -658,7 +745,8 @@ describe('Brave extension host functions', () => {
     });
 
     it('throws brave: summarizer request failed when step 2 fails [EC-18, AC-32]', async () => {
-      globalThis.fetch = vi.fn()
+      globalThis.fetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -692,7 +780,12 @@ describe('Brave extension host functions', () => {
     it('maps step 1 HTTP 403 with code to access denied [EC-11, AC-28]', async () => {
       globalThis.fetch = mockFetchJson(403, {
         type: 'ErrorResponse',
-        error: { id: 'err-3', status: 403, detail: 'Plan restricted', code: 'PLAN_RESTRICTED' },
+        error: {
+          id: 'err-3',
+          status: 403,
+          detail: 'Plan restricted',
+          code: 'PLAN_RESTRICTED',
+        },
       });
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
@@ -765,7 +858,8 @@ describe('Brave extension host functions', () => {
     });
 
     it('emits success event on successful summarize [AC-11]', async () => {
-      globalThis.fetch = vi.fn()
+      globalThis.fetch = vi
+        .fn()
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -781,7 +875,10 @@ describe('Brave extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      await getCallable(ext, 'summarize').fn({ query: 'What is TypeScript?' }, ctx);
+      await getCallable(ext, 'summarize').fn(
+        { query: 'What is TypeScript?' },
+        ctx
+      );
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -799,7 +896,13 @@ describe('Brave extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'summarize').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'summarize').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -829,24 +932,26 @@ describe('Brave extension host functions', () => {
   describe('dispose with in-flight requests [AC-22]', () => {
     it('dispose cancels in-flight search request [AC-22]', async () => {
       // Mock fetch that hangs until its signal is aborted
-      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-        return new Promise((_resolve, reject) => {
-          const signal = init?.signal;
-          if (signal) {
-            if (signal.aborted) {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-              return;
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              if (signal.aborted) {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+                return;
+              }
+              signal.addEventListener('abort', () => {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+              });
             }
-            signal.addEventListener('abort', () => {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-            });
-          }
+          });
         });
-      });
 
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();

@@ -70,9 +70,12 @@ function extractBody(part: MessagePart | undefined): string {
 /**
  * Collect attachment metadata from MIME parts.
  */
-function extractAttachments(parts: MessagePart[] | undefined): Array<{ filename: string; mime_type: string; size: number }> {
+function extractAttachments(
+  parts: MessagePart[] | undefined
+): Array<{ filename: string; mime_type: string; size: number }> {
   if (!Array.isArray(parts)) return [];
-  const results: Array<{ filename: string; mime_type: string; size: number }> = [];
+  const results: Array<{ filename: string; mime_type: string; size: number }> =
+    [];
   for (const part of parts) {
     if (part.filename && part.filename !== '') {
       results.push({
@@ -91,7 +94,9 @@ function extractAttachments(parts: MessagePart[] | undefined): Array<{ filename:
  * Factory returning the gmail_read inner function.
  * AC-12: Returns rill primitive dict with headers/body/attachments.
  */
-export function makeGmailRead(deps: GmailReadDeps): (
+export function makeGmailRead(
+  deps: GmailReadDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -103,7 +108,11 @@ export function makeGmailRead(deps: GmailReadDeps): (
   ): Promise<RillValue> => {
     const messageId = args['message_id'];
     if (typeof messageId !== 'string' || messageId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: message_id must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: message_id must be a non-empty string'
+      );
     }
     const path = `/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`;
     const response = await googleFetch(

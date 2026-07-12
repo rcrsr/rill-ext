@@ -30,7 +30,8 @@ function matchMessage(actual: string, expected: unknown): void {
     expected !== null &&
     typeof expected === 'object' &&
     'asymmetricMatch' in expected &&
-    typeof (expected as { asymmetricMatch: unknown }).asymmetricMatch === 'function'
+    typeof (expected as { asymmetricMatch: unknown }).asymmetricMatch ===
+      'function'
   ) {
     const matched = (
       expected as { asymmetricMatch: (v: unknown) => boolean }
@@ -51,7 +52,8 @@ export function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
   if (error instanceof RuntimeHaltSignal) {
     const status = getStatus(error.value);
     if (opts.code !== undefined) expect(status.code.name).toBe(opts.code);
-    if (opts.provider !== undefined) expect(status.provider).toBe(opts.provider);
+    if (opts.provider !== undefined)
+      expect(status.provider).toBe(opts.provider);
     if (opts.message !== undefined) matchMessage(status.message, opts.message);
     return;
   }
@@ -60,31 +62,6 @@ export function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
     return;
   }
   expect(error).toBeInstanceOf(RuntimeHaltSignal);
-}
-
-/**
- * Calls the given callable and asserts it threw a halt matching the
- * expectation. Use for synchronous in-fn validation throws (which now
- * surface as `RuntimeHaltSignal` carrying an invalid `RillValue` with a
- * generic atom).
- */
-export function expectThrowHalt(
-  fn: () => unknown,
-  opts: HaltExpectation = {}
-): unknown {
-  let thrown: unknown;
-  let threw = false;
-  try {
-    fn();
-  } catch (error: unknown) {
-    thrown = error;
-    threw = true;
-  }
-  if (!threw) {
-    throw new Error('expected function to throw');
-  }
-  expectHalt(thrown, opts);
-  return thrown;
 }
 
 /**

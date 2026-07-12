@@ -25,7 +25,7 @@ import {
 // ============================================================
 
 /** Output mode inferred from body content. `list` when `@@ role` markers are present, `string` otherwise. */
-export type PromptOutput = 'string' | 'list';
+type PromptOutput = 'string' | 'list';
 
 /** Raw YAML frontmatter shape expected in a .prompt.md file. */
 interface PromptFrontmatter {
@@ -105,7 +105,7 @@ const ROLE_MARKER_RE = /^@@\s+\w+\s*$/m;
  */
 export async function parseFile(
   absolutePath: string,
-  relativePath: string,
+  relativePath: string
 ): Promise<ParsedPrompt> {
   // ── Derive resolution name ──────────────────────────────────────────────
   const name = deriveResolutionName(relativePath);
@@ -124,7 +124,10 @@ export async function parseFile(
     bodyLineOffset = split.bodyLineOffset;
   } catch (err) {
     if (err instanceof RuntimeError && err.errorId === 'RILL-R001') {
-      throw new RuntimeError('RILL-R001', err.message, undefined, { path: absolutePath, cause: err });
+      throw new RuntimeError('RILL-R001', err.message, undefined, {
+        path: absolutePath,
+        cause: err,
+      });
     }
     throw err;
   }
@@ -134,11 +137,20 @@ export async function parseFile(
   try {
     // yaml.parse throws YAMLParseError on malformed input.
     const parsed = yamlParse(frontmatter) as unknown;
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new RuntimeError('RILL-R001', 'frontmatter must be a YAML mapping', undefined, {
-        path: absolutePath,
-        line: 2,
-      });
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      throw new RuntimeError(
+        'RILL-R001',
+        'frontmatter must be a YAML mapping',
+        undefined,
+        {
+          path: absolutePath,
+          line: 2,
+        }
+      );
     }
     raw = parsed as PromptFrontmatter;
   } catch (err) {
@@ -151,29 +163,47 @@ export async function parseFile(
       // relative to the full source file.
       const fenceLine = 1;
       const yamlLine: number | undefined = err.linePos?.[0]?.line;
-      const sourceLine = yamlLine !== undefined ? fenceLine + yamlLine : undefined;
+      const sourceLine =
+        yamlLine !== undefined ? fenceLine + yamlLine : undefined;
       throw new RuntimeError(
         'RILL-R001',
         `YAML parse error: ${err.message}`,
         undefined,
-        { path: absolutePath, ...(sourceLine !== undefined ? { line: sourceLine } : {}), cause: err },
+        {
+          path: absolutePath,
+          ...(sourceLine !== undefined ? { line: sourceLine } : {}),
+          cause: err,
+        }
       );
     }
     throw err;
   }
 
   // ── Validate required fields (EC-9) ────────────────────────────────────
-  if (typeof raw['description'] !== 'string' || raw['description'].length === 0) {
-    throw new RuntimeError('RILL-R001', `missing or empty required field "description"`, undefined, {
-      path: absolutePath,
-      field: 'description',
-    });
+  if (
+    typeof raw['description'] !== 'string' ||
+    raw['description'].length === 0
+  ) {
+    throw new RuntimeError(
+      'RILL-R001',
+      `missing or empty required field "description"`,
+      undefined,
+      {
+        path: absolutePath,
+        field: 'description',
+      }
+    );
   }
   if (!Array.isArray(raw['params'])) {
-    throw new RuntimeError('RILL-R001', `missing or invalid required field "params" (must be a list)`, undefined, {
-      path: absolutePath,
-      field: 'params',
-    });
+    throw new RuntimeError(
+      'RILL-R001',
+      `missing or invalid required field "params" (must be a list)`,
+      undefined,
+      {
+        path: absolutePath,
+        field: 'params',
+      }
+    );
   }
 
   const description = raw['description'];
@@ -183,10 +213,15 @@ export async function parseFile(
   const params: RillParam[] = [];
   for (const entry of rawParamEntries) {
     if (typeof entry !== 'string') {
-      throw new RuntimeError('RILL-R001', `params entries must be strings, got: ${JSON.stringify(entry)}`, undefined, {
-        path: absolutePath,
-        entry: JSON.stringify(entry),
-      });
+      throw new RuntimeError(
+        'RILL-R001',
+        `params entries must be strings, got: ${JSON.stringify(entry)}`,
+        undefined,
+        {
+          path: absolutePath,
+          entry: JSON.stringify(entry),
+        }
+      );
     }
     try {
       params.push(parseParamGrammar(entry));
@@ -216,7 +251,7 @@ export async function parseFile(
         'RILL-R001',
         `template references "{${ref.name}}" which is not declared in params`,
         undefined,
-        { path: absolutePath, line: sourceLine, name: ref.name },
+        { path: absolutePath, line: sourceLine, name: ref.name }
       );
     }
   }

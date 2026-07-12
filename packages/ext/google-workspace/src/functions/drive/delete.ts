@@ -21,7 +21,9 @@ export interface DriveDeleteDeps {
  * googleFetch returns null for 204 No Content — converted to true.
  * AC-12: Returns boolean true on success.
  */
-export function makeDriveDelete(deps: DriveDeleteDeps): (
+export function makeDriveDelete(
+  deps: DriveDeleteDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -33,7 +35,11 @@ export function makeDriveDelete(deps: DriveDeleteDeps): (
   ): Promise<RillValue> => {
     const fileId = args['file_id'];
     if (typeof fileId !== 'string' || fileId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: file_id must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: file_id must be a non-empty string'
+      );
     }
     const path = `/files/${encodeURIComponent(fileId)}`;
     // DELETE returns 204 No Content; googleFetch returns null for 204

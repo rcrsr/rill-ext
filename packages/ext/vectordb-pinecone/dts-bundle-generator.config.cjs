@@ -15,7 +15,11 @@ const config = {
 
       libraries: {
         inlinedLibraries: ['@rcrsr/rill-ext-vector-shared'],
-        importedLibraries: ['undici-types', '@rcrsr/rill', '@pinecone-database/pinecone'],
+        importedLibraries: [
+          'undici-types',
+          '@rcrsr/rill',
+          '@pinecone-database/pinecone',
+        ],
       },
 
       output: {

@@ -8,7 +8,12 @@
  * etc.) directly. No per-extension atom registration required.
  */
 
-import { type RillValue, type RuntimeContext, getStatus, isInvalid } from '@rcrsr/rill';
+import {
+  type RillValue,
+  type RuntimeContext,
+  getStatus,
+  isInvalid,
+} from '@rcrsr/rill';
 import type { DisposalState, InFlightState } from './types.js';
 import { checkDisposed } from './disposal.js';
 import { trackRequest } from './request.js';
@@ -31,7 +36,10 @@ export type WrapFunction = (
     ctx: RuntimeContext,
     signal: AbortSignal
   ) => Promise<{ result: RillValue; query: string; resultCount: number }>
-) => (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue>;
+) => (
+  args: Record<string, RillValue>,
+  ctx: RuntimeContext
+) => Promise<RillValue>;
 
 /**
  * Create a function wrapper that adds disposal check, in-flight tracking,
@@ -69,14 +77,20 @@ export function createSearchFunctionWrapper(
       try {
         const { result, query, resultCount } = await fn(args, ctx, signal);
         const duration = Date.now() - startTime;
-        emitSuccessEvent(ctx, provider, operation, duration, query, resultCount);
+        emitSuccessEvent(
+          ctx,
+          provider,
+          operation,
+          duration,
+          query,
+          resultCount
+        );
         return result;
       } catch (error: unknown) {
         const duration = Date.now() - startTime;
-        const invalid =
-          isInvalid(error as RillValue)
-            ? (error as RillValue)
-            : mapSearchError(ctx, provider, error);
+        const invalid = isInvalid(error as RillValue)
+          ? (error as RillValue)
+          : mapSearchError(ctx, provider, error);
         const status = getStatus(invalid);
         emitErrorEvent(ctx, provider, duration, status.message);
         return invalid;

@@ -20,7 +20,9 @@ describe('computeContentHash', () => {
     });
 
     it('produces the same digest when called multiple times with empty strings', () => {
-      expect(computeContentHash('', '', '')).toBe(computeContentHash('', '', ''));
+      expect(computeContentHash('', '', '')).toBe(
+        computeContentHash('', '', '')
+      );
     });
   });
 
@@ -38,7 +40,9 @@ describe('computeContentHash', () => {
       // SHA-256 of "params\noutput\nbody", verified via:
       //   printf 'params\noutput\nbody' | sha256sum
       const result = computeContentHash('params', 'output', 'body');
-      expect(result).toBe('0194cbe082524911328762aac6e2880289a8e4e0e506e7de24c6f2ae45c98f22');
+      expect(result).toBe(
+        '0194cbe082524911328762aac6e2880289a8e4e0e506e7de24c6f2ae45c98f22'
+      );
       expect(result).toMatch(/^[0-9a-f]{64}$/);
     });
   });

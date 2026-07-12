@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RuntimeError, createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
-import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
+import { expectRejectedHalt, expectHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MODULE MOCK
@@ -52,14 +52,20 @@ vi.mock('openai', () => {
 // HELPERS
 // ============================================================
 
-type ExtValue = Record<string, { fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown> }>;
+type ExtValue = Record<
+  string,
+  { fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown> }
+>;
 
 function getHostFn(ext: { value: unknown }, name: string) {
   return (ext.value as ExtValue)[name]!;
 }
 
 /** Build a fetch mock returning a JSON response with the given status. */
-function mockFetchJson(status: number, body: unknown): ReturnType<typeof vi.fn> {
+function mockFetchJson(
+  status: number,
+  body: unknown
+): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -309,8 +315,9 @@ describe('shield() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx)
-      , { message: 'foundry: content safety not configured' });
+        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx),
+        { message: 'foundry: content safety not configured' }
+      );
     });
 
     it('fetch is not called when contentSafety not configured [AC-18]', async () => {
@@ -439,8 +446,9 @@ describe('shield() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx)
-      , { message: 'foundry: authentication failed' });
+        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx),
+        { message: 'foundry: authentication failed' }
+      );
     });
 
     it('maps HTTP 429 to rate limit exceeded', async () => {
@@ -451,8 +459,9 @@ describe('shield() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx)
-      , { message: 'foundry: rate limit exceeded' });
+        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx),
+        { message: 'foundry: rate limit exceeded' }
+      );
     });
   });
 });

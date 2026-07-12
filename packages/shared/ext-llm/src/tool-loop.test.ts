@@ -5,7 +5,13 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { RuntimeError, callable, createRuntimeContext, invokeCallable, type RillValue } from '@rcrsr/rill';
+import {
+  RuntimeError,
+  callable,
+  createRuntimeContext,
+  invokeCallable,
+  type RillValue,
+} from '@rcrsr/rill';
 import { executeToolLoop, buildResponseMessages } from './tool-loop.js';
 import type { ToolLoopCallbacks } from './types.js';
 
@@ -25,12 +31,16 @@ vi.mock('@rcrsr/rill', async (importOriginal) => {
  * Create a mock Rill callable function for testing
  */
 function createMockTool(
-  implementation: (args: Record<string, RillValue>) => RillValue | Promise<RillValue>,
+  implementation: (
+    args: Record<string, RillValue>
+  ) => RillValue | Promise<RillValue>,
   description?: string
 ): RillValue {
   const baseCallable = callable(implementation, false);
   if (description !== undefined) {
-    (baseCallable as { annotations: Record<string, unknown> }).annotations['description'] = description;
+    (baseCallable as { annotations: Record<string, unknown> }).annotations[
+      'description'
+    ] = description;
   }
   return baseCallable;
 }
@@ -980,8 +990,12 @@ describe('executeToolLoop', () => {
       );
 
       const descriptor = buildTools.mock.calls[0]?.[0]?.[0];
-      expect(descriptor.input_schema.properties['param']).toEqual({ type: 'string' });
-      expect(descriptor.input_schema.properties['param']).not.toHaveProperty('description');
+      expect(descriptor.input_schema.properties['param']).toEqual({
+        type: 'string',
+      });
+      expect(descriptor.input_schema.properties['param']).not.toHaveProperty(
+        'description'
+      );
     });
 
     it('includes param in required[] when defaultValue is undefined (AC-28)', async () => {
@@ -1115,14 +1129,21 @@ describe('executeToolLoop', () => {
       );
 
       expect(mockFn).toHaveBeenCalledTimes(1);
-      expect(mockFn).toHaveBeenCalledWith({ param_a: 'value_a', param_b: 42 }, expect.anything());
+      expect(mockFn).toHaveBeenCalledWith(
+        { param_a: 'value_a', param_b: 42 },
+        expect.anything()
+      );
     });
 
     it('passes all named args regardless of input key order', async () => {
       // IC-11: Named args passed correctly regardless of input key order
       const mockFn = vi.fn((args: Record<string, RillValue>) => {
         // Verify all named args received
-        expect(args).toEqual({ first: 'first_value', second: 'second_value', third: 'third_value' });
+        expect(args).toEqual({
+          first: 'first_value',
+          second: 'second_value',
+          third: 'third_value',
+        });
         return 'success';
       });
 
@@ -2186,7 +2207,9 @@ describe('executeToolLoop yieldChunk', () => {
         content: 'streamed',
         usage: { input_tokens: 10, output_tokens: 5 },
       }));
-      const callbacks = createMockCallbacks({ callAPIStreaming: mockCallAPIStreaming });
+      const callbacks = createMockCallbacks({
+        callAPIStreaming: mockCallAPIStreaming,
+      });
       const emitEvent = vi.fn();
 
       const result = await executeToolLoop(
@@ -2209,14 +2232,20 @@ describe('executeToolLoop yieldChunk', () => {
   describe('when yieldChunk is provided and callAPIStreaming is defined', () => {
     it('uses callAPIStreaming instead of callAPI', async () => {
       // IR-2: yieldChunk + callAPIStreaming defined → streaming path used
-      const mockCallAPIStreaming = vi.fn(async (_msgs, _tools, _onTextDelta) => ({
-        content: 'streamed response',
-        usage: { input_tokens: 20, output_tokens: 10 },
-      }));
-      const callbacks = createMockCallbacks({ callAPIStreaming: mockCallAPIStreaming });
+      const mockCallAPIStreaming = vi.fn(
+        async (_msgs, _tools, _onTextDelta) => ({
+          content: 'streamed response',
+          usage: { input_tokens: 20, output_tokens: 10 },
+        })
+      );
+      const callbacks = createMockCallbacks({
+        callAPIStreaming: mockCallAPIStreaming,
+      });
       const emitEvent = vi.fn();
       const chunks: unknown[] = [];
-      const yieldChunk = vi.fn((chunk: unknown) => { chunks.push(chunk); });
+      const yieldChunk = vi.fn((chunk: unknown) => {
+        chunks.push(chunk);
+      });
 
       await executeToolLoop(
         [{ role: 'user', content: 'Hello' }],
@@ -2245,10 +2274,14 @@ describe('executeToolLoop yieldChunk', () => {
           };
         }
       );
-      const callbacks = createMockCallbacks({ callAPIStreaming: mockCallAPIStreaming });
+      const callbacks = createMockCallbacks({
+        callAPIStreaming: mockCallAPIStreaming,
+      });
       const emitEvent = vi.fn();
       const chunks: unknown[] = [];
-      const yieldChunk = vi.fn((chunk: unknown) => { chunks.push(chunk); });
+      const yieldChunk = vi.fn((chunk: unknown) => {
+        chunks.push(chunk);
+      });
 
       await executeToolLoop(
         [{ role: 'user', content: 'Hi' }],
@@ -2266,7 +2299,10 @@ describe('executeToolLoop yieldChunk', () => {
       );
       expect(textDeltaChunks).toHaveLength(2);
       expect(textDeltaChunks[0]).toEqual({ type: 'text_delta', text: 'Hello' });
-      expect(textDeltaChunks[1]).toEqual({ type: 'text_delta', text: ', world' });
+      expect(textDeltaChunks[1]).toEqual({
+        type: 'text_delta',
+        text: ', world',
+      });
     });
 
     it('emits tool_call chunk before tool execution', async () => {
@@ -2293,7 +2329,9 @@ describe('executeToolLoop yieldChunk', () => {
       });
       const emitEvent = vi.fn();
       const chunks: unknown[] = [];
-      const yieldChunk = vi.fn((chunk: unknown) => { chunks.push(chunk); });
+      const yieldChunk = vi.fn((chunk: unknown) => {
+        chunks.push(chunk);
+      });
 
       await executeToolLoop(
         [{ role: 'user', content: 'Go' }],
@@ -2341,7 +2379,9 @@ describe('executeToolLoop yieldChunk', () => {
       });
       const emitEvent = vi.fn();
       const chunks: unknown[] = [];
-      const yieldChunk = vi.fn((chunk: unknown) => { chunks.push(chunk); });
+      const yieldChunk = vi.fn((chunk: unknown) => {
+        chunks.push(chunk);
+      });
 
       await executeToolLoop(
         [{ role: 'user', content: 'Compute' }],
@@ -2444,7 +2484,9 @@ describe('executeToolLoop yieldChunk', () => {
       const mockCallAPIStreaming = vi.fn(async () => {
         throw streamingError;
       });
-      const callbacks = createMockCallbacks({ callAPIStreaming: mockCallAPIStreaming });
+      const callbacks = createMockCallbacks({
+        callAPIStreaming: mockCallAPIStreaming,
+      });
       const emitEvent = vi.fn();
       const yieldChunk = vi.fn();
 
@@ -2474,8 +2516,15 @@ describe('executeToolLoop yieldChunk', () => {
 describe('buildResponseMessages', () => {
   it('returns array with single text part assistant message appended', () => {
     // IR-7: appends {role:'assistant', parts:[...]} to input list
-    const input = [{ role: 'user' as const, parts: [{ type: 'text' as const, text: 'Hello' }] }];
-    const result = buildResponseMessages(input, [{ type: 'text', text: 'Hi there' }]);
+    const input = [
+      {
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'Hello' }],
+      },
+    ];
+    const result = buildResponseMessages(input, [
+      { type: 'text', text: 'Hi there' },
+    ]);
     expect(result).toEqual([
       { role: 'user', parts: [{ type: 'text', text: 'Hello' }] },
       { role: 'assistant', parts: [{ type: 'text', text: 'Hi there' }] },
@@ -2485,12 +2534,19 @@ describe('buildResponseMessages', () => {
   it('works with empty input messages', () => {
     // IR-7: empty input → single-element array with assistant message
     const result = buildResponseMessages([], [{ type: 'text', text: 'Hello' }]);
-    expect(result).toEqual([{ role: 'assistant', parts: [{ type: 'text', text: 'Hello' }] }]);
+    expect(result).toEqual([
+      { role: 'assistant', parts: [{ type: 'text', text: 'Hello' }] },
+    ]);
   });
 
   it('does not mutate the input array', () => {
     // IR-7: pure function, returns new array
-    const input = [{ role: 'user' as const, parts: [{ type: 'text' as const, text: 'Hello' }] }];
+    const input = [
+      {
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'Hello' }],
+      },
+    ];
     const inputCopy = [...input];
     buildResponseMessages(input, [{ type: 'text', text: 'Hi there' }]);
     expect(input).toEqual(inputCopy);
@@ -2499,8 +2555,15 @@ describe('buildResponseMessages', () => {
 
   it('returns a new array instance (does not mutate input)', () => {
     // IR-7: returned array is a new reference
-    const input = [{ role: 'user' as const, parts: [{ type: 'text' as const, text: 'Hello' }] }];
-    const result = buildResponseMessages(input, [{ type: 'text', text: 'Reply' }]);
+    const input = [
+      {
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'Hello' }],
+      },
+    ];
+    const result = buildResponseMessages(input, [
+      { type: 'text', text: 'Reply' },
+    ]);
     expect(result).not.toBe(input);
     expect(result).toHaveLength(2);
     expect(input).toHaveLength(1);
@@ -2508,16 +2571,39 @@ describe('buildResponseMessages', () => {
 
   it('preserves all input messages', () => {
     const input = [
-      { role: 'system' as const, parts: [{ type: 'text' as const, text: 'You are helpful.' }] },
-      { role: 'user' as const, parts: [{ type: 'text' as const, text: 'Question' }] },
-      { role: 'assistant' as const, parts: [{ type: 'text' as const, text: 'Answer' }] },
+      {
+        role: 'system' as const,
+        parts: [{ type: 'text' as const, text: 'You are helpful.' }],
+      },
+      {
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'Question' }],
+      },
+      {
+        role: 'assistant' as const,
+        parts: [{ type: 'text' as const, text: 'Answer' }],
+      },
     ];
-    const result = buildResponseMessages(input, [{ type: 'text', text: 'Final answer' }]);
+    const result = buildResponseMessages(input, [
+      { type: 'text', text: 'Final answer' },
+    ]);
     expect(result).toHaveLength(4);
-    expect(result[0]).toEqual({ role: 'system', parts: [{ type: 'text', text: 'You are helpful.' }] });
-    expect(result[1]).toEqual({ role: 'user', parts: [{ type: 'text', text: 'Question' }] });
-    expect(result[2]).toEqual({ role: 'assistant', parts: [{ type: 'text', text: 'Answer' }] });
-    expect(result[3]).toEqual({ role: 'assistant', parts: [{ type: 'text', text: 'Final answer' }] });
+    expect(result[0]).toEqual({
+      role: 'system',
+      parts: [{ type: 'text', text: 'You are helpful.' }],
+    });
+    expect(result[1]).toEqual({
+      role: 'user',
+      parts: [{ type: 'text', text: 'Question' }],
+    });
+    expect(result[2]).toEqual({
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Answer' }],
+    });
+    expect(result[3]).toEqual({
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Final answer' }],
+    });
   });
 
   it('preserves multi-part assistant (thinking + text + tool_use)', () => {
@@ -2525,7 +2611,12 @@ describe('buildResponseMessages', () => {
     const parts = [
       { type: 'thinking' as const, text: 'Let me think...' },
       { type: 'text' as const, text: 'Here is my answer.' },
-      { type: 'tool_use' as const, id: 'call_1', name: 'search', input: { query: 'test' } },
+      {
+        type: 'tool_use' as const,
+        id: 'call_1',
+        name: 'search',
+        input: { query: 'test' },
+      },
     ];
     const result = buildResponseMessages([], parts);
     expect(result).toHaveLength(1);
@@ -2554,7 +2645,9 @@ describe('executeToolLoop max_turns resolution', () => {
   // Creates callbacks that always returns a tool call (to keep the loop running)
   function createInfiniteToolCallbacks() {
     return createMockCallbacks({
-      extractToolCalls: vi.fn(() => [{ id: 'call_1', name: 'tool', input: {} }]),
+      extractToolCalls: vi.fn(() => [
+        { id: 'call_1', name: 'tool', input: {} },
+      ]),
     });
   }
 
@@ -2570,11 +2663,11 @@ describe('executeToolLoop max_turns resolution', () => {
         3,
         callbacks,
         vi.fn(),
-        5,         // per-call maxTurns = 5
+        5, // per-call maxTurns = 5
         undefined,
         undefined,
         undefined,
-        10         // factoryMaxTurns = 10 (should NOT be used)
+        10 // factoryMaxTurns = 10 (should NOT be used)
       )
     ).rejects.toThrow('tool_loop exceeded max_turns (5)');
     // extractToolCalls is called 5 times (5 turns)
@@ -2593,11 +2686,11 @@ describe('executeToolLoop max_turns resolution', () => {
         3,
         callbacks,
         vi.fn(),
-        0,         // per-call sentinel
+        0, // per-call sentinel
         undefined,
         undefined,
         undefined,
-        3          // factoryMaxTurns = 3
+        3 // factoryMaxTurns = 3
       )
     ).rejects.toThrow('tool_loop exceeded max_turns (3)');
     expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(3);
@@ -2614,11 +2707,11 @@ describe('executeToolLoop max_turns resolution', () => {
       3,
       callbacks,
       vi.fn(),
-      0,         // per-call sentinel
+      0, // per-call sentinel
       undefined,
       undefined,
       undefined,
-      undefined  // no factoryMaxTurns
+      undefined // no factoryMaxTurns
     );
 
     // Loop should complete: 1 turn with tool call, 1 turn with no tool calls
@@ -2638,11 +2731,11 @@ describe('executeToolLoop max_turns resolution', () => {
         3,
         callbacks,
         vi.fn(),
-        0,         // per-call sentinel
+        0, // per-call sentinel
         undefined,
         undefined,
         undefined,
-        7          // factoryMaxTurns = 7
+        7 // factoryMaxTurns = 7
       )
     ).rejects.toThrow('tool_loop exceeded max_turns (7)');
     expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(7);
@@ -2660,7 +2753,7 @@ describe('executeToolLoop max_turns resolution', () => {
         3,
         callbacks,
         vi.fn(),
-        -1         // negative per-call
+        -1 // negative per-call
       )
     ).rejects.toThrow('max_turns must be >= 0, got -1');
   });
@@ -2673,7 +2766,9 @@ describe('executeToolLoop max_turns resolution', () => {
 describe('executeToolLoop EC-15 max_turns_exceeded', () => {
   it('halts with max_turns_exceeded when turn limit is reached', async () => {
     const callbacks = createMockCallbacks({
-      extractToolCalls: vi.fn(() => [{ id: 'call_1', name: 'tool', input: {} }]),
+      extractToolCalls: vi.fn(() => [
+        { id: 'call_1', name: 'tool', input: {} },
+      ]),
     });
     const tools = { tool: createMockTool(() => 'ok') };
 
@@ -2684,7 +2779,7 @@ describe('executeToolLoop EC-15 max_turns_exceeded', () => {
         3,
         callbacks,
         vi.fn(),
-        2          // limit to 2 turns
+        2 // limit to 2 turns
       )
     ).rejects.toThrow('tool_loop exceeded max_turns (2)');
   });
@@ -2697,7 +2792,9 @@ describe('executeToolLoop EC-15 max_turns_exceeded', () => {
 describe('executeToolLoop EC-16 max_errors_exceeded', () => {
   it('halts with max_errors_exceeded when error threshold is reached', async () => {
     const tools = {
-      failing_tool: createMockTool(() => { throw new Error('Tool failed'); }),
+      failing_tool: createMockTool(() => {
+        throw new Error('Tool failed');
+      }),
     };
 
     let apiCallCount = 0;
@@ -2754,7 +2851,7 @@ describe('executeToolLoop EC-16 max_errors_exceeded', () => {
       executeToolLoop(
         [{ role: 'user', content: 'Test' }],
         tools,
-        0,         // 0 → defaults to 3 internally
+        0, // 0 → defaults to 3 internally
         callbacks,
         vi.fn()
       )

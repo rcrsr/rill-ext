@@ -47,7 +47,11 @@ describe('mapSearchError', () => {
   });
 
   it('maps TypeError to UNAVAILABLE with connection_failed kind', () => {
-    const result = mapSearchError(ctx, provider, new TypeError('Failed to fetch'));
+    const result = mapSearchError(
+      ctx,
+      provider,
+      new TypeError('Failed to fetch')
+    );
     const status = statusOf(result);
     expect(status.code.name).toBe('UNAVAILABLE');
     expect(status.message).toBe(`${provider}: connection failed`);
@@ -55,7 +59,11 @@ describe('mapSearchError', () => {
   });
 
   it('maps SyntaxError to PROTOCOL with unexpected_response_format kind', () => {
-    const result = mapSearchError(ctx, provider, new SyntaxError('Unexpected token'));
+    const result = mapSearchError(
+      ctx,
+      provider,
+      new SyntaxError('Unexpected token')
+    );
     const status = statusOf(result);
     expect(status.code.name).toBe('PROTOCOL');
     expect(status.message).toBe(`${provider}: unexpected response format`);
@@ -73,14 +81,21 @@ describe('mapSearchError', () => {
     [500, 'UNAVAILABLE', 'server error (500)'],
     [502, 'UNAVAILABLE', 'server error (502)'],
     [503, 'UNAVAILABLE', 'server error (503)'],
-  ])('maps HTTP status %d to atom #%s with message "%s"', (status, atom, fragment) => {
-    const result = mapSearchError(ctx, provider, { status });
-    expect(statusOf(result).code.name).toBe(atom);
-    expect(statusOf(result).message).toBe(`${provider}: ${fragment}`);
-  });
+  ])(
+    'maps HTTP status %d to atom #%s with message "%s"',
+    (status, atom, fragment) => {
+      const result = mapSearchError(ctx, provider, { status });
+      expect(statusOf(result).code.name).toBe(atom);
+      expect(statusOf(result).message).toBe(`${provider}: ${fragment}`);
+    }
+  );
 
   it('maps generic Error to UNAVAILABLE with provider-prefixed message', () => {
-    const result = mapSearchError(ctx, provider, new Error('something unexpected'));
+    const result = mapSearchError(
+      ctx,
+      provider,
+      new Error('something unexpected')
+    );
     expect(statusOf(result).code.name).toBe('UNAVAILABLE');
     expect(statusOf(result).message).toBe(`${provider}: something unexpected`);
   });
@@ -136,7 +151,9 @@ describe('mapProviderSearchError', () => {
     const result = mapProviderSearchError(ctx, 'brave', 403, body);
     const status = statusOf(result);
     expect(status.code.name).toBe('FORBIDDEN');
-    expect(status.message).toBe('brave: access denied (SUBSCRIPTION_TOKEN_EXPIRED)');
+    expect(status.message).toBe(
+      'brave: access denied (SUBSCRIPTION_TOKEN_EXPIRED)'
+    );
     expect(status.raw['kind']).toBe('access_denied');
   });
 

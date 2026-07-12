@@ -62,13 +62,20 @@ vi.mock('openai', () => {
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /** Build a RillTypeValue from a TypeStructure for use in generate() schema arg. */
 function typeVal(structure: TypeStructure): RillTypeValue {
-  return { __rill_type: true, typeName: structure.kind, structure } as unknown as RillTypeValue;
+  return {
+    __rill_type: true,
+    typeName: structure.kind,
+    structure,
+  } as unknown as RillTypeValue;
 }
 
 function createGenerateMockResponse(jsonContent: string, model = 'gpt-4o') {
@@ -176,7 +183,9 @@ describe('generate() function', () => {
 
     // AC-6: result contains model field
     it('result dict contains model field', async () => {
-      mockCreate.mockResolvedValue(createGenerateMockResponse('{"name":"Bob"}'));
+      mockCreate.mockResolvedValue(
+        createGenerateMockResponse('{"name":"Bob"}')
+      );
 
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
@@ -191,7 +200,9 @@ describe('generate() function', () => {
 
     // AC-6: result contains usage field with input and output tokens
     it('result dict contains usage with input and output tokens', async () => {
-      mockCreate.mockResolvedValue(createGenerateMockResponse('{"name":"Carol"}'));
+      mockCreate.mockResolvedValue(
+        createGenerateMockResponse('{"name":"Carol"}')
+      );
 
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
@@ -246,7 +257,9 @@ describe('generate() function', () => {
 
     // AC-6: stop_reason field is present in result
     it('result dict contains stop_reason field', async () => {
-      mockCreate.mockResolvedValue(createGenerateMockResponse('{"name":"Eve"}'));
+      mockCreate.mockResolvedValue(
+        createGenerateMockResponse('{"name":"Eve"}')
+      );
 
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
@@ -286,8 +299,9 @@ describe('generate() function', () => {
         getCallable(ext, 'generate').fn(
           { prompt: 'test', schema: stringSchema, options: {} },
           ctx
-        )
-      , { message: 'generate requires a dict type as schema' });
+        ),
+        { message: 'generate requires a dict type as schema' }
+      );
     });
 
     // AC-6: halts with #PROTOCOL when response JSON is malformed

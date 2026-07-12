@@ -49,19 +49,16 @@ export async function resolvePath(
   mounts: Record<string, MountConfig>,
   operation: Operation,
   ctx: RuntimeContext,
-  createMode = false,
+  createMode = false
 ): Promise<string | RillValue> {
   // Step 1: Resolve mount name to MountConfig
   const mount = mounts[mountName];
   if (!mount) {
-    return ctx.invalidate(
-      new Error(`mount "${mountName}" not configured`),
-      {
-        code: 'FORBIDDEN',
-        provider: PROVIDER,
-        raw: { kind: 'unknown_mount', mountName },
-      },
-    );
+    return ctx.invalidate(new Error(`mount "${mountName}" not configured`), {
+      code: 'FORBIDDEN',
+      provider: PROVIDER,
+      raw: { kind: 'unknown_mount', mountName },
+    });
   }
 
   // Step 2: Use mount's resolved physical path (set at creation time)
@@ -73,7 +70,7 @@ export async function resolvePath(
         code: 'FORBIDDEN',
         provider: PROVIDER,
         raw: { kind: 'mount_uninitialized', mountName },
-      },
+      }
     );
   }
 
@@ -88,20 +85,17 @@ export async function resolvePath(
     !normalized.startsWith(mountBase + path.sep) &&
     normalized !== mountBase
   ) {
-    return ctx.invalidate(
-      new Error('path escapes mount boundary'),
-      {
-        code: 'FORBIDDEN',
-        provider: PROVIDER,
-        raw: {
-          kind: 'path_escape',
-          mountName,
-          path: relativePath,
-          normalized,
-          mountBase,
-        },
+    return ctx.invalidate(new Error('path escapes mount boundary'), {
+      code: 'FORBIDDEN',
+      provider: PROVIDER,
+      raw: {
+        kind: 'path_escape',
+        mountName,
+        path: relativePath,
+        normalized,
+        mountBase,
       },
-    );
+    });
   }
 
   // Step 5: Resolve final path with fs.realpath() (symlink defense)
@@ -121,36 +115,30 @@ export async function resolvePath(
     if (error && typeof error === 'object' && 'code' in error) {
       const code = (error as { code: string }).code;
       if (code === 'EACCES' || code === 'EPERM') {
-        return ctx.invalidate(
-          new Error(`permission denied: ${normalized}`),
-          {
-            code: 'FORBIDDEN',
-            provider: PROVIDER,
-            raw: { kind: 'permission_denied', path: normalized, code },
-          },
-        );
+        return ctx.invalidate(new Error(`permission denied: ${normalized}`), {
+          code: 'FORBIDDEN',
+          provider: PROVIDER,
+          raw: { kind: 'permission_denied', path: normalized, code },
+        });
       }
       if (code === 'ENOENT') {
         if (createMode) {
           return ctx.invalidate(
             new Error(
-              `parent directory does not exist: ${path.dirname(normalized)}`,
+              `parent directory does not exist: ${path.dirname(normalized)}`
             ),
             {
               code: 'FORBIDDEN',
               provider: PROVIDER,
               raw: { kind: 'parent_missing', path: normalized },
-            },
+            }
           );
         }
-        return ctx.invalidate(
-          new Error(`file not found: ${normalized}`),
-          {
-            code: 'FORBIDDEN',
-            provider: PROVIDER,
-            raw: { kind: 'file_not_found', path: normalized },
-          },
-        );
+        return ctx.invalidate(new Error(`file not found: ${normalized}`), {
+          code: 'FORBIDDEN',
+          provider: PROVIDER,
+          raw: { kind: 'file_not_found', path: normalized },
+        });
       }
     }
     throw error;
@@ -161,20 +149,17 @@ export async function resolvePath(
     !resolvedPath.startsWith(mountBase + path.sep) &&
     resolvedPath !== mountBase
   ) {
-    return ctx.invalidate(
-      new Error('path escapes mount boundary'),
-      {
-        code: 'FORBIDDEN',
-        provider: PROVIDER,
-        raw: {
-          kind: 'symlink_escape',
-          mountName,
-          path: relativePath,
-          resolvedPath,
-          mountBase,
-        },
+    return ctx.invalidate(new Error('path escapes mount boundary'), {
+      code: 'FORBIDDEN',
+      provider: PROVIDER,
+      raw: {
+        kind: 'symlink_escape',
+        mountName,
+        path: relativePath,
+        resolvedPath,
+        mountBase,
       },
-    );
+    });
   }
 
   // Step 7: If glob set, verify filename matches pattern
@@ -187,7 +172,7 @@ export async function resolvePath(
           code: 'FORBIDDEN',
           provider: PROVIDER,
           raw: { kind: 'glob_mismatch', mountName, glob: mount.glob, filename },
-        },
+        }
       );
     }
   }
@@ -200,7 +185,7 @@ export async function resolvePath(
         code: 'FORBIDDEN',
         provider: PROVIDER,
         raw: { kind: 'mode_violation', mountName, mode: mount.mode, operation },
-      },
+      }
     );
   }
 
@@ -259,7 +244,7 @@ export function matchesGlob(filename: string, pattern: string): boolean {
  */
 export function checkMode(
   mode: 'read' | 'write' | 'read-write',
-  operation: Operation,
+  operation: Operation
 ): boolean {
   if (mode === 'read-write') return true;
   if (mode === 'read' && operation === 'read') return true;
@@ -291,7 +276,7 @@ export async function initializeMount(mount: MountConfig): Promise<void> {
           'RILL-R005',
           `mount path does not exist: ${mount.path}`,
           undefined,
-          { path: mount.path },
+          { path: mount.path }
         );
       }
       if (code === 'EACCES' || code === 'EPERM') {
@@ -299,7 +284,7 @@ export async function initializeMount(mount: MountConfig): Promise<void> {
           'RILL-R005',
           `permission denied: ${mount.path}`,
           undefined,
-          { path: mount.path, code },
+          { path: mount.path, code }
         );
       }
     }
@@ -324,7 +309,7 @@ export async function initializeMount(mount: MountConfig): Promise<void> {
 export function parseMountPath(
   fullPath: string,
   mounts: Record<string, MountConfig>,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): { mountName: string; relativePath: string } | RillValue {
   const normalized = fullPath.startsWith('/') ? fullPath.slice(1) : fullPath;
   const sortedNames = Object.keys(mounts).sort((a, b) => b.length - a.length);
@@ -341,12 +326,9 @@ export function parseMountPath(
     }
   }
 
-  return ctx.invalidate(
-    new Error(`no mount matches path "${fullPath}"`),
-    {
-      code: 'FORBIDDEN',
-      provider: PROVIDER,
-      raw: { kind: 'no_mount_match', path: fullPath },
-    },
-  );
+  return ctx.invalidate(new Error(`no mount matches path "${fullPath}"`), {
+    code: 'FORBIDDEN',
+    provider: PROVIDER,
+    raw: { kind: 'no_mount_match', path: fullPath },
+  });
 }

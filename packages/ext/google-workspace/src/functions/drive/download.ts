@@ -25,7 +25,9 @@ export interface DriveDownloadDeps {
  * (arrayBuffer) to base64-encode.
  * AC-12: Returns base64-encoded string (rill primitive).
  */
-export function makeDriveDownload(deps: DriveDownloadDeps): (
+export function makeDriveDownload(
+  deps: DriveDownloadDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -37,7 +39,11 @@ export function makeDriveDownload(deps: DriveDownloadDeps): (
   ): Promise<RillValue> => {
     const fileId = args['file_id'];
     if (typeof fileId !== 'string' || fileId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: file_id must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: file_id must be a non-empty string'
+      );
     }
     // AC-11: compose lifecycle (ctx.signal), caller signal, and 30s hard timeout
     const signals: AbortSignal[] = [
@@ -67,7 +73,13 @@ export function makeDriveDownload(deps: DriveDownloadDeps): (
       throw mapFetchError(ctx, error, 'drive') as unknown as RillValue;
     }
     if (!response.ok) {
-      throw mapGoogleError(ctx, response.status, 'drive', 'download', fileId) as unknown as RillValue;
+      throw mapGoogleError(
+        ctx,
+        response.status,
+        'drive',
+        'download',
+        fileId
+      ) as unknown as RillValue;
     }
     const buffer = await response.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');

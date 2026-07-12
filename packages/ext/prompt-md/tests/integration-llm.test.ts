@@ -14,7 +14,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { createRuntimeContext, isRillStream, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  isRillStream,
+  type ApplicationCallable,
+} from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
 import { makeFactoryCtx } from './_helpers.js';
 
@@ -59,7 +63,12 @@ vi.mock('openai', () => {
   class MockAPIError extends Error {
     status: number | undefined;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    constructor(status: number | undefined, _error: any, message: string, _headers: any) {
+    constructor(
+      status: number | undefined,
+      _error: any,
+      message: string,
+      _headers: any
+    ) {
       super(message);
       this.status = status;
       this.name = 'APIError';
@@ -149,7 +158,10 @@ function makeAnthropicMockStream(content: string) {
   };
   return {
     [Symbol.asyncIterator]: async function* () {
-      yield { type: 'content_block_delta', delta: { type: 'text_delta', text: content } };
+      yield {
+        type: 'content_block_delta',
+        delta: { type: 'text_delta', text: content },
+      };
     },
     finalMessage: vi.fn().mockResolvedValue(response),
     abort: vi.fn(),
@@ -191,7 +203,9 @@ function makeOpenAIMockStream(content: string) {
 }
 
 /** Create a Gemini-compatible async iterable (consumed lazily inside the stream). */
-function makeGeminiMockStream(content: string): AsyncIterable<{ text: string }> {
+function makeGeminiMockStream(
+  content: string
+): AsyncIterable<{ text: string }> {
   async function* gen() {
     yield { text: content };
   }
@@ -199,7 +213,10 @@ function makeGeminiMockStream(content: string): AsyncIterable<{ text: string }> 
 }
 
 /** Extract a named ApplicationCallable from an ext factory result value dict. */
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -214,9 +231,11 @@ async function makeTempDir(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((d) =>
-      fs.rm(d, { recursive: true, force: true }).catch(() => undefined),
-    ),
+    tempDirs
+      .splice(0)
+      .map((d) =>
+        fs.rm(d, { recursive: true, force: true }).catch(() => undefined)
+      )
   );
   mockAnthropicStream.mockReset();
   mockOpenAIStream.mockReset();
@@ -231,10 +250,16 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
   it('same rill list passes to anthropic, openai, and gemini message() with no per-provider branching', async () => {
     // ── Arrange: temp dir with chat.prompt.md ─────────────────────────────────
     const dir = await makeTempDir();
-    await fs.writeFile(path.join(dir, 'chat.prompt.md'), CHAT_PROMPT_CONTENT, 'utf-8');
+    await fs.writeFile(
+      path.join(dir, 'chat.prompt.md'),
+      CHAT_PROMPT_CONTENT,
+      'utf-8'
+    );
 
     // Set up SDK mocks before creating extensions.
-    mockAnthropicStream.mockReturnValue(makeAnthropicMockStream('Anthropic response'));
+    mockAnthropicStream.mockReturnValue(
+      makeAnthropicMockStream('Anthropic response')
+    );
     mockOpenAIStream.mockReturnValue(makeOpenAIMockStream('OpenAI response'));
     // Gemini stream is set up below (called lazily inside async generator).
     mockGeminiStream.mockResolvedValue(makeGeminiMockStream('Gemini response'));
@@ -242,18 +267,30 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
     const ctx = createRuntimeContext();
 
     // ── Act: create prompt-md extension and invoke closure ────────────────────
-    const promptExt = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const promptExt = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const chatCallable = getCallable(promptExt, 'chat');
 
     // Invoke the closure to produce the rill list of role dicts.
-    const closureResult = await chatCallable.fn({ query: 'What is rill?' }, ctx);
+    const closureResult = await chatCallable.fn(
+      { query: 'What is rill?' },
+      ctx
+    );
 
     // Verify the closure result is a rill list of role dicts.
     expect(Array.isArray(closureResult)).toBe(true);
     const messages = closureResult as Array<Record<string, unknown>>;
     expect(messages).toHaveLength(2);
-    expect(messages[0]).toMatchObject({ role: 'system', content: expect.any(String) as string });
-    expect(messages[1]).toMatchObject({ role: 'user', content: expect.stringContaining('rill') as string });
+    expect(messages[0]).toMatchObject({
+      role: 'system',
+      content: expect.any(String) as string,
+    });
+    expect(messages[1]).toMatchObject({
+      role: 'user',
+      content: expect.stringContaining('rill') as string,
+    });
 
     // ── Assert: same closureResult feeds all three providers without branching ─
     //
@@ -269,7 +306,7 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
     });
     const anthropicResult = getCallable(anthropicExt, 'message').fn(
       { prompt: closureResult },
-      ctx,
+      ctx
     );
     expect(isRillStream(anthropicResult)).toBe(true);
 
@@ -280,7 +317,7 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
     });
     const openaiResult = getCallable(openaiExt, 'message').fn(
       { prompt: closureResult },
-      ctx,
+      ctx
     );
     expect(isRillStream(openaiResult)).toBe(true);
 
@@ -291,7 +328,7 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
     });
     const geminiResult = await getCallable(geminiExt, 'message').fn(
       { prompt: closureResult },
-      ctx,
+      ctx
     );
     expect(isRillStream(geminiResult)).toBe(true);
 

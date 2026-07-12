@@ -21,7 +21,11 @@ async function makeTempDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'rill-prompt-md-test-'));
 }
 
-async function writePrompt(dir: string, relPath: string, content: string): Promise<void> {
+async function writePrompt(
+  dir: string,
+  relPath: string,
+  content: string
+): Promise<void> {
   const fullPath = path.join(dir, relPath);
   await fs.mkdir(path.dirname(fullPath), { recursive: true });
   await fs.writeFile(fullPath, content, 'utf-8');
@@ -42,9 +46,11 @@ const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) =>
-      fs.rm(dir, { recursive: true, force: true }).catch(() => undefined),
-    ),
+    tempDirs
+      .splice(0)
+      .map((dir) =>
+        fs.rm(dir, { recursive: true, force: true }).catch(() => undefined)
+      )
   );
 });
 
@@ -58,16 +64,20 @@ async function tempDir(): Promise<string> {
 
 describe('EC-6: empty/whitespace basePath', () => {
   it('throws RILL-R001 for empty string basePath', async () => {
-    await expect(createPromptMdExtension({ basePath: '' }, makeFactoryCtx())).rejects.toSatisfy(
+    await expect(
+      createPromptMdExtension({ basePath: '' }, makeFactoryCtx())
+    ).rejects.toSatisfy(
       (err: unknown) =>
-        err instanceof RuntimeError && err.errorId === 'RILL-R001',
+        err instanceof RuntimeError && err.errorId === 'RILL-R001'
     );
   });
 
   it('throws RILL-R001 for whitespace-only basePath', async () => {
-    await expect(createPromptMdExtension({ basePath: '   ' }, makeFactoryCtx())).rejects.toSatisfy(
+    await expect(
+      createPromptMdExtension({ basePath: '   ' }, makeFactoryCtx())
+    ).rejects.toSatisfy(
       (err: unknown) =>
-        err instanceof RuntimeError && err.errorId === 'RILL-R001',
+        err instanceof RuntimeError && err.errorId === 'RILL-R001'
     );
   });
 });
@@ -75,9 +85,13 @@ describe('EC-6: empty/whitespace basePath', () => {
 describe('EC-7: non-existing path and file-as-basePath', () => {
   it('throws RILL-R001 when basePath does not exist', async () => {
     await expect(
-      createPromptMdExtension({ basePath: '/tmp/rill-nonexistent-12345678' }, makeFactoryCtx()),
+      createPromptMdExtension(
+        { basePath: '/tmp/rill-nonexistent-12345678' },
+        makeFactoryCtx()
+      )
     ).rejects.toSatisfy(
-      (err: unknown) => err instanceof RuntimeError && err.errorId === 'RILL-R001',
+      (err: unknown) =>
+        err instanceof RuntimeError && err.errorId === 'RILL-R001'
     );
   });
 
@@ -85,8 +99,11 @@ describe('EC-7: non-existing path and file-as-basePath', () => {
     const dir = await tempDir();
     const filePath = path.join(dir, 'file.txt');
     await fs.writeFile(filePath, 'content', 'utf-8');
-    await expect(createPromptMdExtension({ basePath: filePath }, makeFactoryCtx())).rejects.toSatisfy(
-      (err: unknown) => err instanceof RuntimeError && err.errorId === 'RILL-R001',
+    await expect(
+      createPromptMdExtension({ basePath: filePath }, makeFactoryCtx())
+    ).rejects.toSatisfy(
+      (err: unknown) =>
+        err instanceof RuntimeError && err.errorId === 'RILL-R001'
     );
   });
 });
@@ -105,7 +122,7 @@ params: []
 output: string
 ---
 body
-`,
+`
     );
     let caught: unknown;
     try {
@@ -133,7 +150,7 @@ params: []
 output: string
 ---
 Hello {undeclared}!
-`,
+`
     );
     let caught: unknown;
     try {
@@ -186,10 +203,10 @@ description: Test
 params: []
 ---
 body
-`,
+`
     );
     await expect(
-      createPromptMdExtension({ basePath: dir }, makeFactoryCtx()),
+      createPromptMdExtension({ basePath: dir }, makeFactoryCtx())
     ).resolves.toBeDefined();
   });
 
@@ -203,7 +220,7 @@ params: []
 output: string
 ---
 body
-`,
+`
     );
     let caught: unknown;
     try {
@@ -227,7 +244,7 @@ description: Test
 output: string
 ---
 body
-`,
+`
     );
     let caught: unknown;
     try {
@@ -254,10 +271,16 @@ params: []
 output: dict
 ---
 body
-`,
+`
     );
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
-    const dict = ext.value as Record<string, { annotations: Record<string, unknown> }>;
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
+    const dict = ext.value as Record<
+      string,
+      { annotations: Record<string, unknown> }
+    >;
     expect(dict['stale_output']!.annotations['^output']).toBe('string');
   });
 
@@ -272,10 +295,16 @@ params: []
 output: json
 ---
 body
-`,
+`
     );
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
-    const dict = ext.value as Record<string, { annotations: Record<string, unknown> }>;
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
+    const dict = ext.value as Record<
+      string,
+      { annotations: Record<string, unknown> }
+    >;
     expect(dict['unknown_output']!.annotations['^output']).toBe('string');
   });
 });
@@ -293,7 +322,7 @@ params:
 output: string
 ---
 body
-`,
+`
     );
     let caught: unknown;
     try {
@@ -320,10 +349,16 @@ description: Test
 params: []
 ---
 No role markers here.
-`,
+`
     );
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
-    const dict = ext.value as Record<string, { annotations: Record<string, unknown> }>;
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
+    const dict = ext.value as Record<
+      string,
+      { annotations: Record<string, unknown> }
+    >;
     expect(dict['plain']!.annotations['^output']).toBe('string');
   });
 
@@ -340,10 +375,16 @@ params: []
 You are a helper.
 @@ user
 Hello.
-`,
+`
     );
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
-    const dict = ext.value as Record<string, { annotations: Record<string, unknown> }>;
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
+    const dict = ext.value as Record<
+      string,
+      { annotations: Record<string, unknown> }
+    >;
     expect(dict['chat']!.annotations['^output']).toBe('list');
   });
 });
@@ -361,7 +402,7 @@ describe('AC-13: single malformed file among valid ones surfaces error', () => {
 params: []
 ---
 body
-`,
+`
     );
     let caught: unknown;
     try {
@@ -401,7 +442,7 @@ describe('AC-20: package.json has no cross-extension dependencies', () => {
       (dep) =>
         dep.startsWith('@rcrsr/rill-ext-') &&
         !dep.endsWith('-shared') &&
-        dep !== '@rcrsr/rill-ext-prompt-md',
+        dep !== '@rcrsr/rill-ext-prompt-md'
     );
 
     expect(extSiblings).toHaveLength(0);

@@ -34,7 +34,9 @@ export interface TraversalEntry {
  * @param basePath - Absolute path to the directory to scan.
  * @returns Ordered array of `{ absolutePath, relativePath }` pairs.
  */
-export async function traversePromptFiles(basePath: string): Promise<TraversalEntry[]> {
+export async function traversePromptFiles(
+  basePath: string
+): Promise<TraversalEntry[]> {
   const results: TraversalEntry[] = [];
 
   const recurse = async (currentPath: string): Promise<void> => {

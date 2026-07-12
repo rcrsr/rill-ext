@@ -7,13 +7,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  createRuntimeContext,
-  type ApplicationCallable,
-} from '@rcrsr/rill';
+import { createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
 import { createFoundryExtension } from '../src/factory.js';
 import type { FoundryConfig } from '../src/types.js';
-import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
+import { expectRejectedHalt, expectHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MOCK SETUP
@@ -61,7 +58,10 @@ vi.mock('openai', () => {
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -174,8 +174,9 @@ describe('embed() function', () => {
     const ctx = createRuntimeContext();
 
     await expectRejectedHalt(
-      getCallable(ext, 'embed').fn({ text: 'test' }, ctx)
-    , { message: 'embed_model not configured' });
+      getCallable(ext, 'embed').fn({ text: 'test' }, ctx),
+      { message: 'embed_model not configured' }
+    );
   });
 
   // AC-4: throws RuntimeError for empty text
@@ -183,9 +184,9 @@ describe('embed() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    await expectRejectedHalt(
-      getCallable(ext, 'embed').fn({ text: '' }, ctx)
-    , { message: 'embed text cannot be empty' });
+    await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: '' }, ctx), {
+      message: 'embed text cannot be empty',
+    });
   });
 
   // AC-4: throws RuntimeError for whitespace-only text
@@ -194,8 +195,9 @@ describe('embed() function', () => {
     const ctx = createRuntimeContext();
 
     await expectRejectedHalt(
-      getCallable(ext, 'embed').fn({ text: '   \t\n  ' }, ctx)
-    , { message: 'embed text cannot be empty' });
+      getCallable(ext, 'embed').fn({ text: '   \t\n  ' }, ctx),
+      { message: 'embed text cannot be empty' }
+    );
   });
 
   // AC-4: calls embeddings API with correct model and text
@@ -329,8 +331,9 @@ describe('embed_batch() function', () => {
     const ctx = createRuntimeContext();
 
     await expectRejectedHalt(
-      getCallable(ext, 'embed_batch').fn({ texts: ['test'] }, ctx)
-    , { message: 'embed_model not configured' });
+      getCallable(ext, 'embed_batch').fn({ texts: ['test'] }, ctx),
+      { message: 'embed_model not configured' }
+    );
   });
 
   // AC-5: throws RuntimeError for non-string element
@@ -339,8 +342,12 @@ describe('embed_batch() function', () => {
     const ctx = createRuntimeContext();
 
     await expectRejectedHalt(
-      getCallable(ext, 'embed_batch').fn({ texts: ['valid', 123, 'text'] }, ctx)
-    , { message: 'embed_batch requires list of strings' });
+      getCallable(ext, 'embed_batch').fn(
+        { texts: ['valid', 123, 'text'] },
+        ctx
+      ),
+      { message: 'embed_batch requires list of strings' }
+    );
   });
 
   // AC-5: sends all texts to the embeddings API

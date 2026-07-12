@@ -52,12 +52,21 @@ rill-ext is a pnpm workspace containing official extensions for the rill languag
 
 ```bash
 pnpm install             # Install dependencies
-pnpm run -r build        # Build all packages
-pnpm run -r test         # Run tests
-pnpm run -r typecheck    # Type validation
-pnpm run -r lint         # Check lint errors
-pnpm run -r check        # Complete validation (build, test, lint)
+pnpm run build            # Build all packages
+pnpm run test             # Run tests
+pnpm run check:types      # Type validation (tsc, TypeScript 7)
+pnpm run check:lint       # Check lint errors (oxlint)
+pnpm run check:format     # Check formatting (oxfmt --check)
+pnpm run check:deps       # Check unused dependencies/exports (knip)
+pnpm run fix:lint         # Auto-fix lint errors (oxlint --fix)
+pnpm run fix:format       # Auto-format files (oxfmt)
+pnpm run check            # Complete validation (types, lint, format, deps, build, test)
 ```
+
+Git hooks (via `lefthook`, installed automatically on `pnpm install`):
+
+- `pre-commit`: runs `oxfmt` and `oxlint --fix` on staged files, then stages the fixes.
+- `pre-push`: runs `pnpm -r run typecheck` and `pnpm -r run test`.
 
 Package-specific:
 
@@ -81,7 +90,7 @@ All extension packages declare `@rcrsr/rill` as a `peerDependency`. The core run
 Extensions use semver with two rules:
 
 1. **Minor version compatibility**: an extension's `peerDependency` on `@rcrsr/rill` matches by minor version (e.g., `rill@0.4.x` works with any extension at `0.4.y`). A rill minor bump requires a corresponding extension minor bump.
-2. **Patch version per change**: bump the extension's patch version for each publish, regardless of change size.
+2. **Patch version per release**: each published release increments at least the extension's patch version. Versions are decided and applied at release time, never on the feature/fix PR that introduces the change.
 
 ## Release Process
 
@@ -89,13 +98,15 @@ Releases are tag-driven. Each extension tracks its own version in its `package.j
 
 To release:
 
-1. On a `release/vX.Y.Z` branch, bump the root `package.json` to `X.Y.Z` and stamp the `[Unreleased]` section of root `CHANGELOG.md` as `[X.Y.Z] - <date>`.
+1. On a `release/vX.Y.Z` branch, set the root `package.json` to `X.Y.Z` and update the root `CHANGELOG.md` through the explicit changelog command (which stamps the `[Unreleased]` section as `[X.Y.Z] - <date>`). Do not hand-edit the changelog.
 2. Open a PR, merge to `main`.
 3. From `main`: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
 The `release.yml` workflow triggers on the tag push, builds, tests, then publishes every non-private `packages/ext/*` whose `name@version` is not yet on npm (already-published versions are skipped). It then creates a GitHub Release with auto-generated notes.
 
-Per-extension version bumps (and per-package `CHANGELOG.md` entries) happen on the feature/fix PR that introduces the change, not on the release PR.
+Version numbers are release-time actions: the release tooling bumps every `version` field and stamps the `[Unreleased]` changelog section as `[X.Y.Z] - <date>`. A feature or fix PR never edits a `version` field.
+
+Changelog `[Unreleased]` entries are authored at PR time, not release time. Every PR that changes published behavior adds a bullet under the `## [Unreleased]` section of the root `CHANGELOG.md` and of each affected package `CHANGELOG.md`; `/conduct:open-pr` does this automatically. The release tooling only stamps those accumulated entries with the version and date, it does not write them.
 
 ## Architecture
 

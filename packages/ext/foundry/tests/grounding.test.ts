@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RuntimeError, createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
-import { expectRejectedHalt, expectHalt } from "./_halt-helpers.js";
+import { expectRejectedHalt, expectHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MODULE MOCK
@@ -82,7 +82,8 @@ function configWithGrounding(): FoundryConfig {
       apiVersion: '2025-01-01-preview',
     },
     grounding: {
-      connectionId: '/subscriptions/sub-123/resourceGroups/rg/providers/Microsoft.CognitiveServices/accounts/foundry/connections/bing-search',
+      connectionId:
+        '/subscriptions/sub-123/resourceGroups/rg/providers/Microsoft.CognitiveServices/accounts/foundry/connections/bing-search',
     },
   };
 }
@@ -115,7 +116,10 @@ function configWithoutGrounding(): FoundryConfig {
  * Build a mock AzureOpenAI responses.create() result.
  * Includes one message output item with output_text content and url_citation annotation.
  */
-function buildGroundingResponse(answer: string, citations: Array<{ url: string; title: string }>) {
+function buildGroundingResponse(
+  answer: string,
+  citations: Array<{ url: string; title: string }>
+) {
   const annotations = citations.map((c, i) => ({
     type: 'url_citation' as const,
     url: c.url,
@@ -144,12 +148,16 @@ function buildGroundingResponse(answer: string, citations: Array<{ url: string; 
 }
 
 /** Empty grounding response with no citations. */
-const EMPTY_GROUNDING_RESPONSE = buildGroundingResponse('No results found.', []);
+const EMPTY_GROUNDING_RESPONSE = buildGroundingResponse(
+  'No results found.',
+  []
+);
 
 /** Grounding response with one citation. */
-const ONE_CITATION_RESPONSE = buildGroundingResponse('Azure is a cloud platform.', [
-  { url: 'https://azure.microsoft.com', title: 'Microsoft Azure' },
-]);
+const ONE_CITATION_RESPONSE = buildGroundingResponse(
+  'Azure is a cloud platform.',
+  [{ url: 'https://azure.microsoft.com', title: 'Microsoft Azure' }]
+);
 
 /** Grounding response with two citations. */
 const TWO_CITATION_RESPONSE = buildGroundingResponse(
@@ -286,7 +294,9 @@ describe('ground() host function', () => {
       await getHostFn(ext, 'ground').fn({ query: 'What is Azure?' }, ctx);
 
       expect(mockResponsesCreate).toHaveBeenCalledOnce();
-      const [callArgs] = mockResponsesCreate.mock.calls[0] as [Record<string, unknown>];
+      const [callArgs] = mockResponsesCreate.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
       expect(Array.isArray(callArgs['tools'])).toBe(true);
       const tools = callArgs['tools'] as Array<Record<string, unknown>>;
       expect(tools[0]!['type']).toBe('bing_grounding');
@@ -301,7 +311,9 @@ describe('ground() host function', () => {
 
       await getHostFn(ext, 'ground').fn({ query: 'What is Azure?' }, ctx);
 
-      const [callArgs] = mockResponsesCreate.mock.calls[0] as [Record<string, unknown>];
+      const [callArgs] = mockResponsesCreate.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
       expect(callArgs['input']).toBe('What is Azure?');
     });
 
@@ -314,15 +326,17 @@ describe('ground() host function', () => {
 
       await getHostFn(ext, 'ground').fn({ query: 'test' }, ctx);
 
-      const [callArgs] = mockResponsesCreate.mock.calls[0] as [Record<string, unknown>];
+      const [callArgs] = mockResponsesCreate.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
       const tools = callArgs['tools'] as Array<Record<string, unknown>>;
       const bingTool = tools[0] as Record<string, unknown>;
       const bingGrounding = bingTool['bing_grounding'] as {
         search_configurations: Array<{ project_connection_id: string }>;
       };
-      expect(bingGrounding.search_configurations[0]!.project_connection_id).toContain(
-        'bing-search'
-      );
+      expect(
+        bingGrounding.search_configurations[0]!.project_connection_id
+      ).toContain('bing-search');
     });
 
     it('uses grounding.model when set instead of inference.model', async () => {
@@ -334,7 +348,9 @@ describe('ground() host function', () => {
 
       await getHostFn(ext, 'ground').fn({ query: 'test' }, ctx);
 
-      const [callArgs] = mockResponsesCreate.mock.calls[0] as [Record<string, unknown>];
+      const [callArgs] = mockResponsesCreate.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
       expect(callArgs['model']).toBe('gpt-4o-grounding');
     });
 
@@ -347,7 +363,9 @@ describe('ground() host function', () => {
 
       await getHostFn(ext, 'ground').fn({ query: 'test' }, ctx);
 
-      const [callArgs] = mockResponsesCreate.mock.calls[0] as [Record<string, unknown>];
+      const [callArgs] = mockResponsesCreate.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
       expect(callArgs['model']).toBe('gpt-4o');
     });
   });
@@ -374,8 +392,9 @@ describe('ground() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      , { message: 'foundry: grounding connection not configured' });
+        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
+        { message: 'foundry: grounding connection not configured' }
+      );
     });
 
     it('responses.create is not called when grounding not configured [AC-20]', async () => {
@@ -406,8 +425,9 @@ describe('ground() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      , { message: 'grounding requires a model' });
+        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
+        { message: 'grounding requires a model' }
+      );
     });
   });
 
@@ -485,8 +505,9 @@ describe('ground() host function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      , { message: 'Connection refused' });
+        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
+        { message: 'Connection refused' }
+      );
     });
   });
 });

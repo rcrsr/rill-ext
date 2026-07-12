@@ -40,7 +40,11 @@ describe('introspection integration', () => {
       };
 
       // Act
-      const dicts = createIntrospectionDicts(toolFunctions, resourceFunctions, promptFunctions);
+      const dicts = createIntrospectionDicts(
+        toolFunctions,
+        resourceFunctions,
+        promptFunctions
+      );
 
       // Assert - all three dicts are present
       expect(dicts.tools).toBeDefined();
@@ -118,7 +122,8 @@ describe('introspection integration', () => {
       const dicts = createIntrospectionDicts(toolFunctions, {}, {});
 
       // Modify source after dict creation (should not affect result)
-      (toolFunctions as Record<string, RillFunction>)['tool2'] = makeRillFn('Second');
+      (toolFunctions as Record<string, RillFunction>)['tool2'] =
+        makeRillFn('Second');
 
       // Assert - still contains only original data (captured at creation)
       expect(Object.keys(dicts.tools)).toHaveLength(1);

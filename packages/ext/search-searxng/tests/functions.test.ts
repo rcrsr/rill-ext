@@ -14,7 +14,7 @@ import {
   type ApplicationCallable,
   type ExtensionFactoryCtx,
   type RillValue,
-} from "@rcrsr/rill";
+} from '@rcrsr/rill';
 import { createSearxngExtension } from '../src/factory.js';
 
 function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
@@ -39,12 +39,18 @@ import type { SearxngConfig } from '../src/types.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /** Build a fetch mock that returns a JSON response with given status. */
-function mockFetchJson(status: number, body: unknown): ReturnType<typeof vi.fn> {
+function mockFetchJson(
+  status: number,
+  body: unknown
+): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -62,7 +68,9 @@ function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
-    json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
+    json: vi
+      .fn()
+      .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
   });
 }
 
@@ -70,13 +78,18 @@ function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
  * Create a test extension with the probe mocked to succeed.
  * After creation, globalThis.fetch is reset so each test can set its own mock.
  */
-async function createTestExtension(config?: Partial<SearxngConfig>): Promise<{ value: unknown; dispose?: () => Promise<void> }> {
+async function createTestExtension(
+  config?: Partial<SearxngConfig>
+): Promise<{ value: unknown; dispose?: () => Promise<void> }> {
   globalThis.fetch = vi.fn().mockResolvedValueOnce({
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue({ formats: ['html', 'json'] }),
   });
-  return createSearxngExtension({ baseUrl: 'http://localhost:8888', ...config }, makeFactoryCtx());
+  return createSearxngExtension(
+    { baseUrl: 'http://localhost:8888', ...config },
+    makeFactoryCtx()
+  );
 }
 
 // ============================================================
@@ -87,7 +100,11 @@ const SEARCH_RESPONSE = {
   query: 'TypeScript tutorials',
   number_of_results: 2,
   results: [
-    { url: 'https://example.com/1', title: 'TS Guide', content: 'Content here' },
+    {
+      url: 'https://example.com/1',
+      title: 'TS Guide',
+      content: 'Content here',
+    },
     { url: 'https://example.com/2', title: 'TS Docs', content: 'More content' },
   ],
 };
@@ -96,7 +113,7 @@ const CONFIG_RESPONSE = {
   categories: ['general', 'images', 'news'],
   engines: [{ name: 'google', shortcut: 'g' }],
   plugins: ['limiter', 'oa_doi_rewrite'],
-  locales: { 'en': 'English' },
+  locales: { en: 'English' },
 };
 
 // ============================================================
@@ -173,11 +190,17 @@ describe('SearXNG extension host functions', () => {
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect((init.headers as Record<string, string> | undefined)?.['Authorization']).toBeUndefined();
+      expect(
+        (init.headers as Record<string, string> | undefined)?.['Authorization']
+      ).toBeUndefined();
     });
 
     it('accepts number_of_results: 0 as valid [AC-40]', async () => {
-      const zeroResults = { ...SEARCH_RESPONSE, number_of_results: 0, results: [] };
+      const zeroResults = {
+        ...SEARCH_RESPONSE,
+        number_of_results: 0,
+        results: [],
+      };
       const ext = await createTestExtension();
       globalThis.fetch = mockFetchJson(200, zeroResults);
       const ctx = createRuntimeContext();
@@ -212,7 +235,13 @@ describe('SearXNG extension host functions', () => {
       const ext = await createTestExtension();
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'search').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'search').fn({ query: '' }, ctx),
@@ -383,7 +412,13 @@ describe('SearXNG extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'search').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -416,7 +451,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchJson(200, CONFIG_RESPONSE);
       const ctx = createRuntimeContext();
 
-      const result = (await getCallable(ext, 'config').fn({}, ctx)) as Record<string, unknown>;
+      const result = (await getCallable(ext, 'config').fn({}, ctx)) as Record<
+        string,
+        unknown
+      >;
 
       expect(result['categories']).toBeDefined();
       expect(result['engines']).toBeDefined();
@@ -429,7 +467,10 @@ describe('SearXNG extension host functions', () => {
       globalThis.fetch = mockFetchJson(200, CONFIG_RESPONSE);
       const ctx = createRuntimeContext();
 
-      const result = (await getCallable(ext, 'config').fn({}, ctx)) as Record<string, unknown>;
+      const result = (await getCallable(ext, 'config').fn({}, ctx)) as Record<
+        string,
+        unknown
+      >;
 
       expect(Array.isArray(result['categories'])).toBe(true);
     });
@@ -518,7 +559,10 @@ describe('SearXNG extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'config').fn({}, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'config').fn({}, ctx)) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -550,24 +594,26 @@ describe('SearXNG extension host functions', () => {
       const ext = await createTestExtension();
 
       // Mock fetch that hangs until its signal is aborted
-      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-        return new Promise((_resolve, reject) => {
-          const signal = init?.signal;
-          if (signal) {
-            if (signal.aborted) {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-              return;
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              if (signal.aborted) {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+                return;
+              }
+              signal.addEventListener('abort', () => {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+              });
             }
-            signal.addEventListener('abort', () => {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-            });
-          }
+          });
         });
-      });
 
       const ctx = createRuntimeContext();
 

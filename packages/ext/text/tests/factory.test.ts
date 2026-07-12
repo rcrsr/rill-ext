@@ -48,7 +48,7 @@ describe('text extension factory', () => {
       }
 
       expect(Object.keys(ext.value as Record<string, unknown>)).toHaveLength(
-        EXPECTED_FUNCTIONS.length,
+        EXPECTED_FUNCTIONS.length
       );
     });
 

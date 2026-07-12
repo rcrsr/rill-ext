@@ -30,7 +30,10 @@ export function createFunctionWrapper(
     ctx: RuntimeContext
   ) => Promise<RillValue>,
   metadata?: (args: Record<string, RillValue>) => Record<string, unknown>
-) => (args: Record<string, RillValue>, ctx: RuntimeContext) => Promise<RillValue> {
+) => (
+  args: Record<string, RillValue>,
+  ctx: RuntimeContext
+) => Promise<RillValue> {
   return (operation, fn, metadata) => {
     return async (
       args: Record<string, RillValue>,

@@ -20,14 +20,17 @@ import type { GeminiExtensionConfig } from '../src/types.js';
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /** Consume a RillStream to completion and return the resolved dict. */
 async function collectStream(
   stream: RillValue,
-  ctx: ReturnType<typeof createRuntimeContext>,
+  ctx: ReturnType<typeof createRuntimeContext>
 ): Promise<{ chunks: string[]; resolved: Record<string, unknown> }> {
   const chunks: string[] = [];
   let current = stream as RillStream;
@@ -48,7 +51,7 @@ async function collectStream(
 
 /** Build an async generator that yields simple text chunks. */
 async function* makeChunksIterable(
-  chunks: string[],
+  chunks: string[]
 ): AsyncGenerator<{ text: string }> {
   for (const text of chunks) {
     yield { text };
@@ -122,8 +125,14 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<string, unknown>;
-      const contents = call['contents'] as Array<{ role: string; parts: unknown[] }>;
+      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      const contents = call['contents'] as Array<{
+        role: string;
+        parts: unknown[];
+      }>;
 
       // Canonical assistant turn must appear as 'model' on the wire
       expect(contents[1]!.role).toBe('model');
@@ -142,7 +151,10 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<string, unknown>;
+      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
       const contents = call['contents'] as Array<{ role: string }>;
 
       expect(contents[0]!.role).toBe('user');
@@ -167,7 +179,10 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<string, unknown>;
+      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
       const config = call['config'] as Record<string, unknown>;
       const contents = call['contents'] as Array<{ role: string }>;
 
@@ -199,8 +214,14 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<string, unknown>;
-      const contents = call['contents'] as Array<{ role: string; parts: Array<Record<string, unknown>> }>;
+      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      const contents = call['contents'] as Array<{
+        role: string;
+        parts: Array<Record<string, unknown>>;
+      }>;
 
       expect(contents).toHaveLength(1);
       expect(contents[0]!.role).toBe('user');
@@ -224,7 +245,11 @@ describe('Gemini wire-format translation', () => {
           parts: [
             {
               type: 'image',
-              source: { kind: 'base64', data: 'abc123', media_type: 'image/png' },
+              source: {
+                kind: 'base64',
+                data: 'abc123',
+                media_type: 'image/png',
+              },
             },
           ],
         },
@@ -233,11 +258,20 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<string, unknown>;
-      const contents = call['contents'] as Array<{ role: string; parts: Array<Record<string, unknown>> }>;
+      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      const contents = call['contents'] as Array<{
+        role: string;
+        parts: Array<Record<string, unknown>>;
+      }>;
       const part = contents[0]!.parts[0]!;
 
-      expect(part['inlineData']).toEqual({ mimeType: 'image/png', data: 'abc123' });
+      expect(part['inlineData']).toEqual({
+        mimeType: 'image/png',
+        data: 'abc123',
+      });
     });
 
     it('url image → fileData Part with fileUri and mimeType', async () => {
@@ -263,8 +297,14 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<string, unknown>;
-      const contents = call['contents'] as Array<{ role: string; parts: Array<Record<string, unknown>> }>;
+      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      const contents = call['contents'] as Array<{
+        role: string;
+        parts: Array<Record<string, unknown>>;
+      }>;
       const part = contents[0]!.parts[0]!;
 
       expect(part['fileData']).toEqual({
@@ -293,7 +333,11 @@ describe('Gemini wire-format translation', () => {
         {
           role: 'user',
           parts: [
-            { type: 'tool_result', id: 'tu_1', parts: [{ type: 'text', text: 'result' }] },
+            {
+              type: 'tool_result',
+              id: 'tu_1',
+              parts: [{ type: 'text', text: 'result' }],
+            },
           ],
         },
       ];
@@ -301,18 +345,27 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<string, unknown>;
-      const contents = call['contents'] as Array<{ role: string; parts: Array<Record<string, unknown>> }>;
+      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      const contents = call['contents'] as Array<{
+        role: string;
+        parts: Array<Record<string, unknown>>;
+      }>;
 
       // First content item (from assistant turn) should have a functionCall Part
       const assistantContent = contents.find((c) => c.role === 'model');
       expect(assistantContent).toBeDefined();
 
       const functionCallPart = assistantContent!.parts.find(
-        (p) => 'functionCall' in p,
+        (p) => 'functionCall' in p
       );
       expect(functionCallPart).toBeDefined();
-      expect(functionCallPart!['functionCall']).toEqual({ name: 'fn', args: { x: 1 } });
+      expect(functionCallPart!['functionCall']).toEqual({
+        name: 'fn',
+        args: { x: 1 },
+      });
     });
   });
 
@@ -324,7 +377,9 @@ describe('Gemini wire-format translation', () => {
     /** Returns all Parts from all Content objects in a generateContentStream call. */
     function extractAllParts(callArg: unknown): Array<Record<string, unknown>> {
       const arg = callArg as Record<string, unknown>;
-      const contents = arg['contents'] as Array<{ parts: Array<Record<string, unknown>> }>;
+      const contents = arg['contents'] as Array<{
+        parts: Array<Record<string, unknown>>;
+      }>;
       return contents.flatMap((c) => c.parts);
     }
 
@@ -332,10 +387,15 @@ describe('Gemini wire-format translation', () => {
       const ext = createGeminiExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const stream = await getCallable(ext, 'message').fn({ prompt: 'hello' }, ctx);
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'hello' },
+        ctx
+      );
       await collectStream(stream, ctx);
 
-      const parts = extractAllParts(mockGenerateContentStream.mock.calls[0]![0]);
+      const parts = extractAllParts(
+        mockGenerateContentStream.mock.calls[0]![0]
+      );
       for (const part of parts) {
         const keys = Object.keys(part);
         if ('text' in part) {
@@ -358,7 +418,11 @@ describe('Gemini wire-format translation', () => {
           parts: [
             {
               type: 'image',
-              source: { kind: 'base64', data: 'b64data', media_type: 'image/jpeg' },
+              source: {
+                kind: 'base64',
+                data: 'b64data',
+                media_type: 'image/jpeg',
+              },
             },
           ],
         },
@@ -367,7 +431,9 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const parts = extractAllParts(mockGenerateContentStream.mock.calls[0]![0]);
+      const parts = extractAllParts(
+        mockGenerateContentStream.mock.calls[0]![0]
+      );
       for (const part of parts) {
         if ('inlineData' in part) {
           const keys = Object.keys(part);
@@ -405,7 +471,9 @@ describe('Gemini wire-format translation', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       await collectStream(stream, ctx);
 
-      const parts = extractAllParts(mockGenerateContentStream.mock.calls[0]![0]);
+      const parts = extractAllParts(
+        mockGenerateContentStream.mock.calls[0]![0]
+      );
       for (const part of parts) {
         if ('functionCall' in part) {
           const keys = Object.keys(part);

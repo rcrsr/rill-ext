@@ -54,7 +54,7 @@ export function validateConfig(config: OutlookConfig): void {
   if (config.auth.type !== 'bearer' && config.auth.type !== 'session') {
     throw new RuntimeError(
       'RILL-R001',
-      "outlook: auth.type must be 'bearer' or 'session'",
+      "outlook: auth.type must be 'bearer' or 'session'"
     );
   }
 
@@ -73,19 +73,16 @@ export function validateConfig(config: OutlookConfig): void {
   if (config.mail?.maxResults !== undefined) {
     const max = config.mail.maxResults;
     if (!Number.isInteger(max) || max < 1 || max > 1000) {
-      throw new RuntimeError(
-        'RILL-R001',
-        'outlook: maxResults must be 1-1000',
-      );
+      throw new RuntimeError('RILL-R001', 'outlook: maxResults must be 1-1000');
     }
   }
 
   if (config.mail?.folders !== undefined) {
-    if (!Array.isArray(config.mail.folders) || config.mail.folders.length === 0) {
-      throw new RuntimeError(
-        'RILL-R001',
-        'outlook: folders must be non-empty',
-      );
+    if (
+      !Array.isArray(config.mail.folders) ||
+      config.mail.folders.length === 0
+    ) {
+      throw new RuntimeError('RILL-R001', 'outlook: folders must be non-empty');
     }
   }
 }
@@ -107,7 +104,7 @@ export function mergeCapabilities(
       readonly read: boolean;
       readonly create: boolean;
     }>;
-  }>,
+  }>
 ): OutlookCapabilities {
   if (!partial) {
     return DEFAULT_CAPABILITIES;

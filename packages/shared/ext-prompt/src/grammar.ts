@@ -34,7 +34,10 @@ function validateName(name: string): void {
     throw new RuntimeError('RILL-R001', 'param name must not be empty');
   }
   if (/\s/.test(name)) {
-    throw new RuntimeError('RILL-R001', 'param name must be a valid identifier');
+    throw new RuntimeError(
+      'RILL-R001',
+      'param name must be a valid identifier'
+    );
   }
 }
 
@@ -70,7 +73,7 @@ export function parseParamGrammar(entry: string): RillParam {
   if (colonIdx === -1) {
     throw new RuntimeError(
       'RILL-R001',
-      `malformed param entry — expected "name: type" or "name: type = default", got: "${entry}"`,
+      `malformed param entry — expected "name: type" or "name: type = default", got: "${entry}"`
     );
   }
 
@@ -104,11 +107,14 @@ export function parseParamGrammar(entry: string): RillParam {
     if (err instanceof RuntimeError) throw err;
     throw new RuntimeError(
       'RILL-R001',
-      `failed to parse param type "${typeExpr}": ${String((err as Error).message ?? err)}`,
+      `failed to parse param type "${typeExpr}": ${String((err as Error).message ?? err)}`
     );
   }
 
-  const defaultValue = rawDefault === undefined ? undefined : coerceDefault(name, structure, rawDefault);
+  const defaultValue =
+    rawDefault === undefined
+      ? undefined
+      : coerceDefault(name, structure, rawDefault);
 
   return {
     name,
@@ -130,7 +136,7 @@ export function parseParamGrammar(entry: string): RillParam {
 function coerceDefault(
   name: string,
   structure: TypeStructure,
-  raw: string,
+  raw: string
 ): string | number | boolean {
   if (structure.kind === 'string') {
     // Strip surrounding quotes if present; otherwise use verbatim.
@@ -147,7 +153,7 @@ function coerceDefault(
     if (!Number.isFinite(n)) {
       throw new RuntimeError(
         'RILL-R001',
-        `default value for number param "${name}" is not a valid number: "${raw}"`,
+        `default value for number param "${name}" is not a valid number: "${raw}"`
       );
     }
     return n;
@@ -156,13 +162,13 @@ function coerceDefault(
     if (raw !== 'true' && raw !== 'false') {
       throw new RuntimeError(
         'RILL-R001',
-        `default value for bool param "${name}" must be "true" or "false", got: "${raw}"`,
+        `default value for bool param "${name}" must be "true" or "false", got: "${raw}"`
       );
     }
     return raw === 'true';
   }
   throw new RuntimeError(
     'RILL-R001',
-    `defaults for param type "${structure.kind}" are not supported in v0 (param: "${name}")`,
+    `defaults for param type "${structure.kind}" are not supported in v0 (param: "${name}")`
   );
 }

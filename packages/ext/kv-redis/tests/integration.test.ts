@@ -38,11 +38,16 @@ import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
  */
 function getCallable(
   ext: { value: unknown },
-  name: string,
+  name: string
 ): { fn: (args: Record<string, unknown>) => Promise<unknown> } {
   const value = ext.value as Record<
     string,
-    { fn: (args: Record<string, unknown>, ctx: unknown) => unknown | Promise<unknown> }
+    {
+      fn: (
+        args: Record<string, unknown>,
+        ctx: unknown
+      ) => unknown | Promise<unknown>;
+    }
   >;
   const callable = value[name]!;
   return {
@@ -127,10 +132,16 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const name = await getCallable(ext, 'get').fn({ mount: 'user', key: 'name' });
+      const name = await getCallable(ext, 'get').fn({
+        mount: 'user',
+        key: 'name',
+      });
       expect(name).toBe('Anonymous');
 
-      const count = await getCallable(ext, 'get').fn({ mount: 'user', key: 'count' });
+      const count = await getCallable(ext, 'get').fn({
+        mount: 'user',
+        key: 'count',
+      });
       expect(count).toBe(0);
     });
 
@@ -148,7 +159,10 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = await getCallable(ext, 'get').fn({ mount: 'cache', key: 'missing' });
+      const result = await getCallable(ext, 'get').fn({
+        mount: 'cache',
+        key: 'missing',
+      });
       expect(result).toBe('');
     });
 
@@ -166,8 +180,15 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key', value: 'value' });
-      const result = await getCallable(ext, 'get').fn({ mount: 'state', key: 'key' });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key',
+        value: 'value',
+      });
+      const result = await getCallable(ext, 'get').fn({
+        mount: 'state',
+        key: 'key',
+      });
       expect(result).toBe('value');
     });
   });
@@ -187,7 +208,11 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = await getCallable(ext, 'get_or').fn({ mount: 'cache', key: 'missing', fallback: 'fallback' });
+      const result = await getCallable(ext, 'get_or').fn({
+        mount: 'cache',
+        key: 'missing',
+        fallback: 'fallback',
+      });
       expect(result).toBe('fallback');
     });
 
@@ -205,8 +230,16 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'cache', key: 'key', value: 'stored' });
-      const result = await getCallable(ext, 'get_or').fn({ mount: 'cache', key: 'key', fallback: 'fallback' });
+      await getCallable(ext, 'set').fn({
+        mount: 'cache',
+        key: 'key',
+        value: 'stored',
+      });
+      const result = await getCallable(ext, 'get_or').fn({
+        mount: 'cache',
+        key: 'key',
+        fallback: 'fallback',
+      });
       expect(result).toBe('stored');
     });
   });
@@ -226,10 +259,17 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = await getCallable(ext, 'set').fn({ mount: 'state', key: 'key', value: 'value' });
+      const result = await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key',
+        value: 'value',
+      });
       expect(result).toBe(true);
 
-      const value = await getCallable(ext, 'get').fn({ mount: 'state', key: 'key' });
+      const value = await getCallable(ext, 'get').fn({
+        mount: 'state',
+        key: 'key',
+      });
       expect(value).toBe('value');
     });
 
@@ -247,9 +287,13 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await expect(getCallable(ext, 'set').fn({ mount: 'readonly', key: 'key', value: 'value' })).rejects.toThrow(
-        `Mount 'readonly' is read-only`
-      );
+      await expect(
+        getCallable(ext, 'set').fn({
+          mount: 'readonly',
+          key: 'key',
+          value: 'value',
+        })
+      ).rejects.toThrow(`Mount 'readonly' is read-only`);
     });
 
     it('throws when value exceeds maxValueSize', async () => {
@@ -268,9 +312,13 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(ext);
 
       const largeValue = 'x'.repeat(20);
-      await expect(getCallable(ext, 'set').fn({ mount: 'limited', key: 'key', value: largeValue })).rejects.toThrow(
-        'exceeds size limit'
-      );
+      await expect(
+        getCallable(ext, 'set').fn({
+          mount: 'limited',
+          key: 'key',
+          value: largeValue,
+        })
+      ).rejects.toThrow('exceeds size limit');
     });
 
     it('validates type in declared mode', async () => {
@@ -290,9 +338,13 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await expect(getCallable(ext, 'set').fn({ mount: 'typed', key: 'count', value: 'string' })).rejects.toThrow(
-        'expects number, got string'
-      );
+      await expect(
+        getCallable(ext, 'set').fn({
+          mount: 'typed',
+          key: 'count',
+          value: 'string',
+        })
+      ).rejects.toThrow('expects number, got string');
     });
   });
 
@@ -311,11 +363,22 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'config', value: { a: 1, b: 2 } });
-      const result = await getCallable(ext, 'merge').fn({ mount: 'state', key: 'config', partial: { b: 3, c: 4 } });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'config',
+        value: { a: 1, b: 2 },
+      });
+      const result = await getCallable(ext, 'merge').fn({
+        mount: 'state',
+        key: 'config',
+        partial: { b: 3, c: 4 },
+      });
       expect(result).toBe(true);
 
-      const value = await getCallable(ext, 'get').fn({ mount: 'state', key: 'config' });
+      const value = await getCallable(ext, 'get').fn({
+        mount: 'state',
+        key: 'config',
+      });
       expect(value).toEqual({ a: 1, b: 3, c: 4 });
     });
 
@@ -333,10 +396,17 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = await getCallable(ext, 'merge').fn({ mount: 'state', key: 'new', partial: { x: 10 } });
+      const result = await getCallable(ext, 'merge').fn({
+        mount: 'state',
+        key: 'new',
+        partial: { x: 10 },
+      });
       expect(result).toBe(true);
 
-      const value = await getCallable(ext, 'get').fn({ mount: 'state', key: 'new' });
+      const value = await getCallable(ext, 'get').fn({
+        mount: 'state',
+        key: 'new',
+      });
       expect(value).toEqual({ x: 10 });
     });
 
@@ -354,9 +424,17 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'string', value: 'value' });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'string',
+        value: 'value',
+      });
       await expect(
-        getCallable(ext, 'merge').fn({ mount: 'state', key: 'string', partial: { x: 1 } })
+        getCallable(ext, 'merge').fn({
+          mount: 'state',
+          key: 'string',
+          partial: { x: 1 },
+        })
       ).rejects.toThrow('Cannot merge into non-dict value');
     });
 
@@ -375,7 +453,11 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(ext);
 
       await expect(
-        getCallable(ext, 'merge').fn({ mount: 'readonly', key: 'key', partial: { x: 1 } })
+        getCallable(ext, 'merge').fn({
+          mount: 'readonly',
+          key: 'key',
+          partial: { x: 1 },
+        })
       ).rejects.toThrow(`Mount 'readonly' is read-only`);
     });
   });
@@ -395,11 +477,21 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key', value: 'value' });
-      const result = await getCallable(ext, 'delete').fn({ mount: 'state', key: 'key' });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key',
+        value: 'value',
+      });
+      const result = await getCallable(ext, 'delete').fn({
+        mount: 'state',
+        key: 'key',
+      });
       expect(result).toBe(true);
 
-      const value = await getCallable(ext, 'get').fn({ mount: 'state', key: 'key' });
+      const value = await getCallable(ext, 'get').fn({
+        mount: 'state',
+        key: 'key',
+      });
       expect(value).toBe('');
     });
 
@@ -417,7 +509,10 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = await getCallable(ext, 'delete').fn({ mount: 'state', key: 'missing' });
+      const result = await getCallable(ext, 'delete').fn({
+        mount: 'state',
+        key: 'missing',
+      });
       expect(result).toBe(false);
     });
   });
@@ -437,9 +532,21 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key1', value: 'value1' });
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key2', value: 'value2' });
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key3', value: 'value3' });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key1',
+        value: 'value1',
+      });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key2',
+        value: 'value2',
+      });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key3',
+        value: 'value3',
+      });
 
       const keys = await getCallable(ext, 'keys').fn({ mount: 'state' });
       expect(keys).toHaveLength(3);
@@ -482,8 +589,15 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key', value: 'value' });
-      const result = await getCallable(ext, 'has').fn({ mount: 'state', key: 'key' });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key',
+        value: 'value',
+      });
+      const result = await getCallable(ext, 'has').fn({
+        mount: 'state',
+        key: 'key',
+      });
       expect(result).toBe(true);
     });
 
@@ -501,7 +615,10 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      const result = await getCallable(ext, 'has').fn({ mount: 'state', key: 'missing' });
+      const result = await getCallable(ext, 'has').fn({
+        mount: 'state',
+        key: 'missing',
+      });
       expect(result).toBe(false);
     });
   });
@@ -521,9 +638,21 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key1', value: 'value1' });
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key2', value: 'value2' });
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key3', value: 'value3' });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key1',
+        value: 'value1',
+      });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key2',
+        value: 'value2',
+      });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key3',
+        value: 'value3',
+      });
 
       const result = await getCallable(ext, 'clear').fn({ mount: 'state' });
       expect(result).toBe(true);
@@ -550,15 +679,29 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'user', key: 'name', value: 'Alice' });
-      await getCallable(ext, 'set').fn({ mount: 'user', key: 'count', value: 42 });
+      await getCallable(ext, 'set').fn({
+        mount: 'user',
+        key: 'name',
+        value: 'Alice',
+      });
+      await getCallable(ext, 'set').fn({
+        mount: 'user',
+        key: 'count',
+        value: 42,
+      });
 
       await getCallable(ext, 'clear').fn({ mount: 'user' });
 
-      const name = await getCallable(ext, 'get').fn({ mount: 'user', key: 'name' });
+      const name = await getCallable(ext, 'get').fn({
+        mount: 'user',
+        key: 'name',
+      });
       expect(name).toBe('Anonymous');
 
-      const count = await getCallable(ext, 'get').fn({ mount: 'user', key: 'count' });
+      const count = await getCallable(ext, 'get').fn({
+        mount: 'user',
+        key: 'count',
+      });
       expect(count).toBe(0);
     });
   });
@@ -578,9 +721,21 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key1', value: 'value1' });
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key2', value: 42 });
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'key3', value: { nested: true } });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key1',
+        value: 'value1',
+      });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key2',
+        value: 42,
+      });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'key3',
+        value: { nested: true },
+      });
 
       const result = await getCallable(ext, 'getAll').fn({ mount: 'state' });
       expect(result).toEqual({
@@ -726,9 +881,9 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await expect(getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
     });
 
     it('set throws for unknown mount', async () => {
@@ -745,9 +900,13 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await expect(getCallable(ext, 'set').fn({ mount: 'unknown', key: 'key', value: 'value' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'set').fn({
+          mount: 'unknown',
+          key: 'key',
+          value: 'value',
+        })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
     });
 
     it('keys throws for unknown mount', async () => {
@@ -764,9 +923,9 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await expect(getCallable(ext, 'keys').fn({ mount: 'unknown' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'keys').fn({ mount: 'unknown' })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
     });
   });
 
@@ -786,10 +945,17 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'session', key: 'token', value: 'abc123' });
+      await getCallable(ext, 'set').fn({
+        mount: 'session',
+        key: 'token',
+        value: 'abc123',
+      });
 
       // Key should exist
-      const exists = await getCallable(ext, 'has').fn({ mount: 'session', key: 'token' });
+      const exists = await getCallable(ext, 'has').fn({
+        mount: 'session',
+        key: 'token',
+      });
       expect(exists).toBe(true);
 
       // Verify TTL was set via raw Redis client
@@ -815,8 +981,16 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      await getCallable(ext, 'set').fn({ mount: 'session', key: 'data', value: { x: 1 } });
-      await getCallable(ext, 'merge').fn({ mount: 'session', key: 'data', partial: { y: 2 } });
+      await getCallable(ext, 'set').fn({
+        mount: 'session',
+        key: 'data',
+        value: { x: 1 },
+      });
+      await getCallable(ext, 'merge').fn({
+        mount: 'session',
+        key: 'data',
+        partial: { y: 2 },
+      });
 
       // Verify TTL was set via raw Redis client
       const rawClient = new Redis(REDIS_URL);
@@ -861,31 +1035,67 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(jsonExt, redisExt);
 
       // Execute identical operations on both backends
-      await getCallable(jsonExt, 'set').fn({ mount: 'state', key: 'count', value: 42 });
-      await getCallable(redisExt, 'set').fn({ mount: 'state', key: 'count', value: 42 });
+      await getCallable(jsonExt, 'set').fn({
+        mount: 'state',
+        key: 'count',
+        value: 42,
+      });
+      await getCallable(redisExt, 'set').fn({
+        mount: 'state',
+        key: 'count',
+        value: 42,
+      });
 
-      await getCallable(jsonExt, 'set').fn({ mount: 'state', key: 'name', value: 'Alice' });
-      await getCallable(redisExt, 'set').fn({ mount: 'state', key: 'name', value: 'Alice' });
+      await getCallable(jsonExt, 'set').fn({
+        mount: 'state',
+        key: 'name',
+        value: 'Alice',
+      });
+      await getCallable(redisExt, 'set').fn({
+        mount: 'state',
+        key: 'name',
+        value: 'Alice',
+      });
 
       // Verify identical results
-      const jsonCount = await getCallable(jsonExt, 'get').fn({ mount: 'state', key: 'count' });
-      const redisCount = await getCallable(redisExt, 'get').fn({ mount: 'state', key: 'count' });
+      const jsonCount = await getCallable(jsonExt, 'get').fn({
+        mount: 'state',
+        key: 'count',
+      });
+      const redisCount = await getCallable(redisExt, 'get').fn({
+        mount: 'state',
+        key: 'count',
+      });
       expect(jsonCount).toBe(redisCount);
       expect(jsonCount).toBe(42);
 
-      const jsonName = await getCallable(jsonExt, 'get').fn({ mount: 'state', key: 'name' });
-      const redisName = await getCallable(redisExt, 'get').fn({ mount: 'state', key: 'name' });
+      const jsonName = await getCallable(jsonExt, 'get').fn({
+        mount: 'state',
+        key: 'name',
+      });
+      const redisName = await getCallable(redisExt, 'get').fn({
+        mount: 'state',
+        key: 'name',
+      });
       expect(jsonName).toBe(redisName);
       expect(jsonName).toBe('Alice');
 
       // Test keys operation
-      const jsonKeys = await getCallable(jsonExt, 'keys').fn({ mount: 'state' });
-      const redisKeys = await getCallable(redisExt, 'keys').fn({ mount: 'state' });
+      const jsonKeys = await getCallable(jsonExt, 'keys').fn({
+        mount: 'state',
+      });
+      const redisKeys = await getCallable(redisExt, 'keys').fn({
+        mount: 'state',
+      });
       expect(jsonKeys?.sort()).toEqual(redisKeys?.sort());
 
       // Test getAll operation
-      const jsonAll = await getCallable(jsonExt, 'getAll').fn({ mount: 'state' });
-      const redisAll = await getCallable(redisExt, 'getAll').fn({ mount: 'state' });
+      const jsonAll = await getCallable(jsonExt, 'getAll').fn({
+        mount: 'state',
+      });
+      const redisAll = await getCallable(redisExt, 'getAll').fn({
+        mount: 'state',
+      });
       expect(jsonAll).toEqual(redisAll);
 
       // Cleanup
@@ -915,16 +1125,38 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(jsonExt, redisExt);
 
       // Set initial dict
-      await getCallable(jsonExt, 'set').fn({ mount: 'config', key: 'settings', value: { a: 1, b: 2 } });
-      await getCallable(redisExt, 'set').fn({ mount: 'config', key: 'settings', value: { a: 1, b: 2 } });
+      await getCallable(jsonExt, 'set').fn({
+        mount: 'config',
+        key: 'settings',
+        value: { a: 1, b: 2 },
+      });
+      await getCallable(redisExt, 'set').fn({
+        mount: 'config',
+        key: 'settings',
+        value: { a: 1, b: 2 },
+      });
 
       // Merge partial dict
-      await getCallable(jsonExt, 'merge').fn({ mount: 'config', key: 'settings', partial: { b: 3, c: 4 } });
-      await getCallable(redisExt, 'merge').fn({ mount: 'config', key: 'settings', partial: { b: 3, c: 4 } });
+      await getCallable(jsonExt, 'merge').fn({
+        mount: 'config',
+        key: 'settings',
+        partial: { b: 3, c: 4 },
+      });
+      await getCallable(redisExt, 'merge').fn({
+        mount: 'config',
+        key: 'settings',
+        partial: { b: 3, c: 4 },
+      });
 
       // Verify identical results
-      const jsonSettings = await getCallable(jsonExt, 'get').fn({ mount: 'config', key: 'settings' });
-      const redisSettings = await getCallable(redisExt, 'get').fn({ mount: 'config', key: 'settings' });
+      const jsonSettings = await getCallable(jsonExt, 'get').fn({
+        mount: 'config',
+        key: 'settings',
+      });
+      const redisSettings = await getCallable(redisExt, 'get').fn({
+        mount: 'config',
+        key: 'settings',
+      });
       expect(jsonSettings).toEqual(redisSettings);
       expect(jsonSettings).toEqual({ a: 1, b: 3, c: 4 });
 
@@ -949,13 +1181,24 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(ext);
 
       // Set initial dict value
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'data', value: { step: 'init', count: 0 } });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'data',
+        value: { step: 'init', count: 0 },
+      });
 
       // Execute merge
-      await getCallable(ext, 'merge').fn({ mount: 'state', key: 'data', partial: { step: 'done', extra: true } });
+      await getCallable(ext, 'merge').fn({
+        mount: 'state',
+        key: 'data',
+        partial: { step: 'done', extra: true },
+      });
 
       // Verify merged result preserves existing keys and applies new ones
-      const result = await getCallable(ext, 'get').fn({ mount: 'state', key: 'data' });
+      const result = await getCallable(ext, 'get').fn({
+        mount: 'state',
+        key: 'data',
+      });
       expect(result).toEqual({ step: 'done', count: 0, extra: true });
     });
 
@@ -974,13 +1217,21 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(ext);
 
       // Set initial value
-      await getCallable(ext, 'set').fn({ mount: 'state', key: 'counter', value: { count: 0 } });
+      await getCallable(ext, 'set').fn({
+        mount: 'state',
+        key: 'counter',
+        value: { count: 0 },
+      });
 
       // Create competing client to simulate race condition
       const competingClient = new Redis(REDIS_URL);
 
       // Start merge operation
-      const mergePromise = getCallable(ext, 'merge').fn({ mount: 'state', key: 'counter', partial: { count: 1 } });
+      const mergePromise = getCallable(ext, 'merge').fn({
+        mount: 'state',
+        key: 'counter',
+        partial: { count: 1 },
+      });
 
       // Immediately modify the key from competing client (simulates race)
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -993,7 +1244,10 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       await mergePromise;
 
       // Verify a valid result (either retry succeeded or error thrown)
-      const result = await getCallable(ext, 'get').fn({ mount: 'state', key: 'counter' });
+      const result = await getCallable(ext, 'get').fn({
+        mount: 'state',
+        key: 'counter',
+      });
       expect(result).toHaveProperty('count');
 
       // Cleanup
@@ -1017,45 +1271,57 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(ext);
 
       // Test all kv functions throw for unknown mount
-      await expect(getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
-
       await expect(
-        getCallable(ext, 'get_or').fn({ mount: 'unknown', key: 'key', fallback: 'fallback' })
+        getCallable(ext, 'get').fn({ mount: 'unknown', key: 'key' })
       ).rejects.toThrow(`Mount 'unknown' not found`);
 
-      await expect(getCallable(ext, 'set').fn({ mount: 'unknown', key: 'key', value: 'value' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'get_or').fn({
+          mount: 'unknown',
+          key: 'key',
+          fallback: 'fallback',
+        })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
 
-      await expect(getCallable(ext, 'merge').fn({ mount: 'unknown', key: 'key', partial: {} })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'set').fn({
+          mount: 'unknown',
+          key: 'key',
+          value: 'value',
+        })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
 
-      await expect(getCallable(ext, 'delete').fn({ mount: 'unknown', key: 'key' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'merge').fn({
+          mount: 'unknown',
+          key: 'key',
+          partial: {},
+        })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
 
-      await expect(getCallable(ext, 'keys').fn({ mount: 'unknown' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'delete').fn({ mount: 'unknown', key: 'key' })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
 
-      await expect(getCallable(ext, 'has').fn({ mount: 'unknown', key: 'key' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'keys').fn({ mount: 'unknown' })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
 
-      await expect(getCallable(ext, 'clear').fn({ mount: 'unknown' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'has').fn({ mount: 'unknown', key: 'key' })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
 
-      await expect(getCallable(ext, 'getAll').fn({ mount: 'unknown' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'clear').fn({ mount: 'unknown' })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
 
-      await expect(getCallable(ext, 'schema').fn({ mount: 'unknown' })).rejects.toThrow(
-        `Mount 'unknown' not found`
-      );
+      await expect(
+        getCallable(ext, 'getAll').fn({ mount: 'unknown' })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
+
+      await expect(
+        getCallable(ext, 'schema').fn({ mount: 'unknown' })
+      ).rejects.toThrow(`Mount 'unknown' not found`);
     });
   });
 
@@ -1075,27 +1341,38 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(ext);
 
       // set should throw
-      await expect(getCallable(ext, 'set').fn({ mount: 'readonly', key: 'key', value: 'value' })).rejects.toThrow(
-        `Mount 'readonly' is read-only`
-      );
+      await expect(
+        getCallable(ext, 'set').fn({
+          mount: 'readonly',
+          key: 'key',
+          value: 'value',
+        })
+      ).rejects.toThrow(`Mount 'readonly' is read-only`);
 
       // merge should throw
-      await expect(getCallable(ext, 'merge').fn({ mount: 'readonly', key: 'key', partial: {} })).rejects.toThrow(
-        `Mount 'readonly' is read-only`
-      );
+      await expect(
+        getCallable(ext, 'merge').fn({
+          mount: 'readonly',
+          key: 'key',
+          partial: {},
+        })
+      ).rejects.toThrow(`Mount 'readonly' is read-only`);
 
       // delete should throw
-      await expect(getCallable(ext, 'delete').fn({ mount: 'readonly', key: 'key' })).rejects.toThrow(
-        `Mount 'readonly' is read-only`
-      );
+      await expect(
+        getCallable(ext, 'delete').fn({ mount: 'readonly', key: 'key' })
+      ).rejects.toThrow(`Mount 'readonly' is read-only`);
 
       // clear should throw
-      await expect(getCallable(ext, 'clear').fn({ mount: 'readonly' })).rejects.toThrow(
-        `Mount 'readonly' is read-only`
-      );
+      await expect(
+        getCallable(ext, 'clear').fn({ mount: 'readonly' })
+      ).rejects.toThrow(`Mount 'readonly' is read-only`);
 
       // Read operations should work
-      const value = await getCallable(ext, 'get').fn({ mount: 'readonly', key: 'key' });
+      const value = await getCallable(ext, 'get').fn({
+        mount: 'readonly',
+        key: 'key',
+      });
       expect(value).toBe('');
 
       const keys = await getCallable(ext, 'keys').fn({ mount: 'readonly' });
@@ -1134,11 +1411,17 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       expect(schema).toEqual([]);
 
       // has returns false
-      const exists = await getCallable(ext, 'has').fn({ mount: 'empty', key: 'nonexistent' });
+      const exists = await getCallable(ext, 'has').fn({
+        mount: 'empty',
+        key: 'nonexistent',
+      });
       expect(exists).toBe(false);
 
       // get returns empty string (open mode)
-      const value = await getCallable(ext, 'get').fn({ mount: 'empty', key: 'nonexistent' });
+      const value = await getCallable(ext, 'get').fn({
+        mount: 'empty',
+        key: 'nonexistent',
+      });
       expect(value).toBe('');
     });
 
@@ -1172,10 +1455,16 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       expect(keys.sort()).toEqual(['count', 'name']);
 
       // get returns defaults
-      const name = await getCallable(ext, 'get').fn({ mount: 'declared', key: 'name' });
+      const name = await getCallable(ext, 'get').fn({
+        mount: 'declared',
+        key: 'name',
+      });
       expect(name).toBe('Default');
 
-      const count = await getCallable(ext, 'get').fn({ mount: 'declared', key: 'count' });
+      const count = await getCallable(ext, 'get').fn({
+        mount: 'declared',
+        key: 'count',
+      });
       expect(count).toBe(0);
     });
   });
@@ -1220,11 +1509,18 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       expect(exactSize).toBe(sizeLimit);
 
       // Should succeed at exact limit
-      const result = await getCallable(ext, 'set').fn({ mount: 'limited', key: 'exact', value: testValue });
+      const result = await getCallable(ext, 'set').fn({
+        mount: 'limited',
+        key: 'exact',
+        value: testValue,
+      });
       expect(result).toBe(true);
 
       // Verify value was stored
-      const retrieved = await getCallable(ext, 'get').fn({ mount: 'limited', key: 'exact' });
+      const retrieved = await getCallable(ext, 'get').fn({
+        mount: 'limited',
+        key: 'exact',
+      });
       expect(retrieved).toBe(testValue);
     });
 
@@ -1259,7 +1555,11 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
 
       // Should fail when exceeding limit
       await expect(
-        getCallable(ext, 'set').fn({ mount: 'limited', key: 'exceed', value: testValue })
+        getCallable(ext, 'set').fn({
+          mount: 'limited',
+          key: 'exceed',
+          value: testValue,
+        })
       ).rejects.toThrow('exceeds size limit');
     });
 
@@ -1280,13 +1580,21 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       extensions.push(ext);
 
       // Set small initial dict
-      await getCallable(ext, 'set').fn({ mount: 'limited', key: 'data', value: { a: 1 } });
+      await getCallable(ext, 'set').fn({
+        mount: 'limited',
+        key: 'data',
+        value: { a: 1 },
+      });
 
       // Merge that would exceed size limit
       const largePartial = { b: 'x'.repeat(200) };
 
       await expect(
-        getCallable(ext, 'merge').fn({ mount: 'limited', key: 'data', partial: largePartial })
+        getCallable(ext, 'merge').fn({
+          mount: 'limited',
+          key: 'data',
+          partial: largePartial,
+        })
       ).rejects.toThrow('exceeds size limit');
     });
   });

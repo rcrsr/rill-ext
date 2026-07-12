@@ -40,7 +40,9 @@ interface GraphEvent {
   readonly location?: { readonly displayName?: string | undefined } | undefined;
   readonly attendees?: readonly GraphRecipient[] | undefined;
   readonly isOnlineMeeting?: boolean | undefined;
-  readonly onlineMeeting?: { readonly joinUrl?: string | undefined } | undefined;
+  readonly onlineMeeting?:
+    | { readonly joinUrl?: string | undefined }
+    | undefined;
 }
 
 interface GraphScheduleItem {
@@ -215,7 +217,9 @@ export function normalizeScheduleItem(item: unknown): ScheduleItemDict {
  * @param graphSchedule - Raw Graph API schedule response object
  * @returns FreeBusyScheduleDict with scheduleId, availability, items
  */
-export function normalizeSchedule(graphSchedule: unknown): FreeBusyScheduleDict {
+export function normalizeSchedule(
+  graphSchedule: unknown
+): FreeBusyScheduleDict {
   const sch = graphSchedule as GraphSchedule;
 
   const items = sch.scheduleItems?.map(normalizeScheduleItem) ?? [];

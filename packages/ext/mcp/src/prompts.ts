@@ -16,11 +16,7 @@ import {
   structureToTypeValue,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
-import {
-  failInput,
-  failTimeout,
-  mapMcpError,
-} from './errors.js';
+import { failInput, failTimeout, mapMcpError } from './errors.js';
 import { sanitizeNames } from './naming.js';
 
 function describeError(error: unknown): string {
@@ -46,7 +42,7 @@ export interface McpPrompt {
 /**
  * MCP prompt argument definition.
  */
-export interface McpPromptArgument {
+interface McpPromptArgument {
   readonly name: string;
   readonly description?: string | undefined;
   readonly required?: boolean | undefined;
@@ -55,7 +51,7 @@ export interface McpPromptArgument {
 /**
  * MCP prompt message content (text or image).
  */
-export interface McpPromptMessageContent {
+interface McpPromptMessageContent {
   readonly type: 'text' | 'image' | string;
   readonly text?: string | undefined;
   readonly data?: string | undefined; // base64 for images
@@ -65,7 +61,7 @@ export interface McpPromptMessageContent {
 /**
  * MCP prompt message.
  */
-export interface McpPromptMessage {
+interface McpPromptMessage {
   readonly role: 'user' | 'assistant' | string;
   readonly content: McpPromptMessageContent | McpPromptMessageContent[];
 }
@@ -175,7 +171,7 @@ function createPromptFunction(
 
   const fn = async (
     args: Record<string, RillValue>,
-    ctxLike: unknown,
+    ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
 
@@ -196,7 +192,7 @@ function createPromptFunction(
         throw failInput(
           ctx,
           `expected string for parameter ${promptArg.name}, got ${typeof value}`,
-          { name: prompt.name, parameter: promptArg.name },
+          { name: prompt.name, parameter: promptArg.name }
         );
       }
 
@@ -206,7 +202,11 @@ function createPromptFunction(
         throw failInput(
           ctx,
           `required parameter ${promptArg.name} is missing`,
-          { name: prompt.name, parameter: promptArg.name, kind: 'missing_required' },
+          {
+            name: prompt.name,
+            parameter: promptArg.name,
+            kind: 'missing_required',
+          }
         );
       }
     }
@@ -252,7 +252,16 @@ function createPromptFunction(
     ...(prompt.description !== undefined && {
       annotations: { description: prompt.description },
     }),
-    returnType: structureToTypeValue({ kind: 'list', element: { kind: 'dict', fields: { role: { type: { kind: 'string' } }, content: { type: { kind: 'string' } } } } }),
+    returnType: structureToTypeValue({
+      kind: 'list',
+      element: {
+        kind: 'dict',
+        fields: {
+          role: { type: { kind: 'string' } },
+          content: { type: { kind: 'string' } },
+        },
+      },
+    }),
   };
 }
 

@@ -15,7 +15,11 @@ const config = {
 
       libraries: {
         inlinedLibraries: [],
-        importedLibraries: ['undici-types', '@rcrsr/rill', '@aws-sdk/client-s3'],
+        importedLibraries: [
+          'undici-types',
+          '@rcrsr/rill',
+          '@aws-sdk/client-s3',
+        ],
       },
 
       output: {

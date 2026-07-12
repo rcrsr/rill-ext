@@ -13,5 +13,4 @@ describe('Package Scaffold', () => {
       expect(pkg.default.devDependencies).toHaveProperty('@rcrsr/rill');
     });
   });
-
 });

@@ -31,7 +31,7 @@ export function makeRuntimeCtx(): RuntimeContext {
 export function expectInvalidThrow(
   thunk: () => unknown,
   atom: string,
-  needle: string,
+  needle: string
 ): void {
   let caught: unknown;
   try {

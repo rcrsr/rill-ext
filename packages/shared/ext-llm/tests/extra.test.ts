@@ -44,27 +44,27 @@ describe('validateExtraKeys', () => {
 
   describe('EC-20: non-plain-object extra', () => {
     it('throws RILL-R001 with "must be a dict" for null', () => {
-      expect(() =>
-        validateExtraKeys(null, RESERVED_KEYS_COMMON)
-      ).toThrow(/must be a dict/);
+      expect(() => validateExtraKeys(null, RESERVED_KEYS_COMMON)).toThrow(
+        /must be a dict/
+      );
     });
 
     it('throws RILL-R001 with "must be a dict" for an array', () => {
-      expect(() =>
-        validateExtraKeys([], RESERVED_KEYS_COMMON)
-      ).toThrow(/must be a dict/);
+      expect(() => validateExtraKeys([], RESERVED_KEYS_COMMON)).toThrow(
+        /must be a dict/
+      );
     });
 
     it('throws RILL-R001 with "must be a dict" for a string', () => {
-      expect(() =>
-        validateExtraKeys('string', RESERVED_KEYS_COMMON)
-      ).toThrow(/must be a dict/);
+      expect(() => validateExtraKeys('string', RESERVED_KEYS_COMMON)).toThrow(
+        /must be a dict/
+      );
     });
 
     it('throws RILL-R001 with "must be a dict" for a number', () => {
-      expect(() =>
-        validateExtraKeys(42, RESERVED_KEYS_COMMON)
-      ).toThrow(/must be a dict/);
+      expect(() => validateExtraKeys(42, RESERVED_KEYS_COMMON)).toThrow(
+        /must be a dict/
+      );
     });
   });
 
@@ -110,17 +110,12 @@ describe('validateExtraKeys', () => {
   describe('non-reserved keys', () => {
     it("returns without throwing for key 'reasoning_effort' which is not reserved", () => {
       expect(() =>
-        validateExtraKeys(
-          { reasoning_effort: 'high' },
-          RESERVED_KEYS_COMMON
-        )
+        validateExtraKeys({ reasoning_effort: 'high' }, RESERVED_KEYS_COMMON)
       ).not.toThrow();
     });
 
     it('returns without throwing for an empty extra object', () => {
-      expect(() =>
-        validateExtraKeys({}, RESERVED_KEYS_COMMON)
-      ).not.toThrow();
+      expect(() => validateExtraKeys({}, RESERVED_KEYS_COMMON)).not.toThrow();
     });
   });
 });

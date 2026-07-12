@@ -62,7 +62,10 @@ vi.mock('openai', () => {
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -116,8 +119,12 @@ function createMockStreamRunner(
 /**
  * Resolve the RillStream by calling its hidden resolve callback.
  */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  const resolve = (stream as Record<string, unknown>)['__rill_stream_resolve'] as () => Promise<unknown>;
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  const resolve = (stream as Record<string, unknown>)[
+    '__rill_stream_resolve'
+  ] as () => Promise<unknown>;
   return (await resolve()) as Record<string, unknown>;
 }
 
@@ -212,7 +219,10 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    const stream = getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
+    const stream = getCallable(ext, 'message').fn(
+      { prompt: 'What is 2+2?' },
+      ctx
+    );
     const result = await resolveStream(stream);
 
     const messages = result['messages'] as Array<Record<string, unknown>>;
@@ -223,7 +233,9 @@ describe('message() function', () => {
     expect(userMsg).toBeDefined();
     expect(assistantMsg).toBeDefined();
     const userParts = userMsg?.['parts'] as Array<Record<string, unknown>>;
-    const assistantParts = assistantMsg?.['parts'] as Array<Record<string, unknown>>;
+    const assistantParts = assistantMsg?.['parts'] as Array<
+      Record<string, unknown>
+    >;
     expect(userParts?.[0]?.['text']).toBe('What is 2+2?');
     expect(assistantParts?.[0]?.['text']).toBe('Response');
   });
@@ -247,7 +259,10 @@ describe('message() function', () => {
 
   // AC-2: sends correct parameters to AzureOpenAI streaming API
   it('sends model and messages to the streaming API', async () => {
-    const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
+    const runner = createMockStreamRunner(
+      [],
+      createMockFinalCompletion('Response')
+    );
     mockStream.mockReturnValue(runner);
 
     const ext = await createFoundryExtension(baseConfig);
@@ -267,7 +282,10 @@ describe('message() function', () => {
 
   // AC-2: system prompt from config is prepended
   it('prepends system message from inference config', async () => {
-    const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
+    const runner = createMockStreamRunner(
+      [],
+      createMockFinalCompletion('Response')
+    );
     mockStream.mockReturnValue(runner);
 
     const config: FoundryConfig = {
@@ -286,7 +304,10 @@ describe('message() function', () => {
     expect(mockStream).toHaveBeenCalledWith(
       expect.objectContaining({
         messages: expect.arrayContaining([
-          expect.objectContaining({ role: 'system', content: 'You are helpful.' }),
+          expect.objectContaining({
+            role: 'system',
+            content: 'You are helpful.',
+          }),
         ]),
       })
     );
@@ -297,8 +318,11 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    expectThrowHalt(() => {
-      getCallable(ext, 'message').fn({ prompt: '' }, ctx);
-    }, { code: 'INVALID_INPUT', message: 'prompt string cannot be empty' });
+    expectThrowHalt(
+      () => {
+        getCallable(ext, 'message').fn({ prompt: '' }, ctx);
+      },
+      { code: 'INVALID_INPUT', message: 'prompt string cannot be empty' }
+    );
   });
 });

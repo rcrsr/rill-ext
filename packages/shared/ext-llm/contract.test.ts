@@ -36,11 +36,11 @@ import {
 // relative imports are resolved at vitest runtime.
 // ============================================================
 
-// @ts-ignore — cross-package relative import; resolved at vitest runtime
+// @ts-expect-error — cross-package relative import; resolved at vitest runtime
 import { createAnthropicExtension } from '../../ext/llm-anthropic/src/factory.js';
-// @ts-ignore — cross-package relative import; resolved at vitest runtime
+// @ts-expect-error — cross-package relative import; resolved at vitest runtime
 import { createOpenAIExtension } from '../../ext/llm-openai/src/factory.js';
-// @ts-ignore — cross-package relative import; resolved at vitest runtime
+// @ts-expect-error — cross-package relative import; resolved at vitest runtime
 import { createGeminiExtension } from '../../ext/llm-gemini/src/factory.js';
 
 import type { LLMProviderConfig } from './src/types.js';
@@ -88,7 +88,12 @@ vi.mock('../../ext/llm-openai/node_modules/openai', () => {
   class MockAPIError extends Error {
     status: number | undefined;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    constructor(status: number | undefined, _error: any, message: string, _headers: any) {
+    constructor(
+      status: number | undefined,
+      _error: any,
+      message: string,
+      _headers: any
+    ) {
       super(message);
       this.status = status;
       this.name = 'APIError';
@@ -147,7 +152,10 @@ vi.mock('../../ext/llm-gemini/node_modules/@google/genai', () => {
 /**
  * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
  */
-function getCallable(ext: ExtensionFactoryResult, name: string): ApplicationCallable {
+function getCallable(
+  ext: ExtensionFactoryResult,
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -165,14 +173,19 @@ async function drainAndResolve(
     const nextFn = current.next as ApplicationCallable;
     current = (await nextFn.fn({}, ctx)) as RillStream;
   }
-  const resolver = (stream as unknown as { __rill_stream_resolve: () => Promise<unknown> })
-    .__rill_stream_resolve;
+  const resolver = (
+    stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+  ).__rill_stream_resolve;
   return (await resolver()) as Record<string, unknown>;
 }
 
 /** Build a RillTypeValue from a TypeStructure. */
 function typeVal(structure: TypeStructure): RillTypeValue {
-  return { __rill_type: true, typeName: structure.kind, structure } as unknown as RillTypeValue;
+  return {
+    __rill_type: true,
+    typeName: structure.kind,
+    structure,
+  } as unknown as RillTypeValue;
 }
 
 /** Minimal dict schema for generate() tests. */
@@ -192,10 +205,7 @@ const NAME_SCHEMA = typeVal({
  * Returns the invalid RillValue, or the original value if not a halt signal.
  */
 function unwrapError(caughtErr: unknown): unknown {
-  if (
-    caughtErr instanceof RuntimeHaltSignal &&
-    caughtErr.value !== undefined
-  ) {
+  if (caughtErr instanceof RuntimeHaltSignal && caughtErr.value !== undefined) {
     return caughtErr.value;
   }
   return caughtErr;
@@ -222,7 +232,10 @@ function setupAnthropicMessageMock(content: string, model: string): void {
 
   anthropicMockStream.mockReturnValue({
     [Symbol.asyncIterator]: async function* () {
-      yield { type: 'content_block_delta', delta: { type: 'text_delta', text: content } };
+      yield {
+        type: 'content_block_delta',
+        delta: { type: 'text_delta', text: content },
+      };
     },
     finalMessage: vi.fn().mockResolvedValue(response),
     abort: vi.fn(),
@@ -299,7 +312,9 @@ function setupOpenAIGenerateMock(jsonText: string, model: string): void {
 /**
  * Gemini chunks async generator — yields { text } objects.
  */
-async function* geminiChunks(chunks: string[]): AsyncGenerator<{ text: string }> {
+async function* geminiChunks(
+  chunks: string[]
+): AsyncGenerator<{ text: string }> {
   for (const text of chunks) {
     yield { text };
   }
@@ -345,8 +360,10 @@ const FACTORIES: FactoryDescriptor[] = [
     name: 'anthropic',
     factory: createAnthropicExtension as FactoryFn,
     model: 'claude-3-5-sonnet-20241022',
-    setupMessageMock: (content: string) => setupAnthropicMessageMock(content, 'claude-3-5-sonnet-20241022'),
-    setupGenerateMock: (jsonText: string) => setupAnthropicGenerateMock(jsonText, 'claude-3-5-sonnet-20241022'),
+    setupMessageMock: (content: string) =>
+      setupAnthropicMessageMock(content, 'claude-3-5-sonnet-20241022'),
+    setupGenerateMock: (jsonText: string) =>
+      setupAnthropicGenerateMock(jsonText, 'claude-3-5-sonnet-20241022'),
     resetMocks: () => {
       anthropicMockStream.mockReset();
       anthropicMockCreate.mockReset();
@@ -356,8 +373,10 @@ const FACTORIES: FactoryDescriptor[] = [
     name: 'openai',
     factory: createOpenAIExtension as FactoryFn,
     model: 'gpt-4o',
-    setupMessageMock: (content: string) => setupOpenAIMessageMock(content, 'gpt-4o'),
-    setupGenerateMock: (jsonText: string) => setupOpenAIGenerateMock(jsonText, 'gpt-4o'),
+    setupMessageMock: (content: string) =>
+      setupOpenAIMessageMock(content, 'gpt-4o'),
+    setupGenerateMock: (jsonText: string) =>
+      setupOpenAIGenerateMock(jsonText, 'gpt-4o'),
     resetMocks: () => {
       openaiMockStream.mockReset();
       openaiMockCreate.mockReset();
@@ -382,8 +401,14 @@ const FACTORIES: FactoryDescriptor[] = [
 
 describe.each(FACTORIES)(
   'LLM contract — $name',
-  ({ name: _name, factory, model, setupMessageMock, setupGenerateMock, resetMocks }) => {
-
+  ({
+    name: _name,
+    factory,
+    model,
+    setupMessageMock,
+    setupGenerateMock,
+    resetMocks,
+  }) => {
     beforeEach(() => {
       resetMocks();
     });
@@ -535,7 +560,13 @@ describe.each(FACTORIES)(
         const callableDict = ext.value as Record<string, unknown>;
 
         const keys = Object.keys(callableDict).sort();
-        expect(keys).toEqual(['embed', 'embed_batch', 'generate', 'message', 'tool_loop']);
+        expect(keys).toEqual([
+          'embed',
+          'embed_batch',
+          'generate',
+          'message',
+          'tool_loop',
+        ]);
       });
     });
 
@@ -574,7 +605,9 @@ describe.each(FACTORIES)(
         expect(isInvalid(errorValue)).toBe(true);
         const status = getStatus(errorValue as RillValue);
         expect((status.code as { name: string }).name).toBe('INVALID_INPUT');
-        expect((status.raw as Record<string, unknown>)['kind']).toBe('trailing_assistant_turn');
+        expect((status.raw as Record<string, unknown>)['kind']).toBe(
+          'trailing_assistant_turn'
+        );
       });
     });
 
@@ -599,7 +632,9 @@ describe.each(FACTORIES)(
         expect(isInvalid(errorValue)).toBe(true);
         const status = getStatus(errorValue as RillValue);
         expect((status.code as { name: string }).name).toBe('INVALID_INPUT');
-        expect((status.raw as Record<string, unknown>)['kind']).toBe('empty_prompt');
+        expect((status.raw as Record<string, unknown>)['kind']).toBe(
+          'empty_prompt'
+        );
       });
     });
 

@@ -19,7 +19,10 @@ function makeFactoryCtx(): ExtensionFactoryCtx {
   };
 }
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -28,7 +31,10 @@ describe('createTavilyExtension', () => {
     it('throws config atom for missing apiKey [EC-13, AC-14]', () => {
       let caught: unknown;
       try {
-        createTavilyExtension({ apiKey: undefined as unknown as string }, makeFactoryCtx());
+        createTavilyExtension(
+          { apiKey: undefined as unknown as string },
+          makeFactoryCtx()
+        );
       } catch (e) {
         caught = e;
       }
@@ -99,65 +105,107 @@ describe('createTavilyExtension', () => {
 
   describe('factory shape [AC-1]', () => {
     it('returns value and dispose', () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       expect(ext).toHaveProperty('value');
       expect(ext).toHaveProperty('dispose');
     });
 
     it('returns both host functions', () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       expect(getCallable(ext, 'search')).toBeDefined();
       expect(getCallable(ext, 'extract')).toBeDefined();
     });
 
     it('each host function has a callable fn', () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       for (const name of ['search', 'extract']) {
         expect(typeof getCallable(ext, name).fn).toBe('function');
       }
     });
 
     it('each host function has params array', () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       for (const name of ['search', 'extract']) {
         expect(Array.isArray(getCallable(ext, name).params)).toBe(true);
       }
     });
 
     it('dispose is a function', () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       expect(typeof ext.dispose).toBe('function');
     });
 
     it('search has query (string) param and options (dict) param', () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       const search = getCallable(ext, 'search');
-      expect(search.params[0]).toMatchObject({ name: 'query', type: { kind: 'string' } });
-      expect(search.params[1]).toMatchObject({ name: 'options', type: { kind: 'dict' } });
+      expect(search.params[0]).toMatchObject({
+        name: 'query',
+        type: { kind: 'string' },
+      });
+      expect(search.params[1]).toMatchObject({
+        name: 'options',
+        type: { kind: 'dict' },
+      });
     });
 
     it('extract has urls (tuple) param and options (dict) param', () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       const extract = getCallable(ext, 'extract');
-      expect(extract.params[0]).toMatchObject({ name: 'urls', type: { kind: 'tuple' } });
-      expect(extract.params[1]).toMatchObject({ name: 'options', type: { kind: 'dict' } });
+      expect(extract.params[0]).toMatchObject({
+        name: 'urls',
+        type: { kind: 'tuple' },
+      });
+      expect(extract.params[1]).toMatchObject({
+        name: 'options',
+        type: { kind: 'dict' },
+      });
     });
   });
 
   describe('dispose lifecycle', () => {
     it('dispose with no in-flight requests resolves [AC-34]', async () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       await expect(ext.dispose!()).resolves.toBeUndefined();
     });
 
     it('dispose twice is idempotent [AC-35]', async () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       await ext.dispose!();
       await expect(ext.dispose!()).resolves.toBeUndefined();
     });
 
     it('dispose three times does not throw [AC-35]', async () => {
-      const ext = createTavilyExtension({ apiKey: 'tvly-test-key' }, makeFactoryCtx());
+      const ext = createTavilyExtension(
+        { apiKey: 'tvly-test-key' },
+        makeFactoryCtx()
+      );
       await ext.dispose!();
       await ext.dispose!();
       await expect(ext.dispose!()).resolves.toBeUndefined();

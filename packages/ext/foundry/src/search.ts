@@ -21,7 +21,11 @@ import {
 } from '@rcrsr/rill';
 import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
 import { buildRestAuthHeaders } from './client.js';
-import { mapRestError, createTimeoutError, detectFoundryError } from './errors.js';
+import {
+  mapRestError,
+  createTimeoutError,
+  detectFoundryError,
+} from './errors.js';
 import type {
   FoundryAuth,
   FoundryConfig,
@@ -76,20 +80,25 @@ export async function callSearch(
 
   // EC-10: Search must be configured
   if (!config.search) {
-    throw haltUnconfigured(ctx, 'search_unconfigured', 'foundry: search not configured');
+    throw haltUnconfigured(
+      ctx,
+      'search_unconfigured',
+      'foundry: search not configured'
+    );
   }
 
   const searchConfig: FoundrySearchConfig = config.search;
 
   // Resolve effective options: caller options override config defaults
   const indexName =
-    typeof options['index'] === 'string' ? options['index'] : searchConfig.indexName;
+    typeof options['index'] === 'string'
+      ? options['index']
+      : searchConfig.indexName;
   const queryType =
     typeof options['queryType'] === 'string'
       ? options['queryType']
       : (searchConfig.queryType ?? DEFAULT_QUERY_TYPE);
-  const top =
-    typeof options['top'] === 'number' ? options['top'] : DEFAULT_TOP;
+  const top = typeof options['top'] === 'number' ? options['top'] : DEFAULT_TOP;
   const filter =
     typeof options['filter'] === 'string' ? options['filter'] : undefined;
 
@@ -340,7 +349,9 @@ function haltUnconfigured(
   );
 }
 
-function buildContentDict(item: Record<string, unknown>): Record<string, RillValue> {
+function buildContentDict(
+  item: Record<string, unknown>
+): Record<string, RillValue> {
   const content: Record<string, RillValue> = {};
   for (const [key, value] of Object.entries(item)) {
     // Skip Azure Search metadata fields (prefixed with @search.)

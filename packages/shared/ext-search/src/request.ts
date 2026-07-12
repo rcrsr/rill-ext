@@ -15,7 +15,10 @@ export function createInFlightState(): InFlightState {
  * @param state - InFlightState object to update
  * @param controller - AbortController for the in-flight request
  */
-export function trackRequest(state: InFlightState, controller: AbortController): void {
+export function trackRequest(
+  state: InFlightState,
+  controller: AbortController
+): void {
   state.controllers.add(controller);
 }
 

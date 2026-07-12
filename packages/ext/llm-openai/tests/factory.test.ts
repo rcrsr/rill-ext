@@ -182,7 +182,12 @@ describe('createOpenAIExtension', () => {
 
       expect(value['message']).toMatchObject({
         params: [
-          { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
+          {
+            name: 'prompt',
+            type: { kind: 'any' },
+            defaultValue: undefined,
+            annotations: { description: 'String or list of message dicts' },
+          },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
@@ -200,7 +205,14 @@ describe('createOpenAIExtension', () => {
       const value = result.value as Record<string, Record<string, unknown>>;
 
       expect(value['embed']).toMatchObject({
-        params: [{ name: 'text', type: { kind: 'string' }, defaultValue: undefined, annotations: {} }],
+        params: [
+          {
+            name: 'text',
+            type: { kind: 'string' },
+            defaultValue: undefined,
+            annotations: {},
+          },
+        ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
         returnType: { typeName: 'vector' },
@@ -217,7 +229,14 @@ describe('createOpenAIExtension', () => {
       const value = result.value as Record<string, Record<string, unknown>>;
 
       expect(value['embed_batch']).toMatchObject({
-        params: [{ name: 'texts', type: { kind: 'list' }, defaultValue: undefined, annotations: {} }],
+        params: [
+          {
+            name: 'texts',
+            type: { kind: 'list' },
+            defaultValue: undefined,
+            annotations: {},
+          },
+        ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
         returnType: { typeName: 'list' },
@@ -235,9 +254,24 @@ describe('createOpenAIExtension', () => {
 
       expect(value['tool_loop']).toMatchObject({
         params: [
-          { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
-          { name: 'tools', type: { kind: 'dict', valueType: { kind: 'closure' } }, defaultValue: undefined, annotations: {} },
-          { name: 'max_turns', type: { kind: 'number' }, defaultValue: 0, annotations: {} },
+          {
+            name: 'prompt',
+            type: { kind: 'any' },
+            defaultValue: undefined,
+            annotations: { description: 'String or list of message dicts' },
+          },
+          {
+            name: 'tools',
+            type: { kind: 'dict', valueType: { kind: 'closure' } },
+            defaultValue: undefined,
+            annotations: {},
+          },
+          {
+            name: 'max_turns',
+            type: { kind: 'number' },
+            defaultValue: 0,
+            annotations: {},
+          },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
@@ -256,8 +290,20 @@ describe('createOpenAIExtension', () => {
 
       expect(value['generate']).toMatchObject({
         params: [
-          { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined, annotations: { description: 'String or list of message dicts' } },
-          { name: 'schema', type: { kind: 'type' }, defaultValue: undefined, annotations: { description: 'Type expression for structured output schema' } },
+          {
+            name: 'prompt',
+            type: { kind: 'any' },
+            defaultValue: undefined,
+            annotations: { description: 'String or list of message dicts' },
+          },
+          {
+            name: 'schema',
+            type: { kind: 'type' },
+            defaultValue: undefined,
+            annotations: {
+              description: 'Type expression for structured output schema',
+            },
+          },
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },

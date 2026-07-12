@@ -46,7 +46,10 @@ vi.mock('@anthropic-ai/sdk', () => {
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -111,8 +114,12 @@ function createMockStreamWithRedactedThinking() {
   };
 }
 
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  return (stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }).__rill_stream_resolve();
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  return (
+    stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
+  ).__rill_stream_resolve();
 }
 
 // ============================================================
@@ -208,7 +215,10 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
     it('base64 image part → SDK ImageBlockParam with source.type: "base64"', () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
-      const ext = createAnthropicExtension({ api_key: 'test-key', model: 'claude-sonnet-4-5-20250929' });
+      const ext = createAnthropicExtension({
+        api_key: 'test-key',
+        model: 'claude-sonnet-4-5-20250929',
+      });
       const ctx = createRuntimeContext();
 
       const prompt = [
@@ -232,7 +242,10 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       const messages = callArgs['messages'] as Array<{
         role: string;
-        content: Array<{ type: string; source?: { type: string; data?: string; media_type?: string } }>;
+        content: Array<{
+          type: string;
+          source?: { type: string; data?: string; media_type?: string };
+        }>;
       }>;
 
       expect(messages).toHaveLength(1);
@@ -253,7 +266,10 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
     it('url image part → SDK ImageBlockParam with source.type: "url"', () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
-      const ext = createAnthropicExtension({ api_key: 'test-key', model: 'claude-sonnet-4-5-20250929' });
+      const ext = createAnthropicExtension({
+        api_key: 'test-key',
+        model: 'claude-sonnet-4-5-20250929',
+      });
       const ctx = createRuntimeContext();
 
       const prompt = [
@@ -277,7 +293,10 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       const messages = callArgs['messages'] as Array<{
         role: string;
-        content: Array<{ type: string; source?: { type: string; url?: string } }>;
+        content: Array<{
+          type: string;
+          source?: { type: string; url?: string };
+        }>;
       }>;
 
       const imageBlock = messages[0]!.content.find((b) => b.type === 'image');
@@ -297,10 +316,16 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
     it('resolves with thinking part having empty text for redacted_thinking block', async () => {
       mockStream.mockReturnValue(createMockStreamWithRedactedThinking());
 
-      const ext = createAnthropicExtension({ api_key: 'test-key', model: 'claude-sonnet-4-5-20250929' });
+      const ext = createAnthropicExtension({
+        api_key: 'test-key',
+        model: 'claude-sonnet-4-5-20250929',
+      });
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Explain your reasoning' }, ctx);
+      const stream = getCallable(ext, 'message').fn(
+        { prompt: 'Explain your reasoning' },
+        ctx
+      );
       const result = await resolveStream(stream);
 
       const messages = result['messages'] as Array<{
@@ -311,7 +336,9 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       const assistantMsg = messages.find((m) => m.role === 'assistant');
       expect(assistantMsg).toBeDefined();
 
-      const thinkingPart = assistantMsg!.parts.find((p) => p.type === 'thinking');
+      const thinkingPart = assistantMsg!.parts.find(
+        (p) => p.type === 'thinking'
+      );
       expect(thinkingPart).toBeDefined();
       // AC-B5: RedactedThinkingBlock → {type:'thinking', text:''}
       expect(thinkingPart!.text).toBe('');
@@ -331,11 +358,17 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
     it('tool_result part in user turn maps to Anthropic ToolResultBlockParam under user role', () => {
       mockStream.mockReturnValue(createMockStreamForWire('Done'));
 
-      const ext = createAnthropicExtension({ api_key: 'test-key', model: 'claude-sonnet-4-5-20250929' });
+      const ext = createAnthropicExtension({
+        api_key: 'test-key',
+        model: 'claude-sonnet-4-5-20250929',
+      });
       const ctx = createRuntimeContext();
 
       const prompt = [
-        { role: 'user', parts: [{ type: 'text', text: 'What is the weather?' }] },
+        {
+          role: 'user',
+          parts: [{ type: 'text', text: 'What is the weather?' }],
+        },
         {
           role: 'assistant',
           parts: [
@@ -364,7 +397,9 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       const messages = callArgs['messages'] as Array<{
         role: string;
-        content: Array<{ type: string; tool_use_id?: string; content?: string }> | string;
+        content:
+          | Array<{ type: string; tool_use_id?: string; content?: string }>
+          | string;
       }>;
 
       // The last message must be a user role
@@ -374,8 +409,13 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       // Its content must contain a tool_result block
       const content = lastMsg.content;
       expect(Array.isArray(content)).toBe(true);
-      const toolResultBlock = (content as Array<{ type: string; tool_use_id?: string; content?: string }>)
-        .find((b) => b.type === 'tool_result');
+      const toolResultBlock = (
+        content as Array<{
+          type: string;
+          tool_use_id?: string;
+          content?: string;
+        }>
+      ).find((b) => b.type === 'tool_result');
       expect(toolResultBlock).toBeDefined();
       expect(toolResultBlock!.tool_use_id).toBe('tu_1');
       expect(toolResultBlock!.content).toBe('ok');
@@ -390,13 +430,19 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
     it('single text part in user message is sent as string shorthand', () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
-      const ext = createAnthropicExtension({ api_key: 'test-key', model: 'claude-sonnet-4-5-20250929' });
+      const ext = createAnthropicExtension({
+        api_key: 'test-key',
+        model: 'claude-sonnet-4-5-20250929',
+      });
       const ctx = createRuntimeContext();
 
       getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
-      const messages = callArgs['messages'] as Array<{ role: string; content: unknown }>;
+      const messages = callArgs['messages'] as Array<{
+        role: string;
+        content: unknown;
+      }>;
 
       // Simple string prompt should be sent as string content (not array)
       expect(messages[0]!.content).toBe('Hello');
@@ -405,7 +451,10 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
     it('multi-part user message is sent as content block array', () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
-      const ext = createAnthropicExtension({ api_key: 'test-key', model: 'claude-sonnet-4-5-20250929' });
+      const ext = createAnthropicExtension({
+        api_key: 'test-key',
+        model: 'claude-sonnet-4-5-20250929',
+      });
       const ctx = createRuntimeContext();
 
       const prompt = [
@@ -415,7 +464,11 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
             { type: 'text', text: 'Look at this image:' },
             {
               type: 'image',
-              source: { kind: 'base64', data: 'abc123', media_type: 'image/png' },
+              source: {
+                kind: 'base64',
+                data: 'abc123',
+                media_type: 'image/png',
+              },
             },
           ],
         },
@@ -424,7 +477,10 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       getCallable(ext, 'message').fn({ prompt }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
-      const messages = callArgs['messages'] as Array<{ role: string; content: unknown }>;
+      const messages = callArgs['messages'] as Array<{
+        role: string;
+        content: unknown;
+      }>;
 
       expect(Array.isArray(messages[0]!.content)).toBe(true);
     });

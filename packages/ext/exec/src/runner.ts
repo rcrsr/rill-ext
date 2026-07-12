@@ -27,7 +27,7 @@ function validateArgs(
   args: readonly string[],
   config: CommandConfig,
   commandName: string,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): RillValue | null {
   const { allowedArgs, blockedArgs } = config;
 
@@ -45,7 +45,7 @@ function validateArgs(
               arg,
               allowedArgs: [...allowedArgs],
             },
-          },
+          }
         );
       }
     }
@@ -65,7 +65,7 @@ function validateArgs(
               arg,
               blockedArgs: [...blockedArgs],
             },
-          },
+          }
         );
       }
     }
@@ -78,7 +78,7 @@ function validateStdin(
   config: CommandConfig,
   commandName: string,
   hasStdin: boolean,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): RillValue | null {
   if (hasStdin && !config.stdin) {
     return ctx.invalidate(
@@ -87,7 +87,7 @@ function validateStdin(
         code: 'INVALID_INPUT',
         provider: PROVIDER,
         raw: { kind: 'stdin_not_supported', commandName },
-      },
+      }
     );
   }
   return null;
@@ -112,7 +112,7 @@ export async function runCommand(
   args: readonly string[],
   stdinData: string | undefined,
   signal: AbortSignal | undefined,
-  ctx: RuntimeContext,
+  ctx: RuntimeContext
 ): Promise<CommandResult | RillValue> {
   const argInvalid = validateArgs(args, config, commandName, ctx);
   if (argInvalid !== null) return argInvalid;
@@ -121,7 +121,7 @@ export async function runCommand(
     config,
     commandName,
     stdinData !== undefined,
-    ctx,
+    ctx
   );
   if (stdinInvalid !== null) return stdinInvalid;
 
@@ -160,7 +160,7 @@ export async function runCommand(
     const { stdout, stderr } = await execFileAsync(
       config.binary,
       args as string[],
-      options,
+      options
     );
 
     return {
@@ -185,18 +185,15 @@ export async function runCommand(
       };
 
       if (execError.code === 'ENOENT') {
-        return ctx.invalidate(
-          new Error(`binary not found: ${config.binary}`),
-          {
-            code: 'INVALID_INPUT',
-            provider: PROVIDER,
-            raw: {
-              kind: 'binary_not_found',
-              commandName,
-              binary: config.binary,
-            },
+        return ctx.invalidate(new Error(`binary not found: ${config.binary}`), {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: {
+            kind: 'binary_not_found',
+            commandName,
+            binary: config.binary,
           },
-        );
+        });
       }
 
       const isMaxBufferError =
@@ -209,18 +206,15 @@ export async function runCommand(
           config.maxBuffer !== undefined);
 
       if (isMaxBufferError) {
-        return ctx.invalidate(
-          new Error('command output exceeds size limit'),
-          {
-            code: 'INVALID_INPUT',
-            provider: PROVIDER,
-            raw: {
-              kind: 'maxbuffer_exceeded',
-              commandName,
-              maxBuffer: config.maxBuffer,
-            },
+        return ctx.invalidate(new Error('command output exceeds size limit'), {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: {
+            kind: 'maxbuffer_exceeded',
+            commandName,
+            maxBuffer: config.maxBuffer,
           },
-        );
+        });
       }
 
       if (execError.killed === true && execError.signal === 'SIGTERM') {
@@ -231,23 +225,17 @@ export async function runCommand(
             code: 'TIMEOUT',
             provider: PROVIDER,
             raw: { kind: 'timeout', commandName, timeoutMs },
-          },
+          }
         );
       }
 
       // AbortError (signal-based abort) — surface as timeout-equivalent
-      if (
-        execError.name === 'AbortError' ||
-        execError.code === 'ABORT_ERR'
-      ) {
-        return ctx.invalidate(
-          new Error(`command "${commandName}" aborted`),
-          {
-            code: 'TIMEOUT',
-            provider: PROVIDER,
-            raw: { kind: 'aborted', commandName },
-          },
-        );
+      if (execError.name === 'AbortError' || execError.code === 'ABORT_ERR') {
+        return ctx.invalidate(new Error(`command "${commandName}" aborted`), {
+          code: 'TIMEOUT',
+          provider: PROVIDER,
+          raw: { kind: 'aborted', commandName },
+        });
       }
 
       if ('stdout' in execError && 'stderr' in execError) {

@@ -157,7 +157,10 @@ describe('sanitizeParameterName', () => {
 
 describe('jsonSchemaPropertyToRillParam', () => {
   it('maps string property to p.str', () => {
-    const param = jsonSchemaPropertyToRillParam('name', { type: 'string', description: 'User name' });
+    const param = jsonSchemaPropertyToRillParam('name', {
+      type: 'string',
+      description: 'User name',
+    });
     expect(param).toEqual({
       name: 'name',
       type: { kind: 'string' },
@@ -167,7 +170,10 @@ describe('jsonSchemaPropertyToRillParam', () => {
   });
 
   it('maps integer property to p.num', () => {
-    const param = jsonSchemaPropertyToRillParam('count', { type: 'integer', description: 'Item count' });
+    const param = jsonSchemaPropertyToRillParam('count', {
+      type: 'integer',
+      description: 'Item count',
+    });
     expect(param).toEqual({
       name: 'count',
       type: { kind: 'number' },
@@ -197,7 +203,10 @@ describe('jsonSchemaPropertyToRillParam', () => {
   });
 
   it('maps enum to p.str', () => {
-    const param = jsonSchemaPropertyToRillParam('status', { type: 'string', enum: ['a', 'b'] });
+    const param = jsonSchemaPropertyToRillParam('status', {
+      type: 'string',
+      enum: ['a', 'b'],
+    });
     expect(param.type).toEqual({ kind: 'string' });
   });
 

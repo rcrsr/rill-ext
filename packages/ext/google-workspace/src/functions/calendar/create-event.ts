@@ -31,7 +31,9 @@ export interface CalendarCreateEventDeps {
  * EC-13: Rejects naive ISO timestamps (no timezone).
  * AC-12: Returns event ID string.
  */
-export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
+export function makeCalendarCreateEvent(
+  deps: CalendarCreateEventDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -48,10 +50,18 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
       failInput(ctx, 'invalid_arg', 'google: title must be a non-empty string');
     }
     if (typeof startTime !== 'string' || startTime.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: start_time must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: start_time must be a non-empty string'
+      );
     }
     if (typeof endTime !== 'string' || endTime.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: end_time must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: end_time must be a non-empty string'
+      );
     }
     // EC-13: Reject naive ISO timestamps
     assertIsoTimestamp(ctx, startTime, 'start_time');
@@ -73,13 +83,19 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
         isAllDay = rawAllDay;
       }
       const rawSendUpdates = options['send_updates'];
-      if (typeof rawSendUpdates === 'string' && VALID_SEND_UPDATES.has(rawSendUpdates)) {
+      if (
+        typeof rawSendUpdates === 'string' &&
+        VALID_SEND_UPDATES.has(rawSendUpdates)
+      ) {
         sendUpdates = rawSendUpdates;
       }
       const rawAttendees = options['attendees'];
       if (Array.isArray(rawAttendees)) {
         attendees = rawAttendees
-          .filter((a): a is Record<string, RillValue> => typeof a === 'object' && a !== null)
+          .filter(
+            (a): a is Record<string, RillValue> =>
+              typeof a === 'object' && a !== null
+          )
           .map((a) => ({ email: String(a['email'] ?? '') }))
           .filter((a) => a.email !== '');
       }
@@ -92,7 +108,11 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
     assertAllowedCalendarId(ctx, calendarId, deps.calendarConfig);
     // EC-12: Reject all-day events when denyAllDay is configured
     if (isAllDay && deps.calendarConfig?.denyAllDay === true) {
-      failForbidden(ctx, 'all_day_not_permitted', 'google: all-day events not permitted');
+      failForbidden(
+        ctx,
+        'all_day_not_permitted',
+        'google: all-day events not permitted'
+      );
     }
     // Build event body
     type EventBody = {
@@ -107,9 +127,7 @@ export function makeCalendarCreateEvent(deps: CalendarCreateEventDeps): (
       start: isAllDay
         ? { date: startTime.slice(0, 10) }
         : { dateTime: startTime },
-      end: isAllDay
-        ? { date: endTime.slice(0, 10) }
-        : { dateTime: endTime },
+      end: isAllDay ? { date: endTime.slice(0, 10) } : { dateTime: endTime },
     };
     if (attendees !== undefined && attendees.length > 0) {
       body.attendees = attendees;

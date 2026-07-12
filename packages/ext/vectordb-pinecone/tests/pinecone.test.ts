@@ -16,7 +16,10 @@ import {
 /**
  * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
  */
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
@@ -267,10 +270,10 @@ describe('Vector CRUD operations', () => {
       expect(callArgs.records[0]?.values).toHaveLength(4);
 
       // Get vector back
-      const getResult = (await getCallable(ext, 'get').fn({ id: 'doc-1' }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const getResult = (await getCallable(ext, 'get').fn(
+        { id: 'doc-1' },
+        ctx
+      )) as Record<string, unknown>;
 
       expect(getResult['id']).toBe('doc-1');
       expect(getResult['vector']).toBeDefined();
@@ -301,10 +304,10 @@ describe('Vector CRUD operations', () => {
 
       expect(upsertResult['success']).toBe(true);
 
-      const getResult = (await getCallable(ext, 'get').fn({ id: 'doc-empty' }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const getResult = (await getCallable(ext, 'get').fn(
+        { id: 'doc-empty' },
+        ctx
+      )) as Record<string, unknown>;
       expect(getResult['metadata']).toEqual({});
     });
 
@@ -337,10 +340,10 @@ describe('Vector CRUD operations', () => {
 
       expect(upsertResult['success']).toBe(true);
 
-      const getResult = (await getCallable(ext, 'get').fn({ id: 'doc-large' }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const getResult = (await getCallable(ext, 'get').fn(
+        { id: 'doc-large' },
+        ctx
+      )) as Record<string, unknown>;
       expect(getResult['metadata']).toEqual(largeMetadata);
     });
   });
@@ -367,10 +370,10 @@ describe('Vector CRUD operations', () => {
 
       mockUpsert.mockResolvedValue(undefined);
 
-      const result = (await getCallable(ext, 'upsert_batch').fn({ items: items }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const result = (await getCallable(ext, 'upsert_batch').fn(
+        { items: items },
+        ctx
+      )) as Record<string, unknown>;
 
       expect(result['succeeded']).toBe(3);
       expect(result['failed']).toBeUndefined();
@@ -378,10 +381,10 @@ describe('Vector CRUD operations', () => {
     });
 
     it('returns { succeeded: 0 } for empty batch (AC-22)', async () => {
-      const result = (await getCallable(ext, 'upsert_batch').fn({ items: [] }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const result = (await getCallable(ext, 'upsert_batch').fn(
+        { items: [] },
+        ctx
+      )) as Record<string, unknown>;
 
       expect(result['succeeded']).toBe(0);
       expect(result['failed']).toBeUndefined();
@@ -399,10 +402,10 @@ describe('Vector CRUD operations', () => {
 
       mockUpsert.mockRejectedValue(new Error('Network error'));
 
-      const result = (await getCallable(ext, 'upsert_batch').fn({ items: items }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const result = (await getCallable(ext, 'upsert_batch').fn(
+        { items: items },
+        ctx
+      )) as Record<string, unknown>;
 
       expect(result['succeeded']).toBe(0);
       expect(result['failed']).toBe('doc-fail');
@@ -434,10 +437,10 @@ describe('Vector CRUD operations', () => {
         new Error('dimension mismatch (expected 4, got 2)')
       );
 
-      const result = (await getCallable(ext, 'upsert_batch').fn({ items: items }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const result = (await getCallable(ext, 'upsert_batch').fn(
+        { items: items },
+        ctx
+      )) as Record<string, unknown>;
 
       expect(result['succeeded']).toBe(46);
       expect(result['failed']).toBe('doc-47');
@@ -514,9 +517,10 @@ describe('Vector CRUD operations', () => {
         ])
       );
 
-      const results = (await getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)) as Array<
-        Record<string, unknown>
-      >;
+      const results = (await getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      )) as Array<Record<string, unknown>>;
 
       expect(results).toHaveLength(3);
       expect(results[0]!['id']).toBe('doc-1');
@@ -532,9 +536,10 @@ describe('Vector CRUD operations', () => {
 
       mockQuery.mockResolvedValue(createMockQueryResponse([]));
 
-      const results = (await getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx)) as Array<
-        Record<string, unknown>
-      >;
+      const results = (await getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      )) as Array<Record<string, unknown>>;
 
       expect(results).toEqual([]);
     });
@@ -591,10 +596,10 @@ describe('Vector CRUD operations', () => {
     it('deletes single vector', async () => {
       mockDeleteOne.mockResolvedValue(undefined);
 
-      const result = (await getCallable(ext, 'delete').fn({ id: 'doc-1' }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const result = (await getCallable(ext, 'delete').fn(
+        { id: 'doc-1' },
+        ctx
+      )) as Record<string, unknown>;
 
       expect(result['id']).toBe('doc-1');
       expect(result['deleted']).toBe(true);
@@ -605,10 +610,10 @@ describe('Vector CRUD operations', () => {
       mockDeleteOne.mockResolvedValue(undefined);
 
       const ids = ['doc-1', 'doc-2', 'doc-3'];
-      const result = (await getCallable(ext, 'delete_batch').fn({ ids: ids }, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const result = (await getCallable(ext, 'delete_batch').fn(
+        { ids: ids },
+        ctx
+      )) as Record<string, unknown>;
 
       expect(result['succeeded']).toBe(3);
       expect(mockDeleteOne).toHaveBeenCalledTimes(3);
@@ -651,7 +656,10 @@ describe('Collection lifecycle operations', () => {
       mockCreateIndex.mockResolvedValue(undefined);
 
       const result = (await getCallable(ext, 'create_collection').fn(
-        { name: 'my_vectors', options: { dimensions: 384, distance: 'cosine' } },
+        {
+          name: 'my_vectors',
+          options: { dimensions: 384, distance: 'cosine' },
+        },
         ctx
       )) as Record<string, unknown>;
 
@@ -703,10 +711,10 @@ describe('Collection lifecycle operations', () => {
       };
       const emptyExt = createPineconeExtension(config);
 
-      const result = (await getCallable(emptyExt, 'describe').fn({}, ctx)) as Record<
-        string,
-        unknown
-      >;
+      const result = (await getCallable(emptyExt, 'describe').fn(
+        {},
+        ctx
+      )) as Record<string, unknown>;
 
       expect(result['count']).toBe(0);
     });
@@ -720,7 +728,10 @@ describe('Collection lifecycle operations', () => {
         ],
       });
 
-      const result = (await getCallable(ext, 'list_collections').fn({}, ctx)) as Array<string>;
+      const result = (await getCallable(ext, 'list_collections').fn(
+        {},
+        ctx
+      )) as Array<string>;
 
       expect(result).toEqual(['index-1', 'index-2', 'index-3']);
     });
@@ -730,7 +741,10 @@ describe('Collection lifecycle operations', () => {
         indexes: [],
       });
 
-      const result = (await getCallable(ext, 'list_collections').fn({}, ctx)) as Array<string>;
+      const result = (await getCallable(ext, 'list_collections').fn(
+        {},
+        ctx
+      )) as Array<string>;
 
       expect(result).toEqual([]);
     });
@@ -798,7 +812,10 @@ describe('Error handling contracts', () => {
     );
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: authentication failed (401)',
       'AUTH'
     );
@@ -813,7 +830,10 @@ describe('Error handling contracts', () => {
     );
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: collection not found',
       'NOT_FOUND'
     );
@@ -828,7 +848,10 @@ describe('Error handling contracts', () => {
     );
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: rate limit exceeded',
       'RATE_LIMIT'
     );
@@ -845,7 +868,10 @@ describe('Error handling contracts', () => {
     );
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: request timeout',
       'TIMEOUT'
     );
@@ -859,7 +885,10 @@ describe('Error handling contracts', () => {
     const wrongVector = createVector(new Float32Array(128).fill(0.1), 'test');
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'upsert').fn({ id: 'doc-1', vector: wrongVector, metadata: {} }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'upsert').fn(
+        { id: 'doc-1', vector: wrongVector, metadata: {} },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: dimension mismatch (expected 384, got 128)',
       'TYPE_MISMATCH'
     );
@@ -871,7 +900,10 @@ describe('Error handling contracts', () => {
     );
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'create_collection').fn({ name: 'test_index', options: { dimensions: 384 } }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'create_collection').fn(
+        { name: 'test_index', options: { dimensions: 384 } },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: collection already exists',
       'CONFLICT'
     );
@@ -881,7 +913,10 @@ describe('Error handling contracts', () => {
     mockFetch.mockResolvedValue({ records: {} });
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'get').fn({ id: 'nonexistent' }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'get').fn(
+        { id: 'nonexistent' },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: id not found'
     );
   });
@@ -895,7 +930,10 @@ describe('Error handling contracts', () => {
     );
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: operation cancelled',
       'DISPOSED'
     );
@@ -910,7 +948,10 @@ describe('Error handling contracts', () => {
     );
 
     await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: Something unexpected happened',
       'UNAVAILABLE'
     );
@@ -949,7 +990,10 @@ describe('Event emission', () => {
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
       'test'
     );
-    await getCallable(ext, 'search').fn({ vector: queryVector, options: { k: 5 } }, ctx);
+    await getCallable(ext, 'search').fn(
+      { vector: queryVector, options: { k: 5 } },
+      ctx
+    );
 
     const searchEvent = events.find((e) => e['event'] === 'pinecone:search');
     expect(searchEvent).toBeDefined();
@@ -1022,7 +1066,10 @@ describe('Request cancellation', () => {
     });
 
     // Start batch operation
-    const batchPromise = getCallable(ext, 'upsert_batch').fn({ items: items }, ctx);
+    const batchPromise = getCallable(ext, 'upsert_batch').fn(
+      { items: items },
+      ctx
+    );
 
     // After disposal, subsequent operations should fail
     await expect(batchPromise).resolves.toBeDefined();
@@ -1033,7 +1080,10 @@ describe('Request cancellation', () => {
       'test'
     );
     await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx) as Promise<RillValue>,
+      getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      ) as Promise<RillValue>,
       'pinecone: operation cancelled',
       'DISPOSED'
     );
@@ -1066,7 +1116,10 @@ describe('Concurrent operations', () => {
         new Float32Array([i / 10, 0.2, 0.3, 0.4]),
         'test'
       );
-      return getCallable(ext, 'search').fn({ vector: queryVector, options: {} }, ctx);
+      return getCallable(ext, 'search').fn(
+        { vector: queryVector, options: {} },
+        ctx
+      );
     });
 
     const results = await Promise.all(searches);

@@ -9,7 +9,14 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { createRuntimeContext, formatValue, getStatus, isInvalid, type ApplicationCallable, type RillValue } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  formatValue,
+  getStatus,
+  isInvalid,
+  type ApplicationCallable,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
 import { makeFactoryCtx } from './_helpers.js';
 import {
@@ -26,7 +33,11 @@ async function makeTempDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'rill-prompt-md-fn-test-'));
 }
 
-async function writePrompt(dir: string, relPath: string, content: string): Promise<void> {
+async function writePrompt(
+  dir: string,
+  relPath: string,
+  content: string
+): Promise<void> {
   const fullPath = path.join(dir, relPath);
   await fs.mkdir(path.dirname(fullPath), { recursive: true });
   await fs.writeFile(fullPath, content, 'utf-8');
@@ -43,9 +54,11 @@ const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) =>
-      fs.rm(dir, { recursive: true, force: true }).catch(() => undefined),
-    ),
+    tempDirs
+      .splice(0)
+      .map((dir) =>
+        fs.rm(dir, { recursive: true, force: true }).catch(() => undefined)
+      )
   );
 });
 
@@ -71,7 +84,7 @@ params:
 output: string
 ---
 Summarize: {text}
-`,
+`
     );
 
     await writePrompt(
@@ -85,7 +98,7 @@ params:
 output: string
 ---
 Translate to {lang}: {text}
-`,
+`
     );
 
     await writePrompt(
@@ -98,10 +111,13 @@ params:
 output: string
 ---
 Research: {topic}
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const keys = Object.keys(dict).sort();
 
@@ -127,7 +143,7 @@ params: []
 output: string
 ---
 body
-`,
+`
     );
 
     await writePrompt(
@@ -139,7 +155,7 @@ params: []
 output: string
 ---
 body
-`,
+`
     );
 
     await writePrompt(
@@ -151,10 +167,13 @@ params: []
 output: string
 ---
 body
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const keys = Object.keys(dict).sort();
 
@@ -182,12 +201,18 @@ params:
 output: string
 ---
 Hello {title} {name}!
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
-    const result = await dict['greet']!.fn({ name: 'Alice', title: 'Dr.' }, {} as never);
+    const result = await dict['greet']!.fn(
+      { name: 'Alice', title: 'Dr.' },
+      {} as never
+    );
 
     expect(result).toBe('Hello Dr. Alice!\n');
   });
@@ -211,10 +236,13 @@ output: list
 You are a helpful assistant.
 @@ user
 Tell me about {topic}.
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const result = await dict['chat']!.fn({ topic: 'AI' }, {} as never);
 
@@ -253,10 +281,13 @@ output: string
 ---
 Q: {query}
 Context: {context}
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const callable = dict['agents.qa']!;
 
@@ -276,7 +307,9 @@ Context: {context}
     expect(callable.annotations[ANNOTATION_KEY_DESCRIPTION]).toBe('QA agent');
 
     // ^input must list params in declaration order
-    const input = callable.annotations[ANNOTATION_KEY_INPUT] as Array<Record<string, unknown>>;
+    const input = callable.annotations[ANNOTATION_KEY_INPUT] as Array<
+      Record<string, unknown>
+    >;
     expect(Array.isArray(input)).toBe(true);
     expect(input).toHaveLength(2);
     expect(input[0]).toMatchObject({ name: 'query' });
@@ -298,10 +331,13 @@ params: []
 output: string
 ---
 This is a static prompt.
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const result = await dict['static']!.fn({}, {} as never);
 
@@ -323,10 +359,13 @@ params: []
 output: string
 ---
 Open: {{ Close: }} Escaped: {{name}}
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const result = await dict['escapes']!.fn({}, {} as never);
 
@@ -343,16 +382,8 @@ Open: {{ Close: }} Escaped: {{name}}
 describe('AC-16: directory mixing .prompt.md and ordinary .md', () => {
   it('loads only .prompt.md files, ignores plain .md files', async () => {
     const dir = await tempDir();
-    await writePrompt(
-      dir,
-      'readme.md',
-      '# README\nThis is documentation.\n',
-    );
-    await writePrompt(
-      dir,
-      'notes.md',
-      '# Notes\nSome notes.\n',
-    );
+    await writePrompt(dir, 'readme.md', '# README\nThis is documentation.\n');
+    await writePrompt(dir, 'notes.md', '# Notes\nSome notes.\n');
     await writePrompt(
       dir,
       'actual.prompt.md',
@@ -362,10 +393,13 @@ params: []
 output: string
 ---
 Prompt body.
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const keys = Object.keys(dict);
 
@@ -390,10 +424,13 @@ params: []
 output: string
 ---
 body
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     await expect(ext.dispose?.()).resolves.toBeUndefined();
     await expect(ext.dispose?.()).resolves.toBeUndefined();
   });
@@ -409,10 +446,13 @@ params: []
 output: string
 ---
 body
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const fn = dict['alive']!.fn;
 
@@ -447,7 +487,10 @@ Hello {text}!
     await writePrompt(dir, 'first.prompt.md', content);
     await writePrompt(dir, 'second.prompt.md', content);
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     const hashFirst = dict['first']!.annotations[ANNOTATION_KEY_HASH];
@@ -480,10 +523,13 @@ Be helpful.
 @@ user
 ## Context
 Some context here.
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const result = await dict['with_heading']!.fn({}, {} as never);
 
@@ -515,14 +561,20 @@ params:
 output: string
 ---
 Result: {data}
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     // Dict should not throw — it formats via rill's formatValue
-    const result = await dict['dict_param']!.fn({ data: { key: 'val' } }, {} as never);
+    const result = await dict['dict_param']!.fn(
+      { data: { key: 'val' } },
+      {} as never
+    );
     expect(typeof result).toBe('string');
     expect(result as string).toContain('Result:');
   });
@@ -539,14 +591,20 @@ params:
 output: string
 ---
 Items: {items}
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
 
     // List should not throw — it formats via rill's formatValue
-    const result = await dict['list_param']!.fn({ items: ['a', 'b'] }, {} as never);
+    const result = await dict['list_param']!.fn(
+      { items: ['a', 'b'] },
+      {} as never
+    );
     expect(typeof result).toBe('string');
     expect(result as string).toContain('Items:');
   });
@@ -567,10 +625,13 @@ params:
 output: string
 ---
 Articles: {articles}
-`,
+`
     );
 
-    const ext = await createPromptMdExtension({ basePath: dir }, makeFactoryCtx());
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
     const dict = asDict(ext.value);
     const callable = dict['articles']!;
 

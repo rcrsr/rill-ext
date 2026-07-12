@@ -18,7 +18,10 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import { mapKvError, type KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
+import {
+  mapKvError,
+  type KvExtensionContract,
+} from '@rcrsr/rill-ext-kv-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { SqliteKvConfig, SqliteKvMountConfig } from './types.js';
 
@@ -34,12 +37,12 @@ interface MountDatabase {
  */
 export function createSqliteKvExtension(
   config: SqliteKvConfig,
-  ctx: ExtensionFactoryCtx,
+  ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new RuntimeError(
       'RILL-R005',
-      'SQLite kv extension requires at least one mount in configuration',
+      'SQLite kv extension requires at least one mount in configuration'
     );
   }
 
@@ -56,7 +59,7 @@ export function createSqliteKvExtension(
         } catch (error: unknown) {
           throw new RuntimeError(
             'RILL-R005',
-            `Failed to create directory for database path "${dbPath}": ${error instanceof Error ? error.message : String(error)}`,
+            `Failed to create directory for database path "${dbPath}": ${error instanceof Error ? error.message : String(error)}`
           );
         }
       }
@@ -69,7 +72,7 @@ export function createSqliteKvExtension(
       if (!TABLE_NAME_PATTERN.test(tableName)) {
         throw new RuntimeError(
           'RILL-R005',
-          `Invalid table name "${tableName}": must match pattern ${TABLE_NAME_PATTERN}`,
+          `Invalid table name "${tableName}": must match pattern ${TABLE_NAME_PATTERN}`
         );
       }
 
@@ -88,7 +91,7 @@ export function createSqliteKvExtension(
       if (error instanceof RuntimeError) throw error;
       throw new RuntimeError(
         'RILL-R005',
-        `Failed to initialize SQLite database for mount "${mountName}": ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to initialize SQLite database for mount "${mountName}": ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
@@ -149,7 +152,9 @@ export function createSqliteKvExtension(
   function unknownMount(runCtx: RuntimeContext, mountName: string): RillValue {
     const available = Object.keys(config.mounts);
     return runCtx.invalidate(
-      new Error(`Mount '${mountName}' not found. Available mounts: ${available.join(', ')}`),
+      new Error(
+        `Mount '${mountName}' not found. Available mounts: ${available.join(', ')}`
+      ),
       {
         code: 'INVALID_INPUT',
         provider: PROVIDER,
@@ -158,18 +163,22 @@ export function createSqliteKvExtension(
           mountName,
           availableMounts: available,
         },
-      },
+      }
     );
   }
 
-  function readonlyMount(runCtx: RuntimeContext, mountName: string, mode: string): RillValue {
+  function readonlyMount(
+    runCtx: RuntimeContext,
+    mountName: string,
+    mode: string
+  ): RillValue {
     return runCtx.invalidate(
       new Error(`Mount '${mountName}' is read-only (mode: ${mode})`),
       {
         code: 'INVALID_INPUT',
         provider: PROVIDER,
         raw: { kind: 'readonly_mount', mountName, mode },
-      },
+      }
     );
   }
 
@@ -195,15 +204,20 @@ export function createSqliteKvExtension(
     const { mountDb, mountConfig } = mount;
 
     if (mountConfig.schema && !(key in mountConfig.schema)) {
-      return runCtx.invalidate(new Error(`key "${key}" not declared in schema`), {
-        code: 'INVALID_INPUT',
-        provider: PROVIDER,
-        raw: { kind: 'schema_violation', mount: mountName, key },
-      });
+      return runCtx.invalidate(
+        new Error(`key "${key}" not declared in schema`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'schema_violation', mount: mountName, key },
+        }
+      );
     }
 
     try {
-      const stmt = mountDb.db.prepare(`SELECT value FROM ${mountDb.table} WHERE key = ?`);
+      const stmt = mountDb.db.prepare(
+        `SELECT value FROM ${mountDb.table} WHERE key = ?`
+      );
       const row = stmt.get(key) as { value: string } | undefined;
       if (row) return JSON.parse(row.value) as RillValue;
       if (mountConfig.schema && key in mountConfig.schema) {
@@ -226,7 +240,7 @@ export function createSqliteKvExtension(
 
     try {
       const stmt = mount.mountDb.db.prepare(
-        `SELECT value FROM ${mount.mountDb.table} WHERE key = ?`,
+        `SELECT value FROM ${mount.mountDb.table} WHERE key = ?`
       );
       const row = stmt.get(key) as { value: string } | undefined;
       if (row) return JSON.parse(row.value) as RillValue;
@@ -246,25 +260,32 @@ export function createSqliteKvExtension(
     if (!mount) return unknownMount(runCtx, mountName);
     const { mountDb, mountConfig } = mount;
 
-    if (mountConfig.mode === 'read') return readonlyMount(runCtx, mountName, mountConfig.mode);
+    if (mountConfig.mode === 'read')
+      return readonlyMount(runCtx, mountName, mountConfig.mode);
 
     if (mountConfig.schema && !(key in mountConfig.schema)) {
-      return runCtx.invalidate(new Error(`key "${key}" not declared in schema`), {
-        code: 'INVALID_INPUT',
-        provider: PROVIDER,
-        raw: { kind: 'schema_violation', mount: mountName, key },
-      });
+      return runCtx.invalidate(
+        new Error(`key "${key}" not declared in schema`),
+        {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: { kind: 'schema_violation', mount: mountName, key },
+        }
+      );
     }
 
     if (mountConfig.schema && key in mountConfig.schema) {
       const expected = mountConfig.schema[key]!.type;
       const actual = actualTypeOf(value);
       if (actual !== expected) {
-        return runCtx.invalidate(new Error(`key "${key}" expects ${expected}, got ${actual}`), {
-          code: 'TYPE_MISMATCH',
-          provider: PROVIDER,
-          raw: { kind: 'type_mismatch', key, expected, actual },
-        });
+        return runCtx.invalidate(
+          new Error(`key "${key}" expects ${expected}, got ${actual}`),
+          {
+            code: 'TYPE_MISMATCH',
+            provider: PROVIDER,
+            raw: { kind: 'type_mismatch', key, expected, actual },
+          }
+        );
       }
     }
 
@@ -272,37 +293,49 @@ export function createSqliteKvExtension(
     const valueSize = calculateValueSize(value);
     if (valueSize > maxValueSize) {
       return runCtx.invalidate(
-        new Error(`value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`),
+        new Error(
+          `value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`
+        ),
         {
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'value_too_large', key, valueSize, maxValueSize },
-        },
+        }
       );
     }
 
     try {
       const maxEntries = mountConfig.maxEntries ?? 10000;
-      const hasStmt = mountDb.db.prepare(`SELECT 1 FROM ${mountDb.table} WHERE key = ?`);
+      const hasStmt = mountDb.db.prepare(
+        `SELECT 1 FROM ${mountDb.table} WHERE key = ?`
+      );
       const exists = hasStmt.get(key) !== undefined;
 
       if (!exists) {
-        const countStmt = mountDb.db.prepare(`SELECT COUNT(*) as count FROM ${mountDb.table}`);
+        const countStmt = mountDb.db.prepare(
+          `SELECT COUNT(*) as count FROM ${mountDb.table}`
+        );
         const countRow = countStmt.get() as { count: number };
         if (countRow.count >= maxEntries) {
           return runCtx.invalidate(
-            new Error(`store exceeds entry limit (${countRow.count + 1} > ${maxEntries})`),
+            new Error(
+              `store exceeds entry limit (${countRow.count + 1} > ${maxEntries})`
+            ),
             {
               code: 'INVALID_INPUT',
               provider: PROVIDER,
-              raw: { kind: 'entry_limit_exceeded', count: countRow.count + 1, maxEntries },
-            },
+              raw: {
+                kind: 'entry_limit_exceeded',
+                count: countRow.count + 1,
+                maxEntries,
+              },
+            }
           );
         }
       }
 
       const stmt = mountDb.db.prepare(
-        `INSERT OR REPLACE INTO ${mountDb.table} (key, value) VALUES (?, ?)`,
+        `INSERT OR REPLACE INTO ${mountDb.table} (key, value) VALUES (?, ?)`
       );
       stmt.run(key, JSON.stringify(value));
       return true;
@@ -321,14 +354,15 @@ export function createSqliteKvExtension(
     if (!mount) return unknownMount(runCtx, mountName);
     const { mountDb, mountConfig } = mount;
 
-    if (mountConfig.mode === 'read') return readonlyMount(runCtx, mountName, mountConfig.mode);
+    if (mountConfig.mode === 'read')
+      return readonlyMount(runCtx, mountName, mountConfig.mode);
 
     let invalidResult: RillValue | null = null;
 
     try {
       const mergeTransaction = mountDb.db.transaction(() => {
         const selectStmt = mountDb.db.prepare(
-          `SELECT value FROM ${mountDb.table} WHERE key = ?`,
+          `SELECT value FROM ${mountDb.table} WHERE key = ?`
         );
         const row = selectStmt.get(key) as { value: string } | undefined;
 
@@ -341,8 +375,12 @@ export function createSqliteKvExtension(
               {
                 code: 'INVALID_INPUT',
                 provider: PROVIDER,
-                raw: { kind: 'merge_non_dict', key, currentType: typeof currentValue },
-              },
+                raw: {
+                  kind: 'merge_non_dict',
+                  key,
+                  currentType: typeof currentValue,
+                },
+              }
             );
             throw new Error('__merge_invalid__');
           }
@@ -363,7 +401,7 @@ export function createSqliteKvExtension(
                 code: 'TYPE_MISMATCH',
                 provider: PROVIDER,
                 raw: { kind: 'type_mismatch', key, expected, actual },
-              },
+              }
             );
             throw new Error('__merge_invalid__');
           }
@@ -374,19 +412,19 @@ export function createSqliteKvExtension(
         if (valueSize > maxValueSize) {
           invalidResult = runCtx.invalidate(
             new Error(
-              `merged value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`,
+              `merged value for "${key}" exceeds size limit (${valueSize} > ${maxValueSize})`
             ),
             {
               code: 'INVALID_INPUT',
               provider: PROVIDER,
               raw: { kind: 'value_too_large', key, valueSize, maxValueSize },
-            },
+            }
           );
           throw new Error('__merge_invalid__');
         }
 
         const updateStmt = mountDb.db.prepare(
-          `INSERT OR REPLACE INTO ${mountDb.table} (key, value) VALUES (?, ?)`,
+          `INSERT OR REPLACE INTO ${mountDb.table} (key, value) VALUES (?, ?)`
         );
         updateStmt.run(key, JSON.stringify(mergedValue));
       });
@@ -408,10 +446,13 @@ export function createSqliteKvExtension(
     if (!mount) return unknownMount(runCtx, mountName);
     const { mountDb, mountConfig } = mount;
 
-    if (mountConfig.mode === 'read') return readonlyMount(runCtx, mountName, mountConfig.mode);
+    if (mountConfig.mode === 'read')
+      return readonlyMount(runCtx, mountName, mountConfig.mode);
 
     try {
-      const stmt = mountDb.db.prepare(`DELETE FROM ${mountDb.table} WHERE key = ?`);
+      const stmt = mountDb.db.prepare(
+        `DELETE FROM ${mountDb.table} WHERE key = ?`
+      );
       const result = stmt.run(key);
       return result.changes > 0;
     } catch (error) {
@@ -427,7 +468,9 @@ export function createSqliteKvExtension(
     if (!mount) return unknownMount(runCtx, mountName);
 
     try {
-      const stmt = mount.mountDb.db.prepare(`SELECT key FROM ${mount.mountDb.table}`);
+      const stmt = mount.mountDb.db.prepare(
+        `SELECT key FROM ${mount.mountDb.table}`
+      );
       const rows = stmt.all() as { key: string }[];
       return rows.map((row) => row.key);
     } catch (error) {
@@ -445,7 +488,7 @@ export function createSqliteKvExtension(
 
     try {
       const stmt = mount.mountDb.db.prepare(
-        `SELECT 1 FROM ${mount.mountDb.table} WHERE key = ?`,
+        `SELECT 1 FROM ${mount.mountDb.table} WHERE key = ?`
       );
       const row = stmt.get(key);
       return row !== undefined;
@@ -462,7 +505,8 @@ export function createSqliteKvExtension(
     if (!mount) return unknownMount(runCtx, mountName);
     const { mountDb, mountConfig } = mount;
 
-    if (mountConfig.mode === 'read') return readonlyMount(runCtx, mountName, mountConfig.mode);
+    if (mountConfig.mode === 'read')
+      return readonlyMount(runCtx, mountName, mountConfig.mode);
 
     try {
       const deleteStmt = mountDb.db.prepare(`DELETE FROM ${mountDb.table}`);
@@ -470,7 +514,7 @@ export function createSqliteKvExtension(
 
       if (mountConfig.schema) {
         const insertStmt = mountDb.db.prepare(
-          `INSERT INTO ${mountDb.table} (key, value) VALUES (?, ?)`,
+          `INSERT INTO ${mountDb.table} (key, value) VALUES (?, ?)`
         );
         for (const [k, entry] of Object.entries(mountConfig.schema)) {
           insertStmt.run(k, JSON.stringify(entry.default));
@@ -491,7 +535,7 @@ export function createSqliteKvExtension(
 
     try {
       const stmt = mount.mountDb.db.prepare(
-        `SELECT key, value FROM ${mount.mountDb.table}`,
+        `SELECT key, value FROM ${mount.mountDb.table}`
       );
       const rows = stmt.all() as { key: string; value: string }[];
       const result: Record<string, RillValue> = {};
@@ -515,7 +559,11 @@ export function createSqliteKvExtension(
 
     const result: RillValue[] = [];
     for (const [key, entry] of Object.entries(mountConfig.schema)) {
-      result.push({ key, type: entry.type, description: entry.description ?? '' });
+      result.push({
+        key,
+        type: entry.type,
+        description: entry.description ?? '',
+      });
     }
     return result;
   };
@@ -541,9 +589,17 @@ export function createSqliteKvExtension(
   // ============================================================
 
   const fnDict: {
-    get: RillFunction; get_or: RillFunction; set: RillFunction; merge: RillFunction;
-    delete: RillFunction; keys: RillFunction; has: RillFunction; clear: RillFunction;
-    getAll: RillFunction; schema: RillFunction; mounts: RillFunction;
+    get: RillFunction;
+    get_or: RillFunction;
+    set: RillFunction;
+    merge: RillFunction;
+    delete: RillFunction;
+    keys: RillFunction;
+    has: RillFunction;
+    clear: RillFunction;
+    getAll: RillFunction;
+    schema: RillFunction;
+    mounts: RillFunction;
   } = {
     get: {
       params: [p.str('mount', 'Mount name'), p.str('key', 'Key to retrieve')],
@@ -558,7 +614,9 @@ export function createSqliteKvExtension(
         p.dict('fallback', 'Fallback value if key missing'),
       ],
       fn: get_or,
-      annotations: { description: 'Get value or return fallback if key missing' },
+      annotations: {
+        description: 'Get value or return fallback if key missing',
+      },
       returnType: anyTypeValue,
     },
     set: {
@@ -578,7 +636,9 @@ export function createSqliteKvExtension(
         p.dict('partial', 'Partial dict to merge'),
       ],
       fn: merge,
-      annotations: { description: 'Merge partial dict into existing dict value' },
+      annotations: {
+        description: 'Merge partial dict into existing dict value',
+      },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
     delete: {
@@ -591,7 +651,10 @@ export function createSqliteKvExtension(
       params: [p.str('mount', 'Mount name')],
       fn: keys,
       annotations: { description: 'Get all keys in mount' },
-      returnType: structureToTypeValue({ kind: 'list', element: { kind: 'string' } }),
+      returnType: structureToTypeValue({
+        kind: 'list',
+        element: { kind: 'string' },
+      }),
     },
     has: {
       params: [p.str('mount', 'Mount name'), p.str('key', 'Key to check')],
@@ -612,7 +675,10 @@ export function createSqliteKvExtension(
       // Homogeneous-value dict per §EXT.8.2: keys are arbitrary user-chosen
       // strings; values are user-stored RillValues whose schema is set by the
       // caller (§EXT.8.3 case 1), so the value type is `any`.
-      returnType: structureToTypeValue({ kind: 'dict', valueType: { kind: 'any' } }),
+      returnType: structureToTypeValue({
+        kind: 'dict',
+        valueType: { kind: 'any' },
+      }),
     },
     schema: {
       params: [p.str('mount', 'Mount name')],

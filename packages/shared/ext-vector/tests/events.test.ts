@@ -31,7 +31,7 @@ describe('withEventEmission', () => {
         provider,
         operation,
         { id: 'vec-1', count: 10 },
-        async () => 'success' as RillValue,
+        async () => 'success' as RillValue
       );
       expect(result).toBe('success');
       expect(onLogEvent).toHaveBeenCalledTimes(1);
@@ -50,7 +50,7 @@ describe('withEventEmission', () => {
         provider,
         operation,
         {},
-        async () => expectedResult as unknown as RillValue,
+        async () => expectedResult as unknown as RillValue
       );
       expect(result).toEqual(expectedResult);
     });
@@ -62,7 +62,7 @@ describe('withEventEmission', () => {
         provider,
         operation,
         {},
-        async () => 'done' as RillValue,
+        async () => 'done' as RillValue
       );
       const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
       expect(event['event']).toBe(`${provider}:${operation}`);
@@ -79,7 +79,7 @@ describe('withEventEmission', () => {
         {},
         async () => {
           throw new Error('Database connection failed');
-        },
+        }
       );
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).message).toContain('Database connection failed');
@@ -98,9 +98,11 @@ describe('withEventEmission', () => {
         {},
         async () => {
           throw new Error('401 unauthorized');
-        },
+        }
       );
-      expect(getStatus(result).message).toContain('authentication failed (401)');
+      expect(getStatus(result).message).toContain(
+        'authentication failed (401)'
+      );
     });
   });
 
@@ -112,7 +114,7 @@ describe('withEventEmission', () => {
         'chroma',
         'query',
         {},
-        async () => 'result' as RillValue,
+        async () => 'result' as RillValue
       );
       const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
       expect(event['event']).toBe('chroma:query');

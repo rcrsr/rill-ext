@@ -49,7 +49,12 @@ const mockEmbeddingsCreate = vi.fn();
 vi.mock('openai', () => {
   class MockAPIError extends Error {
     status: number | undefined;
-    constructor(status: number | undefined, _error: unknown, message: string, _headers: unknown) {
+    constructor(
+      status: number | undefined,
+      _error: unknown,
+      message: string,
+      _headers: unknown
+    ) {
       super(message);
       this.status = status;
       this.name = 'APIError';
@@ -81,15 +86,22 @@ vi.mock('openai', () => {
 // HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /**
  * Resolves a RillStream returned from a host function.
  */
-async function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
-  const resolve = (stream as Record<string, unknown>)['__rill_stream_resolve'] as () => Promise<unknown>;
+async function resolveStream(
+  stream: unknown
+): Promise<Record<string, unknown>> {
+  const resolve = (stream as Record<string, unknown>)[
+    '__rill_stream_resolve'
+  ] as () => Promise<unknown>;
   return (await resolve()) as Record<string, unknown>;
 }
 
@@ -132,7 +144,7 @@ const BASE_CONFIG: OpenAIExtensionConfig = {
 function expectHaltCode(
   fn: () => unknown,
   code: string,
-  rawKind?: string,
+  rawKind?: string
 ): RuntimeHaltSignal {
   let thrown: unknown;
   try {
@@ -155,11 +167,13 @@ function expectHaltCode(
 async function expectRejectedHaltCode(
   promise: Promise<unknown>,
   code: string,
-  rawKind?: string,
+  rawKind?: string
 ): Promise<void> {
   const err = await promise.then(
-    () => { throw new Error('expected rejection'); },
-    (e: unknown) => e,
+    () => {
+      throw new Error('expected rejection');
+    },
+    (e: unknown) => e
   );
   expect(err).toBeInstanceOf(RuntimeHaltSignal);
   const status = getStatus((err as RuntimeHaltSignal).value);
@@ -210,7 +224,11 @@ describe('boundary: valid input acceptance', () => {
         parts: [
           {
             type: 'image',
-            source: { kind: 'url', data: 'https://example.com/img.png', media_type: 'image/png' },
+            source: {
+              kind: 'url',
+              data: 'https://example.com/img.png',
+              media_type: 'image/png',
+            },
           },
         ],
       },
@@ -223,7 +241,7 @@ describe('boundary: valid input acceptance', () => {
   // AC-B6: extra:{} passes validateExtraKeys
   it('AC-B6: factory with extra:{} is accepted', () => {
     expect(() =>
-      createOpenAIExtension({ ...BASE_CONFIG, extra: {} }),
+      createOpenAIExtension({ ...BASE_CONFIG, extra: {} })
     ).not.toThrow();
   });
 
@@ -241,7 +259,7 @@ describe('boundary: valid input acceptance', () => {
     }
 
     const streams = Array.from({ length: 10 }, () =>
-      getCallable(ext, 'message').fn({ prompt: 'hello' }, ctx),
+      getCallable(ext, 'message').fn({ prompt: 'hello' }, ctx)
     );
     await Promise.all(streams.map(resolveStream));
 
@@ -262,9 +280,9 @@ describe('boundary: factory-time validation errors', () => {
   // AC-B7: max_turns:0 → RILL-R001 (verbatim message)
   it('AC-B7: max_turns:0 throws RILL-R001 with exact message', () => {
     expect(() =>
-      createOpenAIExtension({ ...BASE_CONFIG, max_turns: 0 }),
+      createOpenAIExtension({ ...BASE_CONFIG, max_turns: 0 })
     ).toThrow(
-      "Factory config 'max_turns' must be a positive integer or undefined; sentinel value 0 is reserved for per-call override semantics.",
+      "Factory config 'max_turns' must be a positive integer or undefined; sentinel value 0 is reserved for per-call override semantics."
     );
 
     let thrown: unknown;
@@ -282,7 +300,7 @@ describe('boundary: factory-time validation errors', () => {
       createOpenAIExtension({
         ...BASE_CONFIG,
         extra: { model: 'gpt-99' } as Record<string, unknown>,
-      }),
+      })
     ).toThrow(RuntimeError);
   });
 
@@ -292,7 +310,7 @@ describe('boundary: factory-time validation errors', () => {
       createOpenAIExtension({
         ...BASE_CONFIG,
         extra: { temperature: 0.5 } as Record<string, unknown>,
-      }),
+      })
     ).toThrow(RuntimeError);
   });
 
@@ -302,7 +320,7 @@ describe('boundary: factory-time validation errors', () => {
       createOpenAIExtension({
         ...BASE_CONFIG,
         extra: { previous_response_id: 'resp-old' } as Record<string, unknown>,
-      }),
+      })
     ).toThrow(RuntimeError);
   });
 });
@@ -327,7 +345,7 @@ describe('boundary: runtime errors from message()', () => {
 
     expectHaltCode(
       () => getCallable(ext, 'message').fn({ prompt }, ctx),
-      'INVALID_INPUT',
+      'INVALID_INPUT'
     );
   });
 
@@ -342,7 +360,7 @@ describe('boundary: runtime errors from message()', () => {
 
     expectHaltCode(
       () => getCallable(ext, 'message').fn({ prompt }, ctx),
-      'INVALID_INPUT',
+      'INVALID_INPUT'
     );
   });
 
@@ -359,7 +377,7 @@ describe('boundary: runtime errors from message()', () => {
     expectHaltCode(
       () => getCallable(ext, 'message').fn({ prompt }, ctx),
       'INVALID_INPUT',
-      'trailing_assistant_turn',
+      'trailing_assistant_turn'
     );
   });
 
@@ -377,7 +395,7 @@ describe('boundary: runtime errors from message()', () => {
 
     expectHaltCode(
       () => getCallable(ext, 'message').fn({ prompt }, ctx),
-      'INVALID_INPUT',
+      'INVALID_INPUT'
     );
   });
 
@@ -387,9 +405,13 @@ describe('boundary: runtime errors from message()', () => {
     const ctx = createRuntimeContext();
 
     expectHaltCode(
-      () => getCallable(ext, 'message').fn({ prompt: 123 as unknown as RillValue }, ctx),
+      () =>
+        getCallable(ext, 'message').fn(
+          { prompt: 123 as unknown as RillValue },
+          ctx
+        ),
       'INVALID_INPUT',
-      'invalid_prompt_type',
+      'invalid_prompt_type'
     );
   });
 
@@ -399,9 +421,13 @@ describe('boundary: runtime errors from message()', () => {
     const ctx = createRuntimeContext();
 
     expectHaltCode(
-      () => getCallable(ext, 'message').fn({ prompt: [] as unknown as RillValue }, ctx),
+      () =>
+        getCallable(ext, 'message').fn(
+          { prompt: [] as unknown as RillValue },
+          ctx
+        ),
       'INVALID_INPUT',
-      'empty_message_list',
+      'empty_message_list'
     );
   });
 
@@ -413,7 +439,7 @@ describe('boundary: runtime errors from message()', () => {
     expectHaltCode(
       () => getCallable(ext, 'message').fn({ prompt: '' as RillValue }, ctx),
       'INVALID_INPUT',
-      'empty_prompt',
+      'empty_prompt'
     );
   });
 });
@@ -437,10 +463,10 @@ describe('boundary: runtime errors from tool_loop()', () => {
       () =>
         getCallable(ext, 'tool_loop').fn(
           { prompt: 'run a tool', tools: {} as RillValue, max_turns: 0 },
-          ctx,
+          ctx
         ),
       'INVALID_INPUT',
-      'empty_tools_dict',
+      'empty_tools_dict'
     );
   });
 
@@ -455,10 +481,14 @@ describe('boundary: runtime errors from tool_loop()', () => {
     expectHaltCode(
       () =>
         getCallable(ext, 'tool_loop').fn(
-          { prompt: 'run a tool', tools, max_turns: -1 as unknown as RillValue },
-          ctx,
+          {
+            prompt: 'run a tool',
+            tools,
+            max_turns: -1 as unknown as RillValue,
+          },
+          ctx
         ),
-      'INVALID_INPUT',
+      'INVALID_INPUT'
     );
   });
 });

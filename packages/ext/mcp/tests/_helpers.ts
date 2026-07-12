@@ -23,26 +23,6 @@ export function makeRuntimeCtx(): RuntimeContext {
   return createRuntimeContext();
 }
 
-export async function expectInvalidAsync(
-  promise: Promise<unknown>,
-  atom: string,
-  needle?: string,
-): Promise<RillValue> {
-  let caught: unknown;
-  try {
-    await promise;
-  } catch (err) {
-    caught = err;
-  }
-  expect(isInvalid(caught as RillValue)).toBe(true);
-  const status = getStatus(caught as RillValue);
-  expect(status.code.name).toBe(atom);
-  if (needle !== undefined) {
-    expect(status.message).toContain(needle);
-  }
-  return caught as RillValue;
-}
-
 /**
  * Drop-in replacement for `expect(promise).rejects.toThrow(needle)` when the
  * rejection is an invalid RillValue produced by `ctx.invalidate` (which is
@@ -50,7 +30,7 @@ export async function expectInvalidAsync(
  */
 export async function expectRejectsInvalid(
   promise: Promise<unknown>,
-  needle?: string | RegExp,
+  needle?: string | RegExp
 ): Promise<RillValue> {
   let caught: unknown;
   try {

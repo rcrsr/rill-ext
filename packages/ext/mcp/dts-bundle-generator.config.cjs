@@ -15,7 +15,11 @@ const config = {
 
       libraries: {
         inlinedLibraries: [],
-        importedLibraries: ['undici-types', '@rcrsr/rill', '@modelcontextprotocol/sdk'],
+        importedLibraries: [
+          'undici-types',
+          '@rcrsr/rill',
+          '@modelcontextprotocol/sdk',
+        ],
       },
 
       output: {

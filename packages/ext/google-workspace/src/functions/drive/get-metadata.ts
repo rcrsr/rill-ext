@@ -20,7 +20,9 @@ export interface DriveGetMetadataDeps {
  * Factory returning the drive_get_metadata inner function.
  * AC-12: Returns rill primitive dict with file metadata.
  */
-export function makeDriveGetMetadata(deps: DriveGetMetadataDeps): (
+export function makeDriveGetMetadata(
+  deps: DriveGetMetadataDeps
+): (
   args: Record<string, RillValue>,
   ctx: RuntimeContext,
   controller: AbortController
@@ -32,7 +34,11 @@ export function makeDriveGetMetadata(deps: DriveGetMetadataDeps): (
   ): Promise<RillValue> => {
     const fileId = args['file_id'];
     if (typeof fileId !== 'string' || fileId.trim() === '') {
-      failInput(ctx, 'invalid_arg', 'google: file_id must be a non-empty string');
+      failInput(
+        ctx,
+        'invalid_arg',
+        'google: file_id must be a non-empty string'
+      );
     }
     const path = `/files/${encodeURIComponent(fileId)}?fields=${encodeURIComponent(METADATA_FIELDS)}`;
     const response = await googleFetch(

@@ -42,7 +42,7 @@ export function signServiceAccountJwt(
   ctx: RuntimeContext,
   key: ServiceAccountKey,
   scopes: string[],
-  subject?: string | undefined,
+  subject?: string | undefined
 ): string {
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + JWT_LIFETIME_SECONDS;

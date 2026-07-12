@@ -14,7 +14,7 @@ import {
   type ApplicationCallable,
   type ExtensionFactoryCtx,
   type RillValue,
-} from "@rcrsr/rill";
+} from '@rcrsr/rill';
 import { createSerperExtension } from '../src/factory.js';
 
 function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
@@ -38,12 +38,18 @@ async function expectInvalidWithMessage(
 // TEST HELPERS
 // ============================================================
 
-function getCallable(ext: { value: unknown }, name: string): ApplicationCallable {
+function getCallable(
+  ext: { value: unknown },
+  name: string
+): ApplicationCallable {
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
 /** Build a fetch mock that returns a JSON response with given status. */
-function mockFetchJson(status: number, body: unknown): ReturnType<typeof vi.fn> {
+function mockFetchJson(
+  status: number,
+  body: unknown
+): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -61,7 +67,9 @@ function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
-    json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
+    json: vi
+      .fn()
+      .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
   });
 }
 
@@ -74,16 +82,34 @@ const VALID_CONFIG = { apiKey: 'serper-test-key' };
 const SEARCH_RESPONSE = {
   searchParameters: { q: 'TypeScript tutorials', type: 'search' },
   organic: [
-    { title: 'TypeScript Guide', link: 'https://example.com/1', snippet: 'Learn TypeScript', position: 1 },
-    { title: 'TypeScript Docs', link: 'https://example.com/2', snippet: 'Official docs', position: 2 },
+    {
+      title: 'TypeScript Guide',
+      link: 'https://example.com/1',
+      snippet: 'Learn TypeScript',
+      position: 1,
+    },
+    {
+      title: 'TypeScript Docs',
+      link: 'https://example.com/2',
+      snippet: 'Official docs',
+      position: 2,
+    },
   ],
 };
 
 const NEWS_RESPONSE = {
   searchParameters: { q: 'TypeScript news', type: 'news' },
   news: [
-    { title: 'TypeScript 5.0 Released', link: 'https://news.example.com/1', snippet: 'New version' },
-    { title: 'TypeScript Updates', link: 'https://news.example.com/2', snippet: 'Latest changes' },
+    {
+      title: 'TypeScript 5.0 Released',
+      link: 'https://news.example.com/1',
+      snippet: 'New version',
+    },
+    {
+      title: 'TypeScript Updates',
+      link: 'https://news.example.com/2',
+      snippet: 'Latest changes',
+    },
   ],
 };
 
@@ -200,7 +226,9 @@ describe('Serper extension host functions', () => {
       expect(mockFetch).toHaveBeenCalledOnce();
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('https://google.serper.dev/search');
-      expect((init.headers as Record<string, string>)['X-API-KEY']).toBe('serper-test-key');
+      expect((init.headers as Record<string, string>)['X-API-KEY']).toBe(
+        'serper-test-key'
+      );
       expect(init.method).toBe('POST');
     });
 
@@ -220,7 +248,10 @@ describe('Serper extension host functions', () => {
     it('respects custom baseUrl', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
-      const ext = createSerperExtension({ apiKey: 'test-key', baseUrl: 'https://custom.serper.dev' }, makeFactoryCtx());
+      const ext = createSerperExtension(
+        { apiKey: 'test-key', baseUrl: 'https://custom.serper.dev' },
+        makeFactoryCtx()
+      );
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
@@ -233,7 +264,13 @@ describe('Serper extension host functions', () => {
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'search').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'search').fn({ query: '' }, ctx),
@@ -350,7 +387,13 @@ describe('Serper extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'search').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -398,7 +441,10 @@ describe('Serper extension host functions', () => {
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await getCallable(ext, 'news').fn({ query: 'latest TypeScript news' }, ctx);
+      await getCallable(ext, 'news').fn(
+        { query: 'latest TypeScript news' },
+        ctx
+      );
 
       const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('https://google.serper.dev/news');
@@ -411,7 +457,13 @@ describe('Serper extension host functions', () => {
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'news').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'news').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'news').fn({ query: '' }, ctx),
@@ -513,7 +565,13 @@ describe('Serper extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'news').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'news').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -559,7 +617,9 @@ describe('Serper extension host functions', () => {
       expect(first['imageUrl']).toBe('https://images.example.com/ts-logo.png');
       expect(first['imageWidth']).toBe(400);
       expect(first['imageHeight']).toBe(400);
-      expect(first['thumbnailUrl']).toBe('https://thumbs.example.com/ts-logo-thumb.png');
+      expect(first['thumbnailUrl']).toBe(
+        'https://thumbs.example.com/ts-logo-thumb.png'
+      );
       expect(first['source']).toBe('typescriptlang.org');
       expect(first['link']).toBe('https://typescriptlang.org');
     });
@@ -583,7 +643,13 @@ describe('Serper extension host functions', () => {
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      {const __r = await getCallable(ext, 'images').fn({ query: '' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'images').fn(
+          { query: '' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       await expectInvalidWithMessage(
         getCallable(ext, 'images').fn({ query: '' }, ctx),
@@ -685,7 +751,13 @@ describe('Serper extension host functions', () => {
       const onLogEvent = vi.fn();
       ctx.callbacks.onLogEvent = onLogEvent;
 
-      {const __r = await getCallable(ext, 'images').fn({ query: 'test' }, ctx) as RillValue; expect(isInvalid(__r)).toBe(true);}
+      {
+        const __r = (await getCallable(ext, 'images').fn(
+          { query: 'test' },
+          ctx
+        )) as RillValue;
+        expect(isInvalid(__r)).toBe(true);
+      }
 
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -715,24 +787,26 @@ describe('Serper extension host functions', () => {
   describe('dispose with in-flight requests [AC-22]', () => {
     it('dispose cancels in-flight search request [AC-22]', async () => {
       // Mock fetch that hangs until its signal is aborted
-      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-        return new Promise((_resolve, reject) => {
-          const signal = init?.signal;
-          if (signal) {
-            if (signal.aborted) {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-              return;
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            const signal = init?.signal;
+            if (signal) {
+              if (signal.aborted) {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+                return;
+              }
+              signal.addEventListener('abort', () => {
+                const err = new Error('The operation was aborted');
+                err.name = 'AbortError';
+                reject(err);
+              });
             }
-            signal.addEventListener('abort', () => {
-              const err = new Error('The operation was aborted');
-              err.name = 'AbortError';
-              reject(err);
-            });
-          }
+          });
         });
-      });
 
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();

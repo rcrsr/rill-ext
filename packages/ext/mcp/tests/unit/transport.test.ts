@@ -24,9 +24,9 @@ describe('Transport Creation', () => {
         },
       };
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        /mcp: server process exited with code/
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow(/mcp: server process exited with code/);
     });
 
     it('maps exit code from error message', async () => {
@@ -37,9 +37,9 @@ describe('Transport Creation', () => {
         },
       };
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
-        /server process exited with code 1/
-      );
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow(/server process exited with code 1/);
     });
   });
 
@@ -53,7 +53,9 @@ describe('Transport Creation', () => {
         timeout: 2000, // Short timeout
       };
 
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow(
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow(
         /mcp: connection refused at http:\/\/localhost:59999\/mcp/
       );
     }, 5000);
@@ -73,7 +75,9 @@ describe('Transport Creation', () => {
 
       // The error may come from the MCP SDK as a different format
       // We just verify it throws (401 handling is tested in error mapping)
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow();
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow();
     }, 10000);
   });
 
@@ -152,7 +156,9 @@ describe('Transport Creation', () => {
       };
 
       // Should fail to connect but static headers should be handled
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow();
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow();
     }, 5000);
 
     // Test header handling logic without actual connection
@@ -201,7 +207,9 @@ describe('Transport Creation', () => {
       };
 
       // Will fail because command doesn't exist, but confirms stdio path
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow();
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow();
     });
 
     it('creates HTTP transport for http config', async () => {
@@ -214,7 +222,9 @@ describe('Transport Creation', () => {
       };
 
       // Will fail because server doesn't exist, but confirms http path
-      await expect(createMcpExtension(config, makeFactoryCtx())).rejects.toThrow();
+      await expect(
+        createMcpExtension(config, makeFactoryCtx())
+      ).rejects.toThrow();
     }, 5000);
   });
 });

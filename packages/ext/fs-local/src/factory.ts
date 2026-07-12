@@ -40,14 +40,13 @@ const PROVIDER = 'fs-local';
  */
 export async function createLocalFsExtension(
   config: FsLocalExtensionConfig,
-  _ctx: ExtensionFactoryCtx,
+  _ctx: ExtensionFactoryCtx
 ): Promise<ExtensionFactoryResult> {
-
   // Validate required configuration (factory-init: throw R005)
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new RuntimeError(
       'RILL-R005',
-      'fs-local extension requires at least one mount in configuration',
+      'fs-local extension requires at least one mount in configuration'
     );
   }
 
@@ -62,7 +61,9 @@ export async function createLocalFsExtension(
   }
 
   // Initialize mounts in parallel; errors propagate as RILL-R005.
-  await Promise.all(Object.values(mounts).map((mount) => initializeMount(mount)));
+  await Promise.all(
+    Object.values(mounts).map((mount) => initializeMount(mount))
+  );
 
   // ============================================================
   // HELPERS
@@ -77,7 +78,7 @@ export async function createLocalFsExtension(
     size: number,
     max: number,
     filePath: string,
-    runCtx: RuntimeContext,
+    runCtx: RuntimeContext
   ): RillValue | null => {
     if (size > max) {
       return runCtx.invalidate(
@@ -86,7 +87,7 @@ export async function createLocalFsExtension(
           code: 'UNAVAILABLE',
           provider: PROVIDER,
           raw: { kind: 'file_too_large', path: filePath, size, max },
-        },
+        }
       );
     }
     return null;
@@ -105,7 +106,13 @@ export async function createLocalFsExtension(
       relativePath: string;
     };
 
-    const resolved = await resolvePath(mountName, filePath, mounts, 'read', runCtx);
+    const resolved = await resolvePath(
+      mountName,
+      filePath,
+      mounts,
+      'read',
+      runCtx
+    );
     if (isInvalid(resolved as RillValue)) return resolved as RillValue;
     const resolvedPath = resolved as string;
 
@@ -133,7 +140,7 @@ export async function createLocalFsExtension(
       mounts,
       'write',
       runCtx,
-      true,
+      true
     );
     if (isInvalid(resolved as RillValue)) return resolved as RillValue;
     const resolvedPath = resolved as string;
@@ -163,7 +170,7 @@ export async function createLocalFsExtension(
       mounts,
       'write',
       runCtx,
-      true,
+      true
     );
     if (isInvalid(resolved as RillValue)) return resolved as RillValue;
     const resolvedPath = resolved as string;
@@ -177,13 +184,18 @@ export async function createLocalFsExtension(
         stats.size + contentSize,
         max,
         resolvedPath,
-        runCtx,
+        runCtx
       );
       if (sizeInvalid !== null) return sizeInvalid;
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error) {
         if ((error as { code: string }).code === 'ENOENT') {
-          const sizeInvalid = checkFileSize(contentSize, max, resolvedPath, runCtx);
+          const sizeInvalid = checkFileSize(
+            contentSize,
+            max,
+            resolvedPath,
+            runCtx
+          );
           if (sizeInvalid !== null) return sizeInvalid;
         } else {
           throw error;
@@ -206,7 +218,13 @@ export async function createLocalFsExtension(
       relativePath: string;
     };
 
-    const resolved = await resolvePath(mountName, dirPath, mounts, 'read', runCtx);
+    const resolved = await resolvePath(
+      mountName,
+      dirPath,
+      mounts,
+      'read',
+      runCtx
+    );
     if (isInvalid(resolved as RillValue)) return resolved as RillValue;
     const resolvedPath = resolved as string;
 
@@ -245,13 +263,19 @@ export async function createLocalFsExtension(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'mount_uninitialized', mountName },
-        },
+        }
       );
     }
 
     let basePath: string;
     if (searchBase) {
-      const resolved = await resolvePath(mountName, searchBase, mounts, 'read', runCtx);
+      const resolved = await resolvePath(
+        mountName,
+        searchBase,
+        mounts,
+        'read',
+        runCtx
+      );
       if (isInvalid(resolved as RillValue)) return resolved as RillValue;
       basePath = resolved as string;
     } else {
@@ -288,7 +312,13 @@ export async function createLocalFsExtension(
       relativePath: string;
     };
 
-    const resolved = await resolvePath(mountName, filePath, mounts, 'read', runCtx);
+    const resolved = await resolvePath(
+      mountName,
+      filePath,
+      mounts,
+      'read',
+      runCtx
+    );
     if (isInvalid(resolved as RillValue)) return false;
     return true;
   };
@@ -302,7 +332,13 @@ export async function createLocalFsExtension(
       relativePath: string;
     };
 
-    const resolved = await resolvePath(mountName, filePath, mounts, 'write', runCtx);
+    const resolved = await resolvePath(
+      mountName,
+      filePath,
+      mounts,
+      'write',
+      runCtx
+    );
     if (isInvalid(resolved as RillValue)) {
       // For remove(), file-not-found returns false; mode/path violations propagate.
       const msg = getStatus(resolved as RillValue).message ?? '';
@@ -333,7 +369,13 @@ export async function createLocalFsExtension(
       relativePath: string;
     };
 
-    const resolved = await resolvePath(mountName, filePath, mounts, 'read', runCtx);
+    const resolved = await resolvePath(
+      mountName,
+      filePath,
+      mounts,
+      'read',
+      runCtx
+    );
     if (isInvalid(resolved as RillValue)) return resolved as RillValue;
     const resolvedPath = resolved as string;
 
@@ -373,7 +415,7 @@ export async function createLocalFsExtension(
           code: 'INVALID_INPUT',
           provider: PROVIDER,
           raw: { kind: 'mount_uninitialized', mountName },
-        },
+        }
       );
     }
 
@@ -385,7 +427,7 @@ export async function createLocalFsExtension(
           code: 'FORBIDDEN',
           provider: PROVIDER,
           raw: { kind: 'mode_violation', mountName, mode: mount.mode },
-        },
+        }
       );
     }
 
@@ -398,20 +440,17 @@ export async function createLocalFsExtension(
       !normalized.startsWith(mountBase + path.sep) &&
       normalized !== mountBase
     ) {
-      return runCtx.invalidate(
-        new Error('path escapes mount boundary'),
-        {
-          code: 'FORBIDDEN',
-          provider: PROVIDER,
-          raw: {
-            kind: 'path_escape',
-            mountName,
-            path: dirPath,
-            normalized,
-            mountBase,
-          },
+      return runCtx.invalidate(new Error('path escapes mount boundary'), {
+        code: 'FORBIDDEN',
+        provider: PROVIDER,
+        raw: {
+          kind: 'path_escape',
+          mountName,
+          path: dirPath,
+          normalized,
+          mountBase,
         },
-      );
+      });
     }
 
     // Walk up to the deepest existing ancestor and resolve it through
@@ -445,20 +484,17 @@ export async function createLocalFsExtension(
       !resolvedAncestor.startsWith(mountBase + path.sep) &&
       resolvedAncestor !== mountBase
     ) {
-      return runCtx.invalidate(
-        new Error('path escapes mount boundary'),
-        {
-          code: 'FORBIDDEN',
-          provider: PROVIDER,
-          raw: {
-            kind: 'symlink_escape',
-            mountName,
-            path: dirPath,
-            resolvedAncestor,
-            mountBase,
-          },
+      return runCtx.invalidate(new Error('path escapes mount boundary'), {
+        code: 'FORBIDDEN',
+        provider: PROVIDER,
+        raw: {
+          kind: 'symlink_escape',
+          mountName,
+          path: dirPath,
+          resolvedAncestor,
+          mountBase,
         },
-      );
+      });
     }
 
     // Check if target already exists.
@@ -517,14 +553,21 @@ export async function createLocalFsExtension(
             src: args['src'],
             dest: args['dest'],
           },
-        },
+        }
       );
     }
 
     const mountName = srcMountName;
 
-    const resolvedSrcVal = await resolvePath(mountName, srcPath, mounts, 'read', runCtx);
-    if (isInvalid(resolvedSrcVal as RillValue)) return resolvedSrcVal as RillValue;
+    const resolvedSrcVal = await resolvePath(
+      mountName,
+      srcPath,
+      mounts,
+      'read',
+      runCtx
+    );
+    if (isInvalid(resolvedSrcVal as RillValue))
+      return resolvedSrcVal as RillValue;
     const resolvedSrc = resolvedSrcVal as string;
 
     const resolvedDestVal = await resolvePath(
@@ -533,9 +576,10 @@ export async function createLocalFsExtension(
       mounts,
       'write',
       runCtx,
-      true,
+      true
     );
-    if (isInvalid(resolvedDestVal as RillValue)) return resolvedDestVal as RillValue;
+    if (isInvalid(resolvedDestVal as RillValue))
+      return resolvedDestVal as RillValue;
     const resolvedDest = resolvedDestVal as string;
 
     const stats = await fs.stat(resolvedSrc);
@@ -549,14 +593,11 @@ export async function createLocalFsExtension(
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error) {
         if ((error as { code: string }).code === 'ENOENT') {
-          return runCtx.invalidate(
-            new Error(`file not found: ${srcPath}`),
-            {
-              code: 'UNAVAILABLE',
-              provider: PROVIDER,
-              raw: { kind: 'file_not_found', path: resolvedSrc },
-            },
-          );
+          return runCtx.invalidate(new Error(`file not found: ${srcPath}`), {
+            code: 'UNAVAILABLE',
+            provider: PROVIDER,
+            raw: { kind: 'file_not_found', path: resolvedSrc },
+          });
         }
       }
       throw error;
@@ -589,14 +630,21 @@ export async function createLocalFsExtension(
             src: args['src'],
             dest: args['dest'],
           },
-        },
+        }
       );
     }
 
     const mountName = srcMountName;
 
-    const resolvedSrcVal = await resolvePath(mountName, srcPath, mounts, 'read', runCtx);
-    if (isInvalid(resolvedSrcVal as RillValue)) return resolvedSrcVal as RillValue;
+    const resolvedSrcVal = await resolvePath(
+      mountName,
+      srcPath,
+      mounts,
+      'read',
+      runCtx
+    );
+    if (isInvalid(resolvedSrcVal as RillValue))
+      return resolvedSrcVal as RillValue;
     const resolvedSrc = resolvedSrcVal as string;
 
     const resolvedDestVal = await resolvePath(
@@ -605,9 +653,10 @@ export async function createLocalFsExtension(
       mounts,
       'write',
       runCtx,
-      true,
+      true
     );
-    if (isInvalid(resolvedDestVal as RillValue)) return resolvedDestVal as RillValue;
+    if (isInvalid(resolvedDestVal as RillValue))
+      return resolvedDestVal as RillValue;
     const resolvedDest = resolvedDestVal as string;
 
     try {
@@ -616,14 +665,11 @@ export async function createLocalFsExtension(
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error) {
         if ((error as { code: string }).code === 'ENOENT') {
-          return runCtx.invalidate(
-            new Error(`file not found: ${srcPath}`),
-            {
-              code: 'UNAVAILABLE',
-              provider: PROVIDER,
-              raw: { kind: 'file_not_found', path: resolvedSrc },
-            },
-          );
+          return runCtx.invalidate(new Error(`file not found: ${srcPath}`), {
+            code: 'UNAVAILABLE',
+            provider: PROVIDER,
+            raw: { kind: 'file_not_found', path: resolvedSrc },
+          });
         }
       }
       throw error;
@@ -716,8 +762,7 @@ export async function createLocalFsExtension(
           type: { kind: 'string' },
           defaultValue: undefined,
           annotations: {
-            description:
-              'Mount-prefixed directory path (e.g. "/mount/subdir")',
+            description: 'Mount-prefixed directory path (e.g. "/mount/subdir")',
           },
         },
       ],
@@ -821,8 +866,7 @@ export async function createLocalFsExtension(
           type: { kind: 'string' },
           defaultValue: undefined,
           annotations: {
-            description:
-              'Mount-prefixed directory path (e.g. "/mount/subdir")',
+            description: 'Mount-prefixed directory path (e.g. "/mount/subdir")',
           },
         },
       ],

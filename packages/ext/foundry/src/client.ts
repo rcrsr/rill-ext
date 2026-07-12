@@ -17,12 +17,12 @@ import type { FoundryAuth, FoundryInferenceConfig } from './types.js';
 /**
  * OAuth2 scope for AzureOpenAI inference and Bing Grounding.
  */
-export const SCOPE_AI = 'https://ai.azure.com/.default';
+const SCOPE_AI = 'https://ai.azure.com/.default';
 
 /**
  * OAuth2 scope for Content Safety and AI Search REST calls.
  */
-export const SCOPE_COGNITIVE = 'https://cognitiveservices.azure.com/.default';
+const SCOPE_COGNITIVE = 'https://cognitiveservices.azure.com/.default';
 
 // ============================================================
 // AZURE OPENAI CLIENT
@@ -60,7 +60,8 @@ export async function createAzureOpenAIClient(
   }
 
   // Entra ID — lazy import to keep @azure/identity optional at runtime
-  const { getBearerTokenProvider, DefaultAzureCredential } = await import('@azure/identity');
+  const { getBearerTokenProvider, DefaultAzureCredential } =
+    await import('@azure/identity');
   const credential = auth.credential ?? new DefaultAzureCredential();
   const azureADTokenProvider = getBearerTokenProvider(credential, SCOPE_AI);
 
@@ -105,7 +106,10 @@ export async function buildRestAuthHeaders(
   const credential = auth.credential ?? new DefaultAzureCredential();
   const tokenResponse = await credential.getToken(SCOPE_COGNITIVE);
   if (!tokenResponse?.token) {
-    throw new RuntimeError('RILL-R001', 'foundry: failed to acquire Entra token');
+    throw new RuntimeError(
+      'RILL-R001',
+      'foundry: failed to acquire Entra token'
+    );
   }
   return { Authorization: `Bearer ${tokenResponse.token}` };
 }

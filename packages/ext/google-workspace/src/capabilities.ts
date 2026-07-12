@@ -13,7 +13,7 @@ import { failForbidden } from './errors.js';
 export function checkCapability(
   ctx: RuntimeContext,
   enabled: boolean,
-  name: string,
+  name: string
 ): void {
   if (!enabled) {
     failForbidden(ctx, 'capability_disabled', `google: ${name} not enabled`);
