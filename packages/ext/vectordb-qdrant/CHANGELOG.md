@@ -6,6 +6,10 @@
 
 - **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
+### Changed
+
+- **@qdrant/js-client-rest 1.18:** Bumps @qdrant/js-client-rest to ^1.18.0. ([#61](https://github.com/rcrsr/rill-ext/pull/61))
+
 ## [0.19.1] - 2026-04-30
 
 ### Fixed

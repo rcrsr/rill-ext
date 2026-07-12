@@ -9,6 +9,7 @@
 ### Changed
 
 - Bumps `defuddle` to `^0.19.1` (from `^0.18.1`). In-use API surface unchanged. ([#57](https://github.com/rcrsr/rill-ext/pull/57))
+- **linkedom and linkify-it:** Bumps linkedom to ^0.18.13 and linkify-it to ^5.0.2. ([#61](https://github.com/rcrsr/rill-ext/pull/61))
 
 ## [0.19.0] - 2026-05-02
 

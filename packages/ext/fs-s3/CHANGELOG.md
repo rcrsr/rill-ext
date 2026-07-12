@@ -6,6 +6,10 @@
 
 - **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
+### Changed
+
+- **@aws-sdk/client-s3 3.1085:** Bumps @aws-sdk/client-s3 to ^3.1085.0. ([#61](https://github.com/rcrsr/rill-ext/pull/61))
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)

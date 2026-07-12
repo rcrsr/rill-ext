@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TypeScript 7 toolchain:** Adopts TypeScript `7`, replaces ESLint/Prettier with oxlint/oxfmt, and adds knip and lefthook. Standardizes root `check:*`/`fix:*` scripts and sweeps in-range dependencies (`@types/node` to `26`, `@anthropic-ai/sdk` to `0.111`, `defuddle` to `0.19`). No published extension runtime surface changes. ([#57](https://github.com/rcrsr/rill-ext/pull/57))
 - **@google/genai 2.x:** Upgrades the Gemini extension to use @google/genai 2.x with no runtime surface changes. ([#59](https://github.com/rcrsr/rill-ext/pull/59))
 - **Dependency upgrades:** Upgrade @pinecone-database/pinecone to 8.x and which to 7.x. ([#60](https://github.com/rcrsr/rill-ext/pull/60))
+- **Non-rill dependency sweep:** Upgrades vendor SDK and tooling dependencies for 11 packages to latest minor/patch versions, excluding core runtime. ([#61](https://github.com/rcrsr/rill-ext/pull/61))
 
 ## [0.19.7] - 2026-05-03
 

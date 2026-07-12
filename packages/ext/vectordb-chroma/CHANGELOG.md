@@ -6,6 +6,10 @@
 
 - **rill.role declaration:** Declares `"rill": { "role": "extension" }` in `package.json` so the rill-cli install gate admits this package. ([#58](https://github.com/rcrsr/rill-ext/pull/58))
 
+### Changed
+
+- **chromadb 3.5:** Bumps chromadb to ^3.5.0. ([#61](https://github.com/rcrsr/rill-ext/pull/61))
+
 ## [0.19.0] - 2026-04-28
 
 ### Changed (Breaking)
