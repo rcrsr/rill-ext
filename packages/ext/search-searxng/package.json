@@ -1,6 +1,6 @@
 {
   "name": "@rcrsr/rill-ext-search-searxng",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "description": "rill extension for SearXNG self-hosted search integration",
   "license": "MIT",
   "author": "Andre Bremer",

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.8] - 2026-07-11
+
 ### Added
 
 - **GitHub label taxonomy:** Adds automated area labeling for issues and PRs via labeler.yml, workflows, templates, and sync script. ([#56](https://github.com/rcrsr/rill-ext/pull/56))
