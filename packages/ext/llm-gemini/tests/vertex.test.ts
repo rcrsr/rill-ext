@@ -120,10 +120,42 @@ describe('Vertex mode 1: Gemini Developer (default)', () => {
     expect(capturedOptions).not.toHaveProperty('project');
     expect(capturedOptions).not.toHaveProperty('location');
   });
+
+  it('forwards base_url, timeout, and max_retries via httpOptions', () => {
+    const config: GeminiExtensionConfig = {
+      api_key: 'test-key',
+      model: 'gemini-2.0-flash',
+      base_url: 'https://custom.example.com',
+      timeout: 5000,
+      max_retries: 2,
+    };
+
+    createGeminiExtension(config);
+
+    expect(capturedOptions).toEqual({
+      apiKey: 'test-key',
+      httpOptions: {
+        baseUrl: 'https://custom.example.com',
+        timeout: 5000,
+        retryOptions: { attempts: 3 },
+      },
+    });
+  });
+
+  it('omits httpOptions entirely when base_url/timeout/max_retries are unset', () => {
+    const config: GeminiExtensionConfig = {
+      api_key: 'test-key',
+      model: 'gemini-2.0-flash',
+    };
+
+    createGeminiExtension(config);
+
+    expect(capturedOptions).not.toHaveProperty('httpOptions');
+  });
 });
 
 // ============================================================
-// GROUP 2: Default mode api_key validation (EC-1, EC-3)
+// GROUP 2: Default mode api_key validation
 // ============================================================
 
 describe('Vertex mode 1: api_key validation', () => {
@@ -185,6 +217,41 @@ describe('Vertex mode 2: Vertex Express', () => {
       apiKey: 'vertex-express-key',
     });
   });
+
+  it('forwards base_url, timeout, and max_retries via httpOptions', () => {
+    const config: GeminiExtensionConfig = {
+      vertexai: true,
+      api_key: 'vertex-express-key',
+      model: 'gemini-2.0-flash',
+      base_url: 'https://custom.example.com',
+      timeout: 5000,
+      max_retries: 4,
+    };
+
+    createGeminiExtension(config);
+
+    expect(capturedOptions).toEqual({
+      vertexai: true,
+      apiKey: 'vertex-express-key',
+      httpOptions: {
+        baseUrl: 'https://custom.example.com',
+        timeout: 5000,
+        retryOptions: { attempts: 5 },
+      },
+    });
+  });
+
+  it('surfaces the api_key error before an invalid model error', () => {
+    const config = {
+      vertexai: true,
+      api_key: '',
+      model: '',
+    } as GeminiExtensionConfig;
+
+    expect(() => createGeminiExtension(config)).toThrow(
+      'api_key cannot be empty'
+    );
+  });
 });
 
 // ============================================================
@@ -208,6 +275,31 @@ describe('Vertex mode 3: Vertex ADC', () => {
       location: 'us-central1',
     });
     expect(capturedOptions).not.toHaveProperty('apiKey');
+  });
+
+  it('forwards base_url, timeout, and max_retries via httpOptions', () => {
+    const config: GeminiExtensionConfig = {
+      vertexai: true,
+      project: 'my-project',
+      location: 'us-central1',
+      model: 'gemini-2.0-flash',
+      base_url: 'https://custom.example.com',
+      timeout: 5000,
+      max_retries: 0,
+    };
+
+    createGeminiExtension(config);
+
+    expect(capturedOptions).toEqual({
+      vertexai: true,
+      project: 'my-project',
+      location: 'us-central1',
+      httpOptions: {
+        baseUrl: 'https://custom.example.com',
+        timeout: 5000,
+        retryOptions: { attempts: 1 },
+      },
+    });
   });
 
   it('does not invoke validateApiKey path for Vertex ADC (no api_key error thrown)', () => {

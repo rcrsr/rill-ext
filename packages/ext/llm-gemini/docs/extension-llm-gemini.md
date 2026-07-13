@@ -90,7 +90,7 @@ $result.messages[last].parts[0].text -> log
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `api_key` | string | — | API key (required) |
+| `api_key` | string | — | API key; required for Gemini Developer and Vertex Express modes, omitted for Vertex ADC |
 | `model` | string | — | Model identifier (required) |
 | `temperature` | number | — | Response randomness, 0.0–2.0 |
 | `max_tokens` | number | 8192 | Maximum response tokens |
@@ -108,7 +108,7 @@ $result.messages[last].parts[0].text -> log
 
 ### Authentication Modes
 
-The extension supports three mutually exclusive auth modes, selected by the `vertexai` and `api_key` config keys. All keys use snake_case at the config boundary: `vertexai` (boolean), `project` (string), `location` (string). These match `configSchema` in `src/index.ts` exactly.
+The extension supports three mutually exclusive auth modes, selected by the `vertexai` and `api_key` config keys. All keys use snake_case at the config boundary: `vertexai` (boolean), `project` (string), `location` (string), `api_key` (string). These match `configSchema` in `src/index.ts` exactly.
 
 **1. Gemini Developer (default)** — `vertexai` unset or `false`. Auth is `api_key`-based against the public Gemini API.
 

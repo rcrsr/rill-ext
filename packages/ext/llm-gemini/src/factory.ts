@@ -358,33 +358,71 @@ function canonicalToGeminiContents(messages: Message[]): {
 // ============================================================
 
 /**
+ * Build the `httpOptions` object for the GoogleGenAI client from
+ * `base_url`, `timeout`, and `max_retries` config fields, omitting any
+ * fields that are undefined. Returns `undefined` when none are set so
+ * callers do not attach an empty `httpOptions` object.
+ *
+ * `max_retries` maps to `retryOptions.attempts`, which counts the original
+ * request plus retries (attempts = max_retries + 1).
+ */
+function buildHttpOptions(
+  config: GeminiExtensionConfig
+): GoogleGenAIOptions['httpOptions'] {
+  const httpOptions: NonNullable<GoogleGenAIOptions['httpOptions']> = {};
+
+  if (config.base_url !== undefined) {
+    httpOptions.baseUrl = config.base_url;
+  }
+  if (config.timeout !== undefined) {
+    httpOptions.timeout = config.timeout;
+  }
+  if (config.max_retries !== undefined) {
+    httpOptions.retryOptions = { attempts: config.max_retries + 1 };
+  }
+
+  return Object.keys(httpOptions).length > 0 ? httpOptions : undefined;
+}
+
+/**
  * Resolve the GoogleGenAI client options for the configured auth mode.
  *
  * Three mutually exclusive modes:
  * 1. Gemini Developer (default, !config.vertexai): apiKey-based auth against
- *    the public Gemini API. Callers must validate `config.api_key` before
- *    invoking this function for this mode; it is not re-validated here.
+ *    the public Gemini API.
  * 2. Vertex Express (config.vertexai === true && config.api_key !== undefined):
  *    apiKey-based auth against Vertex AI.
  * 3. Vertex ADC (config.vertexai === true && config.api_key === undefined):
  *    project/location-based auth via Application Default Credentials.
- *    EC-26: project is required. EC-27: location is required.
+ *    project is required in Vertex ADC mode; location is required in Vertex
+ *    ADC mode.
+ *
+ * `base_url`, `timeout`, and `max_retries` are forwarded via `httpOptions`
+ * for all three modes when set.
  */
 function resolveGoogleGenAIOptions(
   config: GeminiExtensionConfig
 ): GoogleGenAIOptions {
+  const httpOptions = buildHttpOptions(config);
+
   if (!config.vertexai) {
-    // Mode 1: Gemini Developer API (default). validateApiKey already ran at
-    // the top of createGeminiExtension to preserve the original validation
-    // order (api_key before model/temperature/etc), so config.api_key is
-    // guaranteed to be a non-empty string here.
-    return { apiKey: config.api_key as string };
+    // Mode 1: Gemini Developer API (default). Self-contained validation
+    // narrows config.api_key to string via the `asserts` return type; the
+    // up-front check in createGeminiExtension preserves validation ordering
+    // (api_key before model/temperature/etc), this call is redundant but
+    // cheap and removes the cross-function invariant.
+    validateApiKey(config.api_key);
+    return { apiKey: config.api_key, ...(httpOptions && { httpOptions }) };
   }
 
   if (config.api_key !== undefined) {
     // Mode 2: Vertex Express (apiKey-based auth against Vertex AI)
     validateApiKey(config.api_key);
-    return { vertexai: true, apiKey: config.api_key };
+    return {
+      vertexai: true,
+      apiKey: config.api_key,
+      ...(httpOptions && { httpOptions }),
+    };
   }
 
   // Mode 3: Vertex ADC (project/location-based auth)
@@ -394,7 +432,12 @@ function resolveGoogleGenAIOptions(
   if (!config.location) {
     throw new RuntimeError('RILL-R001', 'location is required for Vertex AI');
   }
-  return { vertexai: true, project: config.project, location: config.location };
+  return {
+    vertexai: true,
+    project: config.project,
+    location: config.location,
+    ...(httpOptions && { httpOptions }),
+  };
 }
 
 /**
@@ -403,7 +446,7 @@ function resolveGoogleGenAIOptions(
  *
  * @param config - Extension configuration
  * @returns ExtensionResult with message, embed, embed_batch, tool_loop, generate and dispose
- * @throws RuntimeError for invalid configuration (EC-1 through EC-22, EC-26, EC-27)
+ * @throws RuntimeError for invalid configuration
  *
  * @example
  * ```typescript
@@ -419,11 +462,11 @@ function resolveGoogleGenAIOptions(
 export function createGeminiExtension(
   config: GeminiExtensionConfig
 ): ExtensionFactoryResult {
-  // Validate api_key first for the default (Gemini Developer) auth mode, to
-  // preserve the original validation ordering ahead of model/temperature/etc.
-  // Vertex Express validates api_key inside resolveGoogleGenAIOptions; Vertex
-  // ADC does not use api_key at all.
-  if (!config.vertexai) {
+  // Validate api_key first for both the default (Gemini Developer) and
+  // Vertex Express auth modes, ahead of model/temperature/etc, so error
+  // ordering is mode-independent. Vertex ADC has api_key === undefined and
+  // is correctly skipped.
+  if (!config.vertexai || config.api_key !== undefined) {
     validateApiKey(config.api_key);
   }
 
