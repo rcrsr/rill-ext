@@ -20,7 +20,7 @@ export const VERSION = _pkg.version;
 // ============================================================
 
 export const configSchema: ExtensionConfigSchema = {
-  api_key: { type: 'string', required: true, secret: true },
+  api_key: { type: 'string', required: false, secret: true },
   model: { type: 'string', required: true },
   base_url: { type: 'string' },
   temperature: { type: 'number' },
@@ -31,6 +31,9 @@ export const configSchema: ExtensionConfigSchema = {
   embed_model: { type: 'string' },
   max_turns: { type: 'number' },
   max_errors: { type: 'number' },
+  vertexai: { type: 'boolean' },
+  project: { type: 'string' },
+  location: { type: 'string' },
 };
 
 // ============================================================

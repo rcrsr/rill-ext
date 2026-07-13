@@ -10,6 +10,7 @@ import {
   type Content,
   type Part as GeminiPart,
   type Schema,
+  type GoogleGenAIOptions,
 } from '@google/genai';
 import {
   RuntimeError,
@@ -357,12 +358,52 @@ function canonicalToGeminiContents(messages: Message[]): {
 // ============================================================
 
 /**
+ * Resolve the GoogleGenAI client options for the configured auth mode.
+ *
+ * Three mutually exclusive modes:
+ * 1. Gemini Developer (default, !config.vertexai): apiKey-based auth against
+ *    the public Gemini API. Callers must validate `config.api_key` before
+ *    invoking this function for this mode; it is not re-validated here.
+ * 2. Vertex Express (config.vertexai === true && config.api_key !== undefined):
+ *    apiKey-based auth against Vertex AI.
+ * 3. Vertex ADC (config.vertexai === true && config.api_key === undefined):
+ *    project/location-based auth via Application Default Credentials.
+ *    EC-26: project is required. EC-27: location is required.
+ */
+function resolveGoogleGenAIOptions(
+  config: GeminiExtensionConfig
+): GoogleGenAIOptions {
+  if (!config.vertexai) {
+    // Mode 1: Gemini Developer API (default). validateApiKey already ran at
+    // the top of createGeminiExtension to preserve the original validation
+    // order (api_key before model/temperature/etc), so config.api_key is
+    // guaranteed to be a non-empty string here.
+    return { apiKey: config.api_key as string };
+  }
+
+  if (config.api_key !== undefined) {
+    // Mode 2: Vertex Express (apiKey-based auth against Vertex AI)
+    validateApiKey(config.api_key);
+    return { vertexai: true, apiKey: config.api_key };
+  }
+
+  // Mode 3: Vertex ADC (project/location-based auth)
+  if (!config.project) {
+    throw new RuntimeError('RILL-R001', 'project is required for Vertex AI');
+  }
+  if (!config.location) {
+    throw new RuntimeError('RILL-R001', 'location is required for Vertex AI');
+  }
+  return { vertexai: true, project: config.project, location: config.location };
+}
+
+/**
  * Create Gemini extension instance.
  * Validates configuration and returns host functions with cleanup.
  *
  * @param config - Extension configuration
  * @returns ExtensionResult with message, embed, embed_batch, tool_loop, generate and dispose
- * @throws RuntimeError for invalid configuration (EC-1 through EC-22)
+ * @throws RuntimeError for invalid configuration (EC-1 through EC-22, EC-26, EC-27)
  *
  * @example
  * ```typescript
@@ -378,8 +419,15 @@ function canonicalToGeminiContents(messages: Message[]): {
 export function createGeminiExtension(
   config: GeminiExtensionConfig
 ): ExtensionFactoryResult {
+  // Validate api_key first for the default (Gemini Developer) auth mode, to
+  // preserve the original validation ordering ahead of model/temperature/etc.
+  // Vertex Express validates api_key inside resolveGoogleGenAIOptions; Vertex
+  // ADC does not use api_key at all.
+  if (!config.vertexai) {
+    validateApiKey(config.api_key);
+  }
+
   // Validate required fields
-  validateApiKey(config.api_key);
   validateModel(config.model);
   validateTemperature(config.temperature);
 
@@ -393,10 +441,9 @@ export function createGeminiExtension(
   // EC-19/20: Validate extra keys against Gemini-specific reserved set
   validateExtraKeys(config.extra, RESERVED_KEYS_GEMINI);
 
-  // Instantiate SDK client at factory time
-  const client = new GoogleGenAI({
-    apiKey: config.api_key,
-  });
+  // Resolve auth mode (Gemini Developer / Vertex Express / Vertex ADC) and
+  // instantiate SDK client at factory time
+  const client = new GoogleGenAI(resolveGoogleGenAIOptions(config));
 
   // Extract config values for use in functions
   const factoryModel = config.model;
