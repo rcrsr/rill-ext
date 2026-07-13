@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Vertex AI support for Gemini:** Google Vertex AI backend is now available, selectable via vertexai config flag. api_key is now optional. ([#63](https://github.com/rcrsr/rill-ext/pull/63))
+
 ## [0.19.8] - 2026-07-11
 
 ### Added
