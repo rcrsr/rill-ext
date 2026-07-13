@@ -90,7 +90,7 @@ $result.messages[last].parts[0].text -> log
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `api_key` | string | — | API key (required) |
+| `api_key` | string | — | API key; required for Gemini Developer and Vertex Express modes, omitted for Vertex ADC |
 | `model` | string | — | Model identifier (required) |
 | `temperature` | number | — | Response randomness, 0.0–2.0 |
 | `max_tokens` | number | 8192 | Maximum response tokens |
@@ -102,6 +102,56 @@ $result.messages[last].parts[0].text -> log
 | `max_turns` | number | — | Maximum tool-loop turns per instance; must be a positive integer; `0` is rejected at factory init |
 | `max_errors` | number | 3 | Maximum consecutive tool errors before loop aborts; must be a positive integer |
 | `extra` | dict | — | Additional Gemini generation config fields merged verbatim; must not contain reserved keys (see below) |
+| `vertexai` | boolean | `false` | Selects Vertex AI auth (Express or ADC); see [Authentication Modes](#authentication-modes) |
+| `project` | string | — | GCP project ID; required for Vertex ADC mode |
+| `location` | string | — | GCP region (e.g. `us-central1`); required for Vertex ADC mode |
+
+### Authentication Modes
+
+The extension supports three mutually exclusive auth modes, selected by the `vertexai` and `api_key` config keys. All keys use snake_case at the config boundary: `vertexai` (boolean), `project` (string), `location` (string), `api_key` (string). These match `configSchema` in `src/index.ts` exactly.
+
+**1. Gemini Developer (default)** — `vertexai` unset or `false`. Auth is `api_key`-based against the public Gemini API.
+
+```json
+{
+  "gemini": {
+    "api_key": "${GEMINI_API_KEY}",
+    "model": "gemini-2.0-flash"
+  }
+}
+```
+
+**2. Vertex Express** — `vertexai: true` with `api_key` set. Auth is `api_key`-based against Vertex AI.
+
+```json
+{
+  "gemini": {
+    "vertexai": true,
+    "api_key": "${GEMINI_API_KEY}",
+    "model": "gemini-2.0-flash"
+  }
+}
+```
+
+**3. Vertex ADC (Application Default Credentials)** — `vertexai: true` with `api_key` unset. Auth is `project`/`location`-based; the SDK resolves credentials itself from `GOOGLE_APPLICATION_CREDENTIALS` or the GCP metadata server. No secret crosses the rill boundary in this mode.
+
+```json
+{
+  "gemini": {
+    "vertexai": true,
+    "project": "my-gcp-project",
+    "location": "us-central1",
+    "model": "gemini-2.0-flash"
+  }
+}
+```
+
+`project` and `location` are both required in this mode. Missing either throws `RuntimeError RILL-R001` at factory init with one of these messages:
+
+- `project is required for Vertex AI`
+- `location is required for Vertex AI`
+
+**Not supported:** explicit service-account credentials passed via `googleAuthOptions`. The extension does not expose a config key for this; Vertex ADC is the only credential-based mode, and it always resolves credentials through the SDK's default ADC chain.
 
 ### Factory Validation Rules
 
