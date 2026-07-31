@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-07-30
+
+### Changed (Breaking)
+
+- `@rcrsr/rill` peer dependency bumped from `~0.19.0` to `~0.20.0`. This package now requires rill `0.20.x`; consumers on rill `0.19.x` must stay on `0.19.x` of this package.
+- `engines.node` bumped from `>=22.0.0` to `>=22.16.0`, matching the `engines.node` floor that `@rcrsr/rill@0.20.0` declares.
+- No runtime surface changes. No callable signatures, parameter names, return shapes, or error atoms changed.
+
 ## [0.19.1] - 2026-07-11
 
 ### Added

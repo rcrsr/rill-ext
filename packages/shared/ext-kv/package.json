@@ -1,7 +1,7 @@
 {
   "name": "@rcrsr/rill-ext-kv-shared",
   "private": true,
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "Shared utilities for rill key-value extensions",
   "license": "MIT",
   "type": "module",
@@ -17,10 +17,10 @@
     "check": "pnpm run build && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.19.0"
+    "@rcrsr/rill": "~0.20.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.19.0"
+    "@rcrsr/rill": "~0.20.0"
   },
   "repository": {
     "type": "git",
