@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-07-30
+
+### Changed (Breaking)
+
+- **rill 0.20 migration:** All 27 extensions and 7 shared packages move to `@rcrsr/rill@~0.20.0`. Both `peerDependencies` and `devDependencies` ranges bump from `~0.19.0` to `~0.20.0`, and every package version bumps to `0.20.0` per the minor-compatibility rule. Extensions at `0.20.x` require rill `0.20.x`; consumers on rill `0.19.x` must stay on extensions `0.19.x`.
+- No extension runtime surface changes. rill 0.20.0 ships lint-rule activation (`CONDITION_TYPE`, `FOLD_INTERMEDIATES`, `THROWAWAY_CAPTURE`), a `SPACING_CLOSURE` detection fix, a runtime fix for pipe values on dict-member empty-paren calls, a lexer fix allowing reserved words as member names after a dot, and an internal `builtins.ts` split. None of these touch the host-function contract, so no extension source changed. Types, lint, format, knip, build, and all tests pass unmodified.
+
 ## [0.19.9] - 2026-07-13
 
 ### Added

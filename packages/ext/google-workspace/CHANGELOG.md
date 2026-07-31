@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-07-30
+
+### Changed (Breaking)
+
+- `@rcrsr/rill` peer dependency bumped from `~0.19.0` to `~0.20.0`. This package now requires rill `0.20.x`; consumers on rill `0.19.x` must stay on `0.19.x` of this package.
+- No runtime surface changes. No callable signatures, parameter names, return shapes, or error atoms changed.
+
 ## [0.19.6] - 2026-07-11
 
 ### Added

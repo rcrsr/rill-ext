@@ -43,8 +43,8 @@ importers:
         version: 7.0.0
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -67,8 +67,8 @@ importers:
   packages/ext/crypto:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -88,8 +88,8 @@ importers:
   packages/ext/datetime:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -109,8 +109,8 @@ importers:
   packages/ext/exec:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
@@ -127,8 +127,8 @@ importers:
   packages/ext/fetch:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
@@ -152,8 +152,8 @@ importers:
         specifier: ^4.13.0
         version: 4.13.1
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -176,8 +176,8 @@ importers:
   packages/ext/fs-local:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-fs-shared':
         specifier: workspace:*
         version: link:../../shared/ext-fs
@@ -204,8 +204,8 @@ importers:
         version: 3.1085.0
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-fs-shared':
         specifier: workspace:*
         version: link:../../shared/ext-fs
@@ -228,8 +228,8 @@ importers:
   packages/ext/google-workspace:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -249,8 +249,8 @@ importers:
   packages/ext/kv-file:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-kv-shared':
         specifier: workspace:*
         version: link:../../shared/ext-kv
@@ -277,8 +277,8 @@ importers:
         version: 5.11.1
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-kv-file':
         specifier: workspace:*
         version: link:../kv-file
@@ -308,8 +308,8 @@ importers:
         version: 12.11.1
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-kv-shared':
         specifier: workspace:*
         version: link:../../shared/ext-kv
@@ -339,8 +339,8 @@ importers:
         version: 0.111.0(zod@4.3.6)
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -367,8 +367,8 @@ importers:
         version: 2.11.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -395,8 +395,8 @@ importers:
         version: 6.46.0(@aws-sdk/credential-provider-node@3.972.66)(@smithy/signature-v4@5.6.4)(ws@8.20.0)(zod@4.4.3)
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-llm-shared':
         specifier: workspace:^
         version: link:../../shared/ext-llm
@@ -423,8 +423,8 @@ importers:
         version: 1.29.0(zod@4.4.3)
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -447,8 +447,8 @@ importers:
   packages/ext/outlook:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -478,8 +478,8 @@ importers:
         specifier: ^2.11.0
         version: 2.11.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-prompt-shared':
         specifier: workspace:*
         version: link:../../shared/ext-prompt
@@ -502,8 +502,8 @@ importers:
   packages/ext/search-brave:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -526,8 +526,8 @@ importers:
   packages/ext/search-exa:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -550,8 +550,8 @@ importers:
   packages/ext/search-searxng:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -574,8 +574,8 @@ importers:
   packages/ext/search-serper:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -598,8 +598,8 @@ importers:
   packages/ext/search-tavily:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -641,8 +641,8 @@ importers:
         version: 7.2.4
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -675,8 +675,8 @@ importers:
         version: 3.5.0
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -703,8 +703,8 @@ importers:
         version: 8.0.0
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -731,8 +731,8 @@ importers:
         version: 1.18.0(typescript@7.0.2)
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -755,20 +755,20 @@ importers:
   packages/shared/ext-fs:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
 
   packages/shared/ext-kv:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
 
   packages/shared/ext-llm:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
@@ -776,14 +776,14 @@ importers:
   packages/shared/ext-param:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
 
   packages/shared/ext-prompt:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@26.1.1)(vite@7.3.1(@types/node@26.1.1)(jiti@2.7.0)(yaml@2.9.0))
@@ -791,8 +791,8 @@ importers:
   packages/shared/ext-search:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
@@ -800,8 +800,8 @@ importers:
   packages/shared/ext-vector:
     devDependencies:
       '@rcrsr/rill':
-        specifier: ~0.19.0
-        version: 0.19.0
+        specifier: ~0.20.0
+        version: 0.20.0
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
@@ -1679,8 +1679,8 @@ packages:
     resolution: {integrity: sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==}
     engines: {node: '>=18.0.0', pnpm: '>=8'}
 
-  '@rcrsr/rill@0.19.0':
-    resolution: {integrity: sha512-0oa34D3TVwwOjSy88ZyQJmwbT8CFClo8YgXb8daXyTqudAy/x+BCHxXWwSF944lsyizPLLPJDe4sDwknrgr9rg==}
+  '@rcrsr/rill@0.20.0':
+    resolution: {integrity: sha512-/OnCLODUNnATQNOjqgBIxNuTqzTL75P7Db2mLkZgptFGqsi5GMwBaZ0kB3lpJaVdIO6KRjnay253QgWJ/1LXHA==}
     engines: {node: '>=22.16.0'}
 
   '@rollup/rollup-android-arm-eabi@4.60.1':
@@ -4187,7 +4187,7 @@ snapshots:
 
   '@qdrant/openapi-typescript-fetch@1.2.6': {}
 
-  '@rcrsr/rill@0.19.0': {}
+  '@rcrsr/rill@0.20.0': {}
 
   '@rollup/rollup-android-arm-eabi@4.60.1':
     optional: true

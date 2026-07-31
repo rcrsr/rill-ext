@@ -11,6 +11,9 @@ allowBuilds:
   node-pty: true
   protobufjs: true
 
+minimumReleaseAgeExclude:
+  - '@rcrsr/rill@0.20.0'
+
 # dts-bundle-generator@9.5.1 (latest) consumes the classic TypeScript compiler
 # API (ts.sys, ts.createProgram) which TypeScript 7's native compiler no
 # longer ships. Pin dts-bundle-generator's own nested typescript resolution
