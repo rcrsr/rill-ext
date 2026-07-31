@@ -30,7 +30,7 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.16.0"
   },
   "peerDependencies": {
     "@rcrsr/rill": "~0.20.0"

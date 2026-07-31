@@ -27,7 +27,7 @@
   "author": "Andre Bremer",
   "license": "MIT",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.16.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
