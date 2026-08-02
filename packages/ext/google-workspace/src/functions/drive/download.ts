@@ -1,6 +1,6 @@
 /**
  * drive_download callable — download a file from Google Drive as base64.
- * IR-11: drive_download(fileId: str) → str (base64-encoded content)
+ * drive_download(fileId: str) → str (base64-encoded content)
  * Capability: drive.download
  * Scope: drive.readonly
  */
@@ -12,7 +12,7 @@ import type { GoogleAuth } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
 const DRIVE_BASE = 'https://www.googleapis.com/drive/v3';
 const DRIVE_READ_SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
-/** Fixed request timeout per AC-11. */
+/** Fixed request timeout. */
 const REQUEST_TIMEOUT_MS = 30_000;
 export interface DriveDownloadDeps {
   readonly auth: GoogleAuth;
@@ -23,7 +23,7 @@ export interface DriveDownloadDeps {
  * [DEVIATION] Uses raw fetch + resolveToken instead of googleFetch because
  * googleFetch always returns response.json(), but download needs raw bytes
  * (arrayBuffer) to base64-encode.
- * AC-12: Returns base64-encoded string (rill primitive).
+ * Returns base64-encoded string (rill primitive).
  */
 export function makeDriveDownload(
   deps: DriveDownloadDeps
@@ -45,7 +45,7 @@ export function makeDriveDownload(
         'google: file_id must be a non-empty string'
       );
     }
-    // AC-11: compose lifecycle (ctx.signal), caller signal, and 30s hard timeout
+    // compose lifecycle (ctx.signal), caller signal, and 30s hard timeout
     const signals: AbortSignal[] = [
       controller.signal,
       AbortSignal.timeout(REQUEST_TIMEOUT_MS),

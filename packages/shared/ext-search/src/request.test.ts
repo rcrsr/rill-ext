@@ -1,13 +1,13 @@
 /**
  * Test suite for in-flight request tracking utilities.
- * Validates IR-4 and AC-42 acceptance criteria.
+ * Validates tracking, abort propagation, and cleanup.
  */
 
 import { describe, it, expect, vi } from 'vitest';
 import { createInFlightState, trackRequest, abortAll } from './request.js';
 
 describe('createInFlightState', () => {
-  it('returns state with empty controllers Set (IR-4)', () => {
+  it('returns state with empty controllers Set', () => {
     const state = createInFlightState();
 
     expect(state.controllers).toBeInstanceOf(Set);
@@ -24,7 +24,7 @@ describe('createInFlightState', () => {
 });
 
 describe('trackRequest', () => {
-  it('adds controller to the set (IR-4)', () => {
+  it('adds controller to the set', () => {
     const state = createInFlightState();
     const controller = new AbortController();
 
@@ -34,7 +34,7 @@ describe('trackRequest', () => {
     expect(state.controllers.size).toBe(1);
   });
 
-  it('tracks multiple controllers (AC-42)', () => {
+  it('tracks multiple controllers', () => {
     const state = createInFlightState();
     const controller1 = new AbortController();
     const controller2 = new AbortController();
@@ -59,7 +59,7 @@ describe('trackRequest', () => {
 });
 
 describe('abortAll', () => {
-  it('calls abort() on all controllers (IR-4)', () => {
+  it('calls abort() on all controllers', () => {
     const state = createInFlightState();
     const controller1 = new AbortController();
     const controller2 = new AbortController();
@@ -74,7 +74,7 @@ describe('abortAll', () => {
     expect(abort2).toHaveBeenCalledTimes(1);
   });
 
-  it('clears the controllers set after aborting (IR-4)', () => {
+  it('clears the controllers set after aborting', () => {
     const state = createInFlightState();
     const controller = new AbortController();
 
@@ -84,7 +84,7 @@ describe('abortAll', () => {
     expect(state.controllers.size).toBe(0);
   });
 
-  it('is idempotent — second call on empty set causes no error (IR-4)', () => {
+  it('is idempotent — second call on empty set causes no error', () => {
     const state = createInFlightState();
     const controller = new AbortController();
 
@@ -102,7 +102,7 @@ describe('abortAll', () => {
     expect(state.controllers.size).toBe(0);
   });
 
-  it('marks all aborted controllers as aborted (AC-42)', () => {
+  it('marks all aborted controllers as aborted', () => {
     const state = createInFlightState();
     const controller1 = new AbortController();
     const controller2 = new AbortController();

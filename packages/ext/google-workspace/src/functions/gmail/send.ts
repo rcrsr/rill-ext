@@ -1,6 +1,6 @@
 /**
  * gmail_send callable — send a Gmail message via RFC 2822 raw MIME.
- * IR-4: gmail_send(to: str, subject: str, body: str, options: dict?) → str (message ID)
+ * gmail_send(to: str, subject: str, body: str, options: dict?) → str (message ID)
  * Capability: gmail.send
  * Scope: gmail.send
  */
@@ -19,7 +19,7 @@ export interface GmailSendDeps {
 /**
  * Factory returning the gmail_send inner function.
  * POSTs base64url-encoded RFC 2822 MIME to /users/me/messages/send.
- * Returns the sent message ID string per IR-4.
+ * Returns the sent message ID string.
  */
 export function makeGmailSend(
   deps: GmailSendDeps

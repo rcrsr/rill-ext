@@ -4,7 +4,7 @@
  *
  * Routing: o-series reasoning models (o1, o3, o-mini, o4, etc.) use the Responses API.
  * Standard models (gpt-*, text-*, etc.) use Chat Completions.
- * Routing is fixed at factory init per AC-B10.
+ * Routing is fixed at factory init.
  */
 
 import OpenAI from 'openai';
@@ -69,7 +69,7 @@ const DEFAULT_MAX_COMPLETION_TOKENS = 4096;
 
 /**
  * Reserved keys for OpenAI — union of COMMON + Chat Completions + Responses API.
- * Using the superset so `extra` config remains portable across model upgrades (AC-B10).
+ * Using the superset so `extra` config remains portable across model upgrades.
  */
 const RESERVED_KEYS_OPENAI: readonly string[] = [
   ...RESERVED_KEYS_COMMON,
@@ -415,7 +415,7 @@ function responsesAPIToCanonical(response: OAIResponse): Message {
  * Model routing:
  * - o-series (o1, o3, o4-mini, etc.) → Responses API
  * - Standard models (gpt-*, etc.) → Chat Completions
- * Routing is fixed for instance lifetime (AC-B10).
+ * Routing is fixed for instance lifetime.
  *
  * @param config - Extension configuration
  * @returns ExtensionResult with message, embed, embed_batch, tool_loop, generate and dispose
@@ -424,13 +424,13 @@ function responsesAPIToCanonical(response: OAIResponse): Message {
 export function createOpenAIExtension(
   config: OpenAIExtensionConfig
 ): ExtensionFactoryResult {
-  // EC-21, EC-22: Validate factory max_turns BEFORE client creation
+  // Validate factory max_turns BEFORE client creation
   validateMaxTurns(config.max_turns);
 
   // Validate factory max_errors BEFORE client creation; reject 0/negative/non-integer
   validateMaxErrors(config.max_errors);
 
-  // EC-19, EC-20: Validate extra keys BEFORE client creation
+  // Validate extra keys BEFORE client creation
   validateExtraKeys(config.extra, RESERVED_KEYS_OPENAI);
 
   // Validate required fields
@@ -438,7 +438,7 @@ export function createOpenAIExtension(
   validateModel(config.model);
   validateTemperature(config.temperature);
 
-  // Detect model class at factory init; routing fixed for instance lifetime (AC-B10)
+  // Detect model class at factory init; routing fixed for instance lifetime
   const isOSeries = O_SERIES_PATTERN.test(config.model);
 
   // Instantiate SDK client at factory time
@@ -525,7 +525,7 @@ export function createOpenAIExtension(
       fn: (args, ctx): RillValue => {
         const rawPrompt = args['prompt'] as RillValue;
 
-        // IR-1: Normalize prompt (string or message list) → canonical Message[]
+        // Normalize prompt (string or message list) → canonical Message[]
         const normalizedCC = normalizePrompt(rawPrompt, ctx as RuntimeContext);
         if (!Array.isArray(normalizedCC)) {
           throw new RuntimeHaltSignal(normalizedCC, true);
@@ -813,7 +813,7 @@ export function createOpenAIExtension(
     perCallMaxTurns: number,
     ctx: RuntimeContext
   ): void {
-    // EC-13: Negative per-call max_turns
+    // Negative per-call max_turns
     if (perCallMaxTurns < 0) {
       throw haltInvalid(
         ctx,
@@ -823,7 +823,7 @@ export function createOpenAIExtension(
       );
     }
 
-    // EC-14: Empty tools dict
+    // Empty tools dict
     if (
       typeof toolsDict === 'object' &&
       toolsDict !== null &&
@@ -1507,7 +1507,7 @@ export function createOpenAIExtension(
           | { __rill_type?: boolean; structure?: TypeStructure }
           | undefined;
 
-        // EC-17: Validate schema is a rill type expression with dict structure
+        // Validate schema is a rill type expression with dict structure
         if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
           throw haltInvalid(
             ctx as RuntimeContext,
@@ -1529,7 +1529,7 @@ export function createOpenAIExtension(
           schemaArg.structure
         );
 
-        // IR-1: Normalize prompt
+        // Normalize prompt
         const normalizedRaw4 = normalizePrompt(
           rawPrompt,
           ctx as RuntimeContext
@@ -1571,7 +1571,7 @@ export function createOpenAIExtension(
 
         const response = await client.chat.completions.create(apiParams);
 
-        // EC-18: Unexpected finish reason indicates provider-side stream or content filter
+        // Unexpected finish reason indicates provider-side stream or content filter
         const finishReason = response.choices[0]?.finish_reason;
         if (finishReason !== 'stop' && finishReason !== 'length') {
           throw haltInvalid(
@@ -1593,7 +1593,7 @@ export function createOpenAIExtension(
             ?.reasoning_content ?? ''
         );
 
-        // EC-17: Parse JSON — reject non-JSON response
+        // Parse JSON — reject non-JSON response
         let data: unknown;
         try {
           data = JSON.parse(raw) as unknown;

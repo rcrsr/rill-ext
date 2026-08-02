@@ -1,6 +1,6 @@
 /**
  * drive_list callable — list files in Google Drive.
- * IR-9: drive_list(folderId: str?, options: dict?) → { files: list[dict] }
+ * drive_list(folderId: str?, options: dict?) → { files: list[dict] }
  * Capability: drive.list
  * Scope: drive.readonly
  */
@@ -18,9 +18,9 @@ export interface DriveListDeps {
 }
 /**
  * Factory returning the drive_list inner function.
- * BC-2: Empty folder returns { files: [] }, not an error.
- * EC-7: Rejects folderId not in allowedFolderIds (when defined).
- * AC-12: Returns rill primitive dict { files: list[dict] }.
+ * Empty folder returns { files: [] }, not an error.
+ * Rejects folderId not in allowedFolderIds (when defined).
+ * Returns rill primitive dict { files: list[dict] }.
  */
 export function makeDriveList(
   deps: DriveListDeps
@@ -41,7 +41,7 @@ export function makeDriveList(
       typeof folderId === 'string'
         ? folderId
         : undefined;
-    // EC-7: Validate folderId against allowedFolderIds when defined
+    // Validate folderId against allowedFolderIds when defined
     if (folderIdStr !== undefined && folderIdStr !== '') {
       const allowed = deps.driveConfig?.allowedFolderIds;
       if (allowed !== undefined && !allowed.includes(folderIdStr)) {
@@ -73,7 +73,7 @@ export function makeDriveList(
       undefined,
       undefined
     );
-    // BC-2: Empty folder returns { files: [] }
+    // Empty folder returns { files: [] }
     const data = response as {
       files?: Array<{
         id?: string;

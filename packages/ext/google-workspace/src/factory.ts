@@ -12,7 +12,7 @@
  *                 calendar_free_busy
  *
  * All operations check disposal and capability before making API calls.
- * Events emit on success per AC-13. Errors map through mapFetchError.
+ * Events emit on success. Errors map through mapFetchError.
  */
 
 import {
@@ -107,10 +107,10 @@ export function createGoogleWorkspaceExtension(
   // Build per-extension token cache (service-account TTL cache)
   const tokenCache = createTokenCache();
 
-  // Inline disposal state [AC-7]
+  // Inline disposal state
   const disposalState = { isDisposed: false };
 
-  // Inline in-flight tracking state [AC-5]
+  // Inline in-flight tracking state
   const inFlightState: { controllers: Set<AbortController> } = {
     controllers: new Set(),
   };
@@ -213,29 +213,29 @@ export function createGoogleWorkspaceExtension(
   }
 
   // ============================================================
-  // DISPOSE  [AC-7, AC-5, AC-10]
+  // DISPOSE
   // ============================================================
 
   /**
    * Abort all in-flight requests and mark extension as disposed.
-   * Idempotent: second call returns immediately without side effects. [AC-7]
+   * Idempotent: second call returns immediately without side effects.
    */
   const disposeExtension = async (): Promise<void> => {
-    // AC-7: Idempotent guard
+    // Idempotent guard
     if (disposalState.isDisposed) {
       return;
     }
 
-    // Set disposed first so new calls fail immediately [BC-5]
+    // Set disposed first so new calls fail immediately
     disposalState.isDisposed = true;
 
-    // AC-5: Abort all tracked in-flight requests
+    // Abort all tracked in-flight requests
     for (const controller of inFlightState.controllers) {
       controller.abort();
     }
     inFlightState.controllers.clear();
 
-    // AC-10: Clear service-account token cache
+    // Clear service-account token cache
     clearTokenCache(tokenCache);
   };
 
@@ -389,7 +389,7 @@ export function createGoogleWorkspaceExtension(
   );
 
   // ============================================================
-  // CALLABLE DICT  [AC-1]
+  // CALLABLE DICT
   // ============================================================
 
   const stringReturnType = structureToTypeValue({ kind: 'string' });

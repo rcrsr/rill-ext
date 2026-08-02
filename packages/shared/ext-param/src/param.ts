@@ -25,12 +25,12 @@ import {
  * @throws RuntimeError if name is empty or contains whitespace
  */
 function validateParamName(name: string): void {
-  // EC-1: empty name → RuntimeError RILL-R001: "param name must not be empty"
+  // empty name → RuntimeError RILL-R001: "param name must not be empty"
   if (name === '') {
     throw new RuntimeError('RILL-R001', 'param name must not be empty');
   }
 
-  // EC-2: whitespace in name → RuntimeError RILL-R001: "param name must be a valid identifier"
+  // whitespace in name → RuntimeError RILL-R001: "param name must be a valid identifier"
   if (/\s/.test(name)) {
     throw new RuntimeError(
       'RILL-R001',
@@ -61,7 +61,7 @@ function buildAnnotations(desc?: string): Record<string, RillValue> {
  */
 export const p = {
   /**
-   * IR-1: Creates a string parameter descriptor.
+   * Creates a string parameter descriptor.
    *
    * @param name - Parameter name (must be a valid identifier)
    * @param desc - Optional description
@@ -78,7 +78,7 @@ export const p = {
   },
 
   /**
-   * IR-2: Creates a number parameter descriptor.
+   * Creates a number parameter descriptor.
    *
    * @param name - Parameter name (must be a valid identifier)
    * @param desc - Optional description
@@ -96,7 +96,7 @@ export const p = {
   },
 
   /**
-   * IR-3: Creates a boolean parameter descriptor.
+   * Creates a boolean parameter descriptor.
    *
    * @param name - Parameter name (must be a valid identifier)
    * @param desc - Optional description
@@ -114,7 +114,7 @@ export const p = {
   },
 
   /**
-   * IR-4: Creates a dict parameter descriptor.
+   * Creates a dict parameter descriptor.
    *
    * @param name - Parameter name (must be a valid identifier)
    * @param desc - Optional description
@@ -140,7 +140,7 @@ export const p = {
   },
 
   /**
-   * IR-5: Creates a list parameter descriptor.
+   * Creates a list parameter descriptor.
    *
    * @param name - Parameter name (must be a valid identifier)
    * @param itemType - Optional element type; omitted when not provided
@@ -162,7 +162,7 @@ export const p = {
   },
 
   /**
-   * IR-6: Creates a callable parameter descriptor.
+   * Creates a callable parameter descriptor.
    *
    * @param name - Parameter name (must be a valid identifier)
    * @param desc - Optional description

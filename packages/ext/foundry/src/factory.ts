@@ -123,22 +123,22 @@ function messagesToOpenAI(
  *
  * @param config - Extension configuration
  * @returns ExtensionFactoryResult with 10 host functions + dispose
- * @throws RuntimeError for invalid endpoint or auth (EC-1, EC-2)
+ * @throws RuntimeError for invalid endpoint or auth
  */
 export async function createFoundryExtension(
   config: FoundryConfig
 ): Promise<ExtensionFactoryResult> {
-  // EC-1: Validate endpoint is non-empty
+  // Validate endpoint is non-empty
   if (!config.endpoint || config.endpoint.trim().length === 0) {
     throw new RuntimeError('RILL-R001', 'foundry: endpoint is required');
   }
 
-  // EC-2: Validate auth is present
+  // Validate auth is present
   if (!config.auth) {
     throw new RuntimeError('RILL-R001', 'foundry: auth is required');
   }
 
-  // EC-3: Validate auth.type
+  // Validate auth.type
   if (config.auth.type !== 'api-key' && config.auth.type !== 'entra') {
     throw new RuntimeError(
       'RILL-R001',
@@ -187,7 +187,7 @@ export async function createFoundryExtension(
       : null;
 
   // ============================================================
-  // USAGE ACCUMULATOR (IR-7)
+  // USAGE ACCUMULATOR
   // ============================================================
 
   let usageInputTokens = 0;
@@ -228,7 +228,7 @@ export async function createFoundryExtension(
   // ============================================================
 
   /**
-   * Guard: throws EC-4/EC-5/EC-6 when inference config is absent or incomplete.
+   * Guard: throws when inference config is absent or incomplete.
    * Called at the top of every LLM host function.
    */
   function assertInference(ctx: RuntimeContext): {
@@ -243,7 +243,7 @@ export async function createFoundryExtension(
         'foundry: inference not configured'
       );
     }
-    // EC-5: model is required
+    // model is required
     if (!inference.model || inference.model.trim().length === 0) {
       throw haltInvalid(
         ctx,
@@ -252,7 +252,7 @@ export async function createFoundryExtension(
         'foundry: model is required'
       );
     }
-    // EC-6: apiVersion is required
+    // apiVersion is required
     if (!inference.apiVersion || inference.apiVersion.trim().length === 0) {
       throw haltInvalid(
         ctx,
@@ -280,7 +280,7 @@ export async function createFoundryExtension(
   }
 
   // ============================================================
-  // DISPOSE (IR-8)
+  // DISPOSE
   // ============================================================
 
   const dispose = async (): Promise<void> => {
@@ -1528,7 +1528,7 @@ export async function createFoundryExtension(
   } satisfies LlmExtensionContract;
 
   // ============================================================
-  // ADDITIONAL HOST FUNCTIONS (IR-7, tasks 1.4 and 1.5)
+  // ADDITIONAL HOST FUNCTIONS
   // ============================================================
 
   const usageFn: RillFunction = {

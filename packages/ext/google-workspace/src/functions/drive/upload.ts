@@ -1,6 +1,6 @@
 /**
  * drive_upload callable — upload content to Google Drive.
- * IR-10: drive_upload(content: str, filename: str, folderId: str?, options: dict?) → dict
+ * drive_upload(content: str, filename: str, folderId: str?, options: dict?) → dict
  * Capability: drive.upload
  * Scope: drive.file
  */
@@ -14,7 +14,7 @@ import type { GoogleAuth, DriveConfig } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
 const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3';
 const DRIVE_FILE_SCOPES = ['https://www.googleapis.com/auth/drive.file'];
-/** Fixed request timeout per AC-11. */
+/** Fixed request timeout. */
 const REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_MIME_TYPE = 'application/octet-stream';
 export interface DriveUploadDeps {
@@ -28,10 +28,10 @@ export interface DriveUploadDeps {
  * googleFetch always JSON.stringifies the body, but upload needs binary bytes.
  * Uses Google Drive uploadType=multipart so metadata and content are
  * uploaded atomically in a single request (no partial-state window).
- * EC-7: Rejects folderId not in allowedFolderIds (when defined).
- * EC-8: Rejects MIME type in deniedMimeTypes.
- * EC-9: Rejects content byte size > maxUploadBytes (== is allowed per BC-8).
- * AC-12: Returns rill primitive dict.
+ * Rejects folderId not in allowedFolderIds (when defined).
+ * Rejects MIME type in deniedMimeTypes.
+ * Rejects content byte size > maxUploadBytes (== is allowed).
+ * Returns rill primitive dict.
  */
 export function makeDriveUpload(
   deps: DriveUploadDeps
@@ -74,7 +74,7 @@ export function makeDriveUpload(
         mimeType = rawMime;
       }
     }
-    // EC-8: Check deniedMimeTypes
+    // Check deniedMimeTypes
     const deniedMimeTypes = deps.driveConfig?.deniedMimeTypes ?? [];
     if (deniedMimeTypes.includes(mimeType)) {
       failInput(
@@ -97,7 +97,7 @@ export function makeDriveUpload(
     const normalized = stripped.replace(/-/g, '+').replace(/_/g, '/');
     const bytes = Buffer.from(normalized, 'base64');
     const byteLength = bytes.length;
-    // EC-9: Check maxUploadBytes (inclusive: == is allowed per BC-8)
+    // Check maxUploadBytes (inclusive: == is allowed)
     const maxUploadBytes = deps.driveConfig?.maxUploadBytes;
     if (maxUploadBytes !== undefined && byteLength > maxUploadBytes) {
       failInput(
@@ -106,7 +106,7 @@ export function makeDriveUpload(
         `google: file exceeds maximum upload size (${maxUploadBytes} bytes)`
       );
     }
-    // EC-7: Validate folderId against allowedFolderIds when defined
+    // Validate folderId against allowedFolderIds when defined
     if (folderIdStr !== undefined && folderIdStr !== '') {
       const allowed = deps.driveConfig?.allowedFolderIds;
       if (allowed !== undefined && !allowed.includes(folderIdStr)) {
@@ -117,7 +117,7 @@ export function makeDriveUpload(
         );
       }
     }
-    // AC-11: compose lifecycle (ctx.signal), caller signal, and 30s hard timeout
+    // compose lifecycle (ctx.signal), caller signal, and 30s hard timeout
     const signals: AbortSignal[] = [
       controller.signal,
       AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -186,7 +186,7 @@ export function makeDriveUpload(
       size?: string;
       owners?: Array<{ displayName?: string; emailAddress?: string }>;
     };
-    // AC-12: Return rill primitive dict
+    // Return rill primitive dict
     return {
       id: data.id ?? '',
       name: data.name ?? filename,

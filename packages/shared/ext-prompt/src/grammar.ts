@@ -5,8 +5,6 @@
  *   name: type
  *   name: type = default
  *
- * Covers IR-3, EC-3, EC-4.
- *
  * Type parsing is delegated to rill's public parser (tokenize +
  * createParserState + parseTypeRef), then adapted via typeRefToStructure.
  * Rejections enforced by typeRefToStructure: dynamic $T refs, union types
@@ -68,7 +66,7 @@ function validateName(name: string): void {
  * @throws RuntimeError RILL-R001 if entry is malformed or type is unrecognized
  */
 export function parseParamGrammar(entry: string): RillParam {
-  // EC-3: no `:` separator
+  // no `:` separator
   const colonIdx = entry.indexOf(':');
   if (colonIdx === -1) {
     throw new RuntimeError(

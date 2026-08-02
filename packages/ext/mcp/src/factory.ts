@@ -188,13 +188,13 @@ export async function createMcpExtension(
   let disposed = false;
 
   const dispose = async (): Promise<void> => {
-    // BC-5: Idempotent dispose - subsequent calls no-op
+    // Idempotent dispose - subsequent calls no-op
     if (disposed) {
       return;
     }
     disposed = true;
 
-    // NOTE: IR-1 specifies mcp:disconnect should be emitted here, but dispose()
+    // NOTE: mcp:disconnect should be emitted here, but dispose()
     // is called after script execution when no RuntimeContext exists.
 
     // Close client connection
@@ -235,8 +235,8 @@ export async function createMcpExtension(
  * Validate MCP extension configuration synchronously.
  *
  * @param config - Configuration to validate
- * @throws {Error} If stdio transport missing command [EC-1]
- * @throws {Error} If http transport missing url [EC-2]
+ * @throws {Error} If stdio transport missing command
+ * @throws {Error} If http transport missing url
  */
 function validateConfig(config: McpExtensionConfig): void {
   const { transport } = config;
@@ -283,7 +283,7 @@ async function createTransport(config: McpExtensionConfig): Promise<Transport> {
     // Create HTTP transport with optional headers
     const url = new URL(transport.url);
 
-    // Handle static or dynamic headers [AC-4]
+    // Handle static or dynamic headers
     if (transport.headers) {
       let resolvedHeaders: HeadersInit;
       if (typeof transport.headers === 'function') {
@@ -371,7 +371,7 @@ async function discoverCapabilities(
   // Check server-declared capabilities to avoid calling unsupported methods
   const caps = client.getServerCapabilities() ?? {};
 
-  // Parallel capability discovery — only call methods the server supports [IR-1]
+  // Parallel capability discovery — only call methods the server supports
   const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] =
     await Promise.all([
       caps.tools ? client.listTools() : { tools: [] },
@@ -388,7 +388,7 @@ async function discoverCapabilities(
   const allResourceTemplates = resourceTemplatesResult.resourceTemplates || [];
   const allPrompts = promptsResult.prompts || [];
 
-  // Apply filters [BC-7]
+  // Apply filters
   const filteredTools = filterCapabilities(
     allTools,
     config.toolFilter,
@@ -437,7 +437,7 @@ function filterCapabilities<T>(
   filter: string[] | undefined,
   keyFn: (item: T) => string
 ): T[] {
-  // Empty or undefined filter = include all [BC-7]
+  // Empty or undefined filter = include all
   if (!filter || filter.length === 0) {
     return items;
   }

@@ -148,7 +148,7 @@ describe('S3 FS Extension', () => {
   });
 
   describe('createS3FsExtension factory', () => {
-    describe('AC-10: configuration validation', () => {
+    describe('configuration validation', () => {
       it('throws error when region is missing', () => {
         expect(() =>
           createS3FsExtension(
@@ -218,7 +218,7 @@ describe('S3 FS Extension', () => {
       });
     });
 
-    describe('AC-5: S3-compatible configuration', () => {
+    describe('S3-compatible configuration', () => {
       it('accepts endpoint and forcePathStyle config', () => {
         const ext = createS3FsExtension(
           {
@@ -269,7 +269,7 @@ describe('S3 FS Extension', () => {
       });
     });
 
-    describe('IC-6: ExtensionResult structure', () => {
+    describe('ExtensionResult structure', () => {
       it('returns object with dispose function', () => {
         const ext = createS3FsExtension(
           {
@@ -319,7 +319,7 @@ describe('S3 FS Extension', () => {
       });
     });
 
-    describe('IC-6: dispose cleanup', () => {
+    describe('dispose cleanup', () => {
       it('dispose cleans up S3 client without throwing', async () => {
         const ext = createS3FsExtension(
           {

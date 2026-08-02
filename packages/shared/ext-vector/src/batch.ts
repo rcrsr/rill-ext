@@ -46,7 +46,7 @@ export async function executeBatch<TItem>(
 ): Promise<BatchResult> {
   let succeeded = 0;
 
-  // EC-14: Empty items array → { succeeded: 0 }
+  // Empty items array → { succeeded: 0 }
   if (items.length === 0) {
     return { succeeded: 0 };
   }
@@ -54,7 +54,7 @@ export async function executeBatch<TItem>(
   for (let i = 0; i < items.length; i++) {
     const item = items[i]!;
 
-    // Validate item (EC-11: Validation failure → { succeeded, failed, error })
+    // Validate item (validation failure → { succeeded, failed, error })
     // Validation errors from validate callback propagate directly (not caught)
     const validationError = validate(item, i);
     if (validationError !== null) {
@@ -70,7 +70,7 @@ export async function executeBatch<TItem>(
       await execute(item);
       succeeded++;
     } catch (error: unknown) {
-      // EC-12: Execution failure → { succeeded, failed, error }
+      // Execution failure → { succeeded, failed, error }
       return {
         succeeded,
         failed: `index ${i}`,
@@ -79,6 +79,6 @@ export async function executeBatch<TItem>(
     }
   }
 
-  // EC-13: All items succeed → { succeeded } without failed/error
+  // All items succeed → { succeeded } without failed/error
   return { succeeded };
 }

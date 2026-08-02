@@ -333,7 +333,7 @@ export function createChromaExtension(
           });
           const response = await collection.get({ ids: [id] });
 
-          // EC-7: ID not found → invalid value with #NOT_FOUND
+          // ID not found → invalid value with #NOT_FOUND
           if (response.ids.length === 0) {
             const err = new Error('chroma: id not found');
             return ctx.invalidate(err, {

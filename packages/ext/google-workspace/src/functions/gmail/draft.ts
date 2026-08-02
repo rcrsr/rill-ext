@@ -1,6 +1,6 @@
 /**
  * gmail_draft callable — create a Gmail draft message.
- * IR-5: gmail_draft(to: str, subject: str, body: str, options: dict?) → str (draft ID)
+ * gmail_draft(to: str, subject: str, body: str, options: dict?) → str (draft ID)
  * Capability: gmail.draft
  * Scope: gmail.compose
  */
@@ -19,7 +19,7 @@ export interface GmailDraftDeps {
 /**
  * Factory returning the gmail_draft inner function.
  * POSTs base64url-encoded RFC 2822 MIME to /users/me/drafts.
- * Returns the draft ID string per IR-5.
+ * Returns the draft ID string.
  */
 export function makeGmailDraft(
   deps: GmailDraftDeps

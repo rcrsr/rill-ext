@@ -474,14 +474,14 @@ export function createGeminiExtension(
   validateModel(config.model);
   validateTemperature(config.temperature);
 
-  // EC-21/22: Validate factory-level max_turns
+  // Validate factory-level max_turns
   validateMaxTurns(config.max_turns);
 
   // Validate factory-level max_errors; reject 0/negative/non-integer so a
   // misconfigured extension fails fast instead of silently using the default.
   validateMaxErrors(config.max_errors);
 
-  // EC-19/20: Validate extra keys against Gemini-specific reserved set
+  // Validate extra keys against Gemini-specific reserved set
   validateExtraKeys(config.extra, RESERVED_KEYS_GEMINI);
 
   // Resolve auth mode (Gemini Developer / Vertex Express / Vertex ADC) and
@@ -582,7 +582,7 @@ export function createGeminiExtension(
       fn: async (args, ctx): Promise<RillValue> => {
         const rawPrompt = args['prompt'] as RillValue;
 
-        // IR-1: Normalize prompt to canonical Message[]
+        // Normalize prompt to canonical Message[]
         const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
 
         // If normalizePrompt returned an invalid RillValue, surface it
@@ -873,7 +873,7 @@ export function createGeminiExtension(
         const toolsDict = args['tools'] as RillValue;
         const perCallMaxTurns = (args['max_turns'] as number) ?? 0;
 
-        // EC-13: Negative per-call max_turns → INVALID_INPUT
+        // Negative per-call max_turns → INVALID_INPUT
         if (perCallMaxTurns < 0) {
           throw haltInvalid(
             ctx as RuntimeContext,
@@ -883,7 +883,7 @@ export function createGeminiExtension(
           );
         }
 
-        // EC-14: Empty tools dict → INVALID_INPUT
+        // Empty tools dict → INVALID_INPUT
         if (
           toolsDict !== undefined &&
           typeof toolsDict === 'object' &&
@@ -899,7 +899,7 @@ export function createGeminiExtension(
           );
         }
 
-        // IR-1: Normalize prompt to canonical Message[]
+        // Normalize prompt to canonical Message[]
         const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
         if (!Array.isArray(normalized)) {
           // Return the invalid RillValue — caller will see it as an error
@@ -1332,7 +1332,7 @@ export function createGeminiExtension(
             );
           }
 
-          // IR-1: Normalize prompt to canonical Message[]
+          // Normalize prompt to canonical Message[]
           const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
           if (!Array.isArray(normalized)) {
             return normalized;
@@ -1369,14 +1369,14 @@ export function createGeminiExtension(
             responseMimeType: 'application/json',
           });
 
-          // EC-18: generate must not use streaming — non-streaming path only
+          // generate must not use streaming — non-streaming path only
           const response = await client.models.generateContent({
             model: factoryModel,
             contents,
             config: apiConfig,
           });
 
-          // EC-18: Reject streaming response shape
+          // Reject streaming response shape
           if (!('text' in response) && !('candidates' in response)) {
             throw haltInvalid(
               ctx as RuntimeContext,
@@ -1388,7 +1388,7 @@ export function createGeminiExtension(
 
           const raw = response.text ?? '';
 
-          // EC-17: Parse JSON; throw on failure with PROTOCOL / schema_validation_failed
+          // Parse JSON; throw on failure with PROTOCOL / schema_validation_failed
           let data: unknown;
           try {
             data = JSON.parse(raw) as unknown;

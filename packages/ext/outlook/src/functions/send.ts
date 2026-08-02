@@ -10,7 +10,7 @@ import type { ResolvedConfig } from '../factory.js';
 
 /**
  * Send an email message using Graph /me/sendMail.
- * `to` accepts a single string (auto-wrapped) or a list of strings (AC-37).
+ * `to` accepts a single string (auto-wrapped) or a list of strings.
  * Returns SendConfirmationDict { sent: true, to, subject }.
  *
  * @throws an invalid RillValue (#INVALID_INPUT) when to, subject, or body is empty
@@ -21,7 +21,7 @@ export async function send(
   controller: AbortController,
   config: ResolvedConfig
 ): Promise<RillValue> {
-  // AC-37: auto-wrap single string to list
+  // auto-wrap single string to list
   const rawTo = args['to'];
   let toList: string[];
   if (typeof rawTo === 'string') {

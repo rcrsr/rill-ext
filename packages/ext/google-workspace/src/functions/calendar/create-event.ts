@@ -1,6 +1,6 @@
 /**
  * calendar_create_event callable — create a calendar event.
- * IR-17: calendar_create_event(title: str, startTime: str, endTime: str, options: dict?) → str
+ * calendar_create_event(title: str, startTime: str, endTime: str, options: dict?) → str
  * Capability: calendar.create
  * Scopes: calendar.events
  */
@@ -26,10 +26,10 @@ export interface CalendarCreateEventDeps {
 }
 /**
  * Factory returning the calendar_create_event inner function.
- * EC-11: Validates calendarId against allowedCalendarIds.
- * EC-12: Rejects all-day events when calendarConfig.denyAllDay is true.
- * EC-13: Rejects naive ISO timestamps (no timezone).
- * AC-12: Returns event ID string.
+ * Validates calendarId against allowedCalendarIds.
+ * Rejects all-day events when calendarConfig.denyAllDay is true.
+ * Rejects naive ISO timestamps (no timezone).
+ * Returns event ID string.
  */
 export function makeCalendarCreateEvent(
   deps: CalendarCreateEventDeps
@@ -63,7 +63,7 @@ export function makeCalendarCreateEvent(
         'google: end_time must be a non-empty string'
       );
     }
-    // EC-13: Reject naive ISO timestamps
+    // Reject naive ISO timestamps
     assertIsoTimestamp(ctx, startTime, 'start_time');
     assertIsoTimestamp(ctx, endTime, 'end_time');
     // Extract options
@@ -104,9 +104,9 @@ export function makeCalendarCreateEvent(
         description = rawDescription;
       }
     }
-    // EC-11: Validate calendarId against allowlist
+    // Validate calendarId against allowlist
     assertAllowedCalendarId(ctx, calendarId, deps.calendarConfig);
-    // EC-12: Reject all-day events when denyAllDay is configured
+    // Reject all-day events when denyAllDay is configured
     if (isAllDay && deps.calendarConfig?.denyAllDay === true) {
       failForbidden(
         ctx,
@@ -153,7 +153,7 @@ export function makeCalendarCreateEvent(
       undefined,
       undefined
     );
-    // Return event ID string [IR-17, AC-12]
+    // Return event ID string
     const data = response as { id?: string } | null;
     const eventId = data?.id ?? '';
     return eventId as unknown as RillValue;

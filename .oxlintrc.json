@@ -1,5 +1,6 @@
 {
   "plugins": ["typescript", "oxc"],
+  "jsPlugins": ["@rcrsr/rill-dev/lint-rules"],
   "categories": {
     "correctness": "error"
   },
@@ -25,5 +26,14 @@
     "typescript/no-wrapper-object-types": "error",
     "typescript/no-array-constructor": "error"
   },
-  "ignorePatterns": ["dist", "node_modules", "*.d.ts", "generated"]
+  "ignorePatterns": ["dist", "node_modules", "*.d.ts", "generated"],
+  "overrides": [
+    {
+      "files": ["**/src/**/*.{ts,tsx}"],
+      "rules": {
+        "rill/no-spec-id-reference": "error",
+        "rill/no-duplicate-error-id": "error"
+      }
+    }
+  ]
 }

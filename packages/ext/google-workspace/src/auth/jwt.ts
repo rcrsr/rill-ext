@@ -1,6 +1,6 @@
 /**
  * JWT signing utilities for Google service account authentication.
- * Implements IR-22: signServiceAccountJwt.
+ * Implements signServiceAccountJwt.
  */
 
 import { createSign } from 'node:crypto';
@@ -8,13 +8,13 @@ import type { RuntimeContext } from '@rcrsr/rill';
 import type { ServiceAccountKey } from '../types.js';
 import { failAuth } from '../errors.js';
 
-/** JWT header — RS256 algorithm, JWT type (AC-9). */
+/** JWT header — RS256 algorithm, JWT type. */
 const JWT_HEADER = { alg: 'RS256', typ: 'JWT' } as const;
 
-/** Google OAuth2 token endpoint audience (AC-9). */
+/** Google OAuth2 token endpoint audience. */
 const GOOGLE_TOKEN_AUD = 'https://oauth2.googleapis.com/token';
 
-/** JWT lifetime in seconds — 3600 enforced by Google (AC-9). */
+/** JWT lifetime in seconds — 3600 enforced by Google. */
 const JWT_LIFETIME_SECONDS = 3600;
 
 /**
@@ -27,10 +27,10 @@ function toBase64Url(value: string | Buffer): string {
 }
 
 /**
- * Sign a GCP service account JWT for OAuth2 token exchange (IR-22).
+ * Sign a GCP service account JWT for OAuth2 token exchange.
  *
  * Claims include iss, scope (space-separated), aud, iat, exp, and optional sub.
- * exp is always iat + 3600 (AC-9).
+ * exp is always iat + 3600.
  *
  * @param key - Parsed service account key fields
  * @param scopes - OAuth2 scopes to request

@@ -1,11 +1,11 @@
 /**
  * gmail_label callable — apply a named label to a Gmail message.
- * IR-8: gmail_label(messageId: str, labelName: str) → bool
+ * gmail_label(messageId: str, labelName: str) → bool
  * Capability: gmail.label
  * Scope: gmail.modify
  *
  * Flow:
- *  EC-6/BC-9/BC-10: Validate labelName against allowedLabels / deniedLabels before fetch.
+ * Validate labelName against allowedLabels / deniedLabels before fetch.
  *  1. GET /users/me/labels to list all labels
  *  2. Find label by name (case-sensitive)
  *  3. POST /users/me/messages/<id>/modify with { addLabelIds: [labelId] }
@@ -31,9 +31,9 @@ interface GmailLabel {
 }
 /**
  * Validate labelName against allowed/denied label config.
- * EC-6/EC-12: Halts with invalid `#FORBIDDEN` before fetch on violation.
- * BC-9: allowedLabels undefined → all labels accepted.
- * BC-10: allowedLabels non-empty + label not in list → invalid `#FORBIDDEN`.
+ * Halts with invalid `#FORBIDDEN` before fetch on violation.
+ * allowedLabels undefined → all labels accepted.
+ * allowedLabels non-empty + label not in list → invalid `#FORBIDDEN`.
  */
 function validateLabelAccess(
   ctx: RuntimeContext,
@@ -42,7 +42,7 @@ function validateLabelAccess(
 ): void {
   const allowedLabels = gmailConfig?.allowedLabels;
   const deniedLabels = gmailConfig?.deniedLabels ?? [];
-  // EC-12: Check denied list first (before fetch)
+  // Check denied list first (before fetch)
   if (deniedLabels.includes(labelName)) {
     failForbidden(
       ctx,
@@ -50,7 +50,7 @@ function validateLabelAccess(
       `google: label '${labelName}' in denied set`
     );
   }
-  // BC-10: Check allowed list when defined and non-empty
+  // Check allowed list when defined and non-empty
   if (allowedLabels !== undefined && allowedLabels.length > 0) {
     if (!allowedLabels.includes(labelName)) {
       failForbidden(
@@ -64,7 +64,7 @@ function validateLabelAccess(
 /**
  * Factory returning the gmail_label inner function.
  * Validates label access, resolves the label ID, then applies it via messages.modify.
- * Returns true after 200 OK per IR-8.
+ * Returns true after 200 OK.
  */
 export function makeGmailLabel(
   deps: GmailLabelDeps
@@ -94,7 +94,7 @@ export function makeGmailLabel(
         'google: label_name must be a non-empty string'
       );
     }
-    // EC-6/EC-12/BC-9/BC-10: Validate before any API call
+    // Validate before any API call
     validateLabelAccess(ctx, labelName, deps.gmailConfig);
     // Step 1: List all labels to find the label ID by name
     const labelsResponse = await googleFetch(

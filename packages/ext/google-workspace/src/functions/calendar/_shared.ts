@@ -18,7 +18,6 @@ const ISO_TZ_RE =
 /**
  * Assert that a string is ISO 8601 datetime with timezone.
  * Throws an invalid RillValue (`#INVALID_INPUT`) for naive timestamps.
- * EC-13
  */
 export function assertIsoTimestamp(
   ctx: RuntimeContext,
@@ -37,7 +36,6 @@ export function assertIsoTimestamp(
 /**
  * Validate calendarId against allowedCalendarIds when defined.
  * Throws an invalid RillValue (`#FORBIDDEN`) when calendarId is not allowed.
- * EC-11
  */
 export function assertAllowedCalendarId(
   ctx: RuntimeContext,

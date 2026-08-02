@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { sanitizeNames } from './naming.js';
 
 describe('sanitizeNames', () => {
-  describe('IC-6: Name Sanitization', () => {
+  describe('Name Sanitization', () => {
     it('replaces hyphens with underscores', () => {
       const result = sanitizeNames(['read-file']);
       expect(result.get('read-file')).toBe('read_file');
@@ -45,7 +45,7 @@ describe('sanitizeNames', () => {
     });
   });
 
-  describe('AC-5: Name Collision Resolution', () => {
+  describe('Name Collision Resolution', () => {
     it('appends _2 to second occurrence when names collide', () => {
       const result = sanitizeNames(['read-file', 'readFile']);
       expect(result.get('read-file')).toBe('read_file');
@@ -81,7 +81,7 @@ describe('sanitizeNames', () => {
     });
   });
 
-  describe('BC-2: Maximum name collision', () => {
+  describe('Maximum name collision', () => {
     it('handles 50 tools all sanitizing to same name', () => {
       // Create 50 tool names that ALL sanitize to 'read'
       const collisionTest: string[] = [

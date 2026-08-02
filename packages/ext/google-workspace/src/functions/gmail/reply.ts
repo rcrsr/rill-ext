@@ -1,6 +1,6 @@
 /**
  * gmail_reply callable — reply to an existing Gmail message.
- * IR-6: gmail_reply(messageId: str, body: str, options: dict?) → str (message ID)
+ * gmail_reply(messageId: str, body: str, options: dict?) → str (message ID)
  * Capability: gmail.reply
  * Scope: gmail.send
  *

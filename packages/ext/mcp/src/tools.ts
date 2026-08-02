@@ -69,7 +69,7 @@ export interface McpToolResult {
 /**
  * Parses MCP tool result content blocks to rill value.
  *
- * Rules (AC-8):
+ * Rules:
  * - Single text block with JSON → parse to dict
  * - Single text block (non-JSON) → return string
  * - Single image block → dict with [type: "image", data: base64, mime: "..."]
@@ -162,8 +162,8 @@ function parseToolResult(result: McpToolResult): RillValue {
  * Creates async wrapper that:
  * - Emits mcp:tool_call lifecycle event
  * - Calls MCP client.callTool with timeout
- * - Parses result content per AC-8
- * - Maps errors per EC-6 through EC-10
+ * - Parses result content
+ * - Maps errors through the shared error mapper
  * - Emits mcp:error on failures
  *
  * @param tool - MCP tool definition
@@ -187,7 +187,7 @@ function generateToolFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
-    // Emit mcp:connect on first tool call [IR-1]
+    // Emit mcp:connect on first tool call
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
         event: 'mcp:connect',
@@ -204,7 +204,7 @@ function generateToolFunction(
       toolArgs[param.name] = value !== undefined ? value : param.defaultValue;
     }
 
-    // Emit mcp:tool_call event [IR-1]
+    // Emit mcp:tool_call event
     emitExtensionEvent(ctx, {
       event: 'mcp:tool_call',
       subsystem: 'extension:mcp',

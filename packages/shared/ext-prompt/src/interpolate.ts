@@ -1,7 +1,7 @@
 /**
  * Template interpolation and reference scanning for rill prompt bodies.
  *
- * Covers IR-4 (interpolate), IR-7 (scanTemplateReferences), AC-15.
+ * Covers interpolate and scanTemplateReferences.
  *
  * Escape rules:
  *   {{  →  literal {

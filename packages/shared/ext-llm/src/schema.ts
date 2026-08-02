@@ -67,9 +67,9 @@ export function mapRillType(rillType: string): string {
 /**
  * Build a JsonSchemaProperty from a RillType in param position.
  *
- * - closure and tuple types throw RuntimeError RILL-R005 (EC-3).
+ * - closure and tuple types throw RuntimeError RILL-R005.
  * - any type produces an unconstrained property (no type field).
- * - list type maps to array, recursing into element if present (AC-25).
+ * - list type maps to array, recursing into element if present.
  * - dict type maps to object.
  * - primitive types (string, number, bool) map via mapRillType.
  */
@@ -171,8 +171,8 @@ function buildDictSchema(dictType: DictTypeStructure): JsonSchemaObject {
  * - Non-optional params added to required[].
  *
  * @throws RuntimeError RILL-R005 for unsupported top-level kind
- * @throws RuntimeError RILL-R005 for closure/tuple type in param position (EC-3)
- * @throws RuntimeError RILL-R005 for unsupported type name (EC-3)
+ * @throws RuntimeError RILL-R005 for closure/tuple type in param position
+ * @throws RuntimeError RILL-R005 for unsupported type name
  */
 export function buildJsonSchemaFromStructuralType(
   type: TypeStructure,

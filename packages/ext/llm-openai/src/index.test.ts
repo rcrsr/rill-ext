@@ -1,6 +1,6 @@
 /**
  * Tests for OpenAI extension barrel exports and package structure.
- * Verifies IC-16, IC-18, IC-21, IC-22, IC-23 requirements.
+ * Verifies the barrel exports, package metadata, and entry points.
  */
 
 import { createRequire } from 'node:module';
@@ -12,7 +12,7 @@ const _require = createRequire(import.meta.url);
 const _pkg = _require('../package.json') as { version: string };
 
 describe('OpenAI Extension Package', () => {
-  describe('Barrel Exports (IC-16)', () => {
+  describe('Barrel Exports', () => {
     it('exports VERSION matching package.json', () => {
       expect(openaiExtension.VERSION).toBe(_pkg.version);
     });
@@ -32,7 +32,7 @@ describe('OpenAI Extension Package', () => {
     });
   });
 
-  describe('OpenAIExtensionConfig extends LLMExtensionConfig (IC-18)', () => {
+  describe('OpenAIExtensionConfig extends LLMExtensionConfig', () => {
     it('accepts base LLMExtensionConfig fields', () => {
       const config: OpenAIExtensionConfig = {
         model: 'gpt-4-turbo',
@@ -81,7 +81,7 @@ describe('OpenAI Extension Package', () => {
     });
   });
 
-  describe('Factory Function (IC-16)', () => {
+  describe('Factory Function', () => {
     it('creates extension with valid config', () => {
       const config: OpenAIExtensionConfig = {
         model: 'gpt-4-turbo',

@@ -11,15 +11,15 @@
  * Split `text` into paragraphs separated by blank lines.
  *
  * A blank line is a line containing only optional whitespace.  One or more
- * consecutive blank lines count as a single separator (AC-35).  Trailing
- * blank entries produced by a trailing blank line are removed (AC-34).
+ * consecutive blank lines count as a single separator. Trailing
+ * blank entries produced by a trailing blank line are removed.
  *
  * Returns `[]` for empty or all-blank input.
  *
  * Examples:
- *   splitParagraphs('a\n\nb')         → ['a', 'b']            (AC-17)
- *   splitParagraphs('a\n\n')          → ['a']                 (AC-34)
- *   splitParagraphs('a\n\n\n\nb')     → ['a', 'b']            (AC-35)
+ * splitParagraphs('a\n\nb') → ['a', 'b']
+ * splitParagraphs('a\n\n') → ['a']
+ * splitParagraphs('a\n\n\n\nb') → ['a', 'b']
  */
 export function splitParagraphs(text: string): string[] {
   if (text.trim().length === 0) {
@@ -37,22 +37,22 @@ export function splitParagraphs(text: string): string[] {
  * Slide a fixed-size window across `text`, producing overlapping or
  * non-overlapping slices.
  *
- * - Empty string returns `[]` (AC-29).
+ * - Empty string returns `[]`.
  * - When `text.length <= size`, returns a single-element array with the
- *   full text (AC-30).
+ * full text.
  * - Otherwise iterates `i` from `0` in increments of `step`, producing
  *   `text.slice(i, i + size)`.  The final window is included even when
- *   it is shorter than `size` (AC-18, AC-19).
+ * it is shorter than `size`.
  *
  * The internal function name is `windowFn` to avoid colliding with the
- * browser/DOM global `window` (TD-8).  The factory maps it to the
+ * browser/DOM global `window`. The factory maps it to the
  * host-function key `'window'`.
  *
  * Examples:
- *   windowFn('a'.repeat(100), 30, 30)  → 4 windows: [0:30, 30:60, 60:90, 90:100]  (AC-18)
- *   windowFn('a'.repeat(100), 30, 20)  → 5 windows starting at 0,20,40,60,80       (AC-19)
- *   windowFn('', 5, 5)                 → []                                         (AC-29)
- *   windowFn('hi', 30, 30)             → ['hi']                                     (AC-30)
+ * windowFn('a'.repeat(100), 30, 30) → 4 windows: [0:30, 30:60, 60:90, 90:100]
+ * windowFn('a'.repeat(100), 30, 20) → 5 windows starting at 0,20,40,60,80
+ * windowFn('', 5, 5) → []
+ * windowFn('hi', 30, 30) → ['hi']
  */
 export function windowFn(text: string, size: number, step: number): string[] {
   if (text.length === 0) {
@@ -74,17 +74,17 @@ export function windowFn(text: string, size: number, step: number): string[] {
  * Truncate `text` to at most `max` characters, optionally at a word
  * boundary, and append `ellipsis`.
  *
- * - Returns `text` unchanged when `text.length <= max` (AC-31).
- * - When `wordBoundary` is `false`: hard-cut at `max` (AC-20).
+ * - Returns `text` unchanged when `text.length <= max`.
+ * - When `wordBoundary` is `false`: hard-cut at `max`.
  * - When `wordBoundary` is `true`: find the last whitespace at or before
  *   `max`; truncate there.  Falls back to hard-cut at `max` when no
- *   whitespace exists in the prefix (AC-21).
- * - `ellipsis` is appended after the cut; pass `""` for no ellipsis (AC-20).
+ * whitespace exists in the prefix.
+ * - `ellipsis` is appended after the cut; pass `""` for no ellipsis.
  *
  * Examples:
- *   truncate('x'.repeat(500), 100, false, '')    → 100-char string             (AC-20)
- *   truncate('hello world goodbye', 12, true, '') → 'hello world'              (AC-21)
- *   truncate('hi', 100, false, '')               → 'hi'                        (AC-31)
+ * truncate('x'.repeat(500), 100, false, '') → 100-char string
+ * truncate('hello world goodbye', 12, true, '') → 'hello world'
+ * truncate('hi', 100, false, '') → 'hi'
  */
 export function truncate(
   text: string,

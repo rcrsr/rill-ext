@@ -1,6 +1,6 @@
 /**
  * Authenticated HTTP wrapper for Google Workspace API requests.
- * Implements IR-27: token resolution, signal combination, error mapping.
+ * Implements token resolution, signal combination, error mapping.
  */
 
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
@@ -9,16 +9,16 @@ import type { TokenCache } from './auth/resolve.js';
 import { resolveToken } from './auth/resolve.js';
 import { mapGoogleError, mapFetchError, failInput } from './errors.js';
 
-/** Fixed request timeout per AC-11. */
+/** Fixed request timeout. */
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * Perform an authenticated Google API request (IR-27).
+ * Perform an authenticated Google API request.
  *
  * Resolves the Bearer token via resolveToken, combines abort signals,
  * builds the request, and maps HTTP/network errors to RuntimeError.
  *
- * The IR-27 public signature lists (auth, ctx) as resolver params.
+ * The public signature lists (auth, ctx) as resolver params.
  * This implementation widens to also accept cache, scopes, and resourceId
  * because resolveToken requires them and mapGoogleError needs service/operation.
  * The factory closure will bind these to produce per-service helpers. [SPEC]
@@ -37,8 +37,8 @@ const REQUEST_TIMEOUT_MS = 30_000;
  * @param headers - Optional extra request headers
  * @param resourceId - Optional resource ID for 404 error messages
  * @returns Parsed JSON response body, or null for 202/204 responses
- * @throws halt carrying invalid generic atom on HTTP errors [EC-14..EC-18]: `#AUTH` (401), `#FORBIDDEN` (403), `#NOT_FOUND` (404), `#RATE_LIMIT` (429), `#UNAVAILABLE` (5xx)
- * @throws halt carrying invalid `#TIMEOUT` (`request_timeout`) or `#UNAVAILABLE` (`connection_failed`) on network/abort errors [EC-19, EC-20]
+ * @throws halt carrying invalid generic atom on HTTP errors: `#AUTH` (401), `#FORBIDDEN` (403), `#NOT_FOUND` (404), `#RATE_LIMIT` (429), `#UNAVAILABLE` (5xx)
+ * @throws halt carrying invalid `#TIMEOUT` (`request_timeout`) or `#UNAVAILABLE` (`connection_failed`) on network/abort errors
  * @throws halt carrying invalid `#INVALID_INPUT` if baseUrl is not HTTPS
  */
 export async function googleFetch(
@@ -61,7 +61,7 @@ export async function googleFetch(
     failInput(ctx, 'baseurl_not_https', 'google: baseUrl must be HTTPS');
   }
 
-  // AC-11: combine lifecycle (ctx.signal), caller signal, and 30s hard timeout
+  // combine lifecycle (ctx.signal), caller signal, and 30s hard timeout
   const signals: AbortSignal[] = [
     controller.signal,
     AbortSignal.timeout(REQUEST_TIMEOUT_MS),

@@ -1,6 +1,6 @@
 /**
  * drive_delete callable — permanently delete a file from Google Drive.
- * IR-13: drive_delete(fileId: str) → bool
+ * drive_delete(fileId: str) → bool
  * Capability: drive.delete
  * Scope: drive.file
  */
@@ -19,7 +19,7 @@ export interface DriveDeleteDeps {
  * Factory returning the drive_delete inner function.
  * Permanent delete via DELETE /files/{id}.
  * googleFetch returns null for 204 No Content — converted to true.
- * AC-12: Returns boolean true on success.
+ * Returns boolean true on success.
  */
 export function makeDriveDelete(
   deps: DriveDeleteDeps

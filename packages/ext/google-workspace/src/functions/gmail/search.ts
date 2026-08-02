@@ -1,6 +1,6 @@
 /**
  * gmail_search callable — search Gmail messages by query string.
- * IR-2: gmail_search(query: str, options: dict?) → { messages: list[dict] }
+ * gmail_search(query: str, options: dict?) → { messages: list[dict] }
  * Capability: gmail.search
  * Scope: gmail.readonly
  */
@@ -13,7 +13,7 @@ import type { GmailConfig } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
 const GMAIL_BASE = 'https://gmail.googleapis.com';
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
-/** Default and ceiling for maxResults per BC-1. */
+/** Default and ceiling for maxResults. */
 const DEFAULT_MAX_RESULTS = 50;
 export interface GmailSearchDeps {
   readonly auth: GoogleAuth;
@@ -22,8 +22,8 @@ export interface GmailSearchDeps {
 }
 /**
  * Factory returning the gmail_search inner function.
- * BC-1: Truncates options.maxResults to gmailConfig.maxResults ceiling (default 50).
- * AC-12: Returns rill primitive dict { messages: list[dict] }.
+ * Truncates options.maxResults to gmailConfig.maxResults ceiling (default 50).
+ * Returns rill primitive dict { messages: list[dict] }.
  */
 export function makeGmailSearch(
   deps: GmailSearchDeps
@@ -41,7 +41,7 @@ export function makeGmailSearch(
     if (typeof query !== 'string' || query.trim() === '') {
       failInput(ctx, 'invalid_arg', 'google: query must be a non-empty string');
     }
-    // BC-1: cap maxResults at the configured ceiling (default 50)
+    // cap maxResults at the configured ceiling (default 50)
     const ceiling = deps.gmailConfig?.maxResults ?? DEFAULT_MAX_RESULTS;
     let maxResults = ceiling;
     const options = args['options'];
@@ -68,7 +68,7 @@ export function makeGmailSearch(
       undefined,
       undefined
     );
-    // Project response to { messages: [{ id, thread_id }, ...] } per AC-12
+    // Project response to { messages: [{ id, thread_id }, ...] }
     const data = response as {
       messages?: Array<{ id?: string; threadId?: string }>;
     } | null;

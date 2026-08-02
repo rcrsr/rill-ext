@@ -11,7 +11,7 @@ import type { ResolvedConfig } from '../factory.js';
 
 /**
  * Create a draft message using Graph /me/messages.
- * `to` accepts a single string (auto-wrapped) or a list of strings (AC-37).
+ * `to` accepts a single string (auto-wrapped) or a list of strings.
  * Returns a MailMessageDict from the 201 response body.
  *
  * @throws an invalid RillValue (#INVALID_INPUT) when to, subject, or body is empty
@@ -22,7 +22,7 @@ export async function draft(
   controller: AbortController,
   config: ResolvedConfig
 ): Promise<RillValue> {
-  // AC-37: auto-wrap single string to list
+  // auto-wrap single string to list
   const rawTo = args['to'];
   let toList: string[];
   if (typeof rawTo === 'string') {

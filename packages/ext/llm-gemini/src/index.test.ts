@@ -12,7 +12,7 @@ const _require = createRequire(import.meta.url);
 const _pkg = _require('../package.json') as { version: string };
 
 describe('Google Extension Scaffolding (Task 4.1)', () => {
-  describe('IC-24: Barrel exports VERSION, types, factory', () => {
+  describe('Barrel exports VERSION, types, factory', () => {
     it('exports VERSION matching package.json', () => {
       expect(VERSION).toBe(_pkg.version);
     });
@@ -36,7 +36,7 @@ describe('Google Extension Scaffolding (Task 4.1)', () => {
     });
   });
 
-  describe('IC-26: GeminiExtensionConfig extends LLMExtensionConfig', () => {
+  describe('GeminiExtensionConfig extends LLMExtensionConfig', () => {
     it('accepts base LLMExtensionConfig fields', () => {
       const config: GeminiExtensionConfig = {
         model: 'gemini-2.0-flash',

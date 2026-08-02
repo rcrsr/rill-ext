@@ -1,7 +1,7 @@
 /**
  * Pure helpers for whitespace normalisation.
  *
- * No external dependencies — uses built-in string and array operations only (TD-6).
+ * No external dependencies — uses built-in string and array operations only.
  *
  * @module
  */
@@ -11,13 +11,13 @@
  *
  * When `preserveNewlines` is `false` (default):
  *   All whitespace runs (spaces, tabs, newlines) are collapsed to a single
- *   space.  The result is a single-line string (AC-11, AC-45).
+ * space. The result is a single-line string.
  *
  * When `preserveNewlines` is `true`:
  *   Paragraph boundaries (one or more blank lines) are preserved.  Within
  *   each paragraph, internal whitespace runs are collapsed to a single space.
  *   This retains the gross structure of the document while removing repeated
- *   spaces and tabs (AC-12).
+ * spaces and tabs.
  *
  * Examples:
  *   collapseWhitespace('hello    world', false)  → 'hello world'
@@ -48,7 +48,7 @@ export function collapseWhitespace(
  *
  * The common prefix is computed only from lines that contain at least one
  * non-whitespace character; empty or whitespace-only lines are ignored during
- * prefix computation but are kept in the output (AC-13, AC-43).
+ * prefix computation but are kept in the output.
  *
  * When no common indent exists the text is returned unchanged.
  *
@@ -96,7 +96,7 @@ export function dedent(text: string): string {
  * lines.
  *
  * Lines that are empty or contain only whitespace after trimming are dropped.
- * Returns `[]` for all-blank input (AC-14, AC-44).
+ * Returns `[]` for all-blank input.
  *
  * Examples:
  *   trimLines('  a  \n  \n  b  ')  → ['a', 'b']

@@ -7,7 +7,7 @@
  * `#RATE_LIMIT`, `#UNAVAILABLE`).
  *
  * Provider-specific failure shape: (generic atom, meta.provider='google-workspace',
- * meta.raw.kind, meta.raw.service). Spec EC-14..EC-20 message strings
+ * meta.raw.kind, meta.raw.service). Provider message strings
  * are preserved on `meta.raw.message`.
  */
 

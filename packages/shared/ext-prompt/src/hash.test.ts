@@ -2,17 +2,17 @@
  * Unit tests for computeContentHash.
  *
  * Covers:
- *   IR-6  — SHA-256 hex digest of (params + "\n" + output + "\n" + body)
- *   AC-18 — byte-identical inputs produce equal digests (hash stability)
- *   IR-6  — different inputs produce different digests
- *   IR-6  — result is a 64-character lowercase hex string
+ * SHA-256 hex digest of (params + "\n" + output + "\n" + body)
+ * byte-identical inputs produce equal digests (hash stability)
+ * different inputs produce different digests
+ * result is a 64-character lowercase hex string
  */
 
 import { describe, it, expect } from 'vitest';
 import { computeContentHash } from './hash.js';
 
 describe('computeContentHash', () => {
-  describe('hash stability (AC-18)', () => {
+  describe('hash stability', () => {
     it('produces the same digest for identical inputs', () => {
       const a = computeContentHash('params', 'output', 'body');
       const b = computeContentHash('params', 'output', 'body');
@@ -26,7 +26,7 @@ describe('computeContentHash', () => {
     });
   });
 
-  describe('output format (IR-6)', () => {
+  describe('output format', () => {
     it('returns a 64-character string', () => {
       expect(computeContentHash('p', 'o', 'b')).toHaveLength(64);
     });
@@ -47,7 +47,7 @@ describe('computeContentHash', () => {
     });
   });
 
-  describe('different inputs produce different digests (IR-6)', () => {
+  describe('different inputs produce different digests', () => {
     it('differs when params changes', () => {
       const a = computeContentHash('params-a', 'output', 'body');
       const b = computeContentHash('params-b', 'output', 'body');
@@ -74,7 +74,7 @@ describe('computeContentHash', () => {
     });
   });
 
-  describe('never throws (IR-6)', () => {
+  describe('never throws', () => {
     it('handles all-empty inputs without throwing', () => {
       expect(() => computeContentHash('', '', '')).not.toThrow();
     });

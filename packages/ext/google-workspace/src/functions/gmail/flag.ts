@@ -1,6 +1,6 @@
 /**
  * gmail_flag callable — add or remove the STARRED label on a Gmail message.
- * IR-7: gmail_flag(messageId: str, flagged: bool) → bool
+ * gmail_flag(messageId: str, flagged: bool) → bool
  * Capability: gmail.modify
  * Scope: gmail.modify
  */
@@ -18,7 +18,7 @@ export interface GmailFlagDeps {
 /**
  * Factory returning the gmail_flag inner function.
  * Uses messages.modify to add or remove the STARRED system label.
- * Returns true after 200 OK per IR-7.
+ * Returns true after 200 OK.
  */
 export function makeGmailFlag(
   deps: GmailFlagDeps

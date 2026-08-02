@@ -86,7 +86,7 @@ interface RuntimeContextLike {
  * @param toolInput - Input parameters for the tool
  * @param tools - Rill dict mapping tool names to callable functions
  * @returns Result from tool execution
- * @throws RuntimeError if tool not found or validation fails (EC-15, EC-16)
+ * @throws RuntimeError if tool not found or validation fails
  */
 async function executeToolCall(
   toolName: string,
@@ -94,7 +94,7 @@ async function executeToolCall(
   tools: RillValue,
   context?: RuntimeContextLike
 ): Promise<RillValue> {
-  // EC-15: Tool name not in tool map
+  // Tool name not in tool map
   if (!isDict(tools)) {
     throwToolLoopHalt(
       context,
@@ -126,7 +126,7 @@ async function executeToolCall(
     );
   }
 
-  // EC-16: Tool input validation
+  // Tool input validation
   if (typeof toolInput !== 'object' || toolInput === null) {
     throwToolLoopHalt(
       context,
@@ -324,8 +324,8 @@ function patchResponseToolCallNames(
  * @param emitEvent - Event emission function for observability
  * @param maxTurns - Maximum number of turns in the tool loop (default: 10)
  * @returns Final response, executed tool calls, and aggregated token usage
- * @throws RuntimeError if consecutive errors exceed maxErrors (EC-14)
- * @throws RuntimeError if provider callAPI throws (EC-17, wrapped generically)
+ * @throws RuntimeError if consecutive errors exceed maxErrors
+ * @throws RuntimeError if provider callAPI throws (wrapped generically)
  *
  * @example
  * ```typescript
@@ -381,7 +381,7 @@ export async function executeToolLoop(
   const toolDescriptors = Object.entries(toolsDict).map(([name, fn]) => {
     const fnValue = fn as RillValue;
 
-    // EC-3: RuntimeCallable (builtins) cannot be used as tools
+    // RuntimeCallable (builtins) cannot be used as tools
     if (isRuntimeCallable(fnValue)) {
       throwToolLoopHalt(
         context,
@@ -391,7 +391,7 @@ export async function executeToolLoop(
       );
     }
 
-    // EC-2: Value must be a callable
+    // Value must be a callable
     if (!isCallable(fnValue)) {
       throwToolLoopHalt(
         context,
@@ -401,7 +401,7 @@ export async function executeToolLoop(
       );
     }
 
-    // Extract description from callable annotations (IR-2, IR-3)
+    // Extract description from callable annotations
     const callable = fnValue as RillCallable;
     const description =
       (callable.annotations?.['description'] as string | undefined) ?? '';
@@ -423,7 +423,7 @@ export async function executeToolLoop(
     if (params.length > 0) {
       // Build a synthetic closure type to delegate to buildJsonSchemaFromStructuralType.
       // param.type undefined → treated as 'any' (unconstrained, produces {} property).
-      // param.annotations['description'] used for all callable kinds (AC-10, AC-11, AC-30).
+      // param.annotations['description'] used for all callable kinds.
       const closureType: TypeStructure = {
         kind: 'closure',
         params: params.map((p) => ({
@@ -498,7 +498,7 @@ export async function executeToolLoop(
     }
 
     turnCount++;
-    // EC-17: Call provider API with error handling
+    // Call provider API with error handling
     // When yieldChunk is provided and callAPIStreaming is defined, use streaming path.
     let response: unknown;
     try {
@@ -686,7 +686,7 @@ export async function executeToolLoop(
           duration,
         });
 
-        // EC-16: Consecutive errors exceed resolvedMaxErrors
+        // Consecutive errors exceed resolvedMaxErrors
         if (consecutiveErrors >= resolvedMaxErrors) {
           throwToolLoopHalt(
             context,
@@ -715,7 +715,7 @@ export async function executeToolLoop(
     }
   }
 
-  // EC-15: Max turns reached — halt with max_turns_exceeded
+  // Max turns reached — halt with max_turns_exceeded
   throwToolLoopHalt(
     context,
     'INVALID_INPUT',
@@ -732,7 +732,7 @@ export async function executeToolLoop(
  * Build normalized response messages array with assistant reply appended.
  * Used by all LLM extensions to ensure consistent messages field in responses.
  *
- * IR-7: New signature — appends an assistant Message with the given parts.
+ * New signature — appends an assistant Message with the given parts.
  * Pure function; does not mutate the input array.
  *
  * @param inputMessages - Conversation history in canonical parts-shaped form

@@ -1,6 +1,6 @@
 /**
  * calendar_today callable — list calendar events for today (UTC).
- * IR-16: calendar_today(options: dict?) → { events: list[dict] }
+ * calendar_today(options: dict?) → { events: list[dict] }
  * Capability: calendar.read
  * Scopes: calendar.readonly
  */
@@ -24,8 +24,8 @@ export interface CalendarTodayDeps {
 /**
  * Factory returning the calendar_today inner function.
  * Computes today's UTC range: <YYYY-MM-DD>T00:00:00Z to <YYYY-MM-DD>T23:59:59Z.
- * EC-11: Validates calendarId against allowedCalendarIds.
- * AC-12: Returns rill primitive dict { events: list[dict] }.
+ * Validates calendarId against allowedCalendarIds.
+ * Returns rill primitive dict { events: list[dict] }.
  */
 export function makeCalendarToday(
   deps: CalendarTodayDeps
@@ -60,7 +60,7 @@ export function makeCalendarToday(
       }
     }
 
-    // EC-11: Validate calendarId against allowlist
+    // Validate calendarId against allowlist
     assertAllowedCalendarId(ctx, calendarId, deps.calendarConfig);
 
     const path =
@@ -86,7 +86,7 @@ export function makeCalendarToday(
       undefined
     );
 
-    // Project to rill-compatible shape [AC-12]
+    // Project to rill-compatible shape
     const data = response as {
       items?: Array<{
         id?: string;

@@ -25,7 +25,7 @@ const PROVIDER = 'foundry';
  * Foundry-specific error detector for mapProviderError.
  * Extracts HTTP status and message from OpenAI.APIError instances thrown by AzureOpenAI.
  *
- * Covers EC-12 (401), EC-13 (429), EC-14 (timeout), EC-15 (model not deployed).
+ * Covers 401, 429, timeout, and model-not-deployed failures.
  *
  * @param error - Error to inspect
  * @returns Status and message if a known provider error, null otherwise
@@ -107,7 +107,7 @@ function extractBodyMessage(body: unknown): string | null {
 // ============================================================
 
 /**
- * Throw a `#TIMEOUT` halt for a request timeout (EC-14).
+ * Throw a `#TIMEOUT` halt for a request timeout.
  */
 export function createTimeoutError(ctx: RuntimeContext): never {
   const message = `${PROVIDER}: request timeout`;
@@ -126,7 +126,7 @@ export function createTimeoutError(ctx: RuntimeContext): never {
 // ============================================================
 
 /**
- * Throw a `#NOT_FOUND` halt for an unknown deployment name (EC-15).
+ * Throw a `#NOT_FOUND` halt for an unknown deployment name.
  */
 export function createModelNotDeployedError(
   ctx: RuntimeContext,
