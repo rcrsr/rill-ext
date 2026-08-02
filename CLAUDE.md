@@ -58,9 +58,12 @@ pnpm run check:types      # Type validation (tsc, TypeScript 7)
 pnpm run check:lint       # Check lint errors (oxlint)
 pnpm run check:format     # Check formatting (oxfmt --check)
 pnpm run check:deps       # Check unused dependencies/exports (knip)
+pnpm run check:standards  # Repository conformance (@rcrsr/rill-dev)
+pnpm run test:rules       # Unit tests for the custom oxlint rules
+pnpm run bootstrap        # Bring a fresh clone to build-ready
 pnpm run fix:lint         # Auto-fix lint errors (oxlint --fix)
 pnpm run fix:format       # Auto-format files (oxfmt)
-pnpm run check            # Complete validation (types, lint, format, deps, build, test)
+pnpm run check            # Complete validation (types, lint, format, deps, rules, build, test, standards)
 ```
 
 Git hooks (via `lefthook`, installed automatically on `pnpm install`):
@@ -80,6 +83,89 @@ Run a single test file:
 ```bash
 cd packages/ext/llm-anthropic && npx vitest run tests/tool-loop.test.ts
 ```
+
+## Repository Standards
+
+The conformance checker and the custom oxlint rules ship in
+**`@rcrsr/rill-dev`** (a devDependency). They are not copied into this
+repository. The standards document is `node_modules/@rcrsr/rill-dev/REPO-STANDARDS.md`;
+its only source is `rcrsr/rill` under `packages/dev/`.
+
+**Never patch `node_modules/@rcrsr/rill-dev`.** There is no drift check to catch
+it: a local edit is silently lost on the next install and leaves every other
+repository with the broken behaviour. Fixes go upstream (PR against `rcrsr/rill`
+→ merge → bump `packages/dev/package.json` → tag `dev-vx.y.z` → CI publishes),
+then arrive here as a dependency bump. `@rcrsr/rill-dev` releases from its own
+`dev-v*` tag namespace, so a lint-rule fix never mints a language version.
+
+### CI checks the tree; a maintainer checks the host
+
+CI runs `pnpm exec rill-check-standards` — **tree only, no `--remote`, no token.**
+Do not re-add the flag. Two reasons:
+
+- A pull request cannot change host state. Branch protection and repository
+  settings are altered out of band by an admin, so gating merges on them turns
+  every open PR red for a reason no author can fix.
+- `GITHUB_TOKEN` cannot decide them anyway. It reads the repository object, but
+  the administrative fields are omitted and `branches/*/protection` answers 404,
+  so both element groups report unchecked. The flag would cost an API round trip
+  and settle nothing.
+
+Host settings are checked with `pnpm check:standards --remote` from a
+maintainer's authenticated shell, where the credentials already exist and no
+secret has to live in CI. That run is the only thing that sees a merge-strategy
+setting disagreeing with a protection rule, which is invisible in the tree.
+
+### Custom lint rules
+
+Loading the plugin via `"jsPlugins": ["@rcrsr/rill-dev/lint-rules"]` only
+registers the rules; they are opt-in. Both are enabled here, scoped to
+`**/src/**/*.{ts,tsx}` — matching the `src/`-only scope of the per-package
+`lint` scripts — with the rationale for each:
+
+- **`rill/no-spec-id-reference`: on.** This repository carries `conduct/`,
+  a private planning directory, so its stated condition is met. Enabling it
+  cleared 708 references across 86 files; those IDs point at documents that are
+  never published, so they were unresolvable for anyone reading the code.
+- **`rill/no-duplicate-error-id`: on.** The extensions construct `RuntimeError`
+  in 124 places, which is what the rule keys on, so its condition is met. It
+  found zero violations — it is enabled to hold that line, not to fix a backlog.
+
+The scope is `src/` only because that is what the per-package `lint` scripts
+cover. Widening lint to `tests/` is tracked as STD-LINT-4, below.
+
+### Conformance status
+
+`pnpm check:standards` currently reports:
+
+```
+NON-CONFORMANT  20 of 56 checked elements failed: STD-CI-5 STD-CI-6 STD-CI-8
+STD-CHK-4 STD-CHK-5 STD-CHK-6 STD-CHK-7 STD-SCRIPT-4 STD-SCRIPT-3 STD-LINT-7
+STD-LINT-8 STD-LINT-4 STD-REL-3 STD-PM-4 STD-PM-7 STD-SUP-3 STD-SUP-5
+STD-SUP-4 STD-HOOK-3 STD-HOOK-1
+```
+
+These 20 are pre-existing and tracked as work, not accepted as N/A. Read the
+summary line, not the exit code: `--` means *not checked*, and the element still
+applies. A green run means the checked subset holds; it is not a conformance
+claim.
+
+17 further entries report `--`. None is claimed as N/A — no element here meets a
+stated N/A condition. They split into:
+
+- **Host-only**, decided by `--remote` from a maintainer shell: `STD-GATE-1..6`,
+  `STD-SET-1..3`, `STD-PROC-1`. The last `--remote` run found `STD-GATE-5`
+  failing (linear history required while merge-commit and rebase are both still
+  enabled) and `STD-SET-2` failing (wiki enabled but unused).
+- **Cross-repository comparisons**, undecidable from this tree alone:
+  `STD-LINT-1`, `STD-LINT-5`, `STD-LINT-9`, `STD-PM-2`, `STD-DEP-1..5`.
+- **Needs human judgement**: `STD-CI-2`, `STD-SCRIPT-8`, `STD-LINT-6`,
+  `STD-REL-2`, `STD-PM-6`, `STD-PROC-4`, `STD-PROC-7`.
+- **Duplicate of a checked element**: `STD-SUP-2` (same as `STD-REL-3`).
+
+`STD-LINT-3` (workflow-artifact rule enabled) is reported `--` because the
+checker cannot see a private planning directory. It is satisfied in fact: the
+rule is on and the tree is clean.
 
 ## Core Dependency
 

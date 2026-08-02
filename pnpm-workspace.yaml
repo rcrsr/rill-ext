@@ -13,6 +13,7 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@rcrsr/rill@0.20.0'
+  - '@rcrsr/rill-dev@0.1.0'
 
 # dts-bundle-generator@9.5.1 (latest) consumes the classic TypeScript compiler
 # API (ts.sys, ts.createProgram) which TypeScript 7's native compiler no

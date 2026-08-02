@@ -11,6 +11,9 @@ importers:
 
   .:
     devDependencies:
+      '@rcrsr/rill-dev':
+        specifier: ^0.1.0
+        version: 0.1.0
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
@@ -1678,6 +1681,11 @@ packages:
   '@qdrant/openapi-typescript-fetch@1.2.6':
     resolution: {integrity: sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==}
     engines: {node: '>=18.0.0', pnpm: '>=8'}
+
+  '@rcrsr/rill-dev@0.1.0':
+    resolution: {integrity: sha512-xk+OaxyF0iKFb1BC574/LKXuViQJWXDIri6ZrCJd8Kb92ESZkNSTF+hjmUoeSaKQUWjwDRNQDzwclhFaFPJ0oA==}
+    engines: {node: '>=22.16.0'}
+    hasBin: true
 
   '@rcrsr/rill@0.20.0':
     resolution: {integrity: sha512-/OnCLODUNnATQNOjqgBIxNuTqzTL75P7Db2mLkZgptFGqsi5GMwBaZ0kB3lpJaVdIO6KRjnay253QgWJ/1LXHA==}
@@ -4186,6 +4194,8 @@ snapshots:
       undici: 6.24.1
 
   '@qdrant/openapi-typescript-fetch@1.2.6': {}
+
+  '@rcrsr/rill-dev@0.1.0': {}
 
   '@rcrsr/rill@0.20.0': {}
 

@@ -20,9 +20,12 @@
     "check:lint": "pnpm -r run lint",
     "check:format": "oxfmt --check",
     "check:deps": "knip",
+    "check:standards": "rill-check-standards",
+    "test:rules": "rill-test-rules",
     "fix:lint": "oxlint --fix",
     "fix:format": "oxfmt",
-    "check": "pnpm run check:types && pnpm run check:lint && pnpm run check:format && pnpm run check:deps && pnpm run build && pnpm run test"
+    "bootstrap": "bash scripts/bootstrap.sh",
+    "check": "pnpm run check:types && pnpm run check:lint && pnpm run check:format && pnpm run check:deps && pnpm run test:rules && pnpm run build && pnpm run test && pnpm run check:standards"
   },
   "author": "Andre Bremer",
   "license": "MIT",
@@ -30,6 +33,7 @@
     "node": ">=22.16.0"
   },
   "devDependencies": {
+    "@rcrsr/rill-dev": "^0.1.0",
     "@types/node": "^26.1.1",
     "knip": "^6.25.0",
     "lefthook": "^2.1.10",

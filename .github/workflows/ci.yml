@@ -50,3 +50,11 @@ jobs:
 
       - name: Run checks
         run: pnpm -r run check
+
+      # Tree only: no --remote, no token. A pull request cannot change host
+      # state, and GITHUB_TOKEN cannot read branch protection anyway, so the
+      # flag would add an API round trip and decide nothing. Host settings are
+      # checked with `pnpm check:standards --remote` from a maintainer's
+      # authenticated shell.
+      - name: Check repository standards conformance
+        run: pnpm exec rill-check-standards
