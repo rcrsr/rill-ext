@@ -1,0 +1,31 @@
+# Code owners for rill-ext. Copied from the rill ecosystem template; see
+# dev/REPO-STANDARDS.md STD-SUP-7.
+#
+# Last matching pattern wins, so the high-blast-radius paths sit at the bottom.
+
+# Everything, unless a later rule overrides.
+*                           @AndreBremer
+
+# Release and CI machinery. A change here can disable every other gate in the
+# repository, publish from an unverified tree, or widen a token's scope.
+/.github/                   @AndreBremer
+/.github/workflows/         @AndreBremer
+/scripts/                   @AndreBremer
+
+# Shared dev assets: the conformance standard and the lint rules every
+# ecosystem repo derives from. This repository holds a copy, and a local edit
+# to it is what the drift check in ci.yml exists to catch.
+/dev/                       @AndreBremer
+
+# Toolchain and lint policy. Changes here silently alter what CI accepts
+# everywhere else.
+/.oxlintrc.json             @AndreBremer
+/.oxfmtrc.json              @AndreBremer
+/lefthook.yml               @AndreBremer
+/knip.json                  @AndreBremer
+/package.json               @AndreBremer
+/pnpm-workspace.yaml        @AndreBremer
+
+# Shared packages are bundled into every consuming extension at build time, so
+# a change here ships inside packages it does not name.
+/packages/shared/           @AndreBremer
