@@ -28,7 +28,7 @@
     "fix:lint": "oxlint --fix",
     "fix:format": "oxfmt",
     "fix:versions": "bash scripts/sync-versions.sh",
-    "check": "pnpm run check:versions && pnpm run check:types && pnpm run check:lint && pnpm run check:format && pnpm run check:deps && pnpm run test:rules && pnpm run build && pnpm run test && pnpm run check:standards"
+    "check": "pnpm run check:versions && pnpm run build && pnpm run check:types && pnpm run check:lint && pnpm run check:format && pnpm run check:deps && pnpm run test:rules && pnpm run test && pnpm run check:standards"
   },
   "author": "Andre Bremer",
   "license": "MIT",
