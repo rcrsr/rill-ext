@@ -59,10 +59,12 @@ pnpm run check:lint       # Check lint errors (oxlint)
 pnpm run check:format     # Check formatting (oxfmt --check)
 pnpm run check:deps       # Check unused dependencies/exports (knip)
 pnpm run check:standards  # Repository conformance (@rcrsr/rill-dev)
+pnpm run check:versions   # Every package at the root major.minor
 pnpm run test:rules       # Unit tests for the custom oxlint rules
 pnpm run bootstrap        # Bring a fresh clone to build-ready
 pnpm run fix:lint         # Auto-fix lint errors (oxlint --fix)
 pnpm run fix:format       # Auto-format files (oxfmt)
+pnpm run fix:versions     # Sync package versions to the root
 pnpm run check            # Complete validation (types, lint, format, deps, rules, build, test, standards)
 ```
 
@@ -120,8 +122,7 @@ setting disagreeing with a protection rule, which is invisible in the tree.
 
 Loading the plugin via `"jsPlugins": ["@rcrsr/rill-dev/lint-rules"]` only
 registers the rules; they are opt-in. Both are enabled here, scoped to
-`**/src/**/*.{ts,tsx}` — matching the `src/`-only scope of the per-package
-`lint` scripts — with the rationale for each:
+`**/src/**/*.{ts,tsx}`, with the rationale for each:
 
 - **`rill/no-spec-id-reference`: on.** This repository carries `conduct/`,
   a private planning directory, so its stated condition is met. Enabling it
@@ -131,41 +132,62 @@ registers the rules; they are opt-in. Both are enabled here, scoped to
   in 124 places, which is what the rule keys on, so its condition is met. It
   found zero violations — it is enabled to hold that line, not to fix a backlog.
 
-The scope is `src/` only because that is what the per-package `lint` scripts
-cover. Widening lint to `tests/` is tracked as STD-LINT-4, below.
+The `src/`-only scope is deliberate and outlives STD-LINT-4. Lint now covers
+`src/` **and** `tests/`, but these two rules stay scoped to `src/`: what they
+guard is *shipped* source. A planning identifier in a test is not published to
+anyone, so widening them would add findings without closing the leak the rule
+names.
 
 ### Conformance status
 
 `pnpm check:standards` currently reports:
 
 ```
-NON-CONFORMANT  20 of 56 checked elements failed: STD-CI-5 STD-CI-6 STD-CI-8
-STD-CHK-4 STD-CHK-5 STD-CHK-6 STD-CHK-7 STD-SCRIPT-4 STD-SCRIPT-3 STD-LINT-7
-STD-LINT-8 STD-LINT-4 STD-REL-3 STD-PM-4 STD-PM-7 STD-SUP-3 STD-SUP-5
-STD-SUP-4 STD-HOOK-3 STD-HOOK-1
+CONFORMANT  57 checked, 57 passed, 16 not machine-checkable.
 ```
 
-These 20 are pre-existing and tracked as work, not accepted as N/A. Read the
-summary line, not the exit code: `--` means *not checked*, and the element still
-applies. A green run means the checked subset holds; it is not a conformance
-claim.
+Read the summary line, not the exit code: `--` means *not checked*, and the
+element still applies. A green run means the checked subset holds; it is not a
+conformance claim.
 
-17 further entries report `--`. None is claimed as N/A — no element here meets a
-stated N/A condition. They split into:
+16 entries report `--`. None is claimed as N/A — no element here meets a stated
+N/A condition. They split into:
 
 - **Host-only**, decided by `--remote` from a maintainer shell: `STD-GATE-1..6`,
-  `STD-SET-1..3`, `STD-PROC-1`. The last `--remote` run found `STD-GATE-5`
-  failing (linear history required while merge-commit and rebase are both still
-  enabled) and `STD-SET-2` failing (wiki enabled but unused).
+  `STD-SET-1..3`, `STD-PROC-1`. `--remote` checks 63 elements and currently
+  finds two failures, both of which need an admin and neither of which a pull
+  request can fix: **`STD-GATE-5`** (linear history required while merge-commit
+  and rebase are both still enabled) and **`STD-SET-2`** (wiki enabled but
+  unused).
 - **Cross-repository comparisons**, undecidable from this tree alone:
   `STD-LINT-1`, `STD-LINT-5`, `STD-LINT-9`, `STD-PM-2`, `STD-DEP-1..5`.
 - **Needs human judgement**: `STD-CI-2`, `STD-SCRIPT-8`, `STD-LINT-6`,
-  `STD-REL-2`, `STD-PM-6`, `STD-PROC-4`, `STD-PROC-7`.
+  `STD-PM-6`, `STD-PROC-4`, `STD-PROC-7`.
 - **Duplicate of a checked element**: `STD-SUP-2` (same as `STD-REL-3`).
 
 `STD-LINT-3` (workflow-artifact rule enabled) is reported `--` because the
 checker cannot see a private planning directory. It is satisfied in fact: the
 rule is on and the tree is clean.
+
+Two things a green run does **not** cover, recorded so they are not mistaken for
+conformance:
+
+- **`STD-CI-7` (no path filtering) is reported `ok` but is not satisfied.** The
+  checker greps for trigger-level `paths-ignore`, and `ci.yml` instead gates its
+  `check` job behind a `dorny/paths-filter` job with a job-level `if:`. The
+  standard forbids both forms, and names this exact shape — requiring the
+  always-passing filter job as the status check in place of the real one — as
+  the anti-pattern it exists to prevent. `changes` is the only required context
+  on `main`, so the branch is nominally protected and actually ungated. Fixing
+  it means running the full matrix on every pull request and moving the required
+  contexts to the `check` legs, which is a branch-protection change an admin
+  makes out of band. Tracked, not accepted.
+- **`STD-LINT-5` (same plugin set as `rill`) is unmet.** `rill` enables
+  `import`, `vitest` and `promise`; this repository does not. Measured across
+  `src/` and `tests/` they cost 1762 findings, almost all
+  `vitest/require-mock-type-parameters`. That is real work on the test suite,
+  tracked rather than done. `unicorn` — the one default-on plugin, and so the
+  one whose omission was silent — is enabled.
 
 ## Core Dependency
 
