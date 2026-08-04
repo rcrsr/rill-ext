@@ -13,7 +13,14 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@rcrsr/rill@0.20.0'
-  - '@rcrsr/rill-dev@0.1.0'
+  # Quarantine buys reaction time to a compromised release of a package we do
+  # not control. @rcrsr/rill-dev is published by this ecosystem from rcrsr/rill
+  # via trusted publishing, so the window only delays our own fix without
+  # adding scrutiny anyone would actually apply. Excluded by name, not by
+  # version: it floats independently of the language version, so a pin would
+  # need a hand edit every release. This is not the lockstep reason that
+  # applies to @rcrsr/rill above.
+  - '@rcrsr/rill-dev'
 
 # dts-bundle-generator@9.5.1 (latest) consumes the classic TypeScript compiler
 # API (ts.sys, ts.createProgram) which TypeScript 7's native compiler no
