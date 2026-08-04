@@ -7,11 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
-import {
-  expectRejectedHalt,
-  expectThrowHalt,
-  expectHalt,
-} from './_halt-helpers.js';
+import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MODULE MOCK

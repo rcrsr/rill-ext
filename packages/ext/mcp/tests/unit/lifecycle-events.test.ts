@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { emitExtensionEvent } from '@rcrsr/rill';
 import { generateToolFunctions, type McpTool } from '../../src/tools.js';
-import { makeRuntimeCtx, expectRejectsInvalid } from '../_helpers.js';
+import { makeRuntimeCtx } from '../_helpers.js';
 import {
   createReadResourceFunction,
   generateResourceTemplateFunctions,

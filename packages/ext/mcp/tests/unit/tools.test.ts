@@ -722,7 +722,7 @@ describe('generateToolFunctions', () => {
 
       // Each call returns unique result after random delay
       mockClient.callTool.mockImplementation(
-        (args: any) =>
+        (_args: any) =>
           new Promise((resolve) => {
             const id = callCount++;
             setTimeout(

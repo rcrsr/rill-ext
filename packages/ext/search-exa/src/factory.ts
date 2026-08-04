@@ -83,13 +83,13 @@ export function createExaExtension(
       body['contents'] = { text: options['include_text'] };
     if (options['include_highlights'] !== undefined) {
       body['contents'] = {
-        ...((body['contents'] as Record<string, unknown>) ?? {}),
+        ...(body['contents'] as Record<string, unknown>),
         highlights: options['include_highlights'],
       };
     }
     if (options['include_summary'] !== undefined) {
       body['contents'] = {
-        ...((body['contents'] as Record<string, unknown>) ?? {}),
+        ...(body['contents'] as Record<string, unknown>),
         summary: options['include_summary'],
       };
     }
@@ -222,7 +222,7 @@ export function createExaExtension(
       body['contents'] = { text: options['include_text'] };
     if (options['include_highlights'] !== undefined) {
       body['contents'] = {
-        ...((body['contents'] as Record<string, unknown>) ?? {}),
+        ...(body['contents'] as Record<string, unknown>),
         highlights: options['include_highlights'],
       };
     }

@@ -59,12 +59,6 @@ async function collectChunks(stream: unknown): Promise<string[]> {
   return chunks;
 }
 
-function mockSpawnRejection(error: unknown): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const noop: any = vi.fn();
-  return void undefined;
-}
-
 // ============================================================
 // EC-1: Invalid binaryPath at factory creation
 // ============================================================

@@ -193,6 +193,6 @@ export function failAuth(
   throw ctx.invalidate(new Error(message), {
     code: 'AUTH',
     provider: PROVIDER,
-    raw: { kind, message, ...(raw ?? {}) },
+    raw: { kind, message, ...raw },
   }) as unknown as RillValue;
 }

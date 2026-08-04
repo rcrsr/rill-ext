@@ -104,10 +104,7 @@ export function splitRoleMessages(body: string): RoleMessage[] {
 
       if (currentRole !== null) {
         messages.push({ role: currentRole, content: currentLines.join('\n') });
-      } else if (
-        currentLines.length > 0 &&
-        currentLines.some((l) => l.length > 0)
-      ) {
+      } else if (currentLines.some((l) => l.length > 0)) {
         messages.push({ role: 'user', content: currentLines.join('\n') });
       }
       currentRole = role;

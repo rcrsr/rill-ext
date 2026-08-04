@@ -1,11 +1,34 @@
 {
-  "plugins": ["typescript", "oxc"],
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Naming this array replaces oxlint's CLI defaults rather than extending
+  // them, so a plugin left out here is silently off even though the tool
+  // enables it by default. `unicorn` is the one that bites: it is default-on
+  // from the CLI and was inert in this repository until it was listed. See
+  // REPO-STANDARDS.md STD-LINT-8.
+  //
+  // Enabling `unicorn` cost 26 findings across src/ and tests/, all fixed. Its
+  // remaining rules sit in categories this config does not enable, so they stay
+  // off through `categories`, not through omission.
+  //
+  // `import`, `vitest` and `promise` are deliberately not listed yet. They are
+  // not default-on, so their absence is not the silent failure STD-LINT-8
+  // describes. Measured against src/ and tests/ they cost 1762 further
+  // findings, almost all vitest/require-mock-type-parameters. Adopting them is
+  // real work on the test suite, tracked separately as STD-LINT-5, and not
+  // folded into this change.
+  "plugins": ["typescript", "oxc", "unicorn"],
   "jsPlugins": ["@rcrsr/rill-dev/lint-rules"],
   "categories": {
     "correctness": "error"
   },
   "rules": {
-    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    // `ignoreRestSiblings` covers the omit idiom that appears in tests now that
+    // STD-LINT-4 has them in scope: `const { flag: _omit, ...rest } = msg`
+    // names a property solely to drop it, so the binding is unused by design.
+    "no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "ignoreRestSiblings": true }
+    ],
     "typescript/no-explicit-any": "warn",
     "typescript/explicit-function-return-type": "off",
     "typescript/no-namespace": "error",

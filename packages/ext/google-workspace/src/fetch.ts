@@ -78,7 +78,7 @@ export async function googleFetch(
 
   const requestHeaders: Record<string, string> = {
     ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-    ...(headers ?? {}),
+    ...headers,
     Authorization: `Bearer ${token}`,
   };
 

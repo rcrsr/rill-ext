@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { makeFactoryCtx } from './_helpers.js';
-import { createRuntimeContext, RuntimeError } from '@rcrsr/rill';
+import { createRuntimeContext } from '@rcrsr/rill';
 
 // ============================================================
 // MOCKS

@@ -552,7 +552,7 @@ export function createOpenAIExtension(
           ...(factoryTemperature !== undefined
             ? { temperature: factoryTemperature }
             : {}),
-          ...(factoryExtra ?? {}),
+          ...factoryExtra,
         } as OpenAI.ChatCompletionCreateParamsStreaming);
 
         async function* chunks(): AsyncGenerator<RillValue> {
@@ -698,7 +698,7 @@ export function createOpenAIExtension(
           ...(factoryTemperature !== undefined
             ? { temperature: factoryTemperature }
             : {}),
-          ...(factoryExtra ?? {}),
+          ...factoryExtra,
         };
 
         async function* chunks(): AsyncGenerator<RillValue> {
@@ -913,7 +913,7 @@ export function createOpenAIExtension(
               ...(factoryTemperature !== undefined
                 ? { temperature: factoryTemperature }
                 : {}),
-              ...(factoryExtra ?? {}),
+              ...factoryExtra,
             } as OpenAI.ChatCompletionCreateParamsNonStreaming;
 
             const response = await client.chat.completions.create(apiParams, {
@@ -940,7 +940,7 @@ export function createOpenAIExtension(
                 ...(factoryTemperature !== undefined
                   ? { temperature: factoryTemperature }
                   : {}),
-                ...(factoryExtra ?? {}),
+                ...factoryExtra,
               } as OpenAI.ChatCompletionCreateParamsStreaming,
               { signal }
             );
@@ -1254,7 +1254,7 @@ export function createOpenAIExtension(
               ...(factoryTemperature !== undefined
                 ? { temperature: factoryTemperature }
                 : {}),
-              ...(factoryExtra ?? {}),
+              ...factoryExtra,
             };
 
             const response = await client.responses.create(
@@ -1566,7 +1566,7 @@ export function createOpenAIExtension(
           ...(factoryTemperature !== undefined
             ? { temperature: factoryTemperature }
             : {}),
-          ...(factoryExtra ?? {}),
+          ...factoryExtra,
         } as OpenAI.ChatCompletionCreateParamsNonStreaming;
 
         const response = await client.chat.completions.create(apiParams);

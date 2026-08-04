@@ -15,7 +15,7 @@ import {
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 import type { ExtensionEvent } from '@rcrsr/rill';
-import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
+import { expectRejectedHalt } from './_halt-helpers.js';
 
 function getCallable(
   ext: { value: unknown },
@@ -660,7 +660,7 @@ describe('generate() function', () => {
         typeof getCallable(ext, 'generate').annotations?.['description']
       ).toBe('string');
       expect(
-        (getCallable(ext, 'generate').annotations?.['description'] as string)
+        (getCallable(ext, 'generate').annotations!['description'] as string)
           .length
       ).toBeGreaterThan(0);
     });

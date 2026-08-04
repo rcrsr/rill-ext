@@ -190,7 +190,7 @@ function mergeHeaders(
   globalHeaders: Record<string, string>,
   endpointHeaders: Record<string, string> | undefined
 ): Record<string, string> {
-  return { ...globalHeaders, ...(endpointHeaders ?? {}) };
+  return { ...globalHeaders, ...endpointHeaders };
 }
 
 // ============================================================
