@@ -1,6 +1,6 @@
 /**
  * gmail_read callable — fetch a full Gmail message by ID.
- * IR-3: gmail_read(messageId: str) → dict { id, threadId, headers, body, attachments }
+ * gmail_read(messageId: str) → dict { id, threadId, headers, body, attachments }
  * Capability: gmail.read
  * Scope: gmail.readonly
  */
@@ -92,7 +92,7 @@ function extractAttachments(
 }
 /**
  * Factory returning the gmail_read inner function.
- * AC-12: Returns rill primitive dict with headers/body/attachments.
+ * Returns rill primitive dict with headers/body/attachments.
  */
 export function makeGmailRead(
   deps: GmailReadDeps

@@ -1,13 +1,13 @@
 /**
  * Test suite for search configuration validation utilities.
- * Validates error contracts EC-13 and EC-14.
+ * Validates the error contracts.
  */
 
 import { describe, it, expect } from 'vitest';
 import { assertRequired, validateBaseUrl } from './validation.js';
 
 describe('assertRequired', () => {
-  describe('EC-13: Throws for missing values', () => {
+  describe('Throws for missing values', () => {
     it('throws for undefined', () => {
       expect(() => assertRequired(undefined, 'apiKey')).toThrow(
         'apiKey is required'
@@ -51,7 +51,7 @@ describe('assertRequired', () => {
 });
 
 describe('validateBaseUrl', () => {
-  describe('EC-14: Throws for invalid URL schemes', () => {
+  describe('Throws for invalid URL schemes', () => {
     it('throws for ftp:// URL', () => {
       expect(() => validateBaseUrl('ftp://example.com')).toThrow(
         'baseUrl must start with http:// or https://'

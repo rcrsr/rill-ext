@@ -4,7 +4,7 @@
  *         exchangeJwtForToken/exchangeJwtForAccessToken fetch contract.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import {
   RuntimeError,

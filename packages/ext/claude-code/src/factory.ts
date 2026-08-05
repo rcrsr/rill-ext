@@ -113,7 +113,7 @@ interface PtyStreamEventOptions {
  *
  * The async generator converts push-based onData callbacks to a pull-based
  * async iteration. Each raw PTY line is yielded as a string chunk.
- * On non-zero exit (EC-10), an error chunk is yielded and the stream resolves
+ * On non-zero exit, an error chunk is yielded and the stream resolves
  * with partial data rather than throwing.
  *
  * @param spawn - Spawned PTY process handle
@@ -167,8 +167,8 @@ function createPtyStream(
   });
 
   // Monitor exit promise — attach immediately to prevent unhandled rejections.
-  // EC-9: Timeout — re-throw RuntimeError so the generator propagates it to the consumer.
-  // EC-10: Non-zero exit — yield error chunk, resolve with partial data.
+  // Timeout — re-throw RuntimeError so the generator propagates it to the consumer.
+  // Non-zero exit — yield error chunk, resolve with partial data.
   // Track the original error so resolve() can map it to a precise generic
   // atom via mapSpawnError. Timeout, non-zero exit, and other rejections all
   // surface as an [error] chunk plus a captured `exitError`. resolve() turns
@@ -329,7 +329,7 @@ function validateTimeout(timeout: number): void {
  *
  * @param config - Extension configuration
  * @returns ExtensionResult with prompt, skill, command functions and dispose
- * @throws Error for invalid configuration (EC-1, EC-2)
+ * @throws Error for invalid configuration
  *
  * @example
  * ```typescript
@@ -373,7 +373,7 @@ export function createClaudeCodeExtension(
 
   // Dispose function for cleanup
   const dispose = (): void => {
-    // EC-16: Cleanup failure logs warning, doesn't throw
+    // Cleanup failure logs warning, doesn't throw
     for (const disposer of tracker.disposers) {
       try {
         disposer();
@@ -395,7 +395,7 @@ export function createClaudeCodeExtension(
     skill: RillFunction;
     command: RillFunction;
   } = {
-    // IR-2: claude-code::prompt
+    // claude-code::prompt
     prompt: {
       params: [
         p.str('text'),
@@ -413,7 +413,7 @@ export function createClaudeCodeExtension(
         const text = args['text'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-        // EC-7: Validate text is non-empty (before stream creation)
+        // Validate text is non-empty (before stream creation)
         if (text.trim().length === 0) {
           throw ctx.invalidate(new Error('prompt text cannot be empty'), {
             code: 'INVALID_INPUT',
@@ -478,7 +478,7 @@ export function createClaudeCodeExtension(
       }),
     },
 
-    // IR-3: claude-code::skill
+    // claude-code::skill
     skill: {
       params: [
         p.str('name'),
@@ -496,7 +496,7 @@ export function createClaudeCodeExtension(
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
-        // EC-7: Validate name is non-empty (before stream creation)
+        // Validate name is non-empty (before stream creation)
         if (name.trim().length === 0) {
           throw ctx.invalidate(new Error('skill name cannot be empty'), {
             code: 'INVALID_INPUT',
@@ -565,7 +565,7 @@ export function createClaudeCodeExtension(
       }),
     },
 
-    // IR-4: claude-code::command
+    // claude-code::command
     command: {
       params: [
         p.str('name'),
@@ -583,7 +583,7 @@ export function createClaudeCodeExtension(
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
-        // EC-7: Validate name is non-empty (before stream creation)
+        // Validate name is non-empty (before stream creation)
         if (name.trim().length === 0) {
           throw ctx.invalidate(new Error('command name cannot be empty'), {
             code: 'INVALID_INPUT',

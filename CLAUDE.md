@@ -58,9 +58,14 @@ pnpm run check:types      # Type validation (tsc, TypeScript 7)
 pnpm run check:lint       # Check lint errors (oxlint)
 pnpm run check:format     # Check formatting (oxfmt --check)
 pnpm run check:deps       # Check unused dependencies/exports (knip)
+pnpm run check:standards  # Repository conformance (@rcrsr/rill-dev)
+pnpm run check:versions   # Every package at the root major.minor
+pnpm run test:rules       # Unit tests for the custom oxlint rules
+pnpm run bootstrap        # Bring a fresh clone to build-ready
 pnpm run fix:lint         # Auto-fix lint errors (oxlint --fix)
 pnpm run fix:format       # Auto-format files (oxfmt)
-pnpm run check            # Complete validation (types, lint, format, deps, build, test)
+pnpm run fix:versions     # Sync package versions to the root
+pnpm run check            # Complete validation (types, lint, format, deps, rules, build, test, standards)
 ```
 
 Git hooks (via `lefthook`, installed automatically on `pnpm install`):
@@ -80,6 +85,109 @@ Run a single test file:
 ```bash
 cd packages/ext/llm-anthropic && npx vitest run tests/tool-loop.test.ts
 ```
+
+## Repository Standards
+
+The conformance checker and the custom oxlint rules ship in
+**`@rcrsr/rill-dev`** (a devDependency). They are not copied into this
+repository. The standards document is `node_modules/@rcrsr/rill-dev/REPO-STANDARDS.md`;
+its only source is `rcrsr/rill` under `packages/dev/`.
+
+**Never patch `node_modules/@rcrsr/rill-dev`.** There is no drift check to catch
+it: a local edit is silently lost on the next install and leaves every other
+repository with the broken behaviour. Fixes go upstream (PR against `rcrsr/rill`
+→ merge → bump `packages/dev/package.json` → tag `dev-vx.y.z` → CI publishes),
+then arrive here as a dependency bump. `@rcrsr/rill-dev` releases from its own
+`dev-v*` tag namespace, so a lint-rule fix never mints a language version.
+
+### CI checks the tree; a maintainer checks the host
+
+CI runs `pnpm exec rill-check-standards` — **tree only, no `--remote`, no token.**
+Do not re-add the flag. Two reasons:
+
+- A pull request cannot change host state. Branch protection and repository
+  settings are altered out of band by an admin, so gating merges on them turns
+  every open PR red for a reason no author can fix.
+- `GITHUB_TOKEN` cannot decide them anyway. It reads the repository object, but
+  the administrative fields are omitted and `branches/*/protection` answers 404,
+  so both element groups report unchecked. The flag would cost an API round trip
+  and settle nothing.
+
+Host settings are checked with `pnpm check:standards --remote` from a
+maintainer's authenticated shell, where the credentials already exist and no
+secret has to live in CI. That run is the only thing that sees a merge-strategy
+setting disagreeing with a protection rule, which is invisible in the tree.
+
+### Custom lint rules
+
+Loading the plugin via `"jsPlugins": ["@rcrsr/rill-dev/lint-rules"]` only
+registers the rules; they are opt-in. Both are enabled here, scoped to
+`**/src/**/*.{ts,tsx}`, with the rationale for each:
+
+- **`rill/no-spec-id-reference`: on.** This repository carries `conduct/`,
+  a private planning directory, so its stated condition is met. Enabling it
+  cleared 708 references across 86 files; those IDs point at documents that are
+  never published, so they were unresolvable for anyone reading the code.
+- **`rill/no-duplicate-error-id`: on.** The extensions construct `RuntimeError`
+  in 124 places, which is what the rule keys on, so its condition is met. It
+  found zero violations — it is enabled to hold that line, not to fix a backlog.
+
+The `src/`-only scope is deliberate and outlives STD-LINT-4. Lint now covers
+`src/` **and** `tests/`, but these two rules stay scoped to `src/`: what they
+guard is *shipped* source. A planning identifier in a test is not published to
+anyone, so widening them would add findings without closing the leak the rule
+names.
+
+### Conformance status
+
+`pnpm check:standards` currently reports:
+
+```
+CONFORMANT  57 checked, 57 passed, 16 not machine-checkable.
+```
+
+Read the summary line, not the exit code: `--` means *not checked*, and the
+element still applies. A green run means the checked subset holds; it is not a
+conformance claim.
+
+16 entries report `--`. None is claimed as N/A — no element here meets a stated
+N/A condition. They split into:
+
+- **Host-only**, decided by `--remote` from a maintainer shell: `STD-GATE-1..6`,
+  `STD-SET-1..3`, `STD-PROC-1`. `--remote` checks 63 elements and currently
+  finds two failures, both of which need an admin and neither of which a pull
+  request can fix: **`STD-GATE-5`** (linear history required while merge-commit
+  and rebase are both still enabled) and **`STD-SET-2`** (wiki enabled but
+  unused).
+- **Cross-repository comparisons**, undecidable from this tree alone:
+  `STD-LINT-1`, `STD-LINT-5`, `STD-LINT-9`, `STD-PM-2`, `STD-DEP-1..5`.
+- **Needs human judgement**: `STD-CI-2`, `STD-SCRIPT-8`, `STD-LINT-6`,
+  `STD-PM-6`, `STD-PROC-4`, `STD-PROC-7`.
+- **Duplicate of a checked element**: `STD-SUP-2` (same as `STD-REL-3`).
+
+`STD-LINT-3` (workflow-artifact rule enabled) is reported `--` because the
+checker cannot see a private planning directory. It is satisfied in fact: the
+rule is on and the tree is clean.
+
+Two things a green run does **not** cover, recorded so they are not mistaken for
+conformance:
+
+- **`STD-CI-7` (no path filtering) is reported `ok` but is not satisfied.** The
+  checker greps for trigger-level `paths-ignore`, and `ci.yml` instead gates its
+  `check` job behind a `dorny/paths-filter` job with a job-level `if:`. The
+  standard forbids both forms, and names this exact shape — requiring the
+  always-passing filter job as the status check in place of the real one — as
+  the anti-pattern it exists to prevent. `changes` is the only required context
+  on `main`, so the branch is nominally protected and actually ungated. Fixing
+  it means running the full matrix on every pull request and moving the required
+  contexts to the `check` legs, which is a branch-protection change an admin
+  makes out of band. Tracked, not accepted.
+- **`STD-LINT-5` (same plugin set as `rill`) is unmet.** `rill` enables
+  `import`, `vitest` and `promise`; this repository does not. Measured across
+  `src/` and `tests/` they cost 1762 findings, almost all
+  `vitest/require-mock-type-parameters`. That is real work on the test suite,
+  tracked rather than done. `unicorn` — the one default-on plugin, and so the
+  one whose omission was silent — is enabled.
 
 ## Core Dependency
 

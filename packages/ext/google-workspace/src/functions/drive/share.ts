@@ -1,6 +1,6 @@
 /**
  * drive_share callable — share a Drive file with a user.
- * IR-12: drive_share(fileId: str, email: str, role: str?) → bool
+ * drive_share(fileId: str, email: str, role: str?) → bool
  * Capability: drive.share
  * Scope: drive.file
  */
@@ -19,8 +19,8 @@ export interface DriveShareDeps {
 }
 /**
  * Factory returning the drive_share inner function.
- * EC-10: Rejects role not in {reader, commenter, writer}.
- * AC-12: Returns boolean true on success.
+ * Rejects role not in {reader, commenter, writer}.
+ * Returns boolean true on success.
  */
 export function makeDriveShare(
   deps: DriveShareDeps
@@ -46,7 +46,7 @@ export function makeDriveShare(
     if (typeof email !== 'string' || email.trim() === '') {
       failInput(ctx, 'invalid_arg', 'google: email must be a non-empty string');
     }
-    // EC-10: Validate role — default to "reader"
+    // Validate role — default to "reader"
     const rawRole = args['role'];
     const role: DriveRole =
       typeof rawRole === 'string' && rawRole.trim() !== ''

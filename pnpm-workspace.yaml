@@ -1,7 +1,6 @@
 packages:
   - 'packages/ext/*'
   - 'packages/shared/*'
-  - 'packages/apps/*'
 
 allowBuilds:
   '@google/genai': true
@@ -11,8 +10,53 @@ allowBuilds:
   node-pty: true
   protobufjs: true
 
+# Supply-chain policy. Mirrors the rill ecosystem template; see
+# REPO-STANDARDS.md STD-SUP-3, STD-SUP-4 and STD-SUP-5. Both policies are
+# enforced against every lockfile entry on install, not only on resolution,
+# because `trustLockfile` stays at its default of false.
+
+# Minutes a version must have been on the registry before pnpm will install it,
+# which is the window in which a compromised release is normally yanked. Set
+# explicitly rather than inherited: pnpm 11 defaults this to 1440 and pnpm 10
+# defaults it to off, so an inherited value would mean a different policy on
+# each major. 1440 also matches the weekly dependabot cadence above a longer
+# window would just defer every bump by an extra cycle.
+minimumReleaseAge: 1440
+
+# Both entries are excluded by name, never by exact version: a pin needs a hand
+# edit every release and silently stops excluding the moment the next version
+# lands. The two have different reasons, so they are stated separately rather
+# than sharing one comment nobody can audit later.
 minimumReleaseAgeExclude:
-  - '@rcrsr/rill@0.20.0'
+  # Lockstep. Every extension declares a peerDependency on @rcrsr/rill matching
+  # by minor, so a rill minor bump and the extension bump that answers it have
+  # to be installable the same day. A cooling-off window on the runtime would
+  # hold the whole ecosystem back from its own coordinated release.
+  - '@rcrsr/rill'
+  # First-party, and not lockstep. @rcrsr/rill-dev floats independently of the
+  # language version; it is excluded because it is published by this ecosystem
+  # from rcrsr/rill via trusted publishing, so the window delays our own fix
+  # without adding scrutiny anyone would actually apply.
+  - '@rcrsr/rill-dev'
+
+# Fail the install when a package's trust evidence weakens against an
+# earlier-published version, for example a drop from a trusted publisher to
+# provenance-only.
+trustPolicy: no-downgrade
+
+# Enabling the policy above found exactly one real downgrade in this tree.
+# chokidar carried SLSA provenance at 4.0.0 and 4.0.1, published 4.0.2 and
+# 4.0.3 without it, and carries it again at 5.0.0. So the drop is real, and it
+# is not reachable by upgrading: tsup 8.5.1 (the newest release) depends on
+# chokidar ^4.0.3, and no 4.x at or above 4.0.3 carries provenance. Forcing
+# chokidar 5 through a nested override would put tsup on an untested major to
+# satisfy a policy check, which trades a real breakage risk for a paper fix.
+#
+# Excluded by name rather than at 4.0.3, so the entry does not silently stop
+# applying at the next 4.x — and so it starts failing again, correctly, if the
+# situation changes shape. Remove this once tsup accepts chokidar 5.
+trustPolicyExclude:
+  - 'chokidar'
 
 # dts-bundle-generator@9.5.1 (latest) consumes the classic TypeScript compiler
 # API (ts.sys, ts.createProgram) which TypeScript 7's native compiler no

@@ -164,7 +164,7 @@ export function spawnClaudeCli(
       disposed = true;
       const { exitCode: code } = event;
 
-      // EC-9: Non-zero exit code
+      // Non-zero exit code
       if (code !== 0) {
         rejectExit(
           new SpawnError(
@@ -193,7 +193,7 @@ export function spawnClaudeCli(
       clearTimeout(timeoutId);
     }
 
-    // EC-16: Cleanup failure warning
+    // Cleanup failure warning
     try {
       ptyProcess.kill();
     } catch (error: unknown) {

@@ -2,9 +2,9 @@
  * Unit tests for parseParamGrammar.
  *
  * Covers:
- *   IR-3  — happy path dispatch for all supported types, with and without defaults
- *   EC-3  — malformed entry (no `:` separator) → RuntimeError RILL-R001
- *   EC-4  — unrecognized type → RuntimeError RILL-R001
+ * happy path dispatch for all supported types, with and without defaults
+ * malformed entry (no `:` separator) → RuntimeError RILL-R001
+ * unrecognized type → RuntimeError RILL-R001
  *
  * Both `num` and `callable` are hard-rejected (not valid rill type names).
  * Non-renderable types (closure, iterator, stream, vector, type) are also
@@ -19,11 +19,11 @@ import { RuntimeError } from '@rcrsr/rill';
 import { parseParamGrammar } from './grammar.js';
 
 // ============================================================
-// HAPPY PATH (IR-3) — NO DEFAULT
+// HAPPY PATH — NO DEFAULT
 // ============================================================
 
 describe('parseParamGrammar', () => {
-  describe('happy path — no default (IR-3)', () => {
+  describe('happy path — no default', () => {
     it('parses string param', () => {
       const result = parseParamGrammar('question: string');
       expect(result.name).toBe('question');
@@ -68,10 +68,10 @@ describe('parseParamGrammar', () => {
   });
 
   // ============================================================
-  // HAPPY PATH — WITH DEFAULT (IR-3)
+  // HAPPY PATH — WITH DEFAULT
   // ============================================================
 
-  describe('happy path — with default (IR-3)', () => {
+  describe('happy path — with default', () => {
     it('parses number with integer default', () => {
       const result = parseParamGrammar('count: number = 3');
       expect(result.name).toBe('count');
@@ -112,10 +112,10 @@ describe('parseParamGrammar', () => {
   });
 
   // ============================================================
-  // WHITESPACE TRIMMING (IR-3)
+  // WHITESPACE TRIMMING
   // ============================================================
 
-  describe('whitespace trimming (IR-3)', () => {
+  describe('whitespace trimming', () => {
     it('trims whitespace around name', () => {
       const result = parseParamGrammar('  question  : string');
       expect(result.name).toBe('question');
@@ -204,10 +204,10 @@ describe('parseParamGrammar', () => {
   });
 
   // ============================================================
-  // EC-3: MISSING COLON SEPARATOR
+  // MISSING COLON SEPARATOR
   // ============================================================
 
-  describe('missing colon separator (EC-3)', () => {
+  describe('missing colon separator', () => {
     it('throws RuntimeError for entry without colon', () => {
       expect(() => parseParamGrammar('tone = neutral')).toThrow(RuntimeError);
     });
@@ -232,10 +232,10 @@ describe('parseParamGrammar', () => {
   });
 
   // ============================================================
-  // EC-4: UNRECOGNIZED / REJECTED TYPE
+  // UNRECOGNIZED / REJECTED TYPE
   // ============================================================
 
-  describe('unrecognized type (EC-4)', () => {
+  describe('unrecognized type', () => {
     it('throws RuntimeError for unknown type', () => {
       expect(() => parseParamGrammar('x: widget')).toThrow(RuntimeError);
     });

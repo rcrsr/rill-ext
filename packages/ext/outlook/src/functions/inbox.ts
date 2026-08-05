@@ -25,7 +25,7 @@ export async function inbox(
   const unread = args['unread'] as boolean | undefined;
   const folder = args['folder'] as string | undefined;
 
-  // Enforce folder allowlist before any API call (EC-4 / AC-22)
+  // Enforce folder allowlist before any API call
   if (folder !== undefined) {
     checkFolder(ctx, config.folders, folder);
   }

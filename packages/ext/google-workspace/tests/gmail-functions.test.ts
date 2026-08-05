@@ -11,7 +11,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import {
-  RuntimeError,
   createRuntimeContext,
   type ApplicationCallable,
   isInvalid,
@@ -101,11 +100,6 @@ function mockOkJson(body: unknown): Response {
     status: 200,
     json: vi.fn().mockResolvedValue(body),
   } as unknown as Response;
-}
-
-/** Mock ok response with no body (204). */
-function mockOkNoBody(): Response {
-  return { ok: true, status: 204 } as unknown as Response;
 }
 
 /** Mock error response. */

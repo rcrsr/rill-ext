@@ -15,7 +15,7 @@ import { RuntimeError } from '@rcrsr/rill';
  * Keys that LLM provider implementations manage internally.
  * These must not appear in the user-supplied `extra` dict.
  *
- * Order matches the spec (IR-11).
+ * Order matches the spec.
  */
 export const RESERVED_KEYS_COMMON = [
   'messages',
@@ -38,7 +38,7 @@ export const RESERVED_KEYS_COMMON = [
  *
  * @param extra - User-supplied extra config dict (or undefined)
  * @param reservedKeys - Keys the provider owns; collisions are rejected
- * @throws RuntimeError('RILL-R001', ...) per EC-19 and EC-20
+ * @throws RuntimeError('RILL-R001', ...)
  */
 export function validateExtraKeys(
   extra: unknown,
@@ -49,7 +49,7 @@ export function validateExtraKeys(
     return;
   }
 
-  // EC-20: extra is not a plain object (null, array, primitive, etc.)
+  // extra is not a plain object (null, array, primitive, etc.)
   if (typeof extra !== 'object' || extra === null || Array.isArray(extra)) {
     throw new RuntimeError(
       'RILL-R001',
@@ -57,7 +57,7 @@ export function validateExtraKeys(
     );
   }
 
-  // EC-19: extra contains one or more reserved keys
+  // extra contains one or more reserved keys
   const extraKeys = Object.keys(extra as Record<string, unknown>);
   const reservedSet = new Set(reservedKeys);
   const colliding = extraKeys.filter((k) => reservedSet.has(k)).sort();
@@ -83,14 +83,14 @@ export function validateExtraKeys(
  * semantics. Negative values and non-integers are also rejected.
  *
  * @param value - The max_turns config value (or undefined)
- * @throws RuntimeError('RILL-R001', ...) per EC-21 and EC-22
+ * @throws RuntimeError('RILL-R001', ...)
  */
 export function validateMaxTurns(value: unknown): void {
   if (value === undefined) {
     return;
   }
 
-  // EC-21: sentinel value 0 is reserved
+  // sentinel value 0 is reserved
   if (value === 0) {
     throw new RuntimeError(
       'RILL-R001',
@@ -98,7 +98,7 @@ export function validateMaxTurns(value: unknown): void {
     );
   }
 
-  // EC-22: negative or non-integer
+  // negative or non-integer
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new RuntimeError(
       'RILL-R001',

@@ -1,7 +1,7 @@
 /**
  * Pure helpers for MIME content-transfer-encoding decoding.
  *
- * No external dependencies — uses built-in string operations only (TD-6).
+ * No external dependencies — uses built-in string operations only.
  *
  * @module
  */
@@ -15,7 +15,7 @@
  * - `=XX` sequences (where XX is two uppercase or lowercase hex digits) are
  *   decoded to the corresponding UTF-8 byte sequence.
  * - All other characters pass through unchanged, so plain-text input is
- *   returned as-is (AC-37).
+ * returned as-is.
  *
  * The function decodes the full byte sequence and then re-interprets it as
  * UTF-8 via `decodeURIComponent` + `%XX` substitution, preserving multi-byte

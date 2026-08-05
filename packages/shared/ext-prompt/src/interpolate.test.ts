@@ -2,21 +2,21 @@
  * Unit tests for interpolate and scanTemplateReferences.
  *
  * Covers:
- *   IR-4  — {name} substitution, multi-reference, multi-line bodies
- *   AC-15 — {{ → {, }} → }, {{name}} → {name} (no substitution)
- *   IR-7  — scanTemplateReferences returns 1-based line positions
- *   IR-7  — {{name}} is NOT reported as a reference
+ * {name} substitution, multi-reference, multi-line bodies
+ * {{ → {, }} → }, {{name}} → {name} (no substitution)
+ * scanTemplateReferences returns 1-based line positions
+ * {{name}} is NOT reported as a reference
  */
 
 import { describe, it, expect } from 'vitest';
 import { interpolate, scanTemplateReferences } from './interpolate.js';
 
 // ============================================================
-// interpolate — IR-4
+// interpolate
 // ============================================================
 
 describe('interpolate', () => {
-  describe('basic substitution (IR-4)', () => {
+  describe('basic substitution', () => {
     it('substitutes a single reference', () => {
       expect(interpolate('Hello {name}', { name: 'world' })).toBe(
         'Hello world'
@@ -58,10 +58,10 @@ describe('interpolate', () => {
   });
 
   // ============================================================
-  // interpolate — AC-15 escape sequences
+  // interpolate — escape sequences
   // ============================================================
 
-  describe('escape sequences (AC-15)', () => {
+  describe('escape sequences', () => {
     it('{{ emits literal {', () => {
       expect(interpolate('{{', {})).toBe('{');
     });
@@ -97,11 +97,11 @@ describe('interpolate', () => {
 });
 
 // ============================================================
-// scanTemplateReferences — IR-7
+// scanTemplateReferences
 // ============================================================
 
 describe('scanTemplateReferences', () => {
-  describe('basic scanning (IR-7)', () => {
+  describe('basic scanning', () => {
     it('returns empty array for body with no references', () => {
       expect(scanTemplateReferences('no braces here')).toEqual([]);
     });
@@ -142,7 +142,7 @@ describe('scanTemplateReferences', () => {
     });
   });
 
-  describe('escaped forms not reported (IR-7)', () => {
+  describe('escaped forms not reported', () => {
     it('does NOT report {{name}} (escaped)', () => {
       expect(scanTemplateReferences('{{name}}')).toEqual([]);
     });

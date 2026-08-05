@@ -2,12 +2,12 @@
  * Unit tests for splitRoleMessages and VALID_ROLES.
  *
  * Covers:
- *   IR-5  — happy path: ordered role list with correct content
- *   AC-19 — ## heading inside a role section stays as body text
- *   EC-5  — no @@ role marker → RuntimeError RILL-R001
- *   IR-16 — VALID_ROLES exported constant
- *   IR-15 — role allowlist enforcement in splitRoleMessages
- *   EC-23 — invalid role marker → RuntimeError RILL-R001 with role + line number
+ * happy path: ordered role list with correct content
+ * ## heading inside a role section stays as body text
+ * no @@ role marker → RuntimeError RILL-R001
+ * VALID_ROLES exported constant
+ * role allowlist enforcement in splitRoleMessages
+ * invalid role marker → RuntimeError RILL-R001 with role + line number
  */
 
 import { describe, it, expect } from 'vitest';
@@ -15,11 +15,11 @@ import { RuntimeError } from '@rcrsr/rill';
 import { splitRoleMessages, VALID_ROLES } from './roles.js';
 
 // ============================================================
-// HAPPY PATH (IR-5)
+// HAPPY PATH
 // ============================================================
 
 describe('splitRoleMessages', () => {
-  describe('happy path (IR-5)', () => {
+  describe('happy path', () => {
     it('splits a body with @@ system and @@ user into ordered role entries', () => {
       const body = '@@ system\nYou are a helpful assistant.\n@@ user\nHello!';
       const result = splitRoleMessages(body);
@@ -64,10 +64,10 @@ describe('splitRoleMessages', () => {
   });
 
   // ============================================================
-  // AC-19: ## HEADING INSIDE ROLE CONTENT
+  // ## HEADING INSIDE ROLE CONTENT
   // ============================================================
 
-  describe('## heading inside role body (AC-19)', () => {
+  describe('## heading inside role body', () => {
     it('keeps ## heading as body text within the enclosing role', () => {
       const body = '@@ user\n## Instructions\nDo something.';
       const result = splitRoleMessages(body);
@@ -122,10 +122,10 @@ describe('splitRoleMessages', () => {
   });
 
   // ============================================================
-  // EC-5: NO ROLE MARKERS
+  // NO ROLE MARKERS
   // ============================================================
 
-  describe('no @@ role markers (EC-5)', () => {
+  describe('no @@ role markers', () => {
     it('throws RuntimeError RILL-R001 when body has no role markers', () => {
       const body = 'no markers here\njust plain text';
 
@@ -150,10 +150,10 @@ describe('splitRoleMessages', () => {
   });
 
   // ============================================================
-  // IR-16: VALID_ROLES CONSTANT
+  // VALID_ROLES CONSTANT
   // ============================================================
 
-  describe('VALID_ROLES (IR-16)', () => {
+  describe('VALID_ROLES', () => {
     it('exports VALID_ROLES as a readonly tuple', () => {
       expect(VALID_ROLES).toEqual(['system', 'user', 'assistant']);
     });
@@ -167,10 +167,10 @@ describe('splitRoleMessages', () => {
   });
 
   // ============================================================
-  // IR-15 / EC-23: ROLE ALLOWLIST ENFORCEMENT
+  // ROLE ALLOWLIST ENFORCEMENT
   // ============================================================
 
-  describe('role allowlist enforcement (IR-15, EC-23)', () => {
+  describe('role allowlist enforcement', () => {
     it('accepts @@ system without error', () => {
       const body = '@@ system\nYou are helpful.';
       expect(() => splitRoleMessages(body)).not.toThrow();

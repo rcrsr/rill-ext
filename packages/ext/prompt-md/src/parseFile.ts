@@ -7,7 +7,7 @@
  * presence of `@@` role markers in the body, and computes the content hash.
  *
  * All errors thrown are `RuntimeError('RILL-R001', ...)` with path context
- * attached. EC-8, EC-9, EC-12, EC-13.
+ * attached.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -96,7 +96,7 @@ const ROLE_MARKER_RE = /^@@\s+\w+\s*$/m;
 /**
  * Reads and fully parses a single `*.prompt.md` file.
  *
- * Implements EC-8 through EC-14 error paths. All errors thrown are
+ * Implements the error paths. All errors thrown are
  * factory-time `RuntimeError('RILL-R001', ...)` with path context attached.
  *
  * @param absolutePath - Absolute filesystem path of the file.
@@ -113,7 +113,7 @@ export async function parseFile(
   // ── Read source ─────────────────────────────────────────────────────────
   const source = await readFile(absolutePath, 'utf-8');
 
-  // ── Split frontmatter fence (EC-8 path: RILL-R001) ─────────────────────
+  // ── Split frontmatter fence (RILL-R001) ───────────────────────────────
   let frontmatter: string;
   let body: string;
   let bodyLineOffset: number;
@@ -132,7 +132,7 @@ export async function parseFile(
     throw err;
   }
 
-  // ── Parse YAML frontmatter (EC-8) ───────────────────────────────────────
+  // ── Parse YAML frontmatter ───────────────────────────────────────
   let raw: PromptFrontmatter;
   try {
     // yaml.parse throws YAMLParseError on malformed input.
@@ -179,7 +179,7 @@ export async function parseFile(
     throw err;
   }
 
-  // ── Validate required fields (EC-9) ────────────────────────────────────
+  // ── Validate required fields ────────────────────────────────────
   if (
     typeof raw['description'] !== 'string' ||
     raw['description'].length === 0
@@ -209,7 +209,7 @@ export async function parseFile(
   const description = raw['description'];
   const rawParamEntries = raw['params'] as unknown[];
 
-  // ── Parse param grammar entries (EC-12) ────────────────────────────────
+  // ── Parse param grammar entries ────────────────────────────────
   const params: RillParam[] = [];
   for (const entry of rawParamEntries) {
     if (typeof entry !== 'string') {
@@ -227,7 +227,6 @@ export async function parseFile(
       params.push(parseParamGrammar(entry));
     } catch (err) {
       if (err instanceof RuntimeError && err.errorId === 'RILL-R001') {
-        // EC-12
         throw new RuntimeError('RILL-R001', err.message, undefined, {
           path: absolutePath,
           entry,
@@ -241,7 +240,7 @@ export async function parseFile(
   // Build declared param name set for template reference validation.
   const declaredNames = new Set(params.map((p) => p.name));
 
-  // ── Validate template references (EC-13) ───────────────────────────────
+  // ── Validate template references ───────────────────────────────
   const refs = scanTemplateReferences(body);
   for (const ref of refs) {
     if (!declaredNames.has(ref.name)) {

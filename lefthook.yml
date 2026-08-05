@@ -1,12 +1,16 @@
 pre-commit:
+  # Piped so a failing step halts the rest. Without it lint still runs after
+  # format has already failed, and the second failure buries the first.
+  piped: true
   commands:
     format:
       glob: '*.{ts,tsx,js,mjs,cjs,json,yaml,yml}'
       run: pnpm exec oxfmt {staged_files}
       stage_fixed: true
     lint:
-      # Match the src-only scope of the per-package `lint` scripts and CI `check:lint`.
-      glob: '**/src/**/*.{ts,tsx}'
+      # Match the scope of the per-package `lint` scripts and CI `check:lint`,
+      # which cover src/ and tests/ (REPO-STANDARDS.md STD-LINT-4).
+      glob: '**/{src,tests}/**/*.{ts,tsx}'
       run: pnpm exec oxlint --config .oxlintrc.json --fix {staged_files}
       stage_fixed: true
 

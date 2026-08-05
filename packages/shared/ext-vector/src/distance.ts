@@ -29,7 +29,7 @@ import type { DistanceMetric } from './types.js';
  * ```
  */
 export function normalizeDistance(metric: string): DistanceMetric | string {
-  // AC-7: "dotproduct" or "Dot" or "dot" → "dot"
+  // "dotproduct" or "Dot" or "dot" → "dot"
   if (metric === 'dotproduct' || metric === 'Dot' || metric === 'dot') {
     return 'dot';
   }
@@ -39,11 +39,11 @@ export function normalizeDistance(metric: string): DistanceMetric | string {
     return 'cosine';
   }
 
-  // AC-8: "euclidean" or "Euclid" → "euclidean"
+  // "euclidean" or "Euclid" → "euclidean"
   if (metric === 'euclidean' || metric === 'Euclid') {
     return 'euclidean';
   }
 
-  // AC-20: Unknown input returns original value unchanged
+  // Unknown input returns original value unchanged
   return metric;
 }

@@ -1,12 +1,12 @@
 /**
  * OAuth2 JWT bearer token exchange for Google service account authentication.
- * Implements IR-23: exchangeJwtForAccessToken and internal exchangeJwtForToken.
+ * Implements exchangeJwtForAccessToken and internal exchangeJwtForToken.
  */
 
 import type { RuntimeContext } from '@rcrsr/rill';
 import { failAuth } from '../errors.js';
 
-/** Google OAuth2 token endpoint URL (AC-9 — HTTPS only, fixed URL). */
+/** Google OAuth2 token endpoint URL (HTTPS only, fixed URL). */
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
 /** OAuth2 JWT bearer grant type. */
@@ -16,7 +16,7 @@ const JWT_BEARER_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
  * Result of a successful Google OAuth2 token exchange.
  * Shared by the JWT-bearer (`exchangeJwtForToken`) and refresh-token
  * (`exchangeRefreshToken`) flows. Internal shape used by `resolveToken`
- * to compute the cache TTL = `expires_in - 300` (BC-6/BC-7).
+ * to compute the cache TTL = `expires_in - 300`.
  */
 export interface TokenExchangeResult {
   readonly accessToken: string;
@@ -24,14 +24,14 @@ export interface TokenExchangeResult {
 }
 
 /**
- * Exchange a signed JWT assertion for a Google OAuth2 access token (IR-23 internal).
+ * Exchange a signed JWT assertion for a Google OAuth2 access token (internal).
  *
  * Returns both the access token and expires_in so the caller (resolveToken in 2.2)
- * can compute the cache TTL as expires_in - 300 (BC-6/BC-7).
+ * can compute the cache TTL as expires_in - 300.
  *
  * On non-OK HTTP response throws an invalid RillValue carrying `#AUTH`
  * with `meta.raw.kind = 'token_refresh_failed'`. The token never appears
- * in the message (IR-23 security constraint).
+ * in the message (security constraint).
  *
  * Network errors propagate to caller for `mapFetchError` to handle.
  */
@@ -72,7 +72,7 @@ export async function exchangeJwtForToken(
 }
 
 /**
- * Exchange a signed JWT assertion for a Google OAuth2 access token (IR-23).
+ * Exchange a signed JWT assertion for a Google OAuth2 access token.
  * Thin wrapper that returns only the access token string.
  */
 export async function exchangeJwtForAccessToken(
@@ -88,7 +88,7 @@ export async function exchangeJwtForAccessToken(
  * Exchange an OAuth2 refresh token for a Google access token.
  *
  * Returns both the access token and expires_in so the caller can compute
- * the cache TTL as expires_in - 300 (BC-6/BC-7).
+ * the cache TTL as expires_in - 300.
  *
  * On non-OK HTTP response throws an invalid RillValue carrying `#AUTH`
  * with `meta.raw.kind = 'token_refresh_failed'`. Neither clientSecret nor

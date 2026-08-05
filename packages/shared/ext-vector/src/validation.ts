@@ -23,21 +23,21 @@ export function assertRequired<T>(
   value: T | undefined | null,
   fieldName: string
 ): asserts value is T {
-  // EC-17: undefined throws
+  // undefined throws
   if (value === undefined) {
     throw new Error(`${fieldName} is required`);
   }
 
-  // EC-18: null throws
+  // null throws
   if (value === null) {
     throw new Error(`${fieldName} is required`);
   }
 
-  // EC-19: empty string throws
+  // empty string throws
   if (value === '') {
     throw new Error(`${fieldName} is required`);
   }
 
-  // AC-6: Zero (0) passes validation
-  // AC-5: Non-empty string passes validation
+  // Zero (0) passes validation
+  // Non-empty string passes validation
 }

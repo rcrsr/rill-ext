@@ -8,7 +8,7 @@
  *   Calendar: events, today, free_busy, create_event
  *
  * All operations check disposal and capability before making API calls.
- * Events emit on success per §IR-8. Errors map through mapFetchError.
+ * Events emit on success. Errors map through mapFetchError.
  */
 
 import {
@@ -103,7 +103,7 @@ export function createOutlookExtension(
   // Validate config — throws RuntimeError(RILL-R001) on failure
   validateConfig(config);
 
-  // Merge capabilities with defaults [AC-15]
+  // Merge capabilities with defaults
   const capabilities = mergeCapabilities(config.capabilities);
 
   // Resolve config values at factory time (immutable closure)
@@ -115,7 +115,7 @@ export function createOutlookExtension(
     folders: config.mail?.folders ?? DEFAULT_FOLDERS,
   };
 
-  // Inline disposal state [IR-6]
+  // Inline disposal state
   const disposalState = { isDisposed: false };
 
   // Inline in-flight tracking state
@@ -217,7 +217,7 @@ export function createOutlookExtension(
   }
 
   // ============================================================
-  // HOST FUNCTIONS  [AC-1, IR-8]
+  // HOST FUNCTIONS
   // ============================================================
 
   // Mail: inbox — emits outlook:mail:read
@@ -427,7 +427,7 @@ export function createOutlookExtension(
   );
 
   // ============================================================
-  // DISPOSE  [IR-6, AC-20]
+  // DISPOSE
   // ============================================================
 
   /**
@@ -450,7 +450,7 @@ export function createOutlookExtension(
   };
 
   // ============================================================
-  // CALLABLE DICT  [AC-1]
+  // CALLABLE DICT
   // ============================================================
 
   // Rich return-type shapes per .claude/policies/policy-domain-ext.md §EXT.8.

@@ -48,7 +48,7 @@ const DEFAULT_CAPABILITIES: GoogleCapabilities = {
 
 /**
  * Parse and validate a GCP service account key JSON string.
- * Throws RuntimeError RILL-R001 with EC-3 messages on failure.
+ * Throws RuntimeError RILL-R001 on failure.
  *
  * @param keyJson - Service account key JSON string
  * @returns Parsed ServiceAccountKey with required fields
@@ -115,12 +115,12 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
  * @throws RuntimeError (RILL-R001) on validation failure
  */
 export function validateConfig(config: GoogleWorkspaceConfig): void {
-  // EC-1: Missing auth
+  // Missing auth
   if (!config.auth) {
     throw new RuntimeError('RILL-R001', 'google: auth is required');
   }
 
-  // EC-2: Invalid auth type
+  // Invalid auth type
   const authType = config.auth.type;
   if (
     authType !== 'bearer' &&
@@ -134,26 +134,26 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
     );
   }
 
-  // EC-1: Bearer requires non-empty token
+  // Bearer requires non-empty token
   if (config.auth.type === 'bearer') {
     if (!config.auth.token || config.auth.token === '') {
       throw new RuntimeError('RILL-R001', 'google: auth.token is required');
     }
   }
 
-  // EC-1: Session requires non-empty tokenVar
+  // Session requires non-empty tokenVar
   if (config.auth.type === 'session') {
     if (!config.auth.tokenVar || config.auth.tokenVar === '') {
       throw new RuntimeError('RILL-R001', 'google: auth.tokenVar is required');
     }
   }
 
-  // EC-3: Service account requires valid keyJson
+  // Service account requires valid keyJson
   if (config.auth.type === 'service-account') {
     parseServiceAccountKey(config.auth.keyJson);
   }
 
-  // EC-1: oauth-refresh requires client_id, client_secret, and refresh_token
+  // oauth-refresh requires client_id, client_secret, and refresh_token
   if (config.auth.type === 'oauth-refresh') {
     if (!config.auth.client_id || config.auth.client_id === '') {
       throw new RuntimeError('RILL-R001', 'google: auth.client_id is required');
@@ -172,7 +172,7 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
     }
   }
 
-  // EC-4: gmail.maxResults range 1-500
+  // gmail.maxResults range 1-500
   if (config.gmail?.maxResults !== undefined) {
     const max = config.gmail.maxResults;
     if (!Number.isInteger(max) || max < 1 || max > 500) {
@@ -183,7 +183,7 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
     }
   }
 
-  // EC-4: drive.maxUploadBytes must be positive
+  // drive.maxUploadBytes must be positive
   if (config.drive?.maxUploadBytes !== undefined) {
     const bytes = config.drive.maxUploadBytes;
     if (!Number.isInteger(bytes) || bytes <= 0) {
@@ -194,7 +194,7 @@ export function validateConfig(config: GoogleWorkspaceConfig): void {
     }
   }
 
-  // EC-4: drive.allowedFolderIds must be non-empty if defined
+  // drive.allowedFolderIds must be non-empty if defined
   if (config.drive?.allowedFolderIds !== undefined) {
     if (config.drive.allowedFolderIds.length === 0) {
       throw new RuntimeError(

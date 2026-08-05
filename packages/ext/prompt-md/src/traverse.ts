@@ -2,7 +2,7 @@
  * Recursive directory traversal for *.prompt.md files.
  *
  * Mirrors the pattern at packages/ext/fs-local/src/factory.ts:255-268.
- * Does NOT import from @rcrsr/rill-ext-fs-local (§EXT.2.1 / GF-20).
+ * Does NOT import from @rcrsr/rill-ext-fs-local (§EXT.2.1).
  *
  * Does not follow symlinks (readdir default: no followSymlinks option passed).
  * Rejects relative paths containing `..` segments as a security measure.

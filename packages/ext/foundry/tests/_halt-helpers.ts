@@ -48,7 +48,7 @@ function matchMessage(actual: string, expected: unknown): void {
  * (synchronous validation throws) so tests need not branch on the
  * underlying exception class.
  */
-export function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
+function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
   if (error instanceof RuntimeHaltSignal) {
     const status = getStatus(error.value);
     if (opts.code !== undefined) expect(status.code.name).toBe(opts.code);

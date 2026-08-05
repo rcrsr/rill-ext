@@ -7,11 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  createRuntimeContext,
-  type ApplicationCallable,
-  type RillValue,
-} from '@rcrsr/rill';
+import { createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
 import { createFoundryExtension } from '../src/factory.js';
 import type { FoundryConfig } from '../src/types.js';
 import { expectThrowHalt } from './_halt-helpers.js';

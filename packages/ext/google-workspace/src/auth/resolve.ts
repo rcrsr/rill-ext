@@ -1,6 +1,6 @@
 /**
  * Token resolution for Google Workspace authentication.
- * Implements IR-21: resolveToken with TTL cache for service-account mode.
+ * Implements resolveToken with TTL cache for service-account mode.
  */
 
 import type { RuntimeContext } from '@rcrsr/rill';
@@ -15,7 +15,7 @@ import { exchangeJwtForToken, exchangeRefreshToken } from './exchange.js';
 
 /**
  * Cached access token slot with millisecond expiry timestamp.
- * expiresAtMs = Date.now() + (expires_in - 300) * 1000 (AC-10).
+ * expiresAtMs = Date.now() + (expires_in - 300) * 1000.
  */
 interface TokenCacheSlot {
   readonly accessToken: string;
@@ -25,7 +25,7 @@ interface TokenCacheSlot {
 /**
  * Mutable container for a single cached access token slot.
  * Passed in from the factory closure so it lives for the extension lifecycle.
- * Cleared on dispose() (AC-10).
+ * Cleared on dispose().
  */
 export interface TokenCache {
   slot: TokenCacheSlot | null;
@@ -41,7 +41,7 @@ export function createTokenCache(): TokenCache {
 
 /**
  * Clear the token cache (called on dispose).
- * Idempotent: safe to call multiple times (AC-10).
+ * Idempotent: safe to call multiple times.
  */
 export function clearTokenCache(cache: TokenCache): void {
   cache.slot = null;
@@ -52,16 +52,16 @@ export function clearTokenCache(cache: TokenCache): void {
 // ============================================================
 
 /**
- * Resolve the Bearer token for Google API requests (IR-21).
+ * Resolve the Bearer token for Google API requests.
  *
  * - bearer: returns auth.token directly (no I/O)
- * - session: reads auth.tokenVar from RuntimeContext parent chain (EC-21)
+ * - session: reads auth.tokenVar from RuntimeContext parent chain
  * - service-account: uses TTL cache; on miss/expiry signs JWT and exchanges
- *   for an access token, caching with TTL = expires_in - 300 s (AC-10, BC-6, BC-7)
+ * for an access token, caching with TTL = expires_in - 300 s
  * - oauth-refresh: uses TTL cache; on miss/expiry exchanges refresh token for
- *   an access token, caching with TTL = expires_in - 300 s (AC-10, BC-6, BC-7)
+ * an access token, caching with TTL = expires_in - 300 s
  *
- * IR-21 specifies the public shape as (auth, ctx) => Promise<string>.
+ * The public shape is (auth, ctx) => Promise<string>.
  * The additional `cache`, `scopes`, and `signal` parameters are required
  * for the service-account flow and are supplied by the factory closure.
  * The factory binds these to produce the (auth, ctx) => Promise<string>
@@ -73,7 +73,7 @@ export function clearTokenCache(cache: TokenCache): void {
  * @param scopes - OAuth2 scopes for service-account JWT; ignored for other modes
  * @param signal - AbortSignal for token exchange HTTP request cancellation
  * @returns Resolved Bearer token string
- * @throws halt carrying invalid `#AUTH` (`raw.kind == 'session_token_missing'`) if session token variable not found (EC-21)
+ * @throws halt carrying invalid `#AUTH` (`raw.kind == 'session_token_missing'`) if session token variable not found
  * @throws halt carrying invalid `#AUTH` on JWT signing or token exchange failure
  */
 export async function resolveToken(
@@ -101,7 +101,7 @@ export async function resolveToken(
       scope = scope.parent;
     }
 
-    // EC-21: session token variable not found
+    // session token variable not found
     failAuth(
       ctx,
       'session_token_missing',
@@ -112,12 +112,12 @@ export async function resolveToken(
 
   // --- service-account: check TTL cache, sign JWT and exchange on miss ---
   if (auth.type === 'service-account') {
-    // BC-6: cache hit within TTL — reuse without signing or exchange
+    // cache hit within TTL — reuse without signing or exchange
     if (cache.slot !== null && cache.slot.expiresAtMs > Date.now()) {
       return cache.slot.accessToken;
     }
 
-    // BC-7: cache miss or TTL expired — re-sign and re-exchange
+    // cache miss or TTL expired — re-sign and re-exchange
     let key: ServiceAccountKey;
     try {
       key = JSON.parse(auth.keyJson) as ServiceAccountKey;
@@ -137,7 +137,7 @@ export async function resolveToken(
       signal
     );
 
-    // AC-10: cache with TTL = expires_in - 300 seconds
+    // cache with TTL = expires_in - 300 seconds
     cache.slot = {
       accessToken,
       expiresAtMs: Date.now() + (expiresIn - 300) * 1000,
@@ -147,12 +147,12 @@ export async function resolveToken(
   }
 
   // --- oauth-refresh: check TTL cache, exchange refresh token on miss ---
-  // BC-6: cache hit within TTL — reuse without exchange
+  // cache hit within TTL — reuse without exchange
   if (cache.slot !== null && cache.slot.expiresAtMs > Date.now()) {
     return cache.slot.accessToken;
   }
 
-  // BC-7: cache miss or TTL expired — exchange refresh token
+  // cache miss or TTL expired — exchange refresh token
   const { accessToken, expiresIn } = await exchangeRefreshToken(
     auth.client_id,
     auth.client_secret,
@@ -161,7 +161,7 @@ export async function resolveToken(
     signal
   );
 
-  // AC-10: cache with TTL = expires_in - 300 seconds
+  // cache with TTL = expires_in - 300 seconds
   cache.slot = {
     accessToken,
     expiresAtMs: Date.now() + (expiresIn - 300) * 1000,

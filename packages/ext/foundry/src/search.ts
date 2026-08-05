@@ -50,7 +50,7 @@ const PROVIDER = 'foundry';
  * Search Azure AI Search indexes.
  *
  * Returns a list of `{ id, score, content }` dicts.
- * Validates `search` config on each call (EC-10 if missing).
+ * Validates `search` config on each call, halting when it is missing.
  *
  * Options dict fields:
  *   - `index` — overrides config.search.indexName
@@ -78,7 +78,7 @@ export async function callSearch(
     throw haltDisposed(ctx);
   }
 
-  // EC-10: Search must be configured
+  // Search must be configured
   if (!config.search) {
     throw haltUnconfigured(
       ctx,
@@ -240,7 +240,7 @@ async function runSearchRequest(
     throw error;
   }
 
-  // EC-11: Search index not found
+  // Search index not found
   if (response.status === 404) {
     const message = `foundry: search index '${indexName}' not found`;
     throw new RuntimeHaltSignal(

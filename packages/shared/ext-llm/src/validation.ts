@@ -28,12 +28,12 @@ export const MAX_TEMPERATURE = 2.0;
  * @throws Error if key is undefined or empty
  */
 export function validateApiKey(key: string | undefined): asserts key is string {
-  // EC-1: key is undefined → Error: "api_key is required"
+  // key is undefined → Error: "api_key is required"
   if (key === undefined) {
     throw new Error('api_key is required');
   }
 
-  // EC-2: key is empty string → Error: "api_key cannot be empty"
+  // key is empty string → Error: "api_key cannot be empty"
   if (key === '') {
     throw new Error('api_key cannot be empty');
   }
@@ -53,7 +53,7 @@ export function validateApiKey(key: string | undefined): asserts key is string {
 export function validateModel(
   model: string | undefined
 ): asserts model is string {
-  // EC-3: model is undefined or empty → Error: "model is required"
+  // model is undefined or empty → Error: "model is required"
   if (!model) {
     throw new Error('model is required');
   }
@@ -76,7 +76,7 @@ export function validateTemperature(temperature: number | undefined): void {
     return;
   }
 
-  // EC-4: temperature out of range → Error: "temperature must be between 0 and 2"
+  // temperature out of range → Error: "temperature must be between 0 and 2"
   if (temperature < MIN_TEMPERATURE || temperature > MAX_TEMPERATURE) {
     throw new Error('temperature must be between 0 and 2');
   }
@@ -102,14 +102,14 @@ export function validateTemperature(temperature: number | undefined): void {
 export function validateMessages(
   messages: Array<Record<string, unknown>>
 ): void {
-  // EC-5: Messages array empty → RuntimeError: "messages list cannot be empty"
+  // Messages array empty → RuntimeError: "messages list cannot be empty"
   if (messages.length === 0) {
     throw new RuntimeError('RILL-R001', 'messages list cannot be empty');
   }
 
   // Validate each message
   for (const message of messages) {
-    // EC-6: Message lacks `role` → RuntimeError: "message missing required 'role' field"
+    // Message lacks `role` → RuntimeError: "message missing required 'role' field"
     if (!('role' in message) || !message['role']) {
       throw new RuntimeError(
         'RILL-R001',
@@ -117,7 +117,7 @@ export function validateMessages(
       );
     }
 
-    // EC-7: Message requires either `parts` (canonical) or `content` (sugar).
+    // Message requires either `parts` (canonical) or `content` (sugar).
     const hasParts =
       'parts' in message &&
       message['parts'] !== undefined &&
@@ -149,7 +149,7 @@ export function validateMessages(
  * @throws RuntimeError if text is empty
  */
 export function validateEmbedText(text: string): void {
-  // EC-8: Embed text empty → RuntimeError: "embed text cannot be empty"
+  // Embed text empty → RuntimeError: "embed text cannot be empty"
   if (text === '') {
     throw new RuntimeError('RILL-R001', 'embed text cannot be empty');
   }
@@ -173,7 +173,7 @@ export function validateEmbedBatch(texts: RillValue[]): string[] {
   for (let i = 0; i < texts.length; i++) {
     const item = texts[i];
 
-    // EC-9: Batch contains non-string → RuntimeError: "embed_batch requires list of strings"
+    // Batch contains non-string → RuntimeError: "embed_batch requires list of strings"
     if (typeof item !== 'string') {
       throw new RuntimeError(
         'RILL-R001',
@@ -181,7 +181,7 @@ export function validateEmbedBatch(texts: RillValue[]): string[] {
       );
     }
 
-    // EC-10: Batch contains empty or whitespace-only string → RuntimeError: "embed text cannot be empty at index {i}"
+    // Batch contains empty or whitespace-only string → RuntimeError: "embed text cannot be empty at index {i}"
     if (item.trim() === '') {
       throw new RuntimeError(
         'RILL-R001',
@@ -209,7 +209,7 @@ export function validateEmbedBatch(texts: RillValue[]): string[] {
 export function validateEmbedModel(
   model: string | undefined
 ): asserts model is string {
-  // EC-11: Embed model falsy → RuntimeError: "embed_model not configured"
+  // Embed model falsy → RuntimeError: "embed_model not configured"
   if (!model) {
     throw new RuntimeError('RILL-R001', 'embed_model not configured');
   }

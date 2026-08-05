@@ -1,6 +1,6 @@
 /**
  * drive_get_metadata callable — retrieve file metadata from Google Drive.
- * IR-14: drive_get_metadata(fileId: str) → dict
+ * drive_get_metadata(fileId: str) → dict
  * Capability: drive.read
  * Scope: drive.readonly
  */
@@ -18,7 +18,7 @@ export interface DriveGetMetadataDeps {
 }
 /**
  * Factory returning the drive_get_metadata inner function.
- * AC-12: Returns rill primitive dict with file metadata.
+ * Returns rill primitive dict with file metadata.
  */
 export function makeDriveGetMetadata(
   deps: DriveGetMetadataDeps
@@ -65,7 +65,7 @@ export function makeDriveGetMetadata(
       createdTime?: string;
       modifiedTime?: string;
     } | null;
-    // AC-12: Return rill primitive dict
+    // Return rill primitive dict
     return {
       id: data?.id ?? '',
       name: data?.name ?? '',

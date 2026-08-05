@@ -43,7 +43,7 @@ export async function createPromptMdExtension(
   config: PromptMdExtensionConfig,
   _ctx: ExtensionFactoryCtx
 ): Promise<ExtensionFactoryResult> {
-  // ── EC-6: validate basePath is non-empty ──────────────────────────────────
+  // ── validate basePath is non-empty ────────────────────────────────────────
   if (
     typeof config.basePath !== 'string' ||
     config.basePath.trim().length === 0
@@ -60,7 +60,7 @@ export async function createPromptMdExtension(
 
   const basePath = config.basePath.trim();
 
-  // ── EC-7: verify basePath exists and is a directory ───────────────────────
+  // ── verify basePath exists and is a directory ─────────────────────────────
   try {
     const info = await stat(basePath);
     if (!info.isDirectory()) {
@@ -90,12 +90,12 @@ export async function createPromptMdExtension(
   // ── Collect *.prompt.md files ─────────────────────────────────────────────
   const entries = await traversePromptFiles(basePath);
 
-  // ── Parse all files (EC-8 through EC-14 propagate as RILL-R001) ──────────
+  // ── Parse all files (errors propagate as RILL-R001) ───────────────────────
   const parsed = await Promise.all(
     entries.map((entry) => parseFile(entry.absolutePath, entry.relativePath))
   );
 
-  // ── EC-15: collision detection ────────────────────────────────────────────
+  // ── collision detection ───────────────────────────────────────────────────
   const nameToAbsolutePaths = new Map<string, string[]>();
   for (const prompt of parsed) {
     const existing = nameToAbsolutePaths.get(prompt.name);
@@ -148,7 +148,7 @@ export async function createPromptMdExtension(
     innerDict[name] = wrappedClosure;
   }
 
-  // Apply compile-time contract check (AC-5).
+  // Apply compile-time contract check.
   const callableDict = innerDict satisfies PromptExtensionContract;
 
   // ── dispose ───────────────────────────────────────────────────────────────

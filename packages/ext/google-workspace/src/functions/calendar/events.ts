@@ -1,6 +1,6 @@
 /**
  * calendar_events callable — list calendar events within a date/time range.
- * IR-15: calendar_events(startDate: str, endDate: str, options: dict?) → { events: list[dict] }
+ * calendar_events(startDate: str, endDate: str, options: dict?) → { events: list[dict] }
  * Capability: calendar.read
  * Scopes: calendar.readonly
  */
@@ -26,10 +26,10 @@ export interface CalendarEventsDeps {
 }
 /**
  * Factory returning the calendar_events inner function.
- * BC-3: Returns { events: [] } immediately when startDate equals endDate.
- * EC-11: Validates calendarId against allowedCalendarIds.
- * EC-13: Rejects naive ISO timestamps (no timezone).
- * AC-12: Returns rill primitive dict { events: list[dict] }.
+ * Returns { events: [] } immediately when startDate equals endDate.
+ * Validates calendarId against allowedCalendarIds.
+ * Rejects naive ISO timestamps (no timezone).
+ * Returns rill primitive dict { events: list[dict] }.
  */
 export function makeCalendarEvents(
   deps: CalendarEventsDeps
@@ -69,7 +69,7 @@ export function makeCalendarEvents(
       timeMin = `${startDate}T00:00:00Z`;
       timeMax = `${endDate}T00:00:00Z`;
     } else if (!startIsDateOnly && !endIsDateOnly) {
-      // Both must be ISO datetimes with timezone [EC-13]
+      // Both must be ISO datetimes with timezone
       assertIsoTimestamp(ctx, startDate, 'start_date');
       assertIsoTimestamp(ctx, endDate, 'end_date');
       timeMin = startDate;
@@ -82,7 +82,7 @@ export function makeCalendarEvents(
         'google: start_date and end_date must both be date-only or both be ISO 8601 with timezone'
       );
     }
-    // BC-3: start equal to end → empty result, no fetch
+    // start equal to end → empty result, no fetch
     if (timeMin === timeMax) {
       return { events: [] } as unknown as RillValue;
     }
@@ -95,7 +95,7 @@ export function makeCalendarEvents(
         calendarId = rawCalId;
       }
     }
-    // EC-11: Validate calendarId against allowlist
+    // Validate calendarId against allowlist
     assertAllowedCalendarId(ctx, calendarId, deps.calendarConfig);
     const path =
       `/calendars/${encodeURIComponent(calendarId)}/events` +
@@ -118,7 +118,7 @@ export function makeCalendarEvents(
       undefined,
       undefined
     );
-    // Project to rill-compatible shape [AC-12]
+    // Project to rill-compatible shape
     const data = response as {
       items?: Array<{
         id?: string;

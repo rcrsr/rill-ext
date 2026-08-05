@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
 import { createFoundryExtension } from '../src/factory.js';
 import type { FoundryConfig } from '../src/types.js';
-import { expectRejectedHalt, expectHalt } from './_halt-helpers.js';
+import { expectRejectedHalt } from './_halt-helpers.js';
 
 // ============================================================
 // MOCK SETUP
@@ -90,7 +90,7 @@ describe('embed() function', () => {
 
   // AC-4: embed returns a rill vector with float data
   it('returns a rill vector with float data', async () => {
-    const mockEmbedding = new Array(1536).fill(0).map((_, i) => i * 0.001);
+    const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding }],
       model: 'text-embedding-3-small',
@@ -112,7 +112,7 @@ describe('embed() function', () => {
 
   // AC-4: vector carries the embed model name
   it('returns vector with correct model field', async () => {
-    const mockEmbedding = new Array(1536).fill(0).map((_, i) => i * 0.001);
+    const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding }],
       model: 'text-embedding-3-small',
@@ -132,7 +132,7 @@ describe('embed() function', () => {
 
   // AC-4: different embedding dimensions are handled correctly
   it('handles different embedding dimensions', async () => {
-    const mockEmbedding = new Array(768).fill(0).map((_, i) => i * 0.001);
+    const mockEmbedding = Array.from({ length: 768 }, (_, i) => i * 0.001);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding }],
       model: 'text-embedding-3-large',
@@ -202,7 +202,7 @@ describe('embed() function', () => {
 
   // AC-4: calls embeddings API with correct model and text
   it('sends correct model and text to the embeddings API', async () => {
-    const mockEmbedding = new Array(1536).fill(0).map((_, i) => i * 0.001);
+    const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding }],
       model: 'text-embedding-3-small',
@@ -235,8 +235,8 @@ describe('embed_batch() function', () => {
 
   // AC-5: embed_batch returns list of vectors
   it('returns list of rill vectors for multiple texts', async () => {
-    const mockEmbedding1 = new Array(1536).fill(0).map((_, i) => i * 0.001);
-    const mockEmbedding2 = new Array(1536).fill(0).map((_, i) => i * 0.002);
+    const mockEmbedding1 = Array.from({ length: 1536 }, (_, i) => i * 0.001);
+    const mockEmbedding2 = Array.from({ length: 1536 }, (_, i) => i * 0.002);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding1 }, { embedding: mockEmbedding2 }],
       model: 'text-embedding-3-small',
@@ -259,7 +259,7 @@ describe('embed_batch() function', () => {
 
   // AC-5: each vector has Float32Array data
   it('each vector contains Float32Array data', async () => {
-    const mockEmbedding = new Array(1536).fill(0).map((_, i) => i * 0.001);
+    const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding }, { embedding: mockEmbedding }],
       model: 'text-embedding-3-small',
@@ -276,12 +276,12 @@ describe('embed_batch() function', () => {
 
     expect(result[0]?.['data']).toBeInstanceOf(Float32Array);
     expect(result[1]?.['data']).toBeInstanceOf(Float32Array);
-    expect((result[0]?.['data'] as Float32Array).length).toBe(1536);
+    expect((result[0]!['data'] as Float32Array).length).toBe(1536);
   });
 
   // AC-5: each vector carries the embed model
   it('each vector has correct model field', async () => {
-    const mockEmbedding = new Array(512).fill(0).map((_, i) => i * 0.001);
+    const mockEmbedding = Array.from({ length: 512 }, (_, i) => i * 0.001);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding }, { embedding: mockEmbedding }],
       model: 'text-embedding-3-small',
@@ -352,7 +352,7 @@ describe('embed_batch() function', () => {
 
   // AC-5: sends all texts to the embeddings API
   it('sends all texts to the embeddings API in one call', async () => {
-    const mockEmbedding = new Array(1536).fill(0).map((_, i) => i * 0.001);
+    const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [
         { embedding: mockEmbedding },

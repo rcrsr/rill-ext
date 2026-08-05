@@ -4,12 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  RuntimeError,
-  isInvalid,
-  getStatus,
-  type RillValue,
-} from '@rcrsr/rill';
+import { RuntimeError } from '@rcrsr/rill';
 import { validateConfig, mergeCapabilities } from '../src/config.js';
 import type { GoogleWorkspaceConfig } from '../src/types.js';
 

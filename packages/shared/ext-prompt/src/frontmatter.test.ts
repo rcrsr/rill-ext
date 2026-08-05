@@ -2,9 +2,9 @@
  * Unit tests for splitFrontmatter.
  *
  * Covers:
- *   IR-2  — happy path: correct split, bodyLineOffset
- *   EC-1  — missing opening fence
- *   EC-2  — unclosed frontmatter block
+ * happy path: correct split, bodyLineOffset
+ * missing opening fence
+ * unclosed frontmatter block
  */
 
 import { describe, it, expect } from 'vitest';
@@ -12,11 +12,11 @@ import { RuntimeError } from '@rcrsr/rill';
 import { splitFrontmatter } from './frontmatter.js';
 
 // ============================================================
-// HAPPY PATH (IR-2)
+// HAPPY PATH
 // ============================================================
 
 describe('splitFrontmatter', () => {
-  describe('happy path (IR-2)', () => {
+  describe('happy path', () => {
     it('splits frontmatter and body from a well-formed source', () => {
       const source =
         '---\ndescription: test prompt\n---\nbody line 1\nbody line 2';
@@ -70,10 +70,10 @@ describe('splitFrontmatter', () => {
   });
 
   // ============================================================
-  // EC-1: MISSING OPENING FENCE
+  // MISSING OPENING FENCE
   // ============================================================
 
-  describe('missing opening fence (EC-1)', () => {
+  describe('missing opening fence', () => {
     it('throws RuntimeError RILL-R001 when source does not start with ---', () => {
       const source = 'description: test prompt\n---\nbody';
 
@@ -92,10 +92,10 @@ describe('splitFrontmatter', () => {
   });
 
   // ============================================================
-  // EC-2: UNCLOSED FRONTMATTER BLOCK
+  // UNCLOSED FRONTMATTER BLOCK
   // ============================================================
 
-  describe('unclosed frontmatter block (EC-2)', () => {
+  describe('unclosed frontmatter block', () => {
     it('throws RuntimeError RILL-R001 when closing fence is absent', () => {
       const source = '---\ndescription: test prompt\nbody line 1';
 

@@ -13,7 +13,7 @@
  *
  * Part-type allowlist (v1): `text`, `thinking`, `tool_use`, `tool_result`,
  * `image`. All other `type` values are rejected at the boundary by
- * `assertPartTypes` (EC-7).
+ * `assertPartTypes`.
  *
  * `MESSAGES_RETURN_TYPE` is the canonical `RillTypeValue` for any host
  * function that returns a message list. Extensions use it as the
@@ -22,12 +22,12 @@
  * stream `retType`), use `MESSAGES_LIST_STRUCTURE` or
  * `MESSAGE_DICT_STRUCTURE` directly.
  *
- * IR-1:  normalizePrompt — string or list → Message[]
- * IR-2:  assertBoundaryRoles — validate role allowlist
- * IR-3:  assertNoTrailingAssistant — reject trailing assistant turn
- * IR-4:  assertPartTypes — validate part type allowlist and shapes
- * IR-5:  expandContentSugar — {role, content:string} → {role, parts:[...]}
- * IR-6:  MESSAGES_RETURN_TYPE — declarative TypeStructure for return type
+ * normalizePrompt — string or list → Message[]
+ * assertBoundaryRoles — validate role allowlist
+ * assertNoTrailingAssistant — reject trailing assistant turn
+ * assertPartTypes — validate part type allowlist and shapes
+ * expandContentSugar — {role, content:string} → {role, parts:[...]}
+ * MESSAGES_RETURN_TYPE — declarative TypeStructure for return type
  */
 
 import {
@@ -123,7 +123,7 @@ const VALID_PART_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 // ============================================================
-// IR-6: MESSAGES_RETURN_TYPE
+// MESSAGES_RETURN_TYPE
 // ============================================================
 
 /**
@@ -219,7 +219,7 @@ export const MESSAGES_RETURN_TYPE = structureToTypeValue(
 );
 
 // ============================================================
-// IR-5: expandContentSugar
+// expandContentSugar
 // ============================================================
 
 /**
@@ -250,15 +250,15 @@ export function expandContentSugar(
 }
 
 // ============================================================
-// IR-2: assertBoundaryRoles
+// assertBoundaryRoles
 // ============================================================
 
 /**
  * Validates that every message role is in the `system`/`user`/`assistant` allowlist.
  *
  * Returns an invalid RillValue when validation fails, undefined when valid.
- * EC-3: Message missing `role` → INVALID_INPUT / invalid_message_format
- * EC-4: Role not in allowlist → INVALID_INPUT / invalid_role
+ * Message missing `role` → INVALID_INPUT / invalid_message_format
+ * Role not in allowlist → INVALID_INPUT / invalid_role
  *
  * @param messages - Already-expanded messages (parts form)
  * @param ctx - Runtime context
@@ -290,13 +290,13 @@ export function assertBoundaryRoles(
 }
 
 // ============================================================
-// IR-3: assertNoTrailingAssistant
+// assertNoTrailingAssistant
 // ============================================================
 
 /**
  * Rejects message lists that end with an assistant turn.
  *
- * EC-5: Final message is assistant role → INVALID_INPUT / trailing_assistant_turn
+ * Final message is assistant role → INVALID_INPUT / trailing_assistant_turn
  *
  * @param messages - Already-expanded messages (parts form)
  * @param ctx - Runtime context
@@ -321,16 +321,16 @@ export function assertNoTrailingAssistant(
 }
 
 // ============================================================
-// IR-4: assertPartTypes
+// assertPartTypes
 // ============================================================
 
 /**
  * Validates that every part type is in the v1 allowlist and that required
  * fields are present for each declared type.
  *
- * EC-7: Part type not in allowlist → INVALID_INPUT / unsupported_part_type
- * EC-8: Part shape invalid for declared type → INVALID_INPUT / invalid_part_shape
- * EC-9: Image source kind not base64/url → INVALID_INPUT / invalid_image_source
+ * Part type not in allowlist → INVALID_INPUT / unsupported_part_type
+ * Part shape invalid for declared type → INVALID_INPUT / invalid_part_shape
+ * Image source kind not base64/url → INVALID_INPUT / invalid_image_source
  *
  * @param messages - Already-expanded messages (parts form)
  * @param ctx - Runtime context
@@ -535,7 +535,7 @@ function validatePartShape(
 }
 
 // ============================================================
-// IR-1: normalizePrompt
+// normalizePrompt
 // ============================================================
 
 /**
@@ -546,7 +546,7 @@ function validatePartShape(
  *
  * Pure function; no side effects; idempotent.
  *
- * Error codes (EC-1..EC-10) emit via ctx.invalidate with INVALID_INPUT.
+ * Error codes emit via ctx.invalidate with INVALID_INPUT.
  *
  * @param rawPrompt - String, list of message dicts, or invalid type
  * @param ctx - Runtime context for error emission
@@ -556,7 +556,7 @@ export function normalizePrompt(
   rawPrompt: RillValue,
   ctx: RuntimeContext
 ): Array<Message> | RillValue {
-  // EC-10: Prompt is neither string nor list
+  // Prompt is neither string nor list
   if (typeof rawPrompt !== 'string' && !Array.isArray(rawPrompt)) {
     return ctx.invalidate(
       new Error('prompt must be a string or list of messages'),
@@ -570,7 +570,7 @@ export function normalizePrompt(
 
   // String path: single user turn
   if (typeof rawPrompt === 'string') {
-    // EC-1: Empty string
+    // Empty string
     if (rawPrompt.trim().length === 0) {
       return ctx.invalidate(new Error('prompt string cannot be empty'), {
         code: 'INVALID_INPUT',
@@ -590,7 +590,7 @@ export function normalizePrompt(
   // List path
   const list = rawPrompt as RillValue[];
 
-  // EC-2: Empty list
+  // Empty list
   if (list.length === 0) {
     return ctx.invalidate(new Error('message list cannot be empty'), {
       code: 'INVALID_INPUT',
@@ -612,7 +612,7 @@ export function normalizePrompt(
 
     const msg = item as Record<string, RillValue>;
 
-    // EC-3: Message missing role
+    // Message missing role
     if (!('role' in msg) || msg['role'] === undefined || msg['role'] === null) {
       return ctx.invalidate(new Error('message missing required role field'), {
         code: 'INVALID_INPUT',
@@ -621,7 +621,7 @@ export function normalizePrompt(
       });
     }
 
-    // EC-6: Message has neither parts nor content
+    // Message has neither parts nor content
     if (!('parts' in msg) && !('content' in msg)) {
       return ctx.invalidate(
         new Error('message must have either parts or content'),
@@ -636,22 +636,22 @@ export function normalizePrompt(
     rawMessages.push(msg);
   }
 
-  // IR-2: Validate roles before expansion
+  // Validate roles before expansion
   const roleError = assertBoundaryRoles(rawMessages, ctx);
   if (roleError !== undefined) {
     return roleError;
   }
 
-  // IR-5: Expand content sugar
+  // Expand content sugar
   const expanded = expandContentSugar(rawMessages);
 
-  // IR-3: No trailing assistant
+  // No trailing assistant
   const trailingError = assertNoTrailingAssistant(expanded, ctx);
   if (trailingError !== undefined) {
     return trailingError;
   }
 
-  // IR-4: Validate part types and shapes
+  // Validate part types and shapes
   const partError = assertPartTypes(expanded, ctx);
   if (partError !== undefined) {
     return partError;

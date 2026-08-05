@@ -161,28 +161,6 @@ function expectHaltCode(
   return thrown as RuntimeHaltSignal;
 }
 
-/**
- * Asserts a rejected promise carries a RuntimeHaltSignal with matching code and optional raw.kind.
- */
-async function expectRejectedHaltCode(
-  promise: Promise<unknown>,
-  code: string,
-  rawKind?: string
-): Promise<void> {
-  const err = await promise.then(
-    () => {
-      throw new Error('expected rejection');
-    },
-    (e: unknown) => e
-  );
-  expect(err).toBeInstanceOf(RuntimeHaltSignal);
-  const status = getStatus((err as RuntimeHaltSignal).value);
-  expect(status.code.name).toBe(code);
-  if (rawKind !== undefined) {
-    expect((status.raw as Record<string, unknown>)['kind']).toBe(rawKind);
-  }
-}
-
 // ============================================================
 // ACCEPTANCE CONDITIONS — VALID INPUTS
 // ============================================================

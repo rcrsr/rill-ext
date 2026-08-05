@@ -236,7 +236,7 @@ function extractToolResultBlocks(
  * Translate a canonical Message[] into Anthropic MessageParam[].
  *
  * System role messages are lifted into the returned `systemText` string.
- * A list with a system turn overrides the factory system parameter (AC-3).
+ * A list with a system turn overrides the factory system parameter.
  *
  * Tool_result parts in user messages are placed as ToolResultBlockParam arrays
  * per the Anthropic wire format.
@@ -323,7 +323,7 @@ function canonicalToAnthropicMessages(messages: Message[]): {
 /**
  * Convert Anthropic response content blocks to canonical Part[].
  * Handles text, tool_use, thinking, and redacted_thinking blocks.
- * AC-B5: RedactedThinkingBlock → {type:'thinking', text:''}.
+ * RedactedThinkingBlock → {type:'thinking', text:''}.
  */
 function anthropicContentToParts(content: Anthropic.ContentBlock[]): Part[] {
   const parts: Part[] = [];
@@ -353,7 +353,7 @@ function anthropicContentToParts(content: Anthropic.ContentBlock[]): Part[] {
       continue;
     }
 
-    // RedactedThinkingBlock — AC-B5: pass through as thinking with empty text
+    // RedactedThinkingBlock: pass through as thinking with empty text
     if (block.type === 'redacted_thinking') {
       parts.push({ type: 'thinking', text: '' });
       continue;
@@ -472,13 +472,13 @@ function haltInvalid(
 export function createAnthropicExtension(
   config: AnthropicExtensionConfig
 ): ExtensionFactoryResult {
-  // EC-21, EC-22: Validate factory max_turns BEFORE client creation
+  // Validate factory max_turns BEFORE client creation
   validateMaxTurns(config.max_turns);
 
   // Validate factory max_errors BEFORE client creation; reject 0/negative/non-integer
   validateMaxErrors(config.max_errors);
 
-  // EC-19, EC-20: Validate extra keys BEFORE client creation
+  // Validate extra keys BEFORE client creation
   validateExtraKeys(config.extra, RESERVED_KEYS_COMMON);
 
   // Validate required fields
@@ -752,7 +752,7 @@ export function createAnthropicExtension(
           // Extract argument
           const texts = args['texts'] as RillValue[];
 
-          // AC-24: Empty list returns empty list without API call
+          // Empty list returns empty list without API call
           if (texts.length === 0) {
             return [] as RillValue;
           }
@@ -847,7 +847,7 @@ export function createAnthropicExtension(
         const toolsDict = args['tools'] as RillValue;
         const maxTurnsArg = args['max_turns'] as number;
 
-        // EC-13: Negative per-call max_turns → INVALID_INPUT
+        // Negative per-call max_turns → INVALID_INPUT
         if (typeof maxTurnsArg === 'number' && maxTurnsArg < 0) {
           throw haltInvalid(
             ctx as RuntimeContext,
@@ -857,7 +857,7 @@ export function createAnthropicExtension(
           );
         }
 
-        // EC-14: Empty tools dict → INVALID_INPUT
+        // Empty tools dict → INVALID_INPUT
         if (
           typeof toolsDict === 'object' &&
           toolsDict !== null &&
@@ -1240,7 +1240,7 @@ export function createAnthropicExtension(
             | { __rill_type?: boolean; structure?: TypeStructure }
             | undefined;
 
-          // EC-3: Validate schema is a type value with dict structure
+          // Validate schema is a type value with dict structure
           if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
             throw haltInvalid(
               ctx as RuntimeContext,
@@ -1258,7 +1258,7 @@ export function createAnthropicExtension(
             );
           }
 
-          // EC-4: Build JSON Schema from TypeStructure
+          // Build JSON Schema from TypeStructure
           const jsonSchema = buildJsonSchemaFromStructuralType(
             schemaArg.structure
           );
@@ -1298,12 +1298,12 @@ export function createAnthropicExtension(
             apiParams.system = effectiveSystem;
           }
 
-          // EC-18: Streaming is not supported for structured output (PROTOCOL)
+          // Streaming is not supported for structured output (PROTOCOL)
           // The Anthropic API returns structured output synchronously; if we somehow
           // get a streaming response, that is an unexpected format.
           const response = await client.messages.create(apiParams);
 
-          // Validate response is not a stream (EC-18)
+          // Validate response is not a stream
           if (
             typeof (response as unknown as { stream?: unknown }).stream ===
             'function'
@@ -1316,12 +1316,12 @@ export function createAnthropicExtension(
             );
           }
 
-          // Extract JSON string from response content text block (AC-8)
+          // Extract JSON string from response content text block
           const raw = extractTextContent(
             response.content as Array<{ type: string; text?: string }>
           );
 
-          // EC-17: Parse JSON, throw on failure with schema_validation_failed kind
+          // Parse JSON, throw on failure with schema_validation_failed kind
           let data: unknown;
           try {
             data = JSON.parse(raw) as unknown;

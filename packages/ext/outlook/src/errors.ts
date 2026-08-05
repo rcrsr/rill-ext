@@ -7,7 +7,7 @@
  * `#RATE_LIMIT`, `#UNAVAILABLE`).
  *
  * Provider-specific failure shape: (generic atom, meta.provider='outlook',
- * meta.raw.kind, meta.raw.status). Spec-defined message strings (EC-12)
+ * meta.raw.kind, meta.raw.status). Spec-defined message strings
  * are preserved on `meta.raw.message` so host scripts can `guard
  * #UNAVAILABLE && raw.kind == 'server_error'`.
  */

@@ -98,10 +98,6 @@ describe('generate() function', () => {
       age: { type: { kind: 'number' } },
     },
   });
-  const NAME_SCHEMA = typeVal({
-    kind: 'dict',
-    fields: { name: { type: { kind: 'string' } } },
-  });
 
   describe('success cases', () => {
     // AC-1: data field contains schema-matching keys

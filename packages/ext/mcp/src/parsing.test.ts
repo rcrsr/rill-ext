@@ -16,7 +16,7 @@ import {
 } from './parsing.js';
 
 describe('mapJsonSchemaTypeToRillType', () => {
-  describe('IC-7: Type Mapping', () => {
+  describe('Type Mapping', () => {
     it('maps string to string', () => {
       const property: JsonSchemaProperty = { type: 'string' };
       expect(mapJsonSchemaTypeToRillType(property)).toBe('string');
@@ -82,7 +82,7 @@ describe('mapJsonSchemaTypeToRillType', () => {
 });
 
 describe('getDefaultValueForType', () => {
-  describe('AC-8: Default Values', () => {
+  describe('Default Values', () => {
     it('returns empty string for string type', () => {
       expect(getDefaultValueForType('string')).toBe('');
     });
@@ -222,7 +222,7 @@ describe('jsonSchemaPropertyToRillParam', () => {
 });
 
 describe('generateParametersFromSchema', () => {
-  describe('AC-20: RillParam Output Shape', () => {
+  describe('RillParam Output Shape', () => {
     it('generates RillParam with correct types from properties', () => {
       const schema: JsonSchema = {
         type: 'object',
@@ -356,7 +356,7 @@ describe('generateParametersFromSchema', () => {
       expect(params[0]!.annotations).toEqual({});
     });
 
-    it('returns empty array for missing properties (AC-34)', () => {
+    it('returns empty array for missing properties', () => {
       const schema: JsonSchema = {
         type: 'object',
       };
@@ -366,7 +366,7 @@ describe('generateParametersFromSchema', () => {
       expect(params).toEqual([]);
     });
 
-    it('returns empty array for schema with no properties key (AC-34)', () => {
+    it('returns empty array for schema with no properties key', () => {
       const schema: JsonSchema = {};
 
       const params = generateParametersFromSchema(schema);
@@ -447,7 +447,7 @@ describe('generateParametersFromSchema', () => {
 });
 
 describe('parseResourceContent', () => {
-  describe('IC-7: Resource Content Parsing', () => {
+  describe('Resource Content Parsing', () => {
     it('parses text content as string', () => {
       const result: ResourceReadResult = {
         contents: [
@@ -537,7 +537,7 @@ describe('parseResourceContent', () => {
     });
   });
 
-  describe('BC-6: Zero-Byte Resource', () => {
+  describe('Zero-Byte Resource', () => {
     it('returns empty string for empty content array', () => {
       const result: ResourceReadResult = {
         contents: [],

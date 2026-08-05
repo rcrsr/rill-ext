@@ -300,7 +300,7 @@ export function jsonSchemaPropertyToRillParam(
  * @returns Array of RillParam
  */
 export function generateParametersFromSchema(schema: JsonSchema): RillParam[] {
-  // Missing properties: return empty array (AC-34)
+  // Missing properties: return empty array
   if (!schema.properties) {
     return [];
   }
@@ -353,7 +353,7 @@ function parseResourceContentBlock(block: ResourceContentBlock): RillValue {
   if (block.text !== undefined) {
     const text = block.text;
 
-    // BC-6: Empty text content returns empty string
+    // Empty text content returns empty string
     if (text.length === 0) {
       return '';
     }
@@ -385,7 +385,7 @@ function parseResourceContentBlock(block: ResourceContentBlock): RillValue {
     };
   }
 
-  // BC-6: No text or blob content (zero bytes): return empty string
+  // No text or blob content (zero bytes): return empty string
   return '';
 }
 
@@ -406,7 +406,7 @@ function parseResourceContentBlock(block: ResourceContentBlock): RillValue {
 export function parseResourceContent(result: ResourceReadResult): RillValue {
   const { contents } = result;
 
-  // BC-6: Empty content: return empty string
+  // Empty content: return empty string
   if (contents.length === 0) {
     return '';
   }

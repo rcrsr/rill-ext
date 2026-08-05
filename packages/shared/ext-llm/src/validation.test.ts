@@ -28,12 +28,12 @@ describe('validateApiKey', () => {
   });
 
   it('throws for undefined key', () => {
-    // EC-1, AC-7: key is undefined → Error: "api_key is required"
+    // key is undefined → Error: "api_key is required"
     expect(() => validateApiKey(undefined)).toThrow('api_key is required');
   });
 
   it('throws for empty string key', () => {
-    // EC-2, AC-15: key is empty string → Error: "api_key cannot be empty"
+    // key is empty string → Error: "api_key cannot be empty"
     expect(() => validateApiKey('')).toThrow('api_key cannot be empty');
   });
 });
@@ -48,12 +48,12 @@ describe('validateModel', () => {
   });
 
   it('throws for undefined model', () => {
-    // EC-3: model is undefined → Error: "model is required"
+    // model is undefined → Error: "model is required"
     expect(() => validateModel(undefined)).toThrow('model is required');
   });
 
   it('throws for empty string model', () => {
-    // EC-3: model is empty string → Error: "model is required"
+    // model is empty string → Error: "model is required"
     expect(() => validateModel('')).toThrow('model is required');
   });
 });
@@ -64,13 +64,13 @@ describe('validateModel', () => {
 
 describe('validateTemperature', () => {
   it('passes for minimum boundary 0.0', () => {
-    // AC-13: Temperature exactly 0.0 - boundary case
+    // Temperature exactly 0.0 - boundary case
     expect(() => validateTemperature(MIN_TEMPERATURE)).not.toThrow();
     expect(() => validateTemperature(0.0)).not.toThrow();
   });
 
   it('passes for maximum boundary 2.0', () => {
-    // AC-14: Temperature exactly 2.0 - boundary case
+    // Temperature exactly 2.0 - boundary case
     expect(() => validateTemperature(MAX_TEMPERATURE)).not.toThrow();
     expect(() => validateTemperature(2.0)).not.toThrow();
   });
@@ -86,7 +86,7 @@ describe('validateTemperature', () => {
   });
 
   it('throws for value above maximum', () => {
-    // EC-4, AC-8: temperature > 2.0 → Error
+    // temperature > 2.0 → Error
     expect(() => validateTemperature(3.0)).toThrow(
       'temperature must be between 0 and 2'
     );
@@ -96,7 +96,7 @@ describe('validateTemperature', () => {
   });
 
   it('throws for value below minimum', () => {
-    // EC-4: temperature < 0.0 → Error
+    // temperature < 0.0 → Error
     expect(() => validateTemperature(-0.1)).toThrow(
       'temperature must be between 0 and 2'
     );
@@ -112,7 +112,7 @@ describe('validateTemperature', () => {
 
 describe('validateMessages', () => {
   it('passes for single-element array', () => {
-    // AC-16: Boundary case - single-element message array
+    // Boundary case - single-element message array
     const messages = [{ role: 'user', content: 'Hello' }];
     expect(() => validateMessages(messages)).not.toThrow();
   });
@@ -126,13 +126,13 @@ describe('validateMessages', () => {
   });
 
   it('throws for empty array', () => {
-    // EC-5, AC-9: Messages array empty → RuntimeError
+    // Messages array empty → RuntimeError
     expect(() => validateMessages([])).toThrow(RuntimeError);
     expect(() => validateMessages([])).toThrow('messages list cannot be empty');
   });
 
   it('throws for message missing role', () => {
-    // EC-6: Message lacks `role` → RuntimeError
+    // Message lacks `role` → RuntimeError
     const messages = [{ content: 'Hello' }];
     expect(() => validateMessages(messages)).toThrow(RuntimeError);
     expect(() => validateMessages(messages)).toThrow(
@@ -141,7 +141,7 @@ describe('validateMessages', () => {
   });
 
   it('throws for message with empty role', () => {
-    // EC-6: Message has empty role → RuntimeError
+    // Message has empty role → RuntimeError
     const messages = [{ role: '', content: 'Hello' }];
     expect(() => validateMessages(messages)).toThrow(RuntimeError);
     expect(() => validateMessages(messages)).toThrow(
@@ -150,7 +150,7 @@ describe('validateMessages', () => {
   });
 
   it('throws for message missing content', () => {
-    // EC-7: Message lacks both `parts` and `content` → RuntimeError
+    // Message lacks both `parts` and `content` → RuntimeError
     const messages = [{ role: 'user' }];
     expect(() => validateMessages(messages)).toThrow(RuntimeError);
     expect(() => validateMessages(messages)).toThrow(
@@ -159,7 +159,7 @@ describe('validateMessages', () => {
   });
 
   it('throws for message with undefined content', () => {
-    // EC-7: Message has undefined content and no parts → RuntimeError
+    // Message has undefined content and no parts → RuntimeError
     const messages = [{ role: 'assistant', content: undefined }];
     expect(() => validateMessages(messages)).toThrow(RuntimeError);
     expect(() => validateMessages(messages)).toThrow(
@@ -168,7 +168,7 @@ describe('validateMessages', () => {
   });
 
   it('throws for message with null content', () => {
-    // EC-7: Message has null content and no parts → RuntimeError
+    // Message has null content and no parts → RuntimeError
     const messages = [{ role: 'system', content: null }];
     expect(() => validateMessages(messages)).toThrow(RuntimeError);
     expect(() => validateMessages(messages)).toThrow(
@@ -177,7 +177,7 @@ describe('validateMessages', () => {
   });
 
   it('includes role name in error message', () => {
-    // EC-7: Error message includes role name
+    // Error message includes role name
     const messages = [{ role: 'custom-role', content: undefined }];
     expect(() => validateMessages(messages)).toThrow(
       "custom-role message requires 'parts' or 'content'"
@@ -196,7 +196,7 @@ describe('validateEmbedText', () => {
   });
 
   it('throws for empty string', () => {
-    // EC-8: Embed text empty → RuntimeError
+    // Embed text empty → RuntimeError
     expect(() => validateEmbedText('')).toThrow(RuntimeError);
     expect(() => validateEmbedText('')).toThrow('embed text cannot be empty');
   });
@@ -208,7 +208,7 @@ describe('validateEmbedText', () => {
 
 describe('validateEmbedBatch', () => {
   it('passes for single-string array', () => {
-    // AC-17: Boundary case - single-string array
+    // Boundary case - single-string array
     const result = validateEmbedBatch(['text']);
     expect(result).toEqual(['text']);
   });
@@ -219,7 +219,7 @@ describe('validateEmbedBatch', () => {
   });
 
   it('throws for non-string element', () => {
-    // EC-9, AC-10: Batch contains non-string → RuntimeError
+    // Batch contains non-string → RuntimeError
     expect(() => validateEmbedBatch([123 as unknown as RillValue])).toThrow(
       RuntimeError
     );
@@ -229,7 +229,7 @@ describe('validateEmbedBatch', () => {
   });
 
   it('throws for mixed types array', () => {
-    // AC-10: Batch with mixed types → RuntimeError
+    // Batch with mixed types → RuntimeError
     expect(() =>
       validateEmbedBatch(['valid', 42 as unknown as RillValue, 'text'])
     ).toThrow(RuntimeError);
@@ -239,7 +239,7 @@ describe('validateEmbedBatch', () => {
   });
 
   it('throws for array with object', () => {
-    // EC-9: Non-string element (object) → RuntimeError
+    // Non-string element (object) → RuntimeError
     expect(() => validateEmbedBatch([{} as unknown as RillValue])).toThrow(
       RuntimeError
     );
@@ -249,7 +249,7 @@ describe('validateEmbedBatch', () => {
   });
 
   it('throws for empty string in array', () => {
-    // EC-10: Batch contains empty string → RuntimeError
+    // Batch contains empty string → RuntimeError
     expect(() => validateEmbedBatch(['valid', '', 'text'])).toThrow(
       RuntimeError
     );
@@ -259,21 +259,21 @@ describe('validateEmbedBatch', () => {
   });
 
   it('includes correct index in error message', () => {
-    // EC-10: Error message includes index
+    // Error message includes index
     expect(() => validateEmbedBatch(['a', 'b', ''])).toThrow(
       'embed text cannot be empty at index 2'
     );
   });
 
   it('throws on first empty string encountered', () => {
-    // EC-10: First empty string triggers error
+    // First empty string triggers error
     expect(() => validateEmbedBatch(['', 'valid'])).toThrow(
       'embed text cannot be empty at index 0'
     );
   });
 
   it('throws for whitespace-only string in array', () => {
-    // EC-10: Whitespace-only string is treated as empty
+    // Whitespace-only string is treated as empty
     expect(() => validateEmbedBatch(['valid', '   ', 'text'])).toThrow(
       RuntimeError
     );
@@ -293,7 +293,7 @@ describe('validateEmbedModel', () => {
   });
 
   it('throws for undefined model', () => {
-    // EC-11: Embed model falsy → RuntimeError
+    // Embed model falsy → RuntimeError
     expect(() => validateEmbedModel(undefined)).toThrow(RuntimeError);
     expect(() => validateEmbedModel(undefined)).toThrow(
       'embed_model not configured'
@@ -301,7 +301,7 @@ describe('validateEmbedModel', () => {
   });
 
   it('throws for empty string model', () => {
-    // EC-11: Embed model empty string (falsy) → RuntimeError
+    // Embed model empty string (falsy) → RuntimeError
     expect(() => validateEmbedModel('')).toThrow(RuntimeError);
     expect(() => validateEmbedModel('')).toThrow('embed_model not configured');
   });

@@ -73,7 +73,7 @@ function createMockCallbacks(overrides?: Partial<ToolLoopCallbacks>) {
 describe('executeToolLoop', () => {
   describe('success cases', () => {
     it('executes without tool calls when no tools invoked', async () => {
-      // AC-18: With 0 tools → executes without tool calls
+      // With 0 tools → executes without tool calls
       const tools = {};
       const callbacks = createMockCallbacks({
         extractToolCalls: vi.fn(() => null),
@@ -95,7 +95,7 @@ describe('executeToolLoop', () => {
     });
 
     it('executes single tool call successfully', async () => {
-      // AC-5: Tool loop executes successfully with single tool call
+      // Tool loop executes successfully with single tool call
       const mockToolFn = vi.fn(() => 'tool result');
       const tools = {
         test_tool: createMockTool(mockToolFn),
@@ -141,7 +141,7 @@ describe('executeToolLoop', () => {
     });
 
     it('executes multiple tool calls in sequence', async () => {
-      // AC-5: Multiple tools execute successfully
+      // Multiple tools execute successfully
       const tool1Fn = vi.fn(() => 'result 1');
       const tool2Fn = vi.fn(() => 'result 2');
       const tools = {
@@ -180,7 +180,7 @@ describe('executeToolLoop', () => {
     });
 
     it('handles async tool functions', async () => {
-      // AC-5: Async tools work correctly
+      // Async tools work correctly
       const asyncToolFn = vi.fn(async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         return 'async result';
@@ -212,7 +212,7 @@ describe('executeToolLoop', () => {
     });
 
     it('aggregates token usage across iterations', async () => {
-      // AC-5: Token tracking works correctly
+      // Token tracking works correctly
       const tools = {
         tool: createMockTool(() => 'result'),
       };
@@ -237,7 +237,7 @@ describe('executeToolLoop', () => {
     });
 
     it('continues execution with 0 consecutive errors', async () => {
-      // AC-19: With 0 consecutive errors → continues normally
+      // With 0 consecutive errors → continues normally
       const tools = {
         tool: createMockTool(() => 'success'),
       };
@@ -269,7 +269,7 @@ describe('executeToolLoop', () => {
 
   describe('error cases - consecutive errors exceed threshold', () => {
     it('throws after maxErrors consecutive errors', async () => {
-      // EC-14, AC-11: Consecutive errors exceed maxErrors → throws
+      // Consecutive errors exceed maxErrors → throws
       let toolCallCount = 0;
       const tools = {
         failing_tool: createMockTool(() => {
@@ -316,7 +316,7 @@ describe('executeToolLoop', () => {
     });
 
     it('throws on next error after reaching threshold', async () => {
-      // AC-20: At exactly maxErrors threshold → throws on next
+      // At exactly maxErrors threshold → throws on next
       let toolCallCount = 0;
       const tools = {
         tool: createMockTool(() => {
@@ -354,7 +354,7 @@ describe('executeToolLoop', () => {
     });
 
     it('resets consecutive error count on success', async () => {
-      // AC-19: Error count resets after successful execution
+      // Error count resets after successful execution
       let callIndex = 0;
       const tools = {
         tool: createMockTool(() => {
@@ -398,7 +398,7 @@ describe('executeToolLoop', () => {
 
   describe('error cases - unknown tool name', () => {
     it('does not throw immediately for unknown tool during execution', async () => {
-      // EC-15, AC-12: Tool name not in tool map → throws when tool is executed
+      // Tool name not in tool map → throws when tool is executed
       // However, current implementation exits after first iteration, and errors
       // are tracked but don't halt execution unless consecutive errors exceed maxErrors
       const tools = {
@@ -431,7 +431,7 @@ describe('executeToolLoop', () => {
     });
 
     it('throws RuntimeError after maxErrors unknown tool calls', async () => {
-      // EC-15: Multiple unknown tools exceed maxErrors → throws RuntimeError
+      // Multiple unknown tools exceed maxErrors → throws RuntimeError
       const tools = {
         tool: createMockTool(() => 'result'),
       };
@@ -465,7 +465,7 @@ describe('executeToolLoop', () => {
 
   describe('error cases - invalid tool input', () => {
     it('throws for non-callable tool', async () => {
-      // EC-16: Tool input validation fails → throws
+      // Tool input validation fails → throws
       const tools = {
         invalid_tool: 'not a function' as unknown as RillValue,
       };
@@ -483,7 +483,7 @@ describe('executeToolLoop', () => {
     });
 
     it('does not throw immediately for null tool input', async () => {
-      // EC-16: Tool input is null → error tracked but doesn't halt unless maxErrors exceeded
+      // Tool input is null → error tracked but doesn't halt unless maxErrors exceeded
       const tools = {
         tool: createMockTool(() => 'result'),
       };
@@ -512,7 +512,7 @@ describe('executeToolLoop', () => {
     });
 
     it('throws for undefined tool in dict', async () => {
-      // EC-16: Tool value is undefined → throws
+      // Tool value is undefined → throws
       const tools = {
         tool: undefined as unknown as RillValue,
       };
@@ -532,7 +532,7 @@ describe('executeToolLoop', () => {
 
   describe('error cases - provider API errors', () => {
     it('throws RuntimeError when provider callAPI throws', async () => {
-      // EC-17: Provider callAPI throws → throws via mapProviderError
+      // Provider callAPI throws → throws via mapProviderError
       const tools = {};
       const apiError = new Error('API connection failed');
 
@@ -554,7 +554,7 @@ describe('executeToolLoop', () => {
     });
 
     it('wraps non-Error API failures', async () => {
-      // EC-17: Provider throws non-Error object
+      // Provider throws non-Error object
       const tools = {};
 
       const callbacks = createMockCallbacks({
@@ -575,7 +575,7 @@ describe('executeToolLoop', () => {
     });
 
     it('throws RuntimeError for API failures', async () => {
-      // EC-17: API errors wrapped as RuntimeError
+      // API errors wrapped as RuntimeError
       const tools = {};
       const originalError = new Error('Network timeout');
 
@@ -823,7 +823,7 @@ describe('executeToolLoop', () => {
     });
 
     it('generates JSON Schema from ApplicationCallable params', async () => {
-      // AC-5, IC-11: Tool descriptors include params metadata
+      // Tool descriptors include params metadata
       const toolFn: RillValue = {
         __type: 'callable',
         kind: 'application',
@@ -921,8 +921,8 @@ describe('executeToolLoop', () => {
       ]);
     });
 
-    it('produces unconstrained property {} when param.type is undefined (AC-24, AC-30)', async () => {
-      // AC-30: param.type undefined → JSON Schema property {}
+    it('produces unconstrained property {} when param.type is undefined', async () => {
+      // param.type undefined → JSON Schema property {}
       const toolFn: RillValue = {
         __type: 'callable',
         kind: 'application',
@@ -958,8 +958,8 @@ describe('executeToolLoop', () => {
       expect(descriptor.input_schema.required).toContain('unconstrained');
     });
 
-    it('omits description field when annotations is empty (AC-27)', async () => {
-      // AC-27: empty annotations → no description in schema property
+    it('omits description field when annotations is empty', async () => {
+      // empty annotations → no description in schema property
       const toolFn: RillValue = {
         __type: 'callable',
         kind: 'application',
@@ -998,8 +998,8 @@ describe('executeToolLoop', () => {
       );
     });
 
-    it('includes param in required[] when defaultValue is undefined (AC-28)', async () => {
-      // AC-28: defaultValue === undefined → param appears in required[]
+    it('includes param in required[] when defaultValue is undefined', async () => {
+      // defaultValue === undefined → param appears in required[]
       const toolFn: RillValue = {
         __type: 'callable',
         kind: 'application',
@@ -1033,8 +1033,8 @@ describe('executeToolLoop', () => {
       expect(descriptor.input_schema.required).toContain('required_param');
     });
 
-    it('excludes param from required[] when defaultValue is 0 (falsy but defined) (AC-29)', async () => {
-      // AC-29: defaultValue: 0 → absent from required[]
+    it('excludes param from required[] when defaultValue is 0 (falsy but defined)', async () => {
+      // defaultValue: 0 → absent from required[]
       const toolFn: RillValue = {
         __type: 'callable',
         kind: 'application',
@@ -1071,7 +1071,7 @@ describe('executeToolLoop', () => {
 
   describe('argument conversion', () => {
     it('passes dict input as named args to application callable', async () => {
-      // IC-11: Dict input passed as named args
+      // Dict input passed as named args
       const mockFn = vi.fn((args: Record<string, RillValue>) => {
         // Verify named args received correctly
         expect(args).toEqual({ param_a: 'value_a', param_b: 42 });
@@ -1136,7 +1136,7 @@ describe('executeToolLoop', () => {
     });
 
     it('passes all named args regardless of input key order', async () => {
-      // IC-11: Named args passed correctly regardless of input key order
+      // Named args passed correctly regardless of input key order
       const mockFn = vi.fn((args: Record<string, RillValue>) => {
         // Verify all named args received
         expect(args).toEqual({
@@ -1212,7 +1212,7 @@ describe('executeToolLoop', () => {
     });
 
     it('passes correct named args to tool execution', async () => {
-      // AC-5: Tool execution passes correct named args
+      // Tool execution passes correct named args
       const mockFn = vi.fn((args: Record<string, RillValue>) => {
         return `received: ${args['name']}, ${args['age']}`;
       });
@@ -1271,8 +1271,8 @@ describe('executeToolLoop', () => {
       expect(result.toolCalls[0]?.result).toBe('received: Alice, 30');
     });
 
-    it('rejects runtime callables at validation (EC-3)', async () => {
-      // EC-3: RuntimeCallable (builtins) cannot be used as tools — must wrap in closure
+    it('rejects runtime callables at validation', async () => {
+      // RuntimeCallable (builtins) cannot be used as tools — must wrap in closure
       const mockFn = vi.fn((args: Record<string, RillValue>) => args['value']);
 
       const toolFn: RillValue = {
@@ -1466,8 +1466,8 @@ describe('executeToolLoop', () => {
       expect(result.response).toBeDefined();
     });
 
-    it('enforces maxTurns limit (EC-15: halts with max_turns_exceeded)', async () => {
-      // Multi-turn: Loop halts after maxTurns reached (EC-15)
+    it('enforces maxTurns limit (halts with max_turns_exceeded)', async () => {
+      // Multi-turn: Loop halts after maxTurns reached
       const tools = {
         tool: createMockTool(() => 'result'),
       };
@@ -1485,7 +1485,7 @@ describe('executeToolLoop', () => {
         }),
       });
 
-      // EC-15: max_turns exceeded → throw with max_turns_exceeded message
+      // max_turns exceeded → throw with max_turns_exceeded message
       await expect(
         executeToolLoop(
           [{ role: 'user', content: 'Test' }],
@@ -1813,7 +1813,7 @@ describe('executeToolLoop', () => {
   });
 
   // ============================================================
-  // DICT-FORM VALIDATION (IC-16, AC-1 through AC-17, EC-1 through EC-3)
+  // DICT-FORM VALIDATION
   // ============================================================
 
   describe('dict-form tools validation', () => {
@@ -1879,7 +1879,7 @@ describe('executeToolLoop', () => {
       });
     }
 
-    describe('AC-1: dict-form tools accepted without error', () => {
+    describe('dict-form tools accepted without error', () => {
       it('accepts dict of name -> ApplicationCallable without throwing', async () => {
         const tools = { search: mockAppCallable } as unknown as RillValue;
         const emitEvent = vi.fn();
@@ -1890,7 +1890,7 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-2: tool name comes from dict key', () => {
+    describe('tool name comes from dict key', () => {
       it('builds tool descriptor with name from dict key', async () => {
         const tools = { my_tool: mockAppCallable } as unknown as RillValue;
 
@@ -1914,7 +1914,7 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-3: ScriptCallable description from annotations', () => {
+    describe('ScriptCallable description from annotations', () => {
       it('extracts description from ScriptCallable annotations field', async () => {
         const tools = { search: mockScriptCallable } as unknown as RillValue;
 
@@ -1937,7 +1937,7 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-4: ApplicationCallable description from annotations', () => {
+    describe('ApplicationCallable description from annotations', () => {
       it('extracts description from ApplicationCallable annotations field', async () => {
         const tools = { my_tool: mockAppCallable } as unknown as RillValue;
 
@@ -1960,8 +1960,8 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-8 / EC-1: non-dict tools throws', () => {
-      it('throws EC-1 error for string tools value', async () => {
+    describe('non-dict tools throws', () => {
+      it('throws for a string tools value', async () => {
         await expect(
           executeToolLoop(
             [],
@@ -1973,7 +1973,7 @@ describe('executeToolLoop', () => {
         ).rejects.toThrow('tool_loop: tools must be a dict of name → callable');
       });
 
-      it('throws EC-1 error for number tools value', async () => {
+      it('throws for a number tools value', async () => {
         await expect(
           executeToolLoop(
             [],
@@ -1985,7 +1985,7 @@ describe('executeToolLoop', () => {
         ).rejects.toThrow('tool_loop: tools must be a dict of name → callable');
       });
 
-      it('throws EC-1 error for array tools value', async () => {
+      it('throws for an array tools value', async () => {
         await expect(
           executeToolLoop(
             [],
@@ -1998,8 +1998,8 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-9 / EC-2: non-callable dict value throws', () => {
-      it('throws EC-2 error with tool name in message', async () => {
+    describe('non-callable dict value throws', () => {
+      it('throws with the tool name in the message', async () => {
         const tools = {
           bad: 'not-callable',
         } as unknown as RillValue;
@@ -2018,8 +2018,8 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-10 / EC-3: RuntimeCallable dict value throws', () => {
-      it('throws EC-3 error with tool name in message', async () => {
+    describe('RuntimeCallable dict value throws', () => {
+      it('throws with the builtin name in the message', async () => {
         const tools = {
           builtin_fn: mockRuntimeCallable,
         } as unknown as RillValue;
@@ -2042,7 +2042,7 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-12: empty tools dict is valid', () => {
+    describe('empty tools dict is valid', () => {
       it('accepts empty dict without throwing', async () => {
         const tools = {} as unknown as RillValue;
 
@@ -2052,7 +2052,7 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-13: callable with no params is valid', () => {
+    describe('callable with no params is valid', () => {
       it('accepts callable with empty params array', async () => {
         const noParamsTool: RillValue = {
           __type: 'callable' as const,
@@ -2069,7 +2069,7 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-14: ApplicationCallable with params: undefined is valid', () => {
+    describe('ApplicationCallable with params: undefined is valid', () => {
       it('accepts ApplicationCallable with undefined params', async () => {
         const unparamTool: RillValue = {
           __type: 'callable' as const,
@@ -2086,7 +2086,7 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-15: callable with no description produces empty string', () => {
+    describe('callable with no description produces empty string', () => {
       it('uses empty string when ApplicationCallable has no description', async () => {
         const noDescTool: RillValue = {
           __type: 'callable' as const,
@@ -2148,7 +2148,7 @@ describe('executeToolLoop', () => {
       });
     });
 
-    describe('AC-16: mixed dict of ScriptCallable and ApplicationCallable is valid', () => {
+    describe('mixed dict of ScriptCallable and ApplicationCallable is valid', () => {
       it('accepts dict with both ScriptCallable and ApplicationCallable entries', async () => {
         const tools = {
           script_tool: mockScriptCallable,
@@ -2202,7 +2202,7 @@ describe('executeToolLoop', () => {
 describe('executeToolLoop yieldChunk', () => {
   describe('when yieldChunk is undefined', () => {
     it('calls callAPI (not callAPIStreaming) and returns identical result', async () => {
-      // IR-2: yieldChunk=undefined — behavior identical to non-streaming path
+      // yieldChunk=undefined — behavior identical to non-streaming path
       const mockCallAPIStreaming = vi.fn(async () => ({
         content: 'streamed',
         usage: { input_tokens: 10, output_tokens: 5 },
@@ -2231,7 +2231,7 @@ describe('executeToolLoop yieldChunk', () => {
 
   describe('when yieldChunk is provided and callAPIStreaming is defined', () => {
     it('uses callAPIStreaming instead of callAPI', async () => {
-      // IR-2: yieldChunk + callAPIStreaming defined → streaming path used
+      // yieldChunk + callAPIStreaming defined → streaming path used
       const mockCallAPIStreaming = vi.fn(
         async (_msgs, _tools, _onTextDelta) => ({
           content: 'streamed response',
@@ -2263,7 +2263,7 @@ describe('executeToolLoop yieldChunk', () => {
     });
 
     it('emits text_delta chunks via onTextDelta callback', async () => {
-      // IR-2: text deltas from callAPIStreaming wrapped as { type: "text_delta", text }
+      // text deltas from callAPIStreaming wrapped as { type: "text_delta", text }
       const mockCallAPIStreaming = vi.fn(
         async (_msgs, _tools, onTextDelta: (text: string) => void) => {
           onTextDelta('Hello');
@@ -2306,7 +2306,7 @@ describe('executeToolLoop yieldChunk', () => {
     });
 
     it('emits tool_call chunk before tool execution', async () => {
-      // IR-2: tool_call chunk emitted before executing each tool
+      // tool_call chunk emitted before executing each tool
       const toolImpl = vi.fn(() => 'tool result');
       const tools = { my_tool: createMockTool(toolImpl) };
 
@@ -2356,7 +2356,7 @@ describe('executeToolLoop yieldChunk', () => {
     });
 
     it('emits tool_result chunk after tool execution', async () => {
-      // IR-2: tool_result chunk emitted after tool execution completes
+      // tool_result chunk emitted after tool execution completes
       const toolImpl = vi.fn(() => 'computed result');
       const tools = { compute: createMockTool(toolImpl) };
 
@@ -2406,7 +2406,7 @@ describe('executeToolLoop yieldChunk', () => {
     });
 
     it('emits tool_call before tool_result in correct order within a turn', async () => {
-      // IR-2: order of emission within a single turn — tool_call precedes tool_result
+      // order of emission within a single turn — tool_call precedes tool_result
       // The second turn also emits a text_delta (streaming fires onTextDelta each call),
       // so the full sequence is: text_delta, tool_call, tool_result, text_delta.
       const tools = { order_test: createMockTool(() => 'done') };
@@ -2457,7 +2457,7 @@ describe('executeToolLoop yieldChunk', () => {
     });
 
     it('falls back to callAPI when callAPIStreaming is not defined', async () => {
-      // IR-2: yieldChunk provided but callAPIStreaming absent → use callAPI
+      // yieldChunk provided but callAPIStreaming absent → use callAPI
       const callbacks = createMockCallbacks(); // no callAPIStreaming
       const emitEvent = vi.fn();
       const yieldChunk = vi.fn();
@@ -2477,9 +2477,9 @@ describe('executeToolLoop yieldChunk', () => {
     });
   });
 
-  describe('EC-4: streaming API failure', () => {
+  describe('streaming API failure', () => {
     it('wraps callAPIStreaming failure as RuntimeError RILL-R005', async () => {
-      // EC-4: provider streaming failure → RuntimeError RILL-R005
+      // provider streaming failure → RuntimeError RILL-R005
       const streamingError = new Error('stream connection lost');
       const mockCallAPIStreaming = vi.fn(async () => {
         throw streamingError;
@@ -2510,12 +2510,12 @@ describe('executeToolLoop yieldChunk', () => {
 });
 
 // ============================================================
-// BUILD RESPONSE MESSAGES (IR-7)
+// BUILD RESPONSE MESSAGES
 // ============================================================
 
 describe('buildResponseMessages', () => {
   it('returns array with single text part assistant message appended', () => {
-    // IR-7: appends {role:'assistant', parts:[...]} to input list
+    // appends {role:'assistant', parts:[...]} to input list
     const input = [
       {
         role: 'user' as const,
@@ -2532,7 +2532,7 @@ describe('buildResponseMessages', () => {
   });
 
   it('works with empty input messages', () => {
-    // IR-7: empty input → single-element array with assistant message
+    // empty input → single-element array with assistant message
     const result = buildResponseMessages([], [{ type: 'text', text: 'Hello' }]);
     expect(result).toEqual([
       { role: 'assistant', parts: [{ type: 'text', text: 'Hello' }] },
@@ -2540,7 +2540,7 @@ describe('buildResponseMessages', () => {
   });
 
   it('does not mutate the input array', () => {
-    // IR-7: pure function, returns new array
+    // pure function, returns new array
     const input = [
       {
         role: 'user' as const,
@@ -2554,7 +2554,7 @@ describe('buildResponseMessages', () => {
   });
 
   it('returns a new array instance (does not mutate input)', () => {
-    // IR-7: returned array is a new reference
+    // returned array is a new reference
     const input = [
       {
         role: 'user' as const,
@@ -2607,7 +2607,7 @@ describe('buildResponseMessages', () => {
   });
 
   it('preserves multi-part assistant (thinking + text + tool_use)', () => {
-    // IR-7: multi-part assistant parts preserved exactly
+    // multi-part assistant parts preserved exactly
     const parts = [
       { type: 'thinking' as const, text: 'Let me think...' },
       { type: 'text' as const, text: 'Here is my answer.' },
@@ -2760,10 +2760,10 @@ describe('executeToolLoop max_turns resolution', () => {
 });
 
 // ============================================================
-// EC-15: MAX_TURNS_EXCEEDED
+// MAX_TURNS_EXCEEDED
 // ============================================================
 
-describe('executeToolLoop EC-15 max_turns_exceeded', () => {
+describe('executeToolLoop max_turns_exceeded', () => {
   it('halts with max_turns_exceeded when turn limit is reached', async () => {
     const callbacks = createMockCallbacks({
       extractToolCalls: vi.fn(() => [
@@ -2786,10 +2786,10 @@ describe('executeToolLoop EC-15 max_turns_exceeded', () => {
 });
 
 // ============================================================
-// EC-16: MAX_ERRORS_EXCEEDED
+// MAX_ERRORS_EXCEEDED
 // ============================================================
 
-describe('executeToolLoop EC-16 max_errors_exceeded', () => {
+describe('executeToolLoop max_errors_exceeded', () => {
   it('halts with max_errors_exceeded when error threshold is reached', async () => {
     const tools = {
       failing_tool: createMockTool(() => {

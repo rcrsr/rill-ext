@@ -57,7 +57,7 @@ interface BingGroundingTool {
  * Ground a query via Bing using the Azure AI Foundry responses endpoint.
  *
  * Returns `{ answer: string, citations: list }`.
- * Validates `grounding` config on each call (EC-9 if missing).
+ * Validates `grounding` config on each call, halting when it is missing.
  *
  * @param query - Search query string
  * @param config - Root Foundry config (grounding sub-config validated here)
@@ -77,7 +77,7 @@ export async function callGround(
     throw haltDisposed(ctx);
   }
 
-  // EC-9: Grounding must be configured
+  // Grounding must be configured
   if (!config.grounding) {
     throw haltUnconfigured(
       ctx,

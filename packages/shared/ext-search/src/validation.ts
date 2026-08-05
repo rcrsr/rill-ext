@@ -23,17 +23,17 @@ export function assertRequired<T>(
   value: T | undefined | null,
   fieldName: string
 ): asserts value is T {
-  // EC-13: undefined throws
+  // undefined throws
   if (value === undefined) {
     throw new Error(`${fieldName} is required`);
   }
 
-  // EC-13: null throws
+  // null throws
   if (value === null) {
     throw new Error(`${fieldName} is required`);
   }
 
-  // EC-13: empty string throws
+  // empty string throws
   if (value === '') {
     throw new Error(`${fieldName} is required`);
   }
@@ -52,7 +52,7 @@ export function assertRequired<T>(
  * ```
  */
 export function validateBaseUrl(url: string): void {
-  // EC-14: URL must start with http:// or https://
+  // URL must start with http:// or https://
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     throw new Error('baseUrl must start with http:// or https://');
   }

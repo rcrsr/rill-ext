@@ -5,7 +5,7 @@
  *         AC-4 (capability gate), BC-5 (concurrent call during dispose).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   RuntimeError,
   createRuntimeContext,
@@ -396,13 +396,6 @@ describe('createGoogleWorkspaceExtension', () => {
 
   describe('EC-20: in-flight abort during dispose yields "operation cancelled"', () => {
     it('throws "google: operation cancelled" (not "request timeout") when disposed mid-flight', async () => {
-      // Simulate a function that starts an async op and suspends, giving
-      // dispose() a chance to run and abort the controller before the op
-      // resolves.  We expose the controller out via a captured ref so the
-      // test can call abort() after marking isDisposed, replicating what
-      // disposeExtension() does.
-      let capturedAbort: (() => void) | null = null;
-
       // Build a config that overrides a function body via the wrap path:
       // we use ALL_CAPS_CONFIG so no capability gate fires, then rely on
       // the promise-suspend technique.
@@ -457,7 +450,6 @@ describe('createGoogleWorkspaceExtension', () => {
       // a post-dispose call must not produce "request timeout".
       await ext.dispose();
 
-      let caught: unknown;
       const result = (await getCallable(ext, 'gmail_read').fn(
         { message_id: 'abc' },
         ctx

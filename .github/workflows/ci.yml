@@ -6,14 +6,25 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+
+concurrency:
+  # Include the workflow name: a bare ref collides across workflows keyed on the
+  # same ref, so one would cancel another's run. Never cancel on main — a push
+  # there must leave a completed status behind, or the required contexts for
+  # that commit never report and the branch deadlocks.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3.0.3
         id: filter
         with:
           filters: |
@@ -25,6 +36,9 @@ jobs:
               - '**/*.yml'
               - '**/*.cjs'
               - '**/*.mjs'
+              - '**/*.sh'
+              - '.nvmrc'
+              - '.node-version'
 
   check:
     needs: changes
@@ -35,12 +49,12 @@ jobs:
         node-version: ['22', '24', '25']
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Enable Corepack
         run: corepack enable
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -48,5 +62,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The root `check`, not `pnpm -r run check`. `-r` excludes the workspace
+      # root, so every root-only script — check:format, check:deps,
+      # check:versions, test:rules, check:standards — silently never ran here.
+      # The root aggregate reaches all of them plus each package's typecheck.
+      #
+      # check:standards runs tree-only through this: no --remote, no token. A
+      # pull request cannot change host state, and GITHUB_TOKEN cannot read
+      # branch protection anyway, so the flag would add an API round trip and
+      # decide nothing. Host settings are checked with
+      # `pnpm check:standards --remote` from a maintainer's authenticated shell.
+      #
+      # This also reruns check:versions, check:format, check:deps, test:rules,
+      # and check:standards on every matrix leg, even though none of them can
+      # differ by Node version — they inspect source, config, and manifest
+      # shape, not runtime behaviour. That duplication is deliberate: keeping
+      # one script that contributors and CI both invoke is worth more than the
+      # time saved by splitting the Node-sensitive checks (build, check:types,
+      # test) out onto their own step.
       - name: Run checks
-        run: pnpm -r run check
+        run: pnpm run check

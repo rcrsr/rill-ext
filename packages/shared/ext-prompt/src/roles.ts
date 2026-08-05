@@ -74,10 +74,10 @@ const ROLE_MARKER_RE = /^@@\s+(\w+)\s*$/;
  * entry with role `user` (the documented default).
  *
  * Interior `##` markdown headings are not treated as role markers and
- * remain part of the enclosing role's content (AC-19).
+ * remain part of the enclosing role's content.
  *
- * @throws RuntimeError RILL-R001 when no `@@ role` markers appear (EC-5)
- * @throws RuntimeError RILL-R001 when a marker role is not in VALID_ROLES (EC-23)
+ * @throws RuntimeError RILL-R001 when no `@@ role` markers appear
+ * @throws RuntimeError RILL-R001 when a marker role is not in VALID_ROLES
  */
 export function splitRoleMessages(body: string): RoleMessage[] {
   const lines = body.split('\n');
@@ -94,7 +94,7 @@ export function splitRoleMessages(body: string): RoleMessage[] {
       const role = match[1] as string;
       const lineNumber = i + 1; // 1-based
 
-      // EC-23: validate role against allowlist after marker extraction
+      // validate role against allowlist after marker extraction
       if (!(VALID_ROLES as readonly string[]).includes(role)) {
         throw new RuntimeError(
           'RILL-R001',
@@ -104,10 +104,7 @@ export function splitRoleMessages(body: string): RoleMessage[] {
 
       if (currentRole !== null) {
         messages.push({ role: currentRole, content: currentLines.join('\n') });
-      } else if (
-        currentLines.length > 0 &&
-        currentLines.some((l) => l.length > 0)
-      ) {
+      } else if (currentLines.some((l) => l.length > 0)) {
         messages.push({ role: 'user', content: currentLines.join('\n') });
       }
       currentRole = role;
@@ -118,7 +115,7 @@ export function splitRoleMessages(body: string): RoleMessage[] {
     }
   }
 
-  // EC-5: no role markers found
+  // no role markers found
   if (!sawMarker) {
     throw new RuntimeError(
       'RILL-R001',

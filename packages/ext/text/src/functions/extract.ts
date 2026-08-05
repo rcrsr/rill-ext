@@ -1,7 +1,7 @@
 /**
  * Pure helpers for URL and email extraction using linkify-it.
  *
- * linkify-it (TD-5) is instantiated once at module load to avoid
+ * linkify-it is instantiated once at module load to avoid
  * repeated compilation of internal regular expressions.
  *
  * Match shape (linkify-it v5):
@@ -27,11 +27,11 @@ const linkifier = new LinkifyIt();
  * `ftps:`) and fuzzy bare-hostname matches (`schema === ''`).
  * Excludes email addresses (`schema === 'mailto:'`).
  *
- * Returns `[]` when no matches are found (AC-32).
+ * Returns `[]` when no matches are found.
  *
  * Examples:
- *   extractUrls('Visit https://example.com for info')  → ['https://example.com']  (AC-15)
- *   extractUrls('plain text')                          → []                        (AC-32)
+ * extractUrls('Visit https://example.com for info') → ['https://example.com']
+ * extractUrls('plain text') → []
  */
 export function extractUrls(text: string): string[] {
   const matches = linkifier.match(text);
@@ -48,11 +48,11 @@ export function extractUrls(text: string): string[] {
  * field on the match already carries the bare address (e.g.
  * `'user@example.com'`), so no stripping is needed.
  *
- * Returns `[]` when no matches are found (AC-33).
+ * Returns `[]` when no matches are found.
  *
  * Examples:
- *   extractEmails('Contact user@example.com')  → ['user@example.com']  (AC-16)
- *   extractEmails('plain text')                → []                     (AC-33)
+ * extractEmails('Contact user@example.com') → ['user@example.com']
+ * extractEmails('plain text') → []
  */
 export function extractEmails(text: string): string[] {
   const matches = linkifier.match(text);

@@ -73,7 +73,7 @@ export type ShieldMiddleware = (
  * Call the Azure AI Content Safety Prompt Shields API.
  *
  * Returns `{ safe: boolean, analysis: dict }`.
- * Validates `contentSafety` config on each call (EC-7 if missing).
+ * Validates `contentSafety` config on each call, halting when it is missing.
  *
  * @param text - User prompt text to evaluate
  * @param documents - Optional supporting documents to evaluate
@@ -95,7 +95,7 @@ export async function callShield(
     throw haltDisposed(ctx);
   }
 
-  // EC-7: Content Safety must be configured
+  // Content Safety must be configured
   if (!config.contentSafety) {
     throw haltUnconfigured(
       ctx,
@@ -198,7 +198,7 @@ export function createAutoShieldMiddleware(
       triggeredBy,
     });
 
-    // EC-8: Prompt attack detected
+    // Prompt attack detected
     if (!result.safe) {
       const message = 'foundry: prompt attack detected';
       throw new RuntimeHaltSignal(

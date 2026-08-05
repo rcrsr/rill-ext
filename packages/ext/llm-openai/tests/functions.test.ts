@@ -81,9 +81,12 @@ function createMockStreamRunner(
  * Build a mock stream runner that throws during iteration.
  */
 function createErrorStreamRunner(error: unknown) {
-  async function* asyncChunks() {
-    throw error;
-    yield {} as any; // unreachable — needed for generator type
+  // A plain async iterator rather than a generator: this one never yields, so
+  // as a generator it needed an unreachable `yield` purely to satisfy the
+  // inferred type. Rejecting on the first next() is what "throws during
+  // iteration" actually means.
+  function asyncChunks(): AsyncIterator<any> {
+    return { next: () => Promise.reject(error) };
   }
 
   return {
@@ -100,7 +103,7 @@ function createErrorStreamRunner(error: unknown) {
 function createPartialDisconnectRunner(partialContent: string, error: unknown) {
   const partialCompletion = createMockFinalCompletion(partialContent);
 
-  async function* asyncChunks() {
+  async function* asyncChunks(): AsyncGenerator<any> {
     if (partialContent.length > 0) {
       yield {
         choices: [
@@ -113,7 +116,6 @@ function createPartialDisconnectRunner(partialContent: string, error: unknown) {
       };
     }
     throw error;
-    yield {} as any; // unreachable — needed for generator type
   }
 
   return {
@@ -1056,7 +1058,7 @@ describe('embed() function', () => {
   describe('success cases', () => {
     // AC-4: embed("text") returns vector with model and dimensions
     it('returns vector with correct model and dimensions', async () => {
-      const mockEmbedding = new Array(1536).fill(0).map((_, i) => i * 0.001);
+      const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
       mockEmbeddingsCreate.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
         model: 'text-embedding-3-small',
@@ -1084,7 +1086,7 @@ describe('embed() function', () => {
     });
 
     it('handles different embedding dimensions', async () => {
-      const mockEmbedding = new Array(768).fill(0).map((_, i) => i * 0.001);
+      const mockEmbedding = Array.from({ length: 768 }, (_, i) => i * 0.001);
       mockEmbeddingsCreate.mockResolvedValue({
         data: [{ embedding: mockEmbedding }],
         model: 'text-embedding-3-large',
@@ -1216,8 +1218,8 @@ describe('embed_batch() function', () => {
   describe('success cases', () => {
     // AC-5: embed_batch(["text1", "text2"]) returns list of vectors
     it('returns list of vectors for multiple texts', async () => {
-      const mockEmbedding1 = new Array(1536).fill(0).map((_, i) => i * 0.001);
-      const mockEmbedding2 = new Array(1536).fill(0).map((_, i) => i * 0.002);
+      const mockEmbedding1 = Array.from({ length: 1536 }, (_, i) => i * 0.001);
+      const mockEmbedding2 = Array.from({ length: 1536 }, (_, i) => i * 0.002);
       mockEmbeddingsCreate.mockResolvedValue({
         data: [{ embedding: mockEmbedding1 }, { embedding: mockEmbedding2 }],
         model: 'text-embedding-3-small',

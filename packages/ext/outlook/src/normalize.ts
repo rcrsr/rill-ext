@@ -80,7 +80,7 @@ function isoToEpochMs(value: string | undefined): number {
 
 /**
  * MailMessageDict - 9 fields from Graph API message.
- * AC-14: date is epoch ms converted from ISO 8601.
+ * date is epoch ms converted from ISO 8601.
  */
 export interface MailMessageDict {
   readonly id: string;
@@ -128,7 +128,7 @@ export function normalizeMessage(graphMsg: unknown): MailMessageDict {
 
 /**
  * CalendarEventDict - 8 fields from Graph API event.
- * AC-14: start and end are epoch ms converted from ISO 8601.
+ * start and end are epoch ms converted from ISO 8601.
  * Uses onlineMeeting.joinUrl, not deprecated onlineMeetingUrl.
  */
 export interface CalendarEventDict {
@@ -175,7 +175,7 @@ export function normalizeEvent(graphEvent: unknown): CalendarEventDict {
 
 /**
  * ScheduleItemDict - one slot within a FreeBusyScheduleDict.
- * AC-14: start and end are epoch ms converted from ISO 8601.
+ * start and end are epoch ms converted from ISO 8601.
  */
 export interface ScheduleItemDict {
   readonly status: string;

@@ -6,7 +6,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
-  RuntimeError,
   isInvalid,
   getStatus,
   type RillValue,

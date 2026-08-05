@@ -5,8 +5,6 @@
  * - Accepts named args matching the declared RillParam list
  * - Interpolates {name} placeholders in the body
  * - Returns a rill string (output: 'string') or rill list of role dicts (output: 'list')
- *
- * Covers IR-9, AC-4, AC-14, EC-17.
  */
 
 import {
@@ -65,7 +63,7 @@ const MESSAGE_LIST_RETURN_TYPE: RillTypeValue = structureToTypeValue({
 /**
  * Builds an ApplicationCallable from a fully validated ParsedPrompt.
  *
- * Annotations attached to the callable (IR-9, AC-4):
+ * Annotations attached to the callable:
  *   ^id          — resolution name (rill string)
  *   ^hash        — SHA-256 hex digest of canonical content (rill string)
  *   ^description — human-readable description (rill string)
@@ -75,7 +73,7 @@ const MESSAGE_LIST_RETURN_TYPE: RillTypeValue = structureToTypeValue({
  * The closure fn:
  *   - Coerces values via `formatValue` from `@rcrsr/rill` (rill's canonical stringifier).
  *   - Re-throws existing RuntimeErrors as-is (factory-time RILL-R001 paths).
- *   - Wraps any other uncaught error (EC-17) via `ctx.invalidate(err, { code: 'PROTOCOL', provider: 'prompt-md', raw: { kind: 'closure_failure', ... } })`.
+ * - Wraps any other uncaught error via `ctx.invalidate(err, { code: 'PROTOCOL', provider: 'prompt-md', raw: { kind: 'closure_failure', ... } })`.
  *
  * @param parsed - Fully validated ParsedPrompt from parseFile.
  * @returns An ApplicationCallable wrapping the prompt logic.
@@ -88,7 +86,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
     return { name: param.name, type: typeLabel } as Record<string, RillValue>;
   });
 
-  // ── Annotations dict (IR-9, AC-4) ────────────────────────────────────────
+  // ── Annotations dict ────────────────────────────────────────
   const annotations: Record<string, RillValue> = {
     [ANNOTATION_KEY_ID]: parsed.name,
     [ANNOTATION_KEY_HASH]: parsed.hash,
@@ -122,7 +120,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
       }
 
       // output === 'list': split on @@ role markers → list of { role, content } dicts.
-      // parseFile guarantees at least one marker exists (EC-14), so splitRoleMessages
+      // parseFile guarantees at least one marker exists, so splitRoleMessages
       // will not throw RILL-R001 here.
       const messages = splitRoleMessages(interpolated);
       return messages.map(({ role, content }) => ({
@@ -134,7 +132,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
       if (err instanceof RuntimeError) {
         throw err;
       }
-      // Closure-runtime failure (EC-17): invalidate via ctx with #PROTOCOL.
+      // Closure-runtime failure: invalidate via ctx with #PROTOCOL.
       throw ctx.invalidate(err, {
         code: 'PROTOCOL',
         provider: 'prompt-md',

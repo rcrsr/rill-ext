@@ -39,7 +39,7 @@ export function createFunctionWrapper(
       args: Record<string, RillValue>,
       ctx: RuntimeContext
     ): Promise<RillValue> => {
-      // EC-20: Check disposal state first
+      // Check disposal state first
       const disposed = checkDisposed(ctx, state, provider);
       if (disposed !== null) return disposed;
 

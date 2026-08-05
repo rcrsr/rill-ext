@@ -12,7 +12,6 @@ import {
   getStatus,
   isInvalid,
   isRillStream,
-  RuntimeError,
   type RillValue,
 } from '@rcrsr/rill';
 import type { ClaudeCodeResult } from '../src/types.js';

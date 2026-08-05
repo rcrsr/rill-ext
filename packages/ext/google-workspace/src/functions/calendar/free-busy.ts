@@ -1,6 +1,6 @@
 /**
  * calendar_free_busy callable — query free/busy information for a set of calendars.
- * IR-18: calendar_free_busy(emails: list[str], startTime: str, endTime: str) → dict
+ * calendar_free_busy(emails: list[str], startTime: str, endTime: str) → dict
  * Capability: calendar.freeBusy
  * Scopes: calendar.readonly
  */
@@ -19,9 +19,9 @@ export interface CalendarFreeBusyDeps {
 }
 /**
  * Factory returning the calendar_free_busy inner function.
- * BC-4: Empty emails list → halts with invalid `#INVALID_INPUT` before fetch.
- * EC-13: Rejects naive ISO timestamps (no timezone).
- * AC-12: Returns rill primitive dict keyed by email.
+ * Empty emails list → halts with invalid `#INVALID_INPUT` before fetch.
+ * Rejects naive ISO timestamps (no timezone).
+ * Returns rill primitive dict keyed by email.
  */
 export function makeCalendarFreeBusy(
   deps: CalendarFreeBusyDeps
@@ -38,7 +38,7 @@ export function makeCalendarFreeBusy(
     const emails = args['emails'];
     const startTime = args['start_time'];
     const endTime = args['end_time'];
-    // BC-4: Validate emails before fetch
+    // Validate emails before fetch
     if (!Array.isArray(emails) || emails.length === 0) {
       failInput(
         ctx,
@@ -71,7 +71,7 @@ export function makeCalendarFreeBusy(
         'google: end_time must be a non-empty string'
       );
     }
-    // EC-13: Reject naive ISO timestamps
+    // Reject naive ISO timestamps
     assertIsoTimestamp(ctx, startTime, 'start_time');
     assertIsoTimestamp(ctx, endTime, 'end_time');
     const body = {
@@ -94,7 +94,7 @@ export function makeCalendarFreeBusy(
       undefined,
       undefined
     );
-    // Project to { <email>: { busy: [{ start, end }, ...] }, ... } [AC-12]
+    // Project to { <email>: { busy: [{ start, end }, ...] }, ... }
     const data = response as {
       calendars?: Record<
         string,

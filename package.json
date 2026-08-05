@@ -14,22 +14,30 @@
   },
   "homepage": "https://github.com/rcrsr/rill-ext#readme",
   "scripts": {
+    "prepare": "lefthook install --force",
+    "bootstrap": "bash scripts/bootstrap.sh",
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
+    "test:rules": "rill-test-rules",
     "check:types": "pnpm -r run typecheck",
     "check:lint": "pnpm -r run lint",
     "check:format": "oxfmt --check",
     "check:deps": "knip",
+    "check:standards": "rill-check-standards",
+    "check:versions": "bash scripts/check-versions.sh",
     "fix:lint": "oxlint --fix",
     "fix:format": "oxfmt",
-    "check": "pnpm run check:types && pnpm run check:lint && pnpm run check:format && pnpm run check:deps && pnpm run build && pnpm run test"
+    "fix:versions": "bash scripts/sync-versions.sh",
+    "check": "pnpm run check:versions && pnpm run build && pnpm run check:types && pnpm run check:lint && pnpm run check:format && pnpm run check:deps && pnpm run test:rules && pnpm run test && pnpm run check:standards"
   },
   "author": "Andre Bremer",
   "license": "MIT",
   "engines": {
-    "node": ">=22.16.0"
+    "node": ">=22.16.0",
+    "pnpm": ">=11"
   },
   "devDependencies": {
+    "@rcrsr/rill-dev": "^0.1.0",
     "@types/node": "^26.1.1",
     "knip": "^6.25.0",
     "lefthook": "^2.1.10",

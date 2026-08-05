@@ -42,7 +42,7 @@ export function mapVectorError(
     });
   }
 
-  // EC-8: Non-Error value thrown
+  // Non-Error value thrown
   if (!(error instanceof Error)) {
     return ctx.invalidate(error, {
       code: 'UNAVAILABLE',
@@ -53,7 +53,7 @@ export function mapVectorError(
 
   const message = error.message;
 
-  // EC-1: Status 401 or "unauthorized" in message
+  // Status 401 or "unauthorized" in message
   if (
     message.includes('401') ||
     message.toLowerCase().includes('unauthorized')
@@ -69,7 +69,7 @@ export function mapVectorError(
     });
   }
 
-  // EC-2: "collection"/"index" + "not found" in message
+  // "collection"/"index" + "not found" in message
   const lower = message.toLowerCase();
   if (
     (lower.includes('collection') || lower.includes('index')) &&
@@ -85,7 +85,7 @@ export function mapVectorError(
     });
   }
 
-  // EC-3: Status 429 or "rate limit" in message
+  // Status 429 or "rate limit" in message
   if (message.includes('429') || message.toLowerCase().includes('rate limit')) {
     return ctx.invalidate(error, {
       code: 'RATE_LIMIT',
@@ -97,7 +97,7 @@ export function mapVectorError(
     });
   }
 
-  // EC-4: AbortError name or "timeout" in message — treat as timeout
+  // AbortError name or "timeout" in message — treat as timeout
   if (
     error.name === 'AbortError' ||
     message.toLowerCase().includes('timeout')
@@ -109,7 +109,7 @@ export function mapVectorError(
     });
   }
 
-  // EC-5: "dimension" in message
+  // "dimension" in message
   if (message.toLowerCase().includes('dimension')) {
     const match = message.match(
       /expected (\d+).*got (\d+)|(\d+).*?expected.*?(\d+)/i
@@ -138,7 +138,7 @@ export function mapVectorError(
     });
   }
 
-  // EC-6: "already exists" in message
+  // "already exists" in message
   if (message.toLowerCase().includes('already exists')) {
     return ctx.invalidate(error, {
       code: 'CONFLICT',
@@ -150,7 +150,7 @@ export function mapVectorError(
     });
   }
 
-  // EC-7: TypeError → network/connection failure
+  // TypeError → network/connection failure
   if (error instanceof TypeError) {
     return ctx.invalidate(error, {
       code: 'UNAVAILABLE',
@@ -159,7 +159,7 @@ export function mapVectorError(
     });
   }
 
-  // EC-7: Generic Error instance
+  // Generic Error instance
   return ctx.invalidate(error, {
     code: 'UNAVAILABLE',
     provider,

@@ -31,13 +31,13 @@ export interface FrontmatterSplit {
  * `body` (text after closing fence), and `bodyLineOffset` (1-based
  * line number of the first body line, for error reporting).
  *
- * @throws RuntimeError RILL-R001 when opening fence is missing (EC-1)
- * @throws RuntimeError RILL-R001 when closing fence is missing (EC-2)
+ * @throws RuntimeError RILL-R001 when opening fence is missing
+ * @throws RuntimeError RILL-R001 when closing fence is missing
  */
 export function splitFrontmatter(source: string): FrontmatterSplit {
   const lines = source.split('\n');
 
-  // EC-1: opening fence must be the first line
+  // opening fence must be the first line
   if (lines[0] !== '---') {
     throw new RuntimeError(
       'RILL-R001',
@@ -48,7 +48,7 @@ export function splitFrontmatter(source: string): FrontmatterSplit {
   // Find the closing fence starting from line index 1
   const closingIndex = lines.indexOf('---', 1);
 
-  // EC-2: no closing fence found
+  // no closing fence found
   if (closingIndex === -1) {
     throw new RuntimeError(
       'RILL-R001',

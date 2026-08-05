@@ -1,7 +1,7 @@
 /**
  * Content hash computation for rill prompt definitions.
  *
- * Covers IR-6, AC-18 (hash stability).
+ * Covers hash stability.
  *
  * Uses node:crypto inline — does NOT import @rcrsr/rill-ext-crypto (§EXT.2.1).
  */

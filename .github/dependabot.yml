@@ -1,0 +1,62 @@
+# Copied from the rill ecosystem template. See @rcrsr/rill-dev's REPO-STANDARDS.md STD-SUP-1.
+# Only the `directories` list differs: this workspace nests packages a level
+# deeper than the template's.
+version: 2
+
+updates:
+  # Workspace dependencies. `directories` with a glob covers every package in
+  # the pnpm workspace; a single `directory: "/"` entry would only see the root
+  # manifest and would miss per-package devDependencies entirely.
+  - package-ecosystem: npm
+    directories:
+      - '/'
+      - '/packages/ext/*'
+      - '/packages/shared/*'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    labels:
+      - 'area:dx'
+    groups:
+      # One PR per tool family. Ungrouped, the shared toolchain produces a
+      # separate PR per package per bump, which for 34 packages is dozens a
+      # week and guarantees the updates get ignored.
+      oxc:
+        patterns:
+          - 'oxlint'
+          - 'oxfmt'
+      typescript:
+        patterns:
+          - 'typescript'
+          - '@types/*'
+      testing:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+      dev-tooling:
+        patterns:
+          - 'knip'
+          - 'lefthook'
+          - 'tsx'
+          - 'tsup'
+          - 'dts-bundle-generator'
+    ignore:
+      # The peer range on @rcrsr/rill tracks the release process, not the
+      # registry: an extension's peerDependency matches rill by minor and a
+      # bump is decided at release time. A dependabot PR here would fight
+      # scripts/check-versions.sh and the versioning rule in CLAUDE.md.
+      - dependency-name: '@rcrsr/rill'
+
+  # Action versions. Separate ecosystem, so it needs its own entry.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - 'area:dx'
+    groups:
+      actions:
+        patterns:
+          - '*'
