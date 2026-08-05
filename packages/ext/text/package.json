@@ -38,7 +38,7 @@
   "dependencies": {
     "html-to-text": "^10.0.0",
     "turndown": "^7.2.4",
-    "defuddle": "^0.19.1",
+    "defuddle": "^0.19.2",
     "linkedom": "^0.18.13",
     "entities": "^8.0.0",
     "linkify-it": "^5.0.2"
