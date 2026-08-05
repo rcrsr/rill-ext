@@ -41,7 +41,7 @@
     "defuddle": "^0.19.1",
     "linkedom": "^0.18.13",
     "entities": "^8.0.0",
-    "linkify-it": "^5.0.2"
+    "linkify-it": "^6.1.0"
   },
   "devDependencies": {
     "@rcrsr/rill": "~0.20.0",
