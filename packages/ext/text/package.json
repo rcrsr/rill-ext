@@ -48,7 +48,7 @@
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/html-to-text": "^9.0.4",
     "@types/linkify-it": "^5.0.0",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "@types/turndown": "^5.0.6",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",

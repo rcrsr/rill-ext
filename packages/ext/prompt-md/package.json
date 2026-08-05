@@ -37,7 +37,7 @@
     "@google/genai": "^2.11.0",
     "@rcrsr/rill": "~0.20.0",
     "@rcrsr/rill-ext-prompt-shared": "workspace:*",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "dts-bundle-generator": "^9.5.1",
     "openai": "^6.46.0",
     "tsup": "^8.5.1",
