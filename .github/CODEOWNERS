@@ -1,5 +1,5 @@
 # Code owners for rill-ext. Copied from the rill ecosystem template; see
-# dev/REPO-STANDARDS.md STD-SUP-7.
+# node_modules/@rcrsr/rill-dev/REPO-STANDARDS.md STD-SUP-7.
 #
 # Last matching pattern wins, so the high-blast-radius paths sit at the bottom.
 
@@ -11,11 +11,6 @@
 /.github/                   @AndreBremer
 /.github/workflows/         @AndreBremer
 /scripts/                   @AndreBremer
-
-# Shared dev assets: the conformance standard and the lint rules every
-# ecosystem repo derives from. This repository holds a copy, and a local edit
-# to it is what the drift check in ci.yml exists to catch.
-/dev/                       @AndreBremer
 
 # Toolchain and lint policy. Changes here silently alter what CI accepts
 # everywhere else.

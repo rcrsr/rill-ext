@@ -174,8 +174,8 @@ Write the subject as a description of the change. State what the code does now,
 not how many files you touched.
 
 `lefthook` runs formatting then lint with auto-fix before each commit, piped so
-a failing step halts the rest. It runs typecheck and the full test suite in
-parallel before each push. Skip with `LEFTHOOK=0` only when you have a specific
+a failing step halts the rest. It runs typecheck, then the full test suite,
+before each push. Skip with `LEFTHOOK=0` only when you have a specific
 reason.
 
 ## Pull requests
