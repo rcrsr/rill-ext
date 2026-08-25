@@ -126,7 +126,7 @@ export async function callShield(
     });
 
     const analysis: Record<string, RillValue> = {
-      attackType: result.attackType as RillValue,
+      attack_type: result.attackType as RillValue,
     };
 
     return {

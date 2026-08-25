@@ -474,6 +474,19 @@ export function createOpenAIExtension(
     }
   };
 
+  // After dispose() the abortController is cleared; reject further calls so
+  // in-flight-free requests do not proceed on a disposed extension.
+  function assertNotDisposed(ctx: RuntimeContext): void {
+    if (!abortController) {
+      throw haltInvalid(
+        ctx,
+        'DISPOSED',
+        'extension_disposed',
+        'openai: extension disposed'
+      );
+    }
+  }
+
   // ============================================================
   // SHARED RETURN TYPE STRUCTURE
   // ============================================================
@@ -523,6 +536,7 @@ export function createOpenAIExtension(
         },
       ],
       fn: (args, ctx): RillValue => {
+        assertNotDisposed(ctx as RuntimeContext);
         const rawPrompt = args['prompt'] as RillValue;
 
         // Normalize prompt (string or message list) → canonical Message[]
@@ -667,6 +681,7 @@ export function createOpenAIExtension(
         },
       ],
       fn: (args, ctx): RillValue => {
+        assertNotDisposed(ctx as RuntimeContext);
         const rawPrompt = args['prompt'] as RillValue;
 
         const normalizedRaw1 = normalizePrompt(
@@ -701,13 +716,16 @@ export function createOpenAIExtension(
           ...factoryExtra,
         };
 
+        // One runner backs both the stream and the resolved result so a single
+        // message() call costs one request (not two) and dispose can abort it.
+        const runner = client.responses.stream({
+          ...baseParams,
+          stream: true,
+        } as ResponseCreateParamsStreaming);
+
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
-            const stream = client.responses.stream({
-              ...baseParams,
-              stream: true,
-            } as ResponseCreateParamsStreaming);
-            for await (const event of stream) {
+            for await (const event of runner) {
               const e = event as { type?: string; delta?: string };
               if (e.type === 'response.output_text.delta' && e.delta) {
                 yield e.delta as RillValue;
@@ -726,10 +744,7 @@ export function createOpenAIExtension(
         const resolve = async (): Promise<RillValue> => {
           const startTime = Date.now();
           try {
-            const response = await client.responses.create({
-              ...baseParams,
-              stream: false,
-            } as ResponseCreateParamsNonStreaming);
+            const response = await runner.finalResponse();
 
             const assistantMsg = responsesAPIToCanonical(response);
             const responseMessages = buildResponseMessages(
@@ -789,7 +804,7 @@ export function createOpenAIExtension(
           chunks: chunks(),
           resolve,
           dispose: () => {
-            /* stream aborts via AbortController if needed */
+            runner.abort();
           },
           chunkType: { kind: 'string' },
           retType: VERB_STREAM_RET_TYPE,
@@ -861,6 +876,7 @@ export function createOpenAIExtension(
         p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
+        assertNotDisposed(ctx as RuntimeContext);
         const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
         const perCallMaxTurns = (args['max_turns'] ?? 0) as number;
@@ -1202,6 +1218,7 @@ export function createOpenAIExtension(
         p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
+        assertNotDisposed(ctx as RuntimeContext);
         const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
         const perCallMaxTurns = (args['max_turns'] ?? 0) as number;
@@ -1499,6 +1516,7 @@ export function createOpenAIExtension(
       },
     ],
     fn: async (args, ctx): Promise<RillValue> => {
+      assertNotDisposed(ctx as RuntimeContext);
       const startTime = Date.now();
 
       try {
@@ -1716,6 +1734,7 @@ export function createOpenAIExtension(
   const embedFn: RillFunction = {
     params: [p.str('text')],
     fn: async (args, ctx): Promise<RillValue> => {
+      assertNotDisposed(ctx as RuntimeContext);
       const startTime = Date.now();
 
       try {
@@ -1792,6 +1811,7 @@ export function createOpenAIExtension(
   const embedBatchFn: RillFunction = {
     params: [p.list('texts')],
     fn: async (args, ctx): Promise<RillValue> => {
+      assertNotDisposed(ctx as RuntimeContext);
       const startTime = Date.now();
 
       try {

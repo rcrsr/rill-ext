@@ -53,14 +53,14 @@ export function createRedisKvExtension(
   // Factory-time config validation
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       'Redis kv extension requires at least one mount in configuration'
     );
   }
 
   if (!config.url || typeof config.url !== 'string') {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       'Redis kv extension requires a valid connection URL'
     );
   }
@@ -70,7 +70,7 @@ export function createRedisKvExtension(
     !config.url.startsWith('rediss://')
   ) {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       `Invalid Redis connection URL: must start with redis:// or rediss:// (got: ${config.url})`
     );
   }
@@ -86,7 +86,7 @@ export function createRedisKvExtension(
       const b = prefixes[j]!;
       if (a.prefix.startsWith(b.prefix) || b.prefix.startsWith(a.prefix)) {
         throw new RuntimeError(
-          'RILL-R005',
+          'RILL-R001',
           `Mount prefix overlap detected: "${a.name}" (${a.prefix}) and "${b.name}" (${b.prefix})`
         );
       }
@@ -98,7 +98,7 @@ export function createRedisKvExtension(
     client = new Redis(config.url);
   } catch (error: unknown) {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       `Failed to create Redis client: ${error instanceof Error ? error.message : String(error)}`
     );
   }
@@ -623,8 +623,8 @@ export function createRedisKvExtension(
         name,
         mode: mountConfig.mode,
         schema: mountConfig.schema ? 'declared' : 'open',
-        maxEntries: mountConfig.maxEntries ?? 10000,
-        maxValueSize: mountConfig.maxValueSize ?? 102400,
+        max_entries: mountConfig.maxEntries ?? 10000,
+        max_value_size: mountConfig.maxValueSize ?? 102400,
         prefix: mountConfig.prefix,
         ttl: mountConfig.ttl ?? 0,
       });
@@ -756,8 +756,8 @@ export function createRedisKvExtension(
             name: { type: { kind: 'string' } },
             mode: { type: { kind: 'string' } },
             schema: { type: { kind: 'string' } },
-            maxEntries: { type: { kind: 'number' } },
-            maxValueSize: { type: { kind: 'number' } },
+            max_entries: { type: { kind: 'number' } },
+            max_value_size: { type: { kind: 'number' } },
             prefix: { type: { kind: 'string' } },
             ttl: { type: { kind: 'number' } },
           },

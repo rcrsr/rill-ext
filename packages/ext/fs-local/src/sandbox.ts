@@ -106,7 +106,26 @@ export async function resolvePath(
       const parentDir = path.dirname(normalized);
       const resolvedParent = await fs.realpath(parentDir);
       const filename = path.basename(normalized);
-      resolvedPath = path.join(resolvedParent, filename);
+      const candidate = path.join(resolvedParent, filename);
+      // If the target name already exists as a symlink, follow it so the
+      // post-realpath boundary check sees its true destination; otherwise a
+      // symlink pointing outside the mount is written through. A missing
+      // target (ENOENT) is a genuine new-file write: keep the parent-resolved
+      // path so creation still works.
+      try {
+        resolvedPath = await fs.realpath(candidate);
+      } catch (linkError) {
+        if (
+          linkError &&
+          typeof linkError === 'object' &&
+          'code' in linkError &&
+          (linkError as { code: string }).code === 'ENOENT'
+        ) {
+          resolvedPath = candidate;
+        } else {
+          throw linkError;
+        }
+      }
     } else {
       // Existing file: resolve full path
       resolvedPath = await fs.realpath(normalized);
@@ -261,7 +280,7 @@ export function checkMode(
  *
  * Mutates MountConfig to set resolvedPath field.
  *
- * Throws synchronously (factory-init) — uses RILL-R005 because mounts are
+ * Throws synchronously (factory-init) — uses RILL-R001 because mounts are
  * configured before any host fn returns. Configuration errors should fail
  * extension creation, not produce invalid RillValues at runtime.
  */
@@ -273,7 +292,7 @@ export async function initializeMount(mount: MountConfig): Promise<void> {
       const code = (error as { code: string }).code;
       if (code === 'ENOENT') {
         throw new RuntimeError(
-          'RILL-R005',
+          'RILL-R001',
           `mount path does not exist: ${mount.path}`,
           undefined,
           { path: mount.path }
@@ -281,7 +300,7 @@ export async function initializeMount(mount: MountConfig): Promise<void> {
       }
       if (code === 'EACCES' || code === 'EPERM') {
         throw new RuntimeError(
-          'RILL-R005',
+          'RILL-R001',
           `permission denied: ${mount.path}`,
           undefined,
           { path: mount.path, code }

@@ -848,8 +848,8 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         name: 'user',
         mode: 'read-write',
         schema: 'declared',
-        maxEntries: 1000,
-        maxValueSize: 5000,
+        max_entries: 1000,
+        max_value_size: 5000,
         prefix: 'test:user:',
         ttl: 3600,
       });
@@ -858,8 +858,8 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
         name: 'cache',
         mode: 'read',
         schema: 'open',
-        maxEntries: 10000,
-        maxValueSize: 102400,
+        max_entries: 10000,
+        max_value_size: 102400,
         prefix: 'test:cache:',
         ttl: 0,
       });

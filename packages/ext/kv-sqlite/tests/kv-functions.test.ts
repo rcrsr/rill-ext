@@ -1140,8 +1140,8 @@ describe('kv functions', () => {
         name: 'users',
         mode: 'read-write',
         schema: 'declared',
-        maxEntries: 5000,
-        maxValueSize: 50000,
+        max_entries: 5000,
+        max_value_size: 50000,
         database: db1Path,
         table: 'users_kv',
       });
@@ -1149,8 +1149,8 @@ describe('kv functions', () => {
         name: 'cache',
         mode: 'read',
         schema: 'open',
-        maxEntries: 10000,
-        maxValueSize: 102400,
+        max_entries: 10000,
+        max_value_size: 102400,
         database: db2Path,
         table: 'cache_kv',
       });

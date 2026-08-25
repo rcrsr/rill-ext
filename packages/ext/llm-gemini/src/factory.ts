@@ -522,6 +522,19 @@ export function createGeminiExtension(
     }
   };
 
+  // After dispose() the abortController is cleared; reject further calls so
+  // requests do not proceed on a disposed extension.
+  function assertNotDisposed(ctx: RuntimeContext): void {
+    if (!abortController) {
+      throw haltInvalid(
+        ctx,
+        'DISPOSED',
+        'extension_disposed',
+        'gemini: extension disposed'
+      );
+    }
+  }
+
   /**
    * Build the generationConfig object, merging factory extra.
    * Validated extra fields merge into generationConfig per Gemini SDK shape.
@@ -580,6 +593,7 @@ export function createGeminiExtension(
         },
       ],
       fn: async (args, ctx): Promise<RillValue> => {
+        assertNotDisposed(ctx as RuntimeContext);
         const rawPrompt = args['prompt'] as RillValue;
 
         // Normalize prompt to canonical Message[]
@@ -701,6 +715,7 @@ export function createGeminiExtension(
     embed: {
       params: [p.str('text')],
       fn: async (args, ctx): Promise<RillValue> => {
+        assertNotDisposed(ctx as RuntimeContext);
         const startTime = Date.now();
 
         try {
@@ -766,6 +781,7 @@ export function createGeminiExtension(
     embed_batch: {
       params: [p.list('texts')],
       fn: async (args, ctx): Promise<RillValue> => {
+        assertNotDisposed(ctx as RuntimeContext);
         const startTime = Date.now();
 
         try {
@@ -869,6 +885,7 @@ export function createGeminiExtension(
         p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
+        assertNotDisposed(ctx as RuntimeContext);
         const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
         const perCallMaxTurns = (args['max_turns'] as number) ?? 0;
@@ -1306,6 +1323,7 @@ export function createGeminiExtension(
         },
       ],
       fn: async (args, ctx): Promise<RillValue> => {
+        assertNotDisposed(ctx as RuntimeContext);
         const startTime = Date.now();
 
         try {

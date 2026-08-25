@@ -5,7 +5,6 @@
  */
 
 import {
-  RuntimeError,
   structureToTypeValue,
   toCallable,
   type CallableFn,
@@ -72,20 +71,27 @@ function mapEndpointConfig(
 // ARGUMENT PROCESSING
 // ============================================================
 
+type ProcessedArguments =
+  | { ok: true; args: Record<string, unknown> }
+  | { ok: false; invalid: RillValue };
+
 /**
  * Process named arguments dict, applying defaults and required checks.
  *
+ * A missing required parameter is a runtime call error, so it yields an invalid
+ * RillValue (`#INVALID_INPUT`) via `ctx.invalidate` — not a factory-time throw.
+ *
+ * @param ctx - Runtime context (provides `invalidate`)
  * @param args - Named argument map from runtime
  * @param params - Parameter definitions
  * @param functionName - Function name for error messages
- * @returns Dict of argument name to value
- * @throws RuntimeError on missing required parameter
  */
 function processArguments(
+  ctx: RuntimeContext,
   args: Record<string, RillValue>,
   params: readonly EndpointParam[],
   functionName: string
-): Record<string, unknown> {
+): ProcessedArguments {
   const result: Record<string, unknown> = {};
 
   for (const param of params) {
@@ -95,19 +101,28 @@ function processArguments(
       if (param.defaultValue !== undefined) {
         result[param.name] = param.defaultValue;
       } else if (param.required !== false) {
-        throw new RuntimeError(
-          'RILL-R005',
-          `parameter "${param.name}" is required`,
-          undefined,
-          { functionName, paramName: param.name }
-        );
+        return {
+          ok: false,
+          invalid: ctx.invalidate(
+            new Error(`parameter "${param.name}" is required`),
+            {
+              code: 'INVALID_INPUT',
+              provider: 'fetch',
+              raw: {
+                kind: 'missing_parameter',
+                functionName,
+                paramName: param.name,
+              },
+            }
+          ),
+        };
       }
     } else {
       result[param.name] = value;
     }
   }
 
-  return result;
+  return { ok: true, args: result };
 }
 
 // ============================================================
@@ -184,11 +199,14 @@ export function createFetchExtension(
 
     const endpointFn: CallableFn = async (args, runCtxLike) => {
       const runCtx = runCtxLike as RuntimeContext;
-      const processedArgs = processArguments(
+      const processed = processArguments(
+        runCtx,
         args as Record<string, RillValue>,
         params,
         endpointName
       );
+      if (!processed.ok) return processed.invalid;
+      const processedArgs = processed.args;
 
       const { url, options, responseShape } = buildRequest(
         internalConfig,

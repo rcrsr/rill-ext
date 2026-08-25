@@ -63,7 +63,7 @@ export function createFileKvExtension(
     };
   } else {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       'KV file extension requires either "mounts" or "store" configuration'
     );
   }
@@ -293,8 +293,8 @@ export function createFileKvExtension(
         name,
         mode: cfg.mode,
         schema: cfg.schema ? 'declared' : 'open',
-        maxEntries: cfg.maxEntries ?? 10000,
-        maxValueSize: cfg.maxValueSize ?? 102400,
+        max_entries: cfg.maxEntries ?? 10000,
+        max_value_size: cfg.maxValueSize ?? 102400,
       });
     }
     return result;

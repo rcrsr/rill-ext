@@ -111,21 +111,22 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
         values[param.name] = formatValue(raw);
       }
 
-      // Interpolate body with resolved values.
-      const interpolated = interpolate(parsed.body, values);
-
       // Produce output shape based on declared output type.
       if (parsed.output === 'string') {
-        return interpolated;
+        // Plain string output has no role structure; interpolate the whole body.
+        return interpolate(parsed.body, values);
       }
 
-      // output === 'list': split on @@ role markers → list of { role, content } dicts.
-      // parseFile guarantees at least one marker exists, so splitRoleMessages
-      // will not throw RILL-R001 here.
-      const messages = splitRoleMessages(interpolated);
-      return messages.map(({ role, content }) => ({
+      // output === 'list': split the TEMPLATE into @@ role messages FIRST, then
+      // interpolate within each message's content. Splitting before
+      // interpolation stops an arg value that contains a "@@ role" line from
+      // injecting a new message (e.g. a smuggled system prompt). parseFile
+      // guarantees at least one marker exists, so splitRoleMessages will not
+      // throw RILL-R001 here.
+      const templateMessages = splitRoleMessages(parsed.body);
+      return templateMessages.map(({ role, content }) => ({
         role,
-        content,
+        content: interpolate(content, values),
       })) as RillValue[];
     } catch (err) {
       // Re-throw RuntimeErrors as-is (any RILL-R001 propagated from splitRoleMessages).

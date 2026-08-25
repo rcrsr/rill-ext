@@ -11,7 +11,11 @@ import { googleFetch } from '../../fetch.js';
 import type { GoogleAuth } from '../../types.js';
 import type { CalendarConfig } from '../../types.js';
 import type { TokenCache } from '../../auth/resolve.js';
-import { CAL_BASE, assertAllowedCalendarId } from './_shared.js';
+import {
+  CAL_BASE,
+  assertAllowedCalendarId,
+  toBoundaryDateTime,
+} from './_shared.js';
 
 const CAL_READ_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 
@@ -108,8 +112,8 @@ export function makeCalendarToday(
     const events = rawItems.map((item) => ({
       id: item.id ?? '',
       summary: item.summary ?? '',
-      start: item.start ?? {},
-      end: item.end ?? {},
+      start: toBoundaryDateTime(item.start),
+      end: toBoundaryDateTime(item.end),
       attendees: (item.attendees ?? []).map((a) => ({
         email: a.email ?? '',
         display_name: a.displayName ?? '',

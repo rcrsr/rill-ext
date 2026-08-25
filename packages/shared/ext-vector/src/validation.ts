@@ -3,15 +3,17 @@
  * Validates required fields with type-safe assertions.
  */
 
+import { RuntimeError } from '@rcrsr/rill';
+
 /**
  * Validate that a configuration field is present and non-empty.
  *
- * Throws Error for undefined, null, or empty string.
+ * Throws RuntimeError('RILL-R001') for undefined, null, or empty string.
  * Zero (0) passes validation as it is a valid value.
  *
  * @param value - Value to validate
  * @param fieldName - Field name for error message
- * @throws Error when value is undefined, null, or empty string
+ * @throws RuntimeError('RILL-R001') when value is undefined, null, or empty string
  *
  * @example
  * ```typescript
@@ -25,17 +27,17 @@ export function assertRequired<T>(
 ): asserts value is T {
   // undefined throws
   if (value === undefined) {
-    throw new Error(`${fieldName} is required`);
+    throw new RuntimeError('RILL-R001', `${fieldName} is required`);
   }
 
   // null throws
   if (value === null) {
-    throw new Error(`${fieldName} is required`);
+    throw new RuntimeError('RILL-R001', `${fieldName} is required`);
   }
 
   // empty string throws
   if (value === '') {
-    throw new Error(`${fieldName} is required`);
+    throw new RuntimeError('RILL-R001', `${fieldName} is required`);
   }
 
   // Zero (0) passes validation

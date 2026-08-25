@@ -316,6 +316,21 @@ export function generateParametersFromSchema(schema: JsonSchema): RillParam[] {
   return params;
 }
 
+/**
+ * Builds a map from sanitized (rill-boundary) parameter name back to the
+ * original schema property key. Tool invocation reads arguments by the
+ * sanitized name a rill script sees, then sends the MCP server the exact key
+ * its `inputSchema` declares.
+ */
+export function buildParameterNameMap(schema: JsonSchema): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!schema.properties) return map;
+  for (const key of Object.keys(schema.properties)) {
+    map.set(sanitizeParameterName(key), key);
+  }
+  return map;
+}
+
 // ============================================================
 // RESOURCE CONTENT PARSING
 // ============================================================

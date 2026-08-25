@@ -15,6 +15,7 @@ import {
   CAL_BASE,
   assertIsoTimestamp,
   assertAllowedCalendarId,
+  toBoundaryDateTime,
 } from './_shared.js';
 const CAL_READ_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 /** Regex: date-only YYYY-MM-DD */
@@ -139,8 +140,8 @@ export function makeCalendarEvents(
     const events = rawItems.map((item) => ({
       id: item.id ?? '',
       summary: item.summary ?? '',
-      start: item.start ?? {},
-      end: item.end ?? {},
+      start: toBoundaryDateTime(item.start),
+      end: toBoundaryDateTime(item.end),
       attendees: (item.attendees ?? []).map((a) => ({
         email: a.email ?? '',
         display_name: a.displayName ?? '',

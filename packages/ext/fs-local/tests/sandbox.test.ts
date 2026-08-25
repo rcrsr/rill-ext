@@ -457,7 +457,7 @@ describe('initializeMount - mount initialization', () => {
     );
   });
 
-  it('throws RILL-R005 error code for non-existent path', async () => {
+  it('throws RILL-R001 error code for non-existent path', async () => {
     const mount: MountConfig = {
       path: path.join(tempDir, 'nonexistent'),
       mode: 'read-write',
@@ -468,7 +468,7 @@ describe('initializeMount - mount initialization', () => {
       expect.fail('Should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(RuntimeError);
-      expect((error as RuntimeError).errorId).toBe('RILL-R005');
+      expect((error as RuntimeError).errorId).toBe('RILL-R001');
     }
   });
 });

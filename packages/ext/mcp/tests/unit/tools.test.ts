@@ -552,11 +552,13 @@ describe('generateToolFunctions', () => {
         makeRuntimeCtx()
       );
 
+      // rill scripts call with sanitized snake_case names, but the MCP server
+      // must receive the original schema keys (camelCase here).
       expect(mockClient.callTool).toHaveBeenCalledWith({
         name: 'calculate-bmi',
         arguments: {
-          weight_kg: 70,
-          height_m: 1.75,
+          weightKg: 70,
+          heightM: 1.75,
         },
       });
     });

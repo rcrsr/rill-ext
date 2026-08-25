@@ -16,21 +16,30 @@ export interface MimeOptions {
 }
 
 /**
+ * Strip CR/LF from a header field value so a script-supplied string cannot
+ * inject extra headers (e.g. a subject carrying "\r\nBcc: x@y"). Folding is
+ * not needed here, so line breaks are collapsed to a single space.
+ */
+function sanitizeHeaderValue(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ');
+}
+
+/**
  * Build a base64url-encoded RFC 2822 MIME message string.
  * Uses "From: me" which Gmail API resolves to the authenticated user.
  */
 export function buildRawMime(opts: MimeOptions): string {
   const lines: string[] = [
     `From: me`,
-    `To: ${opts.to}`,
-    `Subject: ${opts.subject}`,
+    `To: ${sanitizeHeaderValue(opts.to)}`,
+    `Subject: ${sanitizeHeaderValue(opts.subject)}`,
   ];
 
   if (opts.inReplyTo) {
-    lines.push(`In-Reply-To: ${opts.inReplyTo}`);
+    lines.push(`In-Reply-To: ${sanitizeHeaderValue(opts.inReplyTo)}`);
   }
   if (opts.references) {
-    lines.push(`References: ${opts.references}`);
+    lines.push(`References: ${sanitizeHeaderValue(opts.references)}`);
   }
 
   lines.push('', opts.body);

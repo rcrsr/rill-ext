@@ -171,7 +171,7 @@ describe('shield() host function', () => {
       )) as Record<string, unknown>;
 
       const analysis = result['analysis'] as Record<string, unknown>;
-      expect('attackType' in analysis).toBe(true);
+      expect('attack_type' in analysis).toBe(true);
     });
 
     it('attackType is null when prompt is safe [AC-9]', async () => {
@@ -187,7 +187,7 @@ describe('shield() host function', () => {
       )) as Record<string, unknown>;
 
       const analysis = result['analysis'] as Record<string, unknown>;
-      expect(analysis['attackType']).toBeNull();
+      expect(analysis['attack_type']).toBeNull();
     });
 
     it('attackType is user_prompt when user prompt attack detected [AC-9]', async () => {
@@ -203,7 +203,7 @@ describe('shield() host function', () => {
       )) as Record<string, unknown>;
 
       const analysis = result['analysis'] as Record<string, unknown>;
-      expect(analysis['attackType']).toBe('user_prompt');
+      expect(analysis['attack_type']).toBe('user_prompt');
     });
   });
 

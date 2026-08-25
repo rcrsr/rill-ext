@@ -337,8 +337,8 @@ export function createPineconeExtension(
             .fetch({ ids: [id] });
 
           if (!response.records || response.records[id] === undefined) {
-            // Throw so withEventEmission catches and maps via mapVectorError
-            // ("id not found" → NOT_FOUND via collection/index keyword path).
+            // Throw so withEventEmission catches and maps via mapVectorError,
+            // whose "id not found" clause yields #NOT_FOUND.
             throw new Error('pinecone: id not found');
           }
 

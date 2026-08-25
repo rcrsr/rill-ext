@@ -253,8 +253,8 @@ function extractCitations(
         citations.push({
           url: annotation.url as RillValue,
           title: annotation.title as RillValue,
-          startIndex: annotation.start_index as RillValue,
-          endIndex: annotation.end_index as RillValue,
+          start_index: annotation.start_index as RillValue,
+          end_index: annotation.end_index as RillValue,
         });
       }
     }

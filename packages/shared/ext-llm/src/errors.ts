@@ -66,21 +66,22 @@ export function mapProviderError(
   error: unknown,
   detect: ProviderErrorDetector
 ): RillValue {
+  // meta.provider is the machine-readable, lowercase id (matches the in-package
+  // haltInvalid path, per the documented convention). Human-readable messages
+  // keep the caller's original casing.
+  const providerId = provider.toLowerCase();
+
+  // A RuntimeHaltSignal already carries an invalid value with its own atom
+  // (#AUTH, #FORBIDDEN, max_errors_exceeded, …). Preserve it — remapping to
+  // #TIMEOUT would erase the reason a script guards on.
   if (error instanceof RuntimeHaltSignal) {
-    return ctx.invalidate(error, {
-      code: 'TIMEOUT',
-      provider,
-      raw: {
-        kind: 'request_cancelled',
-        message: `${provider}: request cancelled`,
-      },
-    });
+    return error.value;
   }
 
   if (error instanceof Error && error.name === 'AbortError') {
     return ctx.invalidate(error, {
       code: 'TIMEOUT',
-      provider,
+      provider: providerId,
       raw: {
         kind: 'request_timeout',
         message: `${provider} error: ${error.message}`,
@@ -94,7 +95,7 @@ export function mapProviderError(
     if (status !== undefined) {
       return ctx.invalidate(error, {
         code: atomForStatus(status),
-        provider,
+        provider: providerId,
         raw: {
           kind: kindForStatus(status),
           status,
@@ -104,7 +105,7 @@ export function mapProviderError(
     }
     return ctx.invalidate(error, {
       code: 'UNAVAILABLE',
-      provider,
+      provider: providerId,
       raw: {
         kind: 'provider_error',
         message: `${provider} API error: ${message}`,
@@ -115,7 +116,7 @@ export function mapProviderError(
   if (error instanceof TypeError) {
     return ctx.invalidate(error, {
       code: 'UNAVAILABLE',
-      provider,
+      provider: providerId,
       raw: {
         kind: 'connection_failed',
         message: `${provider} error: ${error.message}`,
@@ -126,7 +127,7 @@ export function mapProviderError(
   if (error instanceof SyntaxError) {
     return ctx.invalidate(error, {
       code: 'PROTOCOL',
-      provider,
+      provider: providerId,
       raw: {
         kind: 'unexpected_response_format',
         message: `${provider} error: ${error.message}`,
@@ -137,7 +138,7 @@ export function mapProviderError(
   if (error instanceof Error) {
     return ctx.invalidate(error, {
       code: 'UNAVAILABLE',
-      provider,
+      provider: providerId,
       raw: {
         kind: 'unknown_error',
         message: `${provider} error: ${error.message}`,
@@ -147,7 +148,7 @@ export function mapProviderError(
 
   return ctx.invalidate(error, {
     code: 'UNAVAILABLE',
-    provider,
+    provider: providerId,
     raw: {
       kind: 'unknown_error',
       message: `${provider} error: Unknown error`,

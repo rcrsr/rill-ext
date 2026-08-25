@@ -384,6 +384,7 @@ export async function createFoundryExtension(
               }
             }
           } catch (error: unknown) {
+            if (error instanceof RuntimeHaltSignal) throw error;
             throwProviderHalt(
               ctx as RuntimeContext,
               'Foundry',
@@ -1105,6 +1106,7 @@ export async function createFoundryExtension(
               yield chunk;
             }
           } catch (error: unknown) {
+            if (error instanceof RuntimeHaltSignal) throw error;
             throwProviderHalt(
               ctx as RuntimeContext,
               'Foundry',
@@ -1614,7 +1616,7 @@ export async function createFoundryExtension(
         {},
         {
           index: { type: { kind: 'string' }, defaultValue: '' },
-          queryType: { type: { kind: 'string' }, defaultValue: '' },
+          query_type: { type: { kind: 'string' }, defaultValue: '' },
           top: { type: { kind: 'number' }, defaultValue: 10 },
           filter: { type: { kind: 'string' }, defaultValue: '' },
         }

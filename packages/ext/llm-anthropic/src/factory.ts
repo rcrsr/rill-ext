@@ -503,8 +503,12 @@ export function createAnthropicExtension(
   const factoryMaxTurns = config.max_turns;
   const factoryMaxErrors = config.max_errors ?? 3;
 
+  // Disposal sentinel: set by dispose(), read by assertNotDisposed().
+  let disposed = false;
+
   // Dispose function for cleanup
   const dispose = async (): Promise<void> => {
+    disposed = true;
     try {
       // @anthropic-ai/sdk does not expose a close() method; placeholder for future SDK versions
     } catch (error: unknown) {
@@ -512,6 +516,19 @@ export function createAnthropicExtension(
       console.warn(`Failed to cleanup Anthropic SDK: ${message}`);
     }
   };
+
+  // Reject calls after dispose() so requests do not proceed on a disposed
+  // extension.
+  function assertNotDisposed(ctx: RuntimeContext): void {
+    if (disposed) {
+      throw haltInvalid(
+        ctx,
+        'DISPOSED',
+        'extension_disposed',
+        'anthropic: extension disposed'
+      );
+    }
+  }
 
   // Return extension result — satisfies verifies contract at compile time
   const fnDict: {
@@ -532,6 +549,7 @@ export function createAnthropicExtension(
         },
       ],
       fn: (args, ctx): RillValue => {
+        assertNotDisposed(ctx as RuntimeContext);
         // Normalize prompt: string → [{role:'user', parts:[{type:'text', text}]}]
         //                   list  → canonical Message[]
         const rawPrompt = args['prompt'] as RillValue;
@@ -674,6 +692,7 @@ export function createAnthropicExtension(
     embed: {
       params: [p.str('text')],
       fn: async (args, ctx): Promise<RillValue> => {
+        assertNotDisposed(ctx as RuntimeContext);
         const startTime = Date.now();
 
         try {
@@ -746,6 +765,7 @@ export function createAnthropicExtension(
     embed_batch: {
       params: [p.list('texts')],
       fn: async (args, ctx): Promise<RillValue> => {
+        assertNotDisposed(ctx as RuntimeContext);
         const startTime = Date.now();
 
         try {
@@ -842,6 +862,7 @@ export function createAnthropicExtension(
         p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
+        assertNotDisposed(ctx as RuntimeContext);
         // Extract arguments
         const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
@@ -1231,6 +1252,7 @@ export function createAnthropicExtension(
         },
       ],
       fn: async (args, ctx): Promise<RillValue> => {
+        assertNotDisposed(ctx as RuntimeContext);
         const startTime = Date.now();
 
         try {

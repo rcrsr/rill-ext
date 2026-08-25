@@ -56,6 +56,8 @@ const VALID_KEY_JSON = JSON.stringify({
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 const SIGNAL = new AbortController().signal;
+// The cache keys token slots by scope set; all tests use SCOPES.
+const SLOT_KEY = [...SCOPES].sort().join(' ');
 
 // ============================================================
 // createTokenCache / clearTokenCache
@@ -64,23 +66,25 @@ const SIGNAL = new AbortController().signal;
 describe('createTokenCache', () => {
   it('returns a cache with slot = null', () => {
     const cache = createTokenCache();
-    expect(cache.slot).toBeNull();
+    expect(cache.slots.size).toBe(0);
   });
 });
 
 describe('clearTokenCache', () => {
   it('sets slot to null when slot has a value (AC-10)', () => {
     const cache: TokenCache = {
-      slot: { accessToken: 'tok', expiresAtMs: Date.now() + 60_000 },
+      slots: new Map([
+        [SLOT_KEY, { accessToken: 'tok', expiresAtMs: Date.now() + 60_000 }],
+      ]),
     };
     clearTokenCache(cache);
-    expect(cache.slot).toBeNull();
+    expect(cache.slots.size).toBe(0);
   });
 
   it('is idempotent: safe to call when slot is already null (AC-10)', () => {
     const cache = createTokenCache();
     clearTokenCache(cache);
-    expect(cache.slot).toBeNull();
+    expect(cache.slots.size).toBe(0);
   });
 
   it('re-signs on next service-account call after clearTokenCache (AC-10)', async () => {
@@ -102,7 +106,7 @@ describe('clearTokenCache', () => {
 
     // Clear the cache
     clearTokenCache(cache);
-    expect(cache.slot).toBeNull();
+    expect(cache.slots.size).toBe(0);
 
     // Next call must re-sign
     mockSign.mockClear();
@@ -270,9 +274,11 @@ describe('resolveToken — service-account', () => {
 
     await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
 
-    expect(cache.slot).not.toBeNull();
-    expect(cache.slot!.accessToken).toBe('cached-token');
-    expect(cache.slot!.expiresAtMs).toBe(now + (3600 - 300) * 1000);
+    expect(cache.slots.get(SLOT_KEY)).toBeDefined();
+    expect(cache.slots.get(SLOT_KEY)!.accessToken).toBe('cached-token');
+    expect(cache.slots.get(SLOT_KEY)!.expiresAtMs).toBe(
+      now + (3600 - 300) * 1000
+    );
   });
 
   it('returns cached token on cache hit without calling sign or exchange (BC-6)', async () => {
@@ -283,7 +289,9 @@ describe('resolveToken — service-account', () => {
     const futureExpiry = now + 1000;
     const auth = { type: 'service-account' as const, keyJson: VALID_KEY_JSON };
     const cache: TokenCache = {
-      slot: { accessToken: 'cached-token', expiresAtMs: futureExpiry },
+      slots: new Map([
+        [SLOT_KEY, { accessToken: 'cached-token', expiresAtMs: futureExpiry }],
+      ]),
     };
     const ctx = createRuntimeContext();
 
@@ -302,7 +310,9 @@ describe('resolveToken — service-account', () => {
     // Set expired slot (expiresAtMs exactly equals now — not strictly greater)
     const auth = { type: 'service-account' as const, keyJson: VALID_KEY_JSON };
     const cache: TokenCache = {
-      slot: { accessToken: 'stale-token', expiresAtMs: now },
+      slots: new Map([
+        [SLOT_KEY, { accessToken: 'stale-token', expiresAtMs: now }],
+      ]),
     };
     const ctx = createRuntimeContext();
 
@@ -393,8 +403,10 @@ describe('resolveToken — service-account', () => {
     expect(mockExchange).toHaveBeenCalledTimes(2);
 
     // New cache slot should reflect fresh token
-    expect(cache.slot!.accessToken).toBe('token-call-2');
-    expect(cache.slot!.expiresAtMs).toBe(now + ttlMs + 1 + ttlMs);
+    expect(cache.slots.get(SLOT_KEY)!.accessToken).toBe('token-call-2');
+    expect(cache.slots.get(SLOT_KEY)!.expiresAtMs).toBe(
+      now + ttlMs + 1 + ttlMs
+    );
   });
 
   it('emits #AUTH without key material when keyJson parse fails (no key in message)', async () => {
@@ -484,9 +496,11 @@ describe('resolveToken — oauth-refresh', () => {
 
     await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
 
-    expect(cache.slot).not.toBeNull();
-    expect(cache.slot!.accessToken).toBe('refresh-cached-token');
-    expect(cache.slot!.expiresAtMs).toBe(now + (3600 - 300) * 1000);
+    expect(cache.slots.get(SLOT_KEY)).toBeDefined();
+    expect(cache.slots.get(SLOT_KEY)!.accessToken).toBe('refresh-cached-token');
+    expect(cache.slots.get(SLOT_KEY)!.expiresAtMs).toBe(
+      now + (3600 - 300) * 1000
+    );
   });
 
   it('returns cached token on cache hit without calling exchange (BC-6)', async () => {
@@ -496,7 +510,12 @@ describe('resolveToken — oauth-refresh', () => {
 
     const futureExpiry = now + 1000;
     const cache: TokenCache = {
-      slot: { accessToken: 'refresh-hit-token', expiresAtMs: futureExpiry },
+      slots: new Map([
+        [
+          SLOT_KEY,
+          { accessToken: 'refresh-hit-token', expiresAtMs: futureExpiry },
+        ],
+      ]),
     };
     const ctx = createRuntimeContext();
 
@@ -519,7 +538,9 @@ describe('resolveToken — oauth-refresh', () => {
 
     // Slot with expiresAtMs exactly equal to now — not strictly greater, so expired
     const cache: TokenCache = {
-      slot: { accessToken: 'stale-refresh-token', expiresAtMs: now },
+      slots: new Map([
+        [SLOT_KEY, { accessToken: 'stale-refresh-token', expiresAtMs: now }],
+      ]),
     };
     const ctx = createRuntimeContext();
 

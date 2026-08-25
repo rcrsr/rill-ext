@@ -512,7 +512,7 @@ describe('search() host function', () => {
       const ctx = createRuntimeContext();
 
       await getHostFn(ext, 'search').fn(
-        { query: 'test', options: { queryType: 'simple' } },
+        { query: 'test', options: { query_type: 'simple' } },
         ctx
       );
 

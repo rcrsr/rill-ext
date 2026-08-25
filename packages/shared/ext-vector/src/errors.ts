@@ -69,8 +69,22 @@ export function mapVectorError(
     });
   }
 
-  // "collection"/"index" + "not found" in message
   const lower = message.toLowerCase();
+
+  // "id not found" → NOT_FOUND (a get() on a missing id in pinecone/qdrant),
+  // matching chroma which returns NOT_FOUND directly.
+  if (lower.includes('id not found')) {
+    return ctx.invalidate(error, {
+      code: 'NOT_FOUND',
+      provider,
+      raw: {
+        kind: 'id_not_found',
+        message: `${provider}: id not found`,
+      },
+    });
+  }
+
+  // "collection"/"index" + "not found" in message
   if (
     (lower.includes('collection') || lower.includes('index')) &&
     lower.includes('not found')
