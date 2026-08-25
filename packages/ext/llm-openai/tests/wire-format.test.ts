@@ -163,14 +163,20 @@ function mockResponsesResponse(
 }
 
 /**
- * Build a mock Responses API stream object.
+ * Build a mock Responses API stream runner. message() now issues a single
+ * request via client.responses.stream() and reads the result from
+ * runner.finalResponse(), so the runner exposes both.
  */
-function mockResponsesStreamObj() {
+function mockResponsesStreamObj(
+  finalResponse?: ReturnType<typeof mockResponsesResponse>
+) {
   async function* asyncEvents() {
     // no events for resolve-only tests
   }
   return {
     [Symbol.asyncIterator]: asyncEvents,
+    finalResponse: vi.fn().mockResolvedValue(finalResponse),
+    abort: vi.fn(),
   };
 }
 
@@ -365,8 +371,7 @@ describe('Responses API wire-format', () => {
         content: [{ type: 'output_text', text: 'final answer' }],
       },
     ]);
-    mockResponsesCreate.mockResolvedValue(responseObj);
-    mockResponsesStream.mockReturnValue(mockResponsesStreamObj());
+    mockResponsesStream.mockReturnValue(mockResponsesStreamObj(responseObj));
 
     const config: OpenAIExtensionConfig = {
       api_key: 'sk-test',
@@ -404,8 +409,7 @@ describe('Responses API wire-format', () => {
         arguments: '{"q":"test"}',
       },
     ]);
-    mockResponsesCreate.mockResolvedValue(responseObj);
-    mockResponsesStream.mockReturnValue(mockResponsesStreamObj());
+    mockResponsesStream.mockReturnValue(mockResponsesStreamObj(responseObj));
 
     const config: OpenAIExtensionConfig = {
       api_key: 'sk-test',
@@ -443,8 +447,7 @@ describe('Responses API wire-format', () => {
         content: [{ type: 'output_text', text: 'done' }],
       },
     ]);
-    mockResponsesCreate.mockResolvedValue(finalResponse);
-    mockResponsesStream.mockReturnValue(mockResponsesStreamObj());
+    mockResponsesStream.mockReturnValue(mockResponsesStreamObj(finalResponse));
 
     const config: OpenAIExtensionConfig = {
       api_key: 'sk-test',
@@ -475,8 +478,8 @@ describe('Responses API wire-format', () => {
     const stream = getCallable(ext, 'message').fn({ prompt }, ctx);
     await resolveStream(stream);
 
-    expect(mockResponsesCreate).toHaveBeenCalledOnce();
-    const callParams = mockResponsesCreate.mock.calls[0]![0] as {
+    expect(mockResponsesStream).toHaveBeenCalledOnce();
+    const callParams = mockResponsesStream.mock.calls[0]![0] as {
       input: Array<Record<string, unknown>>;
     };
 
@@ -497,8 +500,7 @@ describe('Responses API wire-format', () => {
         content: [{ type: 'output_text', text: 'ok' }],
       },
     ]);
-    mockResponsesCreate.mockResolvedValue(responseObj);
-    mockResponsesStream.mockReturnValue(mockResponsesStreamObj());
+    mockResponsesStream.mockReturnValue(mockResponsesStreamObj(responseObj));
 
     const config: OpenAIExtensionConfig = {
       api_key: 'sk-test',
@@ -511,8 +513,8 @@ describe('Responses API wire-format', () => {
     const stream = getCallable(ext, 'message').fn({ prompt: 'hello' }, ctx);
     await resolveStream(stream);
 
-    expect(mockResponsesCreate).toHaveBeenCalledOnce();
-    const callParams = mockResponsesCreate.mock.calls[0]![0] as Record<
+    expect(mockResponsesStream).toHaveBeenCalledOnce();
+    const callParams = mockResponsesStream.mock.calls[0]![0] as Record<
       string,
       unknown
     >;
@@ -530,8 +532,7 @@ describe('Responses API wire-format', () => {
         content: [{ type: 'output_text', text: 'answer' }],
       },
     ]);
-    mockResponsesCreate.mockResolvedValue(responseObj);
-    mockResponsesStream.mockReturnValue(mockResponsesStreamObj());
+    mockResponsesStream.mockReturnValue(mockResponsesStreamObj(responseObj));
 
     const config: OpenAIExtensionConfig = {
       api_key: 'sk-test',
@@ -544,11 +545,11 @@ describe('Responses API wire-format', () => {
     const s1 = getCallable(ext, 'message').fn({ prompt: 'first' }, ctx);
     await resolveStream(s1);
 
-    mockResponsesStream.mockReturnValue(mockResponsesStreamObj());
+    mockResponsesStream.mockReturnValue(mockResponsesStreamObj(responseObj));
     const s2 = getCallable(ext, 'message').fn({ prompt: 'second' }, ctx);
     await resolveStream(s2);
 
-    expect(mockResponsesCreate).toHaveBeenCalledTimes(2);
+    expect(mockResponsesStream).toHaveBeenCalledTimes(2);
     expect(mockCCStream).not.toHaveBeenCalled();
   });
 });

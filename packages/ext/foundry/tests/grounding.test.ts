@@ -493,7 +493,7 @@ describe('ground() host function', () => {
 
       await expectRejectedHalt(
         getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
-        { provider: 'Foundry' }
+        { provider: 'foundry' }
       );
     });
 

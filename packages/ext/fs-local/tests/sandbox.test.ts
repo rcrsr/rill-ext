@@ -363,6 +363,28 @@ describe('resolvePath - symlink cannot escape sandbox', () => {
     );
     expect(resolved).toBe(path.join(tempDir, 'data', 'test.txt'));
   });
+
+  it('rejects a dangling symlink to an out-of-mount target in createMode', async () => {
+    const symlinkPath = path.join(tempDir, 'data', 'evil');
+    const outsideTarget = path.join(tempDir, 'victim.txt');
+    // outsideTarget does not exist yet: symlink target is dangling
+    await fs.symlink(outsideTarget, symlinkPath);
+
+    const result = await resolvePath(
+      'data',
+      'evil',
+      mounts,
+      'write',
+      makeRuntimeCtx(),
+      true
+    );
+    expect(isInvalid(result as RillValue)).toBe(true);
+    const status = getStatus(result as RillValue);
+    expect(status.code.name).toBe('FORBIDDEN');
+    expect(status.message).toMatch(/dangling symlink/);
+
+    await expect(fs.access(outsideTarget)).rejects.toThrow();
+  });
 });
 
 // ============================================================
@@ -457,7 +479,7 @@ describe('initializeMount - mount initialization', () => {
     );
   });
 
-  it('throws RILL-R005 error code for non-existent path', async () => {
+  it('throws RILL-R001 error code for non-existent path', async () => {
     const mount: MountConfig = {
       path: path.join(tempDir, 'nonexistent'),
       mode: 'read-write',
@@ -468,7 +490,7 @@ describe('initializeMount - mount initialization', () => {
       expect.fail('Should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(RuntimeError);
-      expect((error as RuntimeError).errorId).toBe('RILL-R005');
+      expect((error as RuntimeError).errorId).toBe('RILL-R001');
     }
   });
 });

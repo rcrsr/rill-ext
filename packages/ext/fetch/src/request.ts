@@ -366,6 +366,22 @@ export async function executeRequest(
                 );
               }
             }
+
+            // Non-4xx, non-retryable failure (e.g. 500, 501, 505, unfollowed 3xx)
+            const body = await response.text();
+            return ctx.invalidate(
+              new Error(`${namespace}: HTTP ${status} — ${body}`),
+              {
+                code: atomForStatus(status),
+                provider: PROVIDER,
+                raw: {
+                  kind: 'http_error',
+                  status,
+                  body,
+                  namespace,
+                },
+              }
+            );
           }
 
           // Success - parse response

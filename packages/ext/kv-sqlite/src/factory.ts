@@ -41,7 +41,7 @@ export function createSqliteKvExtension(
 ): ExtensionFactoryResult {
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       'SQLite kv extension requires at least one mount in configuration'
     );
   }
@@ -58,7 +58,7 @@ export function createSqliteKvExtension(
           mkdirSync(dbDir, { recursive: true });
         } catch (error: unknown) {
           throw new RuntimeError(
-            'RILL-R005',
+            'RILL-R001',
             `Failed to create directory for database path "${dbPath}": ${error instanceof Error ? error.message : String(error)}`
           );
         }
@@ -71,7 +71,7 @@ export function createSqliteKvExtension(
       const TABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
       if (!TABLE_NAME_PATTERN.test(tableName)) {
         throw new RuntimeError(
-          'RILL-R005',
+          'RILL-R001',
           `Invalid table name "${tableName}": must match pattern ${TABLE_NAME_PATTERN}`
         );
       }
@@ -90,7 +90,7 @@ export function createSqliteKvExtension(
       }
       if (error instanceof RuntimeError) throw error;
       throw new RuntimeError(
-        'RILL-R005',
+        'RILL-R001',
         `Failed to initialize SQLite database for mount "${mountName}": ${error instanceof Error ? error.message : String(error)}`
       );
     }
@@ -575,8 +575,8 @@ export function createSqliteKvExtension(
         name,
         mode: mountConfig.mode,
         schema: mountConfig.schema ? 'declared' : 'open',
-        maxEntries: mountConfig.maxEntries ?? 10000,
-        maxValueSize: mountConfig.maxValueSize ?? 102400,
+        max_entries: mountConfig.maxEntries ?? 10000,
+        max_value_size: mountConfig.maxValueSize ?? 102400,
         database: mountConfig.database,
         table: mountConfig.table,
       });
@@ -708,8 +708,8 @@ export function createSqliteKvExtension(
             name: { type: { kind: 'string' } },
             mode: { type: { kind: 'string' } },
             schema: { type: { kind: 'string' } },
-            maxEntries: { type: { kind: 'number' } },
-            maxValueSize: { type: { kind: 'number' } },
+            max_entries: { type: { kind: 'number' } },
+            max_value_size: { type: { kind: 'number' } },
             database: { type: { kind: 'string' } },
             table: { type: { kind: 'string' } },
           },

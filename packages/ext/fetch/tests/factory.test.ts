@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RuntimeError, getStatus, type ApplicationCallable } from '@rcrsr/rill';
+import { getStatus, type ApplicationCallable } from '@rcrsr/rill';
 import {
   createFetchExtension,
   type FetchExtensionConfig,
@@ -270,7 +270,7 @@ describe('createFetchExtension', () => {
   });
 
   describe('missing required parameter', () => {
-    it('throws RuntimeError when required parameter is missing', async () => {
+    it('returns #INVALID_INPUT when required parameter is missing', async () => {
       const config: FetchExtensionConfig = {
         baseUrl: 'https://api.example.com',
         endpoints: {
@@ -284,15 +284,13 @@ describe('createFetchExtension', () => {
 
       const ext = createFetchExtension(config, makeFactoryCtx());
 
-      await expect(
-        getCallable(ext, 'getUser').fn({}, makeRuntimeCtx())
-      ).rejects.toThrow(RuntimeError);
-      await expect(
-        getCallable(ext, 'getUser').fn({}, makeRuntimeCtx())
-      ).rejects.toThrow('parameter "id" is required');
+      const result = await getCallable(ext, 'getUser').fn({}, makeRuntimeCtx());
+      const status = getStatus(result);
+      expect(status.code.name).toBe('INVALID_INPUT');
+      expect(status.message).toContain('parameter "id" is required');
     });
 
-    it('throws RuntimeError when one of multiple required parameters is missing', async () => {
+    it('returns #INVALID_INPUT when one of multiple required parameters is missing', async () => {
       const config: FetchExtensionConfig = {
         baseUrl: 'https://api.example.com',
         endpoints: {
@@ -309,12 +307,13 @@ describe('createFetchExtension', () => {
 
       const ext = createFetchExtension(config, makeFactoryCtx());
 
-      await expect(
-        getCallable(ext, 'createUser').fn({ name: 'John' }, makeRuntimeCtx())
-      ).rejects.toThrow(RuntimeError);
-      await expect(
-        getCallable(ext, 'createUser').fn({ name: 'John' }, makeRuntimeCtx())
-      ).rejects.toThrow('parameter "email" is required');
+      const result = await getCallable(ext, 'createUser').fn(
+        { name: 'John' },
+        makeRuntimeCtx()
+      );
+      const status = getStatus(result);
+      expect(status.code.name).toBe('INVALID_INPUT');
+      expect(status.message).toContain('parameter "email" is required');
     });
 
     it('does not throw when optional parameter with defaultValue is missing', async () => {

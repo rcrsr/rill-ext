@@ -64,8 +64,8 @@ export async function createEvent(
       eventBody['location'] = { displayName: options['location'] };
     }
 
-    if (typeof options['isOnline'] === 'boolean') {
-      eventBody['isOnlineMeeting'] = options['isOnline'];
+    if (typeof options['is_online'] === 'boolean') {
+      eventBody['isOnlineMeeting'] = options['is_online'];
     }
   }
 

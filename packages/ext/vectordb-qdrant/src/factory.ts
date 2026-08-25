@@ -300,8 +300,8 @@ export function createQdrantExtension(
           });
 
           if (response.length === 0) {
-            // Throw so withEventEmission catches and maps via mapVectorError
-            // ("id not found" → NOT_FOUND via collection/index keyword path).
+            // Throw so withEventEmission catches and maps via mapVectorError,
+            // whose "id not found" clause yields #NOT_FOUND.
             throw new Error('qdrant: id not found');
           }
 

@@ -42,14 +42,20 @@ export function createExecExtension(
   const getMaxBuffer = (cmd: CommandConfig): number =>
     cmd.maxBuffer ?? globalMaxOutputSize;
 
-  const getEnv = (cmd: CommandConfig): Record<string, string> | undefined => {
-    if (!inheritEnv && !cmd.env) return undefined;
-
+  const getEnv = (cmd: CommandConfig): Record<string, string> => {
     const baseEnv: Record<string, string> = {};
     if (inheritEnv) {
       for (const [key, value] of Object.entries(process.env)) {
         if (value !== undefined) baseEnv[key] = value;
       }
+    } else {
+      // Isolation: withhold parent secrets (API keys, tokens) but keep PATH so
+      // bare-name binaries still resolve through execFile. Returning undefined
+      // here would make execFile inherit the full process.env instead.
+      const path = process.env['PATH'];
+      if (path !== undefined) baseEnv['PATH'] = path;
+      const pathExt = process.env['PATHEXT'];
+      if (pathExt !== undefined) baseEnv['PATHEXT'] = pathExt;
     }
     if (cmd.env) Object.assign(baseEnv, cmd.env);
     return baseEnv;

@@ -23,12 +23,14 @@ interface TokenCacheSlot {
 }
 
 /**
- * Mutable container for a single cached access token slot.
+ * Mutable container for cached access token slots, keyed by scope set.
+ * A token minted for one scope set must not satisfy a call needing another
+ * (Google returns 403 insufficient_scopes), so each scope set caches separately.
  * Passed in from the factory closure so it lives for the extension lifecycle.
  * Cleared on dispose().
  */
 export interface TokenCache {
-  slot: TokenCacheSlot | null;
+  slots: Map<string, TokenCacheSlot>;
 }
 
 /**
@@ -36,7 +38,7 @@ export interface TokenCache {
  * One cache per extension instance; scoped to the factory closure.
  */
 export function createTokenCache(): TokenCache {
-  return { slot: null };
+  return { slots: new Map() };
 }
 
 /**
@@ -44,7 +46,14 @@ export function createTokenCache(): TokenCache {
  * Idempotent: safe to call multiple times.
  */
 export function clearTokenCache(cache: TokenCache): void {
-  cache.slot = null;
+  cache.slots.clear();
+}
+
+/**
+ * Normalize a scope set into a stable cache key (order-independent).
+ */
+function scopeCacheKey(scopes: string[]): string {
+  return [...scopes].sort().join(' ');
 }
 
 // ============================================================
@@ -112,9 +121,11 @@ export async function resolveToken(
 
   // --- service-account: check TTL cache, sign JWT and exchange on miss ---
   if (auth.type === 'service-account') {
+    const cacheKey = scopeCacheKey(scopes);
     // cache hit within TTL — reuse without signing or exchange
-    if (cache.slot !== null && cache.slot.expiresAtMs > Date.now()) {
-      return cache.slot.accessToken;
+    const cachedSa = cache.slots.get(cacheKey);
+    if (cachedSa !== undefined && cachedSa.expiresAtMs > Date.now()) {
+      return cachedSa.accessToken;
     }
 
     // cache miss or TTL expired — re-sign and re-exchange
@@ -138,18 +149,20 @@ export async function resolveToken(
     );
 
     // cache with TTL = expires_in - 300 seconds
-    cache.slot = {
+    cache.slots.set(cacheKey, {
       accessToken,
       expiresAtMs: Date.now() + (expiresIn - 300) * 1000,
-    };
+    });
 
     return accessToken;
   }
 
   // --- oauth-refresh: check TTL cache, exchange refresh token on miss ---
+  const cacheKey = scopeCacheKey(scopes);
   // cache hit within TTL — reuse without exchange
-  if (cache.slot !== null && cache.slot.expiresAtMs > Date.now()) {
-    return cache.slot.accessToken;
+  const cachedRefresh = cache.slots.get(cacheKey);
+  if (cachedRefresh !== undefined && cachedRefresh.expiresAtMs > Date.now()) {
+    return cachedRefresh.accessToken;
   }
 
   // cache miss or TTL expired — exchange refresh token
@@ -162,10 +175,10 @@ export async function resolveToken(
   );
 
   // cache with TTL = expires_in - 300 seconds
-  cache.slot = {
+  cache.slots.set(cacheKey, {
     accessToken,
     expiresAtMs: Date.now() + (expiresIn - 300) * 1000,
-  };
+  });
 
   return accessToken;
 }

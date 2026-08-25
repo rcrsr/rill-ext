@@ -54,12 +54,12 @@ const PROVIDER = 'foundry';
  *
  * Options dict fields:
  *   - `index` — overrides config.search.indexName
- *   - `queryType` — overrides config.search.queryType ('simple' | 'full' | 'semantic')
+ *   - `query_type` — overrides config.search.queryType ('simple' | 'full' | 'semantic')
  *   - `top` — max number of results
  *   - `filter` — OData filter expression
  *
  * @param query - Search query string
- * @param options - Optional overrides (index, queryType, top, filter)
+ * @param options - Optional overrides (index, query_type, top, filter)
  * @param config - Root Foundry config (search sub-config validated here)
  * @param auth - Authentication config
  * @param ctx - Runtime context for event emission
@@ -95,8 +95,8 @@ export async function callSearch(
       ? options['index']
       : searchConfig.indexName;
   const queryType =
-    typeof options['queryType'] === 'string'
-      ? options['queryType']
+    typeof options['query_type'] === 'string'
+      ? options['query_type']
       : (searchConfig.queryType ?? DEFAULT_QUERY_TYPE);
   const top = typeof options['top'] === 'number' ? options['top'] : DEFAULT_TOP;
   const filter =

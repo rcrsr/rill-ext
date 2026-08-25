@@ -23,6 +23,7 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 import {
+  buildParameterNameMap,
   generateParametersFromSchema,
   jsonSchemaToTypeStructure,
   type JsonSchema,
@@ -180,6 +181,8 @@ function generateToolFunction(
 ): RillFunction {
   // Generate parameters from JSON Schema
   const params = generateParametersFromSchema(tool.inputSchema);
+  // Maps each sanitized param name back to the server's original schema key.
+  const originalNames = buildParameterNameMap(tool.inputSchema);
 
   // Create async function wrapper
   const fn = async (
@@ -200,8 +203,10 @@ function generateToolFunction(
     for (let i = 0; i < params.length; i++) {
       const param = params[i]!;
       const value = args[param.name];
-      // Use actual argument value or default from param
-      toolArgs[param.name] = value !== undefined ? value : param.defaultValue;
+      // Read by the sanitized name a rill script uses, but send the server the
+      // original schema key it declared in inputSchema.
+      const wireName = originalNames.get(param.name) ?? param.name;
+      toolArgs[wireName] = value !== undefined ? value : param.defaultValue;
     }
 
     // Emit mcp:tool_call event

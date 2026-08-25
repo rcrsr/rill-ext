@@ -42,10 +42,10 @@ export async function createLocalFsExtension(
   config: FsLocalExtensionConfig,
   _ctx: ExtensionFactoryCtx
 ): Promise<ExtensionFactoryResult> {
-  // Validate required configuration (factory-init: throw R005)
+  // Validate required configuration (factory-init: throw R001)
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       'fs-local extension requires at least one mount in configuration'
     );
   }
@@ -60,7 +60,7 @@ export async function createLocalFsExtension(
     mounts[name] = { ...mountConfig };
   }
 
-  // Initialize mounts in parallel; errors propagate as RILL-R005.
+  // Initialize mounts in parallel; errors propagate as RILL-R001.
   await Promise.all(
     Object.values(mounts).map((mount) => initializeMount(mount))
   );

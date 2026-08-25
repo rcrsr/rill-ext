@@ -165,14 +165,14 @@ export function createS3FsExtension(
 ): ExtensionFactoryResult {
   if (!config.region || config.region.trim() === '') {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       'S3 configuration requires non-empty region'
     );
   }
 
   if (!config.mounts || Object.keys(config.mounts).length === 0) {
     throw new RuntimeError(
-      'RILL-R005',
+      'RILL-R001',
       'S3 configuration requires at least one mount'
     );
   }
@@ -180,7 +180,7 @@ export function createS3FsExtension(
   if (config.endpoint !== undefined) {
     if (typeof config.endpoint !== 'string' || config.endpoint.trim() === '') {
       throw new RuntimeError(
-        'RILL-R005',
+        'RILL-R001',
         'S3 endpoint must be a non-empty string'
       );
     }
@@ -188,7 +188,7 @@ export function createS3FsExtension(
       new URL(config.endpoint);
     } catch {
       throw new RuntimeError(
-        'RILL-R005',
+        'RILL-R001',
         `S3 endpoint must be a valid URL: ${config.endpoint}`
       );
     }
@@ -548,7 +548,7 @@ export function createS3FsExtension(
     if (disposed) return disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
-    const { mount } = parsed;
+    const { mount, key } = parsed;
     const pattern = (args['pattern'] as string | undefined) ?? '*';
     const modeCheck = checkMode(runCtx, mount, 'read');
     if (modeCheck) return modeCheck;
@@ -561,7 +561,7 @@ export function createS3FsExtension(
         const result = await s3Client.send(
           new ListObjectsV2Command({
             Bucket: mount.bucket,
-            Prefix: mount.prefix,
+            Prefix: key,
             ContinuationToken: continuationToken,
           }),
           { abortSignal: requestSignal() }
