@@ -110,8 +110,13 @@ export async function resolvePath(
       // If the target name already exists as a symlink, follow it so the
       // post-realpath boundary check sees its true destination; otherwise a
       // symlink pointing outside the mount is written through. A missing
-      // target (ENOENT) is a genuine new-file write: keep the parent-resolved
-      // path so creation still works.
+      // target (ENOENT) from realpath() is ambiguous: it means either nothing
+      // exists at `candidate` (genuine new-file write) or `candidate` is a
+      // dangling symlink (its target does not exist). lstat() disambiguates:
+      // if it succeeds, `candidate` itself exists as a symlink and must be
+      // rejected, since the caller's write/append would follow it to an
+      // out-of-mount target. Only fall back to `candidate` when lstat() also
+      // reports ENOENT (nothing exists there at all).
       try {
         resolvedPath = await fs.realpath(candidate);
       } catch (linkError) {
@@ -121,7 +126,34 @@ export async function resolvePath(
           'code' in linkError &&
           (linkError as { code: string }).code === 'ENOENT'
         ) {
-          resolvedPath = candidate;
+          try {
+            await fs.lstat(candidate);
+            return ctx.invalidate(
+              new Error('path escapes mount boundary via dangling symlink'),
+              {
+                code: 'FORBIDDEN',
+                provider: PROVIDER,
+                raw: {
+                  kind: 'symlink_escape',
+                  mountName,
+                  path: relativePath,
+                  candidate,
+                  mountBase,
+                },
+              }
+            );
+          } catch (lstatError) {
+            if (
+              lstatError &&
+              typeof lstatError === 'object' &&
+              'code' in lstatError &&
+              (lstatError as { code: string }).code === 'ENOENT'
+            ) {
+              resolvedPath = candidate;
+            } else {
+              throw lstatError;
+            }
+          }
         } else {
           throw linkError;
         }

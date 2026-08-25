@@ -680,6 +680,7 @@ describe('embed() function', () => {
       expect(mockEmbedContent).toHaveBeenCalledWith({
         model: 'text-embedding-004',
         contents: ['Test text'],
+        config: { abortSignal: expect.any(AbortSignal) },
       });
     });
   });

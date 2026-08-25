@@ -558,16 +558,19 @@ export function createOpenAIExtension(
 
         const apiMessages = canonicalToCC(inputMessages);
 
-        const runner = client.chat.completions.stream({
-          model: factoryModel,
-          max_completion_tokens: factoryMaxTokens,
-          messages: apiMessages,
-          stream_options: { include_usage: true },
-          ...(factoryTemperature !== undefined
-            ? { temperature: factoryTemperature }
-            : {}),
-          ...factoryExtra,
-        } as OpenAI.ChatCompletionCreateParamsStreaming);
+        const runner = client.chat.completions.stream(
+          {
+            model: factoryModel,
+            max_completion_tokens: factoryMaxTokens,
+            messages: apiMessages,
+            stream_options: { include_usage: true },
+            ...(factoryTemperature !== undefined
+              ? { temperature: factoryTemperature }
+              : {}),
+            ...factoryExtra,
+          } as OpenAI.ChatCompletionCreateParamsStreaming,
+          { signal: abortController!.signal }
+        );
 
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
@@ -718,10 +721,13 @@ export function createOpenAIExtension(
 
         // One runner backs both the stream and the resolved result so a single
         // message() call costs one request (not two) and dispose can abort it.
-        const runner = client.responses.stream({
-          ...baseParams,
-          stream: true,
-        } as ResponseCreateParamsStreaming);
+        const runner = client.responses.stream(
+          {
+            ...baseParams,
+            stream: true,
+          } as ResponseCreateParamsStreaming,
+          { signal: abortController!.signal }
+        );
 
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
@@ -1091,7 +1097,10 @@ export function createOpenAIExtension(
           perCallMaxTurns,
           ctx,
           yieldChunk,
-          toolLoopAbortController.signal,
+          AbortSignal.any([
+            abortController!.signal,
+            toolLoopAbortController.signal,
+          ]),
           factoryMaxTurns
         );
 
@@ -1378,7 +1387,10 @@ export function createOpenAIExtension(
           perCallMaxTurns,
           ctx,
           yieldChunk,
-          toolLoopAbortController.signal,
+          AbortSignal.any([
+            abortController!.signal,
+            toolLoopAbortController.signal,
+          ]),
           factoryMaxTurns
         );
 
@@ -1587,7 +1599,9 @@ export function createOpenAIExtension(
           ...factoryExtra,
         } as OpenAI.ChatCompletionCreateParamsNonStreaming;
 
-        const response = await client.chat.completions.create(apiParams);
+        const response = await client.chat.completions.create(apiParams, {
+          signal: abortController!.signal,
+        });
 
         // Unexpected finish reason indicates provider-side stream or content filter
         const finishReason = response.choices[0]?.finish_reason;
@@ -1743,11 +1757,14 @@ export function createOpenAIExtension(
         validateEmbedText(text.trim());
         validateEmbedModel(factoryEmbedModel);
 
-        const response = await client.embeddings.create({
-          model: factoryEmbedModel,
-          input: text,
-          encoding_format: 'float',
-        });
+        const response = await client.embeddings.create(
+          {
+            model: factoryEmbedModel,
+            input: text,
+            encoding_format: 'float',
+          },
+          { signal: abortController!.signal }
+        );
 
         const embeddingData = response.data[0]?.embedding;
         if (!embeddingData || embeddingData.length === 0) {
@@ -1825,11 +1842,14 @@ export function createOpenAIExtension(
 
         const stringTexts = validateEmbedBatch(texts);
 
-        const response = await client.embeddings.create({
-          model: factoryEmbedModel,
-          input: stringTexts,
-          encoding_format: 'float',
-        });
+        const response = await client.embeddings.create(
+          {
+            model: factoryEmbedModel,
+            input: stringTexts,
+            encoding_format: 'float',
+          },
+          { signal: abortController!.signal }
+        );
 
         const vectors: RillValue[] = [];
         for (const embeddingItem of response.data) {

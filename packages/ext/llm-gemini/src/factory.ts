@@ -633,7 +633,10 @@ export function createGeminiExtension(
               contents,
               config: {
                 ...apiConfig,
-                abortSignal: streamAbortController.signal,
+                abortSignal: AbortSignal.any([
+                  abortController!.signal,
+                  streamAbortController.signal,
+                ]),
               },
             });
             for await (const chunk of stream) {
@@ -727,6 +730,7 @@ export function createGeminiExtension(
           const response = await client.models.embedContent({
             model: factoryEmbedModel,
             contents: [text],
+            config: { abortSignal: abortController!.signal },
           });
 
           const embedding = response.embeddings?.[0];
@@ -797,6 +801,7 @@ export function createGeminiExtension(
           const response = await client.models.embedContent({
             model: factoryEmbedModel,
             contents: stringTexts,
+            config: { abortSignal: abortController!.signal },
           });
 
           const vectors: RillValue[] = [];
@@ -1174,7 +1179,10 @@ export function createGeminiExtension(
               r();
             }
           },
-          toolLoopAbortController.signal,
+          AbortSignal.any([
+            abortController!.signal,
+            toolLoopAbortController.signal,
+          ]),
           factoryMaxTurns
         )
           .then((result) => {
@@ -1391,7 +1399,7 @@ export function createGeminiExtension(
           const response = await client.models.generateContent({
             model: factoryModel,
             contents,
-            config: apiConfig,
+            config: { ...apiConfig, abortSignal: abortController!.signal },
           });
 
           // Reject streaming response shape

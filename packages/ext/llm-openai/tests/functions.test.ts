@@ -320,13 +320,16 @@ describe('message() function', () => {
 
       getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
-      expect(mockStream).toHaveBeenCalledWith({
-        model: 'gpt-4-turbo',
-        max_completion_tokens: 4096,
-        temperature: 0.7,
-        stream_options: { include_usage: true },
-        messages: [{ role: 'user', content: 'What is 2+2?' }],
-      });
+      expect(mockStream).toHaveBeenCalledWith(
+        {
+          model: 'gpt-4-turbo',
+          max_completion_tokens: 4096,
+          temperature: 0.7,
+          stream_options: { include_usage: true },
+          messages: [{ role: 'user', content: 'What is 2+2?' }],
+        },
+        { signal: expect.any(AbortSignal) }
+      );
     });
 
     it('sends system message as first message in OpenAI streaming format', async () => {
@@ -348,16 +351,19 @@ describe('message() function', () => {
 
       getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
-      expect(mockStream).toHaveBeenCalledWith({
-        model: 'gpt-4-turbo',
-        max_completion_tokens: 4096,
-        temperature: 0.7,
-        stream_options: { include_usage: true },
-        messages: [
-          { role: 'system', content: 'You are helpful.' },
-          { role: 'user', content: 'What is 2+2?' },
-        ],
-      });
+      expect(mockStream).toHaveBeenCalledWith(
+        {
+          model: 'gpt-4-turbo',
+          max_completion_tokens: 4096,
+          temperature: 0.7,
+          stream_options: { include_usage: true },
+          messages: [
+            { role: 'system', content: 'You are helpful.' },
+            { role: 'user', content: 'What is 2+2?' },
+          ],
+        },
+        { signal: expect.any(AbortSignal) }
+      );
     });
 
     it('uses factory config max_tokens when set', async () => {
@@ -381,7 +387,8 @@ describe('message() function', () => {
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
           max_completion_tokens: 1000,
-        })
+        }),
+        { signal: expect.any(AbortSignal) }
       );
     });
 
@@ -405,7 +412,8 @@ describe('message() function', () => {
       expect(mockStream).toHaveBeenCalledWith(
         expect.objectContaining({
           max_completion_tokens: 4096,
-        })
+        }),
+        { signal: expect.any(AbortSignal) }
       );
     });
   });
