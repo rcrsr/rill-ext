@@ -33,15 +33,15 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.111.0",
-    "@google/genai": "^2.11.0",
+    "@anthropic-ai/sdk": "^0.120.0",
+    "@google/genai": "^2.18.0",
     "@rcrsr/rill": "~0.20.0",
     "@rcrsr/rill-ext-prompt-shared": "workspace:*",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "dts-bundle-generator": "^9.5.1",
-    "openai": "^6.46.0",
+    "openai": "^7.5.0",
     "tsup": "^8.5.1",
-    "undici-types": "^8.7.0"
+    "undici-types": "^8.10.0"
   },
   "files": [
     "dist"

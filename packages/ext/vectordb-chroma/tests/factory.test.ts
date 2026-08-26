@@ -69,9 +69,9 @@ describe('createChromaExtension', () => {
       const ext = createChromaExtension({ collection: 'test_collection' });
 
       // Multiple calls should not throw
-      await ext.dispose!();
-      await ext.dispose!();
-      await ext.dispose!();
+      await expect(ext.dispose!()).resolves.toBeUndefined();
+      await expect(ext.dispose!()).resolves.toBeUndefined();
+      await expect(ext.dispose!()).resolves.toBeUndefined();
     });
 
     // Note: Testing post-dispose error behavior (EC-8) requires a full

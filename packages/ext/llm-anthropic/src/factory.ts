@@ -3,7 +3,7 @@
  * Creates extension instance with config validation and SDK lifecycle management.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import Anthropic, { APIError } from '@anthropic-ai/sdk';
 import {
   RuntimeError,
   RuntimeHaltSignal,
@@ -218,8 +218,8 @@ function extractToolResultBlocks(
         Record<string, RillValue>
       >;
       const content: string = resultParts
-        .filter((p) => p['type'] === 'text')
-        .map((p) => p['text'] as string)
+        .filter((rp) => rp['type'] === 'text')
+        .map((rp) => rp['text'] as string)
         .join('');
 
       blocks.push({
@@ -251,9 +251,9 @@ function canonicalToAnthropicMessages(messages: Message[]): {
   for (const msg of messages) {
     if (msg.role === 'system') {
       // Lift system turn into top-level system parameter
-      const textParts = msg.parts.filter((p) => p.type === 'text');
+      const textParts = msg.parts.filter((part) => part.type === 'text');
       systemText = textParts
-        .map((p) => (p as { type: 'text'; text: string }).text)
+        .map((part) => (part as { type: 'text'; text: string }).text)
         .join('\n');
       continue;
     }
@@ -263,15 +263,18 @@ function canonicalToAnthropicMessages(messages: Message[]): {
         Record<string, RillValue>
       >;
       const hasToolResults = partsAsRecords.some(
-        (p) => p['type'] === 'tool_result'
+        (part) => part['type'] === 'tool_result'
       );
 
       if (hasToolResults) {
         // Place tool_result blocks inside user role (Anthropic wire format)
         const toolResultBlocks = extractToolResultBlocks(partsAsRecords);
         const textBlocks: Anthropic.ContentBlockParam[] = partsAsRecords
-          .filter((p) => p['type'] === 'text')
-          .map((p) => ({ type: 'text' as const, text: p['text'] as string }));
+          .filter((part) => part['type'] === 'text')
+          .map((part) => ({
+            type: 'text' as const,
+            text: part['text'] as string,
+          }));
 
         const content: Anthropic.ContentBlockParam[] = [
           ...textBlocks,
@@ -282,7 +285,7 @@ function canonicalToAnthropicMessages(messages: Message[]): {
       } else {
         // Normal user message
         const content: Anthropic.ContentBlockParam[] = partsAsRecords
-          .map((p) => partToAnthropicUserContent(p))
+          .map((part) => partToAnthropicUserContent(part))
           .filter((b): b is Anthropic.ContentBlockParam => b !== null);
 
         if (content.length === 1 && content[0]?.type === 'text') {
@@ -303,7 +306,7 @@ function canonicalToAnthropicMessages(messages: Message[]): {
         Record<string, RillValue>
       >;
       const content: Anthropic.ContentBlockParam[] = partsAsRecords
-        .map((p) => partToAnthropicAssistantContent(p))
+        .map((part) => partToAnthropicAssistantContent(part))
         .filter((b): b is Anthropic.ContentBlockParam => b !== null);
 
       if (content.length === 1 && content[0]?.type === 'text') {
@@ -390,7 +393,7 @@ function extractTextContent(
  * @returns Object with status and message if Anthropic error, null otherwise
  */
 const detectAnthropicError: ProviderErrorDetector = (error: unknown) => {
-  if (error instanceof Anthropic.APIError) {
+  if (error instanceof APIError) {
     return {
       status: error.status,
       message: error.message,
@@ -1104,7 +1107,7 @@ export function createAnthropicExtension(
         );
 
         // Signal the drain loop when the tool loop finishes
-        sharedLoopPromise.then(
+        void sharedLoopPromise.then(
           () => {
             loopDone = true;
             if (wakeUp !== undefined) {

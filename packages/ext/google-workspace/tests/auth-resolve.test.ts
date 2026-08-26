@@ -10,7 +10,6 @@ import {
   getStatus,
   type RillValue,
 } from '@rcrsr/rill';
-import {} from '@rcrsr/rill';
 
 // Mock jwt and exchange modules before importing resolve
 vi.mock('../src/auth/jwt.js', () => ({

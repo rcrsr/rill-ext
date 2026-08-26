@@ -21,8 +21,7 @@
     "@rcrsr/rill": "~0.20.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.20.0",
-    "vitest": "^4.1.10"
+    "@rcrsr/rill": "~0.20.0"
   },
   "repository": {
     "type": "git",

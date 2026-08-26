@@ -33,10 +33,10 @@
     "@rcrsr/rill": "~0.20.0",
     "@rcrsr/rill-ext-fs-shared": "workspace:*",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
-    "undici-types": "^8.7.0"
+    "undici-types": "^8.10.0"
   },
   "files": [
     "dist"
@@ -54,6 +54,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1085.0"
+    "@aws-sdk/client-s3": "^3.1118.0"
   }
 }

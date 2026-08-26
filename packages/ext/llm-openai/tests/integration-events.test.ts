@@ -89,8 +89,8 @@ function createErrorStreamRunner(error: unknown) {
  * Trigger the resolve callback on a RillStream to emit events.
  */
 async function resolveStream(stream: unknown): Promise<unknown> {
-  const resolve = (stream as any)
-    .__rill_stream_resolve as () => Promise<unknown>;
+  const resolve = (stream as { __rill_stream_resolve: () => Promise<unknown> })
+    .__rill_stream_resolve;
   return resolve();
 }
 
@@ -103,9 +103,9 @@ vi.mock('openai', () => {
     status: number | undefined;
     constructor(
       status: number | undefined,
-      _error: any,
+      _error: unknown,
       message: string,
-      _headers: any
+      _headers: unknown
     ) {
       super(message);
       this.status = status;

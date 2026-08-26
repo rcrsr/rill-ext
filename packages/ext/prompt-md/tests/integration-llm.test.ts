@@ -62,12 +62,11 @@ const mockOpenAIStream = vi.fn();
 vi.mock('openai', () => {
   class MockAPIError extends Error {
     status: number | undefined;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(
       status: number | undefined,
-      _error: any,
+      _error: unknown,
       message: string,
-      _headers: any
+      _headers: unknown
     ) {
       super(message);
       this.status = status;

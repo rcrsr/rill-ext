@@ -7,7 +7,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { makeFactoryCtx } from './_helpers.js';
+import { makeFactoryCtx, extValue } from './_helpers.js';
+import type { IPty } from 'node-pty';
 import { createRuntimeContext, structureToTypeValue } from '@rcrsr/rill';
 import type { ClaudeCodeResult } from '../src/types.js';
 
@@ -95,7 +96,7 @@ describe('IR-1: Factory result has correct value shape', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const v = ext.value as any;
+    const v = extValue(ext);
 
     // Verify all three function names exist in value dict
     expect(v['prompt']).toBeDefined();
@@ -108,7 +109,7 @@ describe('IR-1: Factory result has correct value shape', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const v = ext.value as any;
+    const v = extValue(ext);
 
     // Verify dispose is on ext, not on ext.value
     expect(ext.dispose).toBeDefined();
@@ -121,7 +122,7 @@ describe('IR-1: Factory result has correct value shape', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const v = ext.value as any;
+    const v = extValue(ext);
 
     // Verify function definitions are intact
     const promptDef = v['prompt'];
@@ -172,14 +173,13 @@ describe('IR-1: Factory result has correct value shape', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.resolve(0),
       dispose: vi.fn(),
     });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const v = ext.value as any;
+    const v = extValue(ext);
     const ctx = createRuntimeContext();
 
     // Call function via ext.value — fn() returns RillStream synchronously
@@ -218,8 +218,7 @@ describe('IR-5: dispose terminates active child processes', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
+      } as unknown as IPty,
       exitCode: new Promise(() => {
         // Never resolves to keep process active
       }),
@@ -249,10 +248,7 @@ describe('IR-5: dispose terminates active child processes', () => {
     const ctx = createRuntimeContext();
 
     // Start prompt but don't await completion — fn() returns RillStream synchronously
-    const stream = (ext.value as any).prompt.fn(
-      { text: 'Test', options: {} },
-      ctx
-    );
+    const stream = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
 
     // Wait briefly for process to start
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -290,8 +286,7 @@ describe('IR-5: dispose terminates active child processes', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise(() => {
           // Never resolves
         }),
@@ -323,7 +318,7 @@ describe('IR-5: dispose terminates active child processes', () => {
 
     // Start 5 concurrent prompts — fn() returns RillStream synchronously
     const streams = Array.from({ length: 5 }, (_, i) =>
-      (ext.value as any).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
+      extValue(ext).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
     );
 
     // Wait briefly for processes to start
@@ -383,8 +378,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
+      } as unknown as IPty,
       exitCode: new Promise(() => {
         // Never resolves
       }),
@@ -414,10 +408,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     const ctx = createRuntimeContext();
 
     // Start process — fn() returns RillStream synchronously
-    const stream = (ext.value as any).prompt.fn(
-      { text: 'Test', options: {} },
-      ctx
-    );
+    const stream = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
 
     // Wait briefly
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -454,8 +445,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise(() => {}),
         dispose: disposeFn,
       };
@@ -485,9 +475,9 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
 
     // Start 3 processes — fn() returns RillStream synchronously
     const streams = [
-      (ext.value as any).prompt.fn({ text: 'Test 1', options: {} }, ctx),
-      (ext.value as any).prompt.fn({ text: 'Test 2', options: {} }, ctx),
-      (ext.value as any).prompt.fn({ text: 'Test 3', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Test 1', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Test 2', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Test 3', options: {} }, ctx),
     ];
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -542,8 +532,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
+      } as unknown as IPty,
       exitCode: new Promise(() => {}),
       dispose: disposeFn,
     });
@@ -571,10 +560,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     const ctx = createRuntimeContext();
 
     // Start process — fn() returns RillStream synchronously
-    const stream = (ext.value as any).prompt.fn(
-      { text: 'Test', options: {} },
-      ctx
-    );
+    const stream = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Call dispose - should not throw despite error
@@ -611,8 +597,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
+      } as unknown as IPty,
       exitCode: new Promise(() => {}),
       dispose: disposeFn,
     });
@@ -639,10 +624,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).prompt.fn(
-      { text: 'Test', options: {} },
-      ctx
-    );
+    const stream = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Call dispose
@@ -685,8 +667,7 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise(() => {}),
         dispose: disposeFn,
       };
@@ -716,9 +697,9 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
 
     // Start 3 processes — fn() returns RillStream synchronously
     const streams = [
-      (ext.value as any).prompt.fn({ text: 'Test 1', options: {} }, ctx),
-      (ext.value as any).prompt.fn({ text: 'Test 2', options: {} }, ctx),
-      (ext.value as any).prompt.fn({ text: 'Test 3', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Test 1', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Test 2', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Test 3', options: {} }, ctx),
     ];
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -759,9 +740,9 @@ describe('IR-1: Factory creation is idempotent', () => {
     const ext3 = createClaudeCodeExtension(config, makeFactoryCtx());
 
     // Verify all created successfully
-    expect((ext1.value as any).prompt).toBeDefined();
-    expect((ext2.value as any).prompt).toBeDefined();
-    expect((ext3.value as any).prompt).toBeDefined();
+    expect(extValue(ext1).prompt).toBeDefined();
+    expect(extValue(ext2).prompt).toBeDefined();
+    expect(extValue(ext3).prompt).toBeDefined();
 
     // Verify each has own dispose function
     expect(ext1.dispose).toBeDefined();
@@ -790,8 +771,7 @@ describe('IR-1: Factory creation is idempotent', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise(() => {}),
         dispose: disposeFn,
       };
@@ -822,15 +802,15 @@ describe('IR-1: Factory creation is idempotent', () => {
     const ctx = createRuntimeContext();
 
     // Start process on each instance — fn() returns RillStream synchronously
-    const stream1 = (ext1.value as any).prompt.fn(
+    const stream1 = extValue(ext1).prompt.fn(
       { text: 'Test 1', options: {} },
       ctx
     );
-    const stream2 = (ext2.value as any).prompt.fn(
+    const stream2 = extValue(ext2).prompt.fn(
       { text: 'Test 2', options: {} },
       ctx
     );
-    const stream3 = (ext3.value as any).prompt.fn(
+    const stream3 = extValue(ext3).prompt.fn(
       { text: 'Test 3', options: {} },
       ctx
     );
@@ -887,9 +867,9 @@ describe('IR-1: Factory creation is idempotent', () => {
     );
 
     // Verify all created with different configs
-    expect((ext1.value as any).prompt).toBeDefined();
-    expect((ext2.value as any).prompt).toBeDefined();
-    expect((ext3.value as any).prompt).toBeDefined();
+    expect(extValue(ext1).prompt).toBeDefined();
+    expect(extValue(ext2).prompt).toBeDefined();
+    expect(extValue(ext3).prompt).toBeDefined();
 
     // Verify independence
     expect(ext1.dispose).not.toBe(ext2.dispose);

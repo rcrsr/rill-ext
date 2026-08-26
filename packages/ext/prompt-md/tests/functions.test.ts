@@ -664,18 +664,11 @@ Articles: {articles}
 });
 
 // ── EC-17: uncaught internal failure ─────────────────────────────────────────
-
-describe('EC-17: uncaught internal failure invalidated via ctx with #PROTOCOL', () => {
-  // [ASSUMPTION] EC-17 is the default catch-all in buildClosure.ts that wraps
-  // unexpected (non-RuntimeError) exceptions via ctx.invalidate with code
-  // 'PROTOCOL' and raw.kind 'closure_failure'. It cannot be triggered
-  // deterministically via the public API since all known error paths are
-  // already covered by RILL-R001 (factory-time) or never throw at runtime.
-  // The implementation is verified by code inspection:
-  // buildClosure.ts lines 93-108 catch any non-RuntimeError and call
-  // ctx.invalidate(err, { code: 'PROTOCOL', provider: 'prompt-md',
-  //   raw: { kind: 'closure_failure', name, detail } }).
-  // parseFile already blocks list-output-without-markers at boot time, so
-  // EC-17 is a defensive branch for future edge cases.
-  it.skip('EC-17 defensive catch-all — untestable via public API (see buildClosure.ts catch branch)', () => {});
-});
+//
+// EC-17 is the default catch-all in buildClosure.ts that wraps unexpected
+// (non-RuntimeError) exceptions via ctx.invalidate with code 'PROTOCOL' and
+// raw.kind 'closure_failure' (buildClosure.ts lines 93-108). It has no test:
+// it cannot be triggered deterministically through the public API, since all
+// known error paths are already covered by RILL-R001 (factory-time) or never
+// throw at runtime, and parseFile blocks list-output-without-markers at boot.
+// The branch is defensive, verified by code inspection.

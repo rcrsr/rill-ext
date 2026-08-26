@@ -11,7 +11,7 @@ import {
   type ApplicationCallable,
   type ExtensionEvent,
 } from '@rcrsr/rill';
-import Anthropic from '@anthropic-ai/sdk';
+import { APIError } from '@anthropic-ai/sdk';
 import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
 function getCallable(
@@ -726,7 +726,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
   describe('IC-12: anthropic:error event with error, duration', () => {
     it('emits error event on message() API failure during resolve', async () => {
       // Use the mocked Anthropic.APIError class
-      const apiError = new Anthropic.APIError(
+      const apiError = new APIError(
         401,
         {
           type: 'error',

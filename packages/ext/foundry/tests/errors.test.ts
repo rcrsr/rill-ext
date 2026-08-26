@@ -268,7 +268,7 @@ describe('mapProviderError + detectFoundryError integration', () => {
   ): Promise<{ code: string; message: string }> {
     const { detectFoundryError } = await import('../src/errors.js');
     const { mapProviderError } = await import('@rcrsr/rill-ext-llm-shared');
-    const { createRuntimeContext, getStatus } = await import('@rcrsr/rill');
+    const { getStatus } = await import('@rcrsr/rill');
     const ctx = createRuntimeContext();
     const result = mapProviderError(ctx, 'Foundry', error, detectFoundryError);
     const status = getStatus(result);

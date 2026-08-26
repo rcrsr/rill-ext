@@ -296,10 +296,10 @@ function canonicalPartToGemini(part: Part): GeminiPart {
       // Canonical tool_result → Gemini functionResponse
       // Collapse nested parts to a text string for the response body
       const responseText = part.parts
-        .map((p) =>
-          p.type === 'text' || p.type === 'thinking'
-            ? p.text
-            : JSON.stringify(p)
+        .map((pt) =>
+          pt.type === 'text' || pt.type === 'thinking'
+            ? pt.text
+            : JSON.stringify(pt)
         )
         .join('');
       return {
@@ -332,7 +332,7 @@ function canonicalToGeminiContents(messages: Message[]): {
     if (msg.role === 'system') {
       // Lift system turn to systemInstruction; use text from first text part
       const textPart = msg.parts.find(
-        (p) => p.type === 'text' || p.type === 'thinking'
+        (part) => part.type === 'text' || part.type === 'thinking'
       );
       if (
         textPart &&

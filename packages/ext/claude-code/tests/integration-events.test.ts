@@ -5,7 +5,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { makeFactoryCtx } from './_helpers.js';
+import { makeFactoryCtx, extValue } from './_helpers.js';
+import type { IPty } from 'node-pty';
 import { createRuntimeContext, type ExtensionEvent } from '@rcrsr/rill';
 
 // Mock which module
@@ -97,7 +98,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -113,7 +114,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       // Execute prompt and resolve stream to trigger event emission
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Hello Claude', options: {} },
         ctx
       );
@@ -161,7 +162,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -176,7 +177,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: longPrompt, options: {} },
         ctx
       );
@@ -220,7 +221,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -235,7 +236,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const skillArgs = { verbose: true, retries: 3 };
-      const stream = (ext.value as any).skill.fn(
+      const stream = extValue(ext).skill.fn(
         { name: 'test-skill', args: skillArgs },
         ctx
       );
@@ -283,7 +284,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -297,7 +298,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).skill.fn(
+      const stream = extValue(ext).skill.fn(
         { name: 'test-skill', args: {} },
         ctx
       );
@@ -340,7 +341,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -355,7 +356,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       const commandArgs = { config: { format: 'json' }, priority: 'high' };
-      const stream = (ext.value as any).command.fn(
+      const stream = extValue(ext).command.fn(
         { name: 'test-command', args: commandArgs },
         ctx
       );
@@ -391,7 +392,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.reject(new Error('Process timeout')),
         dispose: vi.fn(),
       });
@@ -406,7 +407,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       // fn() returns stream synchronously; resolve it to trigger event emission
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       );
@@ -439,7 +440,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.reject(new Error('Skill execution failed')),
         dispose: vi.fn(),
       });
@@ -453,7 +454,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).skill.fn(
+      const stream = extValue(ext).skill.fn(
         { name: 'failing-skill', args: {} },
         ctx
       );
@@ -481,7 +482,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.reject(new Error('Command failed')),
         dispose: vi.fn(),
       });
@@ -495,7 +496,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).command.fn(
+      const stream = extValue(ext).command.fn(
         { name: 'failing-command', args: {} },
         ctx
       );
@@ -524,7 +525,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.reject('String error'),
         dispose: vi.fn(),
       });
@@ -538,7 +539,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       );
@@ -593,7 +594,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -607,7 +608,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       );
@@ -654,7 +655,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -669,19 +670,13 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       });
 
       // Test all three functions — resolve each stream to emit events
-      const s1 = (ext.value as any).prompt.fn(
-        { text: 'Test', options: {} },
-        ctx
-      );
+      const s1 = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
       await resolveStream(s1);
 
-      const s2 = (ext.value as any).skill.fn({ name: 'skill', args: {} }, ctx);
+      const s2 = extValue(ext).skill.fn({ name: 'skill', args: {} }, ctx);
       await resolveStream(s2);
 
-      const s3 = (ext.value as any).command.fn(
-        { name: 'command', args: {} },
-        ctx
-      );
+      const s3 = extValue(ext).command.fn({ name: 'command', args: {} }, ctx);
       await resolveStream(s3);
 
       expect(events).toHaveLength(3);

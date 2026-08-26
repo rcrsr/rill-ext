@@ -700,7 +700,7 @@ export async function executeToolLoop(
 
     // Append assistant message (with tool calls) to history
     const assistantMessage = callbacks.formatAssistantMessage(response);
-    if (assistantMessage != null) {
+    if (assistantMessage !== null && assistantMessage !== undefined) {
       currentMessages.push(assistantMessage);
     }
 

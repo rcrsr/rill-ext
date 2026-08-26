@@ -33,10 +33,10 @@
     "@rcrsr/rill": "~0.20.0",
     "@rcrsr/rill-ext-llm-shared": "workspace:^",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
-    "undici-types": "^8.7.0"
+    "undici-types": "^8.10.0"
   },
   "files": [
     "dist"
@@ -54,6 +54,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@google/genai": "^2.11.0"
+    "@google/genai": "^2.18.0"
   }
 }

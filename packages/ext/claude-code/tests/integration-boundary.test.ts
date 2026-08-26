@@ -8,7 +8,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { SpawnError } from '../src/errors.js';
-import { makeFactoryCtx } from './_helpers.js';
+import { makeFactoryCtx, extValue, type StreamStep } from './_helpers.js';
+import type { IPty } from 'node-pty';
+import type { ClaudeMessage } from '../src/types.js';
 import { createRuntimeContext } from '@rcrsr/rill';
 
 // ============================================================
@@ -66,11 +68,9 @@ async function resolveStream(
  */
 async function collectChunks(stream: unknown): Promise<string[]> {
   const chunks: string[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = stream;
+  let current: StreamStep = stream as StreamStep;
   while (!current.done) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    current = await (current.next as any).fn({}, null);
+    current = (await current.next.fn({}, null)) as StreamStep;
     if (!current.done && current.value !== undefined) {
       chunks.push(current.value as string);
     }
@@ -94,19 +94,21 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     // Create parser that collects chunks
     const processedChunks: string[] = [];
     const mockParser = {
-      processChunk: vi.fn((chunk: string, callback: (msg: any) => void) => {
-        processedChunks.push(chunk);
-        // Simulate parsing JSON lines from chunks
-        const lines = chunk.split('\n').filter((line) => line.trim());
-        lines.forEach((line) => {
-          try {
-            const msg = JSON.parse(line);
-            callback(msg);
-          } catch {
-            // Ignore non-JSON lines
-          }
-        });
-      }),
+      processChunk: vi.fn(
+        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
+          processedChunks.push(chunk);
+          // Simulate parsing JSON lines from chunks
+          const lines = chunk.split('\n').filter((line) => line.trim());
+          lines.forEach((line) => {
+            try {
+              const msg = JSON.parse(line);
+              callback(msg);
+            } catch {
+              // Ignore non-JSON lines
+            }
+          });
+        }
+      ),
       flush: vi.fn(),
     };
 
@@ -141,7 +143,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
         }),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: new Promise<number>((resolve) => {
         // Simulate streaming 10K lines in chunks of 100 lines
         setTimeout(() => {
@@ -180,7 +182,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     const ctx = createRuntimeContext();
 
     // Execute prompt — fn() returns RillStream synchronously
-    const stream = (ext.value as any).prompt.fn(
+    const stream = extValue(ext).prompt.fn(
       { text: 'Process large output', options: {} },
       ctx
     );
@@ -214,16 +216,18 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     const mockParser = {
-      processChunk: vi.fn((chunk: string, callback: (msg: any) => void) => {
-        const lines = chunk.split('\n').filter((line) => line.trim());
-        lines.forEach((line) => {
-          try {
-            callback(JSON.parse(line));
-          } catch {
-            // Ignore parse errors
-          }
-        });
-      }),
+      processChunk: vi.fn(
+        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
+          const lines = chunk.split('\n').filter((line) => line.trim());
+          lines.forEach((line) => {
+            try {
+              callback(JSON.parse(line));
+            } catch {
+              // Ignore parse errors
+            }
+          });
+        }
+      ),
       flush: vi.fn(),
     };
 
@@ -256,7 +260,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
         }),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: new Promise<number>((resolve) => {
         setTimeout(() => {
           // Send 10K lines with varying message types
@@ -289,7 +293,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).prompt.fn(
+    const stream = extValue(ext).prompt.fn(
       { text: 'Mixed content test', options: {} },
       ctx
     );
@@ -336,7 +340,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
           }),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise<number>((resolve) => {
           // Simulate varying completion times (50-150ms)
           const delay = 50 + Math.random() * 100;
@@ -360,14 +364,16 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     });
 
     vi.mocked(createStreamParser).mockImplementation(() => ({
-      processChunk: vi.fn((chunk: string, callback: (msg: any) => void) => {
-        try {
-          const msg = JSON.parse(chunk.trim());
-          callback(msg);
-        } catch {
-          // Ignore parse errors
+      processChunk: vi.fn(
+        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
+          try {
+            const msg = JSON.parse(chunk.trim());
+            callback(msg);
+          } catch {
+            // Ignore parse errors
+          }
         }
-      }),
+      ),
       flush: vi.fn(),
     }));
 
@@ -398,7 +404,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
 
     // Execute 10 concurrent prompts — each fn() call returns a RillStream synchronously
     const streams = Array.from({ length: 10 }, (_, i) =>
-      (ext.value as any).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
+      extValue(ext).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
     );
 
     // For each stream: iterate chunks (so generator processes all data), then resolve
@@ -457,7 +463,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
           }),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise<number>((resolve) => {
           setTimeout(() => {
             if (onDataCallback) {
@@ -479,13 +485,15 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     });
 
     vi.mocked(createStreamParser).mockImplementation(() => ({
-      processChunk: vi.fn((chunk: string, callback: (msg: any) => void) => {
-        try {
-          callback(JSON.parse(chunk.trim()));
-        } catch {
-          // Ignore
+      processChunk: vi.fn(
+        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
+          try {
+            callback(JSON.parse(chunk.trim()));
+          } catch {
+            // Ignore
+          }
         }
-      }),
+      ),
       flush: vi.fn(),
     }));
 
@@ -509,16 +517,16 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
 
     // Execute mixed concurrent calls — all fn() calls return RillStream synchronously
     const streams = [
-      (ext.value as any).prompt.fn({ text: 'Prompt 1', options: {} }, ctx),
-      (ext.value as any).prompt.fn({ text: 'Prompt 2', options: {} }, ctx),
-      (ext.value as any).skill.fn({ name: 'skill-1', args: {} }, ctx),
-      (ext.value as any).skill.fn({ name: 'skill-2', args: {} }, ctx),
-      (ext.value as any).command.fn({ name: 'command-1', args: {} }, ctx),
-      (ext.value as any).prompt.fn({ text: 'Prompt 3', options: {} }, ctx),
-      (ext.value as any).skill.fn({ name: 'skill-3', args: {} }, ctx),
-      (ext.value as any).command.fn({ name: 'command-2', args: {} }, ctx),
-      (ext.value as any).prompt.fn({ text: 'Prompt 4', options: {} }, ctx),
-      (ext.value as any).prompt.fn({ text: 'Prompt 5', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Prompt 1', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Prompt 2', options: {} }, ctx),
+      extValue(ext).skill.fn({ name: 'skill-1', args: {} }, ctx),
+      extValue(ext).skill.fn({ name: 'skill-2', args: {} }, ctx),
+      extValue(ext).command.fn({ name: 'command-1', args: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Prompt 3', options: {} }, ctx),
+      extValue(ext).skill.fn({ name: 'skill-3', args: {} }, ctx),
+      extValue(ext).command.fn({ name: 'command-2', args: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Prompt 4', options: {} }, ctx),
+      extValue(ext).prompt.fn({ text: 'Prompt 5', options: {} }, ctx),
     ];
 
     const results = await Promise.all(streams.map((s) => resolveStream(s)));
@@ -560,7 +568,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
           }),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise<number>((resolve, reject) => {
           setTimeout(() => {
             if (shouldFail) {
@@ -592,13 +600,15 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     });
 
     vi.mocked(createStreamParser).mockImplementation(() => ({
-      processChunk: vi.fn((chunk: string, callback: (msg: any) => void) => {
-        try {
-          callback(JSON.parse(chunk.trim()));
-        } catch {
-          // Ignore
+      processChunk: vi.fn(
+        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
+          try {
+            callback(JSON.parse(chunk.trim()));
+          } catch {
+            // Ignore
+          }
         }
-      }),
+      ),
       flush: vi.fn(),
     }));
 
@@ -622,7 +632,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
 
     // All fn() calls return RillStream synchronously
     const streams = Array.from({ length: 10 }, (_, i) =>
-      (ext.value as any).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
+      extValue(ext).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
     );
 
     // Use Promise.allSettled to capture both successful and failed stream resolutions.
@@ -682,7 +692,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
           }),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise<number>((resolve) => {
           // Fast completion (1ms) to speed up test
           setTimeout(() => {
@@ -700,13 +710,15 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
     });
 
     vi.mocked(createStreamParser).mockImplementation(() => ({
-      processChunk: vi.fn((chunk: string, callback: (msg: any) => void) => {
-        try {
-          callback(JSON.parse(chunk.trim()));
-        } catch {
-          // Ignore
+      processChunk: vi.fn(
+        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
+          try {
+            callback(JSON.parse(chunk.trim()));
+          } catch {
+            // Ignore
+          }
         }
-      }),
+      ),
       flush: vi.fn(),
     }));
 
@@ -729,7 +741,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
     // Execute 1000 sequential prompts
     for (let i = 0; i < 1000; i++) {
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: `Prompt ${i}`, options: {} },
         ctx
       );
@@ -788,7 +800,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
           }),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise<number>((resolve) => {
           setTimeout(() => {
             if (onDataCallback) {
@@ -808,13 +820,15 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
     });
 
     vi.mocked(createStreamParser).mockImplementation(() => ({
-      processChunk: vi.fn((chunk: string, callback: (msg: any) => void) => {
-        try {
-          callback(JSON.parse(chunk.trim()));
-        } catch {
-          // Ignore
+      processChunk: vi.fn(
+        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
+          try {
+            callback(JSON.parse(chunk.trim()));
+          } catch {
+            // Ignore
+          }
         }
-      }),
+      ),
       flush: vi.fn(),
     }));
 
@@ -837,7 +851,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
     // Execute 1000 sequential prompts with varying sizes
     for (let i = 0; i < 1000; i++) {
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: `Prompt ${i}`, options: {} },
         ctx
       );
@@ -864,7 +878,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     // Track PTY instances to verify cleanup
-    const ptyInstances: any[] = [];
+    const ptyInstances: Array<{ kill: ReturnType<typeof vi.fn> }> = [];
 
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
       let onDataCallback: ((chunk: string) => void) | undefined;
@@ -890,7 +904,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       });
 
       return {
-        ptyProcess: ptyInstance as any,
+        ptyProcess: ptyInstance as unknown as IPty,
         exitCode: new Promise<number>((resolve) => {
           setTimeout(() => {
             if (onDataCallback) {
@@ -907,13 +921,15 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
     });
 
     vi.mocked(createStreamParser).mockImplementation(() => ({
-      processChunk: vi.fn((chunk: string, callback: (msg: any) => void) => {
-        try {
-          callback(JSON.parse(chunk.trim()));
-        } catch {
-          // Ignore
+      processChunk: vi.fn(
+        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
+          try {
+            callback(JSON.parse(chunk.trim()));
+          } catch {
+            // Ignore
+          }
         }
-      }),
+      ),
       flush: vi.fn(),
     }));
 
@@ -936,7 +952,7 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
     // Execute 1000 sequential prompts
     for (let i = 0; i < 1000; i++) {
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: `Prompt ${i}`, options: {} },
         ctx
       );

@@ -127,14 +127,23 @@ async function resolveStream(
 /**
  * Collect string chunks from a RillStream by iterating via next() calls.
  */
+type StreamFn = (
+  args: Record<string, unknown>,
+  ctx: Record<string, unknown>
+) => Promise<StreamNode>;
+interface StreamNode {
+  done?: boolean;
+  value?: unknown;
+  next: StreamFn | { fn: StreamFn };
+}
+
 async function collectStreamChunks(stream: unknown): Promise<string[]> {
   const chunks: string[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current = stream as any;
+  let current = stream as StreamNode;
   while (!current.done) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fn = (current.next as any).fn ?? (current.next as any);
-    const fnToCall = typeof fn === 'function' ? fn : (fn as any).fn;
+    const next = current.next;
+    const resolved = typeof next === 'function' ? next : (next.fn ?? next);
+    const fnToCall = typeof resolved === 'function' ? resolved : resolved.fn;
     current = await fnToCall({}, {});
     if (!current.done && current.value !== undefined) {
       chunks.push(current.value as string);

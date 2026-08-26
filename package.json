@@ -3,7 +3,7 @@
   "version": "0.20.0",
   "description": "rill extension ecosystem — official extensions for rill",
   "private": true,
-  "packageManager": "pnpm@11.11.0+sha512.4463f65fd80ed80d69bc1d4bf163ee94f605c7380fc318bb5b2ebe15f8cd12d49c51a4d59e951b401e764d3b6ca751cbf51bc50ed7001a6bcb4935e684c34882",
+  "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c",
   "type": "module",
   "repository": {
     "type": "git",
@@ -37,13 +37,13 @@
     "pnpm": ">=11"
   },
   "devDependencies": {
-    "@rcrsr/rill-dev": "^0.1.0",
-    "@types/node": "^26.1.1",
-    "knip": "^6.25.0",
+    "@rcrsr/rill-dev": "^0.2.2",
+    "@types/node": "^26.2.0",
+    "knip": "^6.32.2",
     "lefthook": "^2.1.10",
-    "oxfmt": "^0.58.0",
-    "oxlint": "^1.73.0",
+    "oxfmt": "^0.65.0",
+    "oxlint": "^1.80.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

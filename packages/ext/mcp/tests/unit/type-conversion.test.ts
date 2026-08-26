@@ -6,6 +6,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { RillValue } from '@rcrsr/rill';
 import type { McpToolResult, McpToolContent } from '../../src/tools.js';
 
 // Test helper to access internal parseToolResult via tool function generation
@@ -16,7 +18,7 @@ import { makeRuntimeCtx, expectRejectsInvalid } from '../_helpers.js';
  * Helper to extract parseToolResult behavior by generating a tool function
  * and calling it with a mocked client that returns the test result.
  */
-async function testParseToolResult(result: McpToolResult): Promise<any> {
+async function testParseToolResult(result: McpToolResult): Promise<RillValue> {
   const mockTool: McpTool = {
     name: 'test_tool',
     description: 'Test tool',
@@ -30,7 +32,7 @@ async function testParseToolResult(result: McpToolResult): Promise<any> {
   // Mock client that returns our test result
   const mockClient = {
     callTool: async () => result,
-  } as any;
+  } as unknown as Client;
 
   const mockContext = makeRuntimeCtx();
 
@@ -314,7 +316,10 @@ describe('AC-8: Type conversion', () => {
       const result: McpToolResult = {
         content: [
           { type: 'text', text: 'Known' },
-          { type: 'unknown', text: 'Mystery content' } as any,
+          {
+            type: 'unknown',
+            text: 'Mystery content',
+          } as unknown as McpToolContent,
         ],
       };
 

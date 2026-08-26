@@ -38,8 +38,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
     it('kills connection and pending call rejects with connection lost error', async () => {
       // Mock a tool that simulates a long-running operation
       let toolCallController: {
-        resolve: (value: any) => void;
-        reject: (reason: any) => void;
+        resolve: (value: unknown) => void;
+        reject: (reason: unknown) => void;
       };
       const pendingToolCall = new Promise((resolve, reject) => {
         toolCallController = { resolve, reject };
@@ -75,7 +75,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
       // Mock callTool to return the pending promise
       vi.spyOn(Client.prototype, 'callTool').mockReturnValue(
-        pendingToolCall as any
+        pendingToolCall as unknown as ReturnType<Client['callTool']>
       );
 
       const config: McpExtensionConfig = {
@@ -87,8 +87,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config, makeFactoryCtx());
-      const fns = extension.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = extension.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Start a long-running tool call
       const toolCallPromise = tools.long_operation!.fn({}, makeRuntimeCtx());
@@ -103,8 +103,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
     it('handles disposal with multiple pending calls', async () => {
       // Track multiple pending operations
       const pendingCalls: Array<{
-        resolve: (value: any) => void;
-        reject: (reason: any) => void;
+        resolve: (value: unknown) => void;
+        reject: (reason: unknown) => void;
       }> = [];
 
       vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
@@ -143,7 +143,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       vi.spyOn(Client.prototype, 'callTool').mockImplementation(() => {
         return new Promise((resolve, reject) => {
           pendingCalls.push({ resolve, reject });
-        }) as any;
+        }) as unknown as ReturnType<Client['callTool']>;
       });
 
       const config: McpExtensionConfig = {
@@ -155,8 +155,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config, makeFactoryCtx());
-      const fns = extension.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = extension.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Start multiple tool calls
       const call1 = tools.tool_one!.fn({}, makeRuntimeCtx());
@@ -306,8 +306,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config, makeFactoryCtx());
-      const fns = extension.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = extension.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Tool call before dispose works
       const resultBefore = await tools.test_tool!.fn(
@@ -367,8 +367,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config, makeFactoryCtx());
-      const fns = extension.value as Record<string, any>;
-      const resources = fns.resources as Record<string, any>;
+      const fns = extension.value as Record<string, unknown>;
+      const resources = fns.resources as Record<string, unknown>;
 
       // Resource read before dispose works
       const resultBefore = await resources.read_resource!.fn(
@@ -436,8 +436,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       };
 
       const extension = await createMcpExtension(config, makeFactoryCtx());
-      const fns = extension.value as Record<string, any>;
-      const prompts = fns.prompts as Record<string, any>;
+      const fns = extension.value as Record<string, unknown>;
+      const prompts = fns.prompts as Record<string, unknown>;
 
       // Prompt call before dispose works
       const resultBefore = await prompts.test!.fn({}, makeRuntimeCtx());
@@ -499,8 +499,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
       // Connect
       const extension = await createMcpExtension(config, makeFactoryCtx());
-      const fns = extension.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = extension.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
       expect(mockConnect).toHaveBeenCalledTimes(1);
 
       // Use

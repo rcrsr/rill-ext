@@ -449,9 +449,9 @@ describe('Process Manager', () => {
       let callCount = 0;
 
       vi.mocked(pty.spawn).mockImplementation(() => {
-        const pty = mockPtys[callCount];
+        const mock = mockPtys[callCount];
         callCount++;
-        return pty as unknown as pty.IPty;
+        return mock as unknown as pty.IPty;
       });
 
       const results = Array.from({ length: 10 }, (_, i) =>
@@ -512,11 +512,11 @@ describe('Process Manager', () => {
       const result = spawnClaudeCli('test', { timeoutMs: 5000 });
       result.dispose();
 
-      // Late exit event after disposal
-      exitCallback?.({ exitCode: 1 });
-
-      // Should not throw or cause issues
-      vi.advanceTimersByTime(5000);
+      // Late exit event after disposal should not throw or cause issues
+      expect(() => {
+        exitCallback?.({ exitCode: 1 });
+        vi.advanceTimersByTime(5000);
+      }).not.toThrow();
     });
   });
 });

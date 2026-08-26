@@ -77,7 +77,12 @@ const mockStream = vi.fn();
 vi.mock('@anthropic-ai/sdk', () => {
   class MockAPIError extends Error {
     status: number;
-    constructor(status: number, _error: any, message: string, _headers: any) {
+    constructor(
+      status: number,
+      _error: unknown,
+      message: string,
+      _headers: unknown
+    ) {
       super(message);
       this.status = status;
       this.name = 'APIError';

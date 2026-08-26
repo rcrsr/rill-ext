@@ -126,7 +126,7 @@ function getOffsetMinutes(epochMs: number, zone: string): number {
 
   const parts = formatter.formatToParts(epochMs);
   const get = (type: string): string =>
-    parts.find((p) => p.type === type)?.value ?? '00';
+    parts.find((part) => part.type === type)?.value ?? '00';
 
   const year = parseInt(get('year'), 10);
   const month = parseInt(get('month'), 10) - 1;
@@ -182,7 +182,7 @@ function getLocalComponents(
 
   const parts = formatter.formatToParts(epochMs);
   const get = (type: string): string =>
-    parts.find((p) => p.type === type)?.value ?? '00';
+    parts.find((part) => part.type === type)?.value ?? '00';
 
   let hours = parseInt(get('hour'), 10);
   if (hours === 24) hours = 0;

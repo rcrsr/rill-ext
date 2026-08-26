@@ -189,7 +189,7 @@ const INVALID_INPUTS: Array<[string, unknown]> = [
 
 describe('non-string input across all functions (EC-6 / AC-28)', () => {
   for (const { name, argKey, extraArgs } of ALL_FUNCTIONS) {
-    describe(name, () => {
+    describe(`${name}`, () => {
       it.each(INVALID_INPUTS)(
         `rejects ${argKey}: %s with INVALID_INPUT / non_string_input`,
         async (_label, invalidValue) => {

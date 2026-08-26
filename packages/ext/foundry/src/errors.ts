@@ -9,7 +9,7 @@
 
 import { RuntimeHaltSignal, type RuntimeContext } from '@rcrsr/rill';
 import type { ProviderErrorDetector } from '@rcrsr/rill-ext-llm-shared';
-import OpenAI from 'openai';
+import { APIError } from 'openai';
 
 // ============================================================
 // CONSTANTS
@@ -32,7 +32,7 @@ const PROVIDER = 'foundry';
  */
 export const detectFoundryError: ProviderErrorDetector = (error: unknown) => {
   // AzureOpenAI uses the same OpenAI.APIError shape
-  if (error instanceof OpenAI.APIError) {
+  if (error instanceof APIError) {
     return {
       status: error.status ?? undefined,
       message: error.message,

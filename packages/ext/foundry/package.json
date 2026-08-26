@@ -27,7 +27,7 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@azure/identity": "^4.13.0",
+    "@azure/identity": "^4.13.2",
     "@rcrsr/rill": "~0.20.0"
   },
   "peerDependenciesMeta": {
@@ -36,14 +36,14 @@
     }
   },
   "devDependencies": {
-    "@azure/identity": "^4.13.0",
+    "@azure/identity": "^4.13.2",
     "@rcrsr/rill": "~0.20.0",
     "@rcrsr/rill-ext-llm-shared": "workspace:^",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
-    "undici-types": "^8.7.0"
+    "undici-types": "^8.10.0"
   },
   "files": [
     "dist"
@@ -61,6 +61,6 @@
     "access": "public"
   },
   "dependencies": {
-    "openai": "^6.46.0"
+    "openai": "^7.5.0"
   }
 }

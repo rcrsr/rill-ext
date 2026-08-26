@@ -424,6 +424,7 @@ describe('createSqliteKvExtension', () => {
 
       // Should be able to open database again (not locked)
       const db = new Database(dbPath);
+      expect(db.open).toBe(true);
       db.close();
     });
 
@@ -451,6 +452,8 @@ describe('createSqliteKvExtension', () => {
       // Both databases should be closable (not locked)
       const db1 = new Database(db1Path);
       const db2 = new Database(db2Path);
+      expect(db1.open).toBe(true);
+      expect(db2.open).toBe(true);
       db1.close();
       db2.close();
     });
