@@ -387,7 +387,7 @@ function extractTextContent(
 
 /**
  * Anthropic-specific error detector for mapProviderError.
- * Extracts status code and message from Anthropic.APIError instances.
+ * Extracts status code and message from APIError instances.
  *
  * @param error - Unknown error value
  * @returns Object with status and message if Anthropic error, null otherwise

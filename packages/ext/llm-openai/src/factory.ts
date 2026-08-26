@@ -96,7 +96,7 @@ const O_SERIES_PATTERN = /^o\d/;
 
 /**
  * OpenAI-specific error detector for mapProviderError.
- * Extracts status code and message from OpenAI.APIError instances.
+ * Extracts status code and message from APIError instances.
  */
 const detectOpenAIError: ProviderErrorDetector = (error: unknown) => {
   if (error instanceof APIError) {

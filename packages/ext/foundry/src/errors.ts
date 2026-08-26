@@ -23,7 +23,7 @@ const PROVIDER = 'foundry';
 
 /**
  * Foundry-specific error detector for mapProviderError.
- * Extracts HTTP status and message from OpenAI.APIError instances thrown by AzureOpenAI.
+ * Extracts HTTP status and message from APIError instances thrown by AzureOpenAI.
  *
  * Covers 401, 429, timeout, and model-not-deployed failures.
  *
@@ -31,7 +31,7 @@ const PROVIDER = 'foundry';
  * @returns Status and message if a known provider error, null otherwise
  */
 export const detectFoundryError: ProviderErrorDetector = (error: unknown) => {
-  // AzureOpenAI uses the same OpenAI.APIError shape
+  // AzureOpenAI uses the same APIError shape
   if (error instanceof APIError) {
     return {
       status: error.status ?? undefined,
