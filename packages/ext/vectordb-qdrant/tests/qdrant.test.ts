@@ -53,12 +53,14 @@ function createMockSearchResponse(
     payload?: Record<string, unknown>;
   }>
 ) {
-  return results.map((r) => ({
-    id: r.id,
-    score: r.score,
-    version: 1,
-    payload: r.payload ?? {},
-  }));
+  return {
+    points: results.map((r) => ({
+      id: r.id,
+      score: r.score,
+      version: 1,
+      payload: r.payload ?? {},
+    })),
+  };
 }
 
 /**
@@ -108,7 +110,7 @@ function createMockCollectionInfo(
 
 // Mock the Qdrant SDK at module level
 const mockUpsert = vi.fn();
-const mockSearch = vi.fn();
+const mockQuery = vi.fn();
 const mockRetrieve = vi.fn();
 const mockDelete = vi.fn();
 const mockGetCollection = vi.fn();
@@ -121,7 +123,7 @@ vi.mock('@qdrant/js-client-rest', () => {
     QdrantClient: class MockQdrantClient {
       constructor(_config: unknown) {}
       upsert = mockUpsert;
-      search = mockSearch;
+      query = mockQuery;
       retrieve = mockRetrieve;
       delete = mockDelete;
       getCollection = mockGetCollection;
@@ -500,7 +502,7 @@ describe('Vector CRUD operations', () => {
         'test'
       );
 
-      mockSearch.mockResolvedValue(
+      mockQuery.mockResolvedValue(
         createMockSearchResponse([
           { id: 'doc-1', score: 0.95, payload: { city: 'Berlin' } },
           { id: 'doc-2', score: 0.88, payload: { city: 'London' } },
@@ -525,7 +527,7 @@ describe('Vector CRUD operations', () => {
         'test'
       );
 
-      mockSearch.mockResolvedValue(createMockSearchResponse([]));
+      mockQuery.mockResolvedValue(createMockSearchResponse([]));
 
       const results = (await getCallable(ext, 'search').fn(
         { vector: queryVector, options: {} },
@@ -542,7 +544,7 @@ describe('Vector CRUD operations', () => {
       );
       const options = { k: 0 };
 
-      mockSearch.mockResolvedValue(createMockSearchResponse([]));
+      mockQuery.mockResolvedValue(createMockSearchResponse([]));
 
       const results = (await getCallable(ext, 'search').fn(
         { vector: queryVector, options },
@@ -550,7 +552,7 @@ describe('Vector CRUD operations', () => {
       )) as Array<Record<string, unknown>>;
 
       expect(results).toEqual([]);
-      expect(mockSearch).toHaveBeenCalledWith(
+      expect(mockQuery).toHaveBeenCalledWith(
         'test_collection',
         expect.objectContaining({
           limit: 0,
@@ -567,7 +569,7 @@ describe('Vector CRUD operations', () => {
       const options = { score_threshold: 0.99 };
 
       // Qdrant would filter out low scores server-side
-      mockSearch.mockResolvedValue(createMockSearchResponse([]));
+      mockQuery.mockResolvedValue(createMockSearchResponse([]));
 
       const results = (await getCallable(ext, 'search').fn(
         { vector: queryVector, options },
@@ -780,7 +782,7 @@ describe('Error handling contracts', () => {
   });
 
   it('HTTP 401 produces correct message format (EC-1, AC-4)', async () => {
-    mockSearch.mockRejectedValue(
+    mockQuery.mockRejectedValue(
       new Error('Request failed with status 401 Unauthorized')
     );
 
@@ -800,7 +802,7 @@ describe('Error handling contracts', () => {
   });
 
   it('missing collection produces "collection not found" (EC-2, AC-11)', async () => {
-    mockSearch.mockRejectedValue(new Error('Collection "missing" not found'));
+    mockQuery.mockRejectedValue(new Error('Collection "missing" not found'));
 
     const queryVector = createVector(
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
@@ -818,7 +820,7 @@ describe('Error handling contracts', () => {
   });
 
   it('rate limit produces "rate limit exceeded" (EC-3, AC-13)', async () => {
-    mockSearch.mockRejectedValue(new Error('Rate limit exceeded (429)'));
+    mockQuery.mockRejectedValue(new Error('Rate limit exceeded (429)'));
 
     const queryVector = createVector(
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
@@ -838,7 +840,7 @@ describe('Error handling contracts', () => {
   it('timeout produces "request timeout" (EC-4, AC-14)', async () => {
     const timeoutError = new Error('Request timeout');
     timeoutError.name = 'AbortError';
-    mockSearch.mockRejectedValue(timeoutError);
+    mockQuery.mockRejectedValue(timeoutError);
 
     const queryVector = createVector(
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
@@ -918,7 +920,7 @@ describe('Error handling contracts', () => {
   });
 
   it('unknown errors produce "qdrant: <message>" (EC-9)', async () => {
-    mockSearch.mockRejectedValue(new Error('Something unexpected happened'));
+    mockQuery.mockRejectedValue(new Error('Something unexpected happened'));
 
     const queryVector = createVector(
       new Float32Array([0.1, 0.2, 0.3, 0.4]),
@@ -957,7 +959,7 @@ describe('Event emission', () => {
     };
     const ext = createQdrantExtension(config);
 
-    mockSearch.mockResolvedValue(
+    mockQuery.mockResolvedValue(
       createMockSearchResponse([
         { id: 'doc-1', score: 0.95 },
         { id: 'doc-2', score: 0.88 },
@@ -1082,8 +1084,8 @@ describe('Concurrent operations', () => {
     const ctx = createRuntimeContext();
 
     // Mock different results for each search
-    mockSearch.mockImplementation(async (_, request) => {
-      const vector = request.vector as number[];
+    mockQuery.mockImplementation(async (_, request) => {
+      const vector = request.query as number[];
       const id = Math.round(vector[0]! * 10);
       return createMockSearchResponse([{ id: `doc-${id}`, score: 0.95 }]);
     });

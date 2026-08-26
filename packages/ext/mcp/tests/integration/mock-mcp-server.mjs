@@ -8,7 +8,10 @@
  * Usage: node mock-mcp-server.mjs
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  McpServer,
+  ResourceTemplate,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
@@ -144,10 +147,7 @@ server.registerResource(
 // Resource template
 server.registerResource(
   'user-profile',
-  {
-    uriTemplate: 'user://{id}/profile',
-    variables: { id: { type: 'string' } },
-  },
+  new ResourceTemplate('user://{id}/profile', { list: undefined }),
   {
     description: 'User profile by ID',
     mimeType: 'application/json',
@@ -157,7 +157,7 @@ server.registerResource(
     return {
       contents: [
         {
-          uri,
+          uri: uri.href,
           mimeType: 'application/json',
           text: JSON.stringify({
             id: userId,
@@ -200,18 +200,10 @@ server.registerPrompt(
   'code_review',
   {
     description: 'Generate a code review prompt',
-    arguments: [
-      {
-        name: 'language',
-        description: 'Programming language',
-        required: true,
-      },
-      {
-        name: 'code',
-        description: 'Code to review',
-        required: true,
-      },
-    ],
+    argsSchema: {
+      language: z.string().describe('Programming language'),
+      code: z.string().describe('Code to review'),
+    },
   },
   async (args) => {
     return {

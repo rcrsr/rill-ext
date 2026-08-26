@@ -174,11 +174,10 @@ describe('Integration Tests', () => {
       });
     });
 
-    it.skip('handles concurrent reads across multiple processes', async () => {
-      // Skipped: Multi-process testing requires complex setup for ESM imports.
-      // AC-2 is adequately covered by in-process concurrent read test above.
-      // SQLite WAL mode enables concurrent readers across processes.
-    });
+    // Concurrent reads across multiple processes are not covered here:
+    // multi-process testing requires complex setup for ESM imports. AC-2 is
+    // adequately covered by the in-process concurrent read test above, and
+    // SQLite WAL mode enables concurrent readers across processes.
   });
 
   describe('AC-6: Performance Under Load', () => {

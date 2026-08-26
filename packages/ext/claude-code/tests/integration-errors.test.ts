@@ -10,7 +10,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { SpawnError } from '../src/errors.js';
-import { expectInvalidThrow, makeFactoryCtx } from './_helpers.js';
+import {
+  expectInvalidThrow,
+  makeFactoryCtx,
+  extValue,
+  type StreamStep,
+} from './_helpers.js';
+import type { IPty } from 'node-pty';
 import {
   createRuntimeContext,
   RuntimeError,
@@ -47,11 +53,9 @@ async function resolveStream(stream: unknown): Promise<RillValue> {
 
 async function collectChunks(stream: unknown): Promise<string[]> {
   const chunks: string[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = stream;
+  let current: StreamStep = stream as StreamStep;
   while (!current.done) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    current = await (current.next as any).fn({}, null);
+    current = (await current.next.fn({}, null)) as StreamStep;
     if (!current.done && current.value !== undefined) {
       chunks.push(current.value as string);
     }
@@ -151,7 +155,7 @@ describe('EC-3, AC-11: Empty text to prompt', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).prompt.fn({ text: '', options: {} }, ctx),
+      () => extValue(ext).prompt.fn({ text: '', options: {} }, ctx),
       'INVALID_INPUT',
       'prompt text cannot be empty'
     );
@@ -162,12 +166,12 @@ describe('EC-3, AC-11: Empty text to prompt', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).prompt.fn({ text: '   ', options: {} }, ctx),
+      () => extValue(ext).prompt.fn({ text: '   ', options: {} }, ctx),
       'INVALID_INPUT',
       'prompt text cannot be empty'
     );
     expectInvalidThrow(
-      () => (ext.value as any).prompt.fn({ text: '\t\n  ', options: {} }, ctx),
+      () => extValue(ext).prompt.fn({ text: '\t\n  ', options: {} }, ctx),
       'INVALID_INPUT',
       'prompt text cannot be empty'
     );
@@ -194,7 +198,7 @@ describe('EC-4, AC-6: Binary not found at spawn (ENOENT)', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
+      () => extValue(ext).prompt.fn({ text: 'test', options: {} }, ctx),
       'UNAVAILABLE',
       'claude binary not found'
     );
@@ -221,7 +225,7 @@ describe('EC-5, AC-7: Permission denied (EACCES)', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
+      () => extValue(ext).prompt.fn({ text: 'test', options: {} }, ctx),
       'FORBIDDEN',
       'Permission denied'
     );
@@ -252,7 +256,7 @@ describe('EC-6: Generic spawn failure', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).prompt.fn({ text: 'test', options: {} }, ctx),
+      () => extValue(ext).prompt.fn({ text: 'test', options: {} }, ctx),
       'UNAVAILABLE',
       'Failed to spawn claude binary'
     );
@@ -295,7 +299,7 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.reject(
         new SpawnError('cli_timeout', 'Claude CLI timeout after 5000ms', {
           timeout_ms: 5000,
@@ -307,10 +311,7 @@ describe('EC-8, AC-8: Timeout exceeded', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).prompt.fn(
-      { text: 'test', options: {} },
-      ctx
-    );
+    const stream = extValue(ext).prompt.fn({ text: 'test', options: {} }, ctx);
     await collectChunks(stream);
     const result = await resolveStream(stream);
     expect(isInvalid(result)).toBe(true);
@@ -354,7 +355,7 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.reject(
         new SpawnError('exit_nonzero', 'Claude CLI exited with code 1', {
           exit_code: 1,
@@ -366,10 +367,7 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).prompt.fn(
-      { text: 'test', options: {} },
-      ctx
-    );
+    const stream = extValue(ext).prompt.fn({ text: 'test', options: {} }, ctx);
     const chunks = await collectChunks(stream);
 
     const errorChunks = chunks.filter((c) => c.startsWith('[error]'));
@@ -412,7 +410,7 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.reject(
         new SpawnError('exit_nonzero', 'Claude CLI exited with code 127', {
           exit_code: 127,
@@ -424,10 +422,7 @@ describe('EC-9, AC-9: Non-zero exit code', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).prompt.fn(
-      { text: 'test', options: {} },
-      ctx
-    );
+    const stream = extValue(ext).prompt.fn({ text: 'test', options: {} }, ctx);
     const chunks = await collectChunks(stream);
     expect(chunks.some((c) => c.includes('127'))).toBe(true);
 
@@ -452,7 +447,7 @@ describe('EC-10: Empty skill name', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).skill.fn({ name: '', args: {} }, ctx),
+      () => extValue(ext).skill.fn({ name: '', args: {} }, ctx),
       'INVALID_INPUT',
       'skill name cannot be empty'
     );
@@ -463,7 +458,7 @@ describe('EC-10: Empty skill name', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).skill.fn({ name: '   ', args: {} }, ctx),
+      () => extValue(ext).skill.fn({ name: '   ', args: {} }, ctx),
       'INVALID_INPUT',
       'skill name cannot be empty'
     );
@@ -506,7 +501,7 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.reject(
         new SpawnError('exit_nonzero', 'Claude CLI exited with code 2', {
           exit_code: 2,
@@ -518,7 +513,7 @@ describe('EC-11: Invalid skill name (non-zero exit)', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).skill.fn(
+    const stream = extValue(ext).skill.fn(
       { name: 'invalid-skill', args: {} },
       ctx
     );
@@ -558,7 +553,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx),
+      () => extValue(ext).skill.fn({ name: 'test-skill', args: {} }, ctx),
       'UNAVAILABLE',
       'Failed to spawn claude binary'
     );
@@ -595,7 +590,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.reject(
         new SpawnError('cli_timeout', 'Claude CLI timeout after 10000ms', {
           timeout_ms: 10000,
@@ -607,7 +602,7 @@ describe('EC-12: Skill spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).skill.fn(
+    const stream = extValue(ext).skill.fn(
       { name: 'test-skill', args: {} },
       ctx
     );
@@ -633,7 +628,7 @@ describe('EC-13: Empty command name', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).command.fn({ name: '', args: {} }, ctx),
+      () => extValue(ext).command.fn({ name: '', args: {} }, ctx),
       'INVALID_INPUT',
       'command name cannot be empty'
     );
@@ -644,7 +639,7 @@ describe('EC-13: Empty command name', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () => (ext.value as any).command.fn({ name: '\t\n', args: {} }, ctx),
+      () => extValue(ext).command.fn({ name: '\t\n', args: {} }, ctx),
       'INVALID_INPUT',
       'command name cannot be empty'
     );
@@ -687,7 +682,7 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.reject(
         new SpawnError('exit_nonzero', 'Claude CLI exited with code 3', {
           exit_code: 3,
@@ -699,7 +694,7 @@ describe('EC-14: Invalid command (non-zero exit)', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).command.fn(
+    const stream = extValue(ext).command.fn(
       { name: 'invalid-command', args: {} },
       ctx
     );
@@ -734,8 +729,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () =>
-        (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
+      () => extValue(ext).command.fn({ name: 'test-command', args: {} }, ctx),
       'UNAVAILABLE',
       'claude binary not found'
     );
@@ -772,7 +766,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.reject(
         new SpawnError('cli_timeout', 'Claude CLI timeout after 15000ms', {
           timeout_ms: 15000,
@@ -784,7 +778,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const stream = (ext.value as any).command.fn(
+    const stream = extValue(ext).command.fn(
       { name: 'test-command', args: {} },
       ctx
     );
@@ -809,8 +803,7 @@ describe('EC-15: Command spawn/parse/timeout errors', () => {
     const ctx = createRuntimeContext();
 
     expectInvalidThrow(
-      () =>
-        (ext.value as any).command.fn({ name: 'test-command', args: {} }, ctx),
+      () => extValue(ext).command.fn({ name: 'test-command', args: {} }, ctx),
       'FORBIDDEN',
       'Permission denied'
     );

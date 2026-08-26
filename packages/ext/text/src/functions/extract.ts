@@ -4,7 +4,7 @@
  * linkify-it is instantiated once at module load to avoid
  * repeated compilation of internal regular expressions.
  *
- * Match shape (linkify-it v5):
+ * Match shape (linkify-it v6):
  *   { schema, index, lastIndex, raw, text, url }
  *
  * Schema values:
@@ -15,7 +15,7 @@
  * @module
  */
 
-import LinkifyIt from 'linkify-it';
+import { LinkifyIt } from 'linkify-it';
 
 /** Linkify-it instance shared across all calls in this module. */
 const linkifier = new LinkifyIt();

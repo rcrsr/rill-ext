@@ -6,7 +6,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { SpawnError } from '../src/errors.js';
-import { makeFactoryCtx, expectInvalidThrow } from './_helpers.js';
+import {
+  makeFactoryCtx,
+  expectInvalidThrow,
+  extValue,
+  type StreamStep,
+} from './_helpers.js';
+import type { IPty } from 'node-pty';
 import {
   createRuntimeContext,
   getStatus,
@@ -54,11 +60,9 @@ async function resolveStream(
  */
 async function collectChunks(stream: unknown): Promise<string[]> {
   const chunks: string[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = stream;
+  let current: StreamStep = stream as StreamStep;
   while (!current.done) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    current = await (current.next as any).fn({}, null);
+    current = (await current.next.fn({}, null)) as StreamStep;
     if (!current.done && current.value !== undefined) {
       chunks.push(current.value as string);
     }
@@ -97,7 +101,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -105,7 +109,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Hello Claude', options: {} },
         ctx
       );
@@ -141,7 +145,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -149,7 +153,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).skill.fn(
+      const stream = extValue(ext).skill.fn(
         { name: 'test-skill', args: {} },
         ctx
       );
@@ -185,7 +189,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -193,7 +197,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).command.fn(
+      const stream = extValue(ext).command.fn(
         { name: 'test-command', args: {} },
         ctx
       );
@@ -240,7 +244,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           }),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise<number>((resolve) => {
           setTimeout(() => {
             if (onDataCallback) {
@@ -258,7 +262,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Hello Claude', options: {} },
         ctx
       );
@@ -303,7 +307,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -311,7 +315,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Hello Claude', options: {} },
         ctx
       );
@@ -361,7 +365,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -370,7 +374,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Hello Claude', options: {} },
         ctx
       );
@@ -421,7 +425,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -429,7 +433,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).skill.fn(
+      const stream = extValue(ext).skill.fn(
         {
           name: 'test-skill',
           args: {
@@ -484,7 +488,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -495,7 +499,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       );
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test prompt', options: { timeout: 60000 } },
         ctx
       );
@@ -538,7 +542,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -549,7 +553,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       );
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test prompt', options: {} },
         ctx
       );
@@ -595,7 +599,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -603,7 +607,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       );
@@ -650,7 +654,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -658,7 +662,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       );
@@ -701,7 +705,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -709,7 +713,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       );
@@ -752,7 +756,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -760,7 +764,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Test', options: {} },
         ctx
       );
@@ -787,7 +791,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
       expectInvalidThrow(
-        () => (ext.value as any).prompt.fn({ text: '', options: {} }, ctx),
+        () => extValue(ext).prompt.fn({ text: '', options: {} }, ctx),
         'INVALID_INPUT',
         'prompt text cannot be empty'
       );
@@ -797,7 +801,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
       expectInvalidThrow(
-        () => (ext.value as any).prompt.fn({ text: '   ', options: {} }, ctx),
+        () => extValue(ext).prompt.fn({ text: '   ', options: {} }, ctx),
         'INVALID_INPUT',
         'prompt text cannot be empty'
       );
@@ -807,7 +811,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
       expectInvalidThrow(
-        () => (ext.value as any).skill.fn({ name: '', args: {} }, ctx),
+        () => extValue(ext).skill.fn({ name: '', args: {} }, ctx),
         'INVALID_INPUT',
         'skill name cannot be empty'
       );
@@ -817,7 +821,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
       expectInvalidThrow(
-        () => (ext.value as any).skill.fn({ name: '  ', args: {} }, ctx),
+        () => extValue(ext).skill.fn({ name: '  ', args: {} }, ctx),
         'INVALID_INPUT',
         'skill name cannot be empty'
       );
@@ -827,7 +831,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
       expectInvalidThrow(
-        () => (ext.value as any).command.fn({ name: '', args: {} }, ctx),
+        () => extValue(ext).command.fn({ name: '', args: {} }, ctx),
         'INVALID_INPUT',
         'command name cannot be empty'
       );
@@ -837,7 +841,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
       expectInvalidThrow(
-        () => (ext.value as any).command.fn({ name: '\t', args: {} }, ctx),
+        () => extValue(ext).command.fn({ name: '\t', args: {} }, ctx),
         'INVALID_INPUT',
         'command name cannot be empty'
       );
@@ -860,10 +864,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
 
       expectInvalidThrow(
         () =>
-          (ext.value as any).prompt.fn(
-            { text: 'Hello Claude', options: {} },
-            ctx
-          ),
+          extValue(ext).prompt.fn({ text: 'Hello Claude', options: {} }, ctx),
         'UNAVAILABLE',
         'claude binary not found'
       );
@@ -902,7 +903,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.reject(
           new SpawnError('cli_timeout', 'Claude CLI timeout after 5000ms', {
             timeoutMs: 5000,
@@ -914,7 +915,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Hello Claude', options: { timeout: 5000 } },
         ctx
       );
@@ -969,7 +970,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: new Promise<number>((_, reject) => {
           setTimeout(() => {
             if (onDataCallback) {
@@ -984,7 +985,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = (ext.value as any).prompt.fn(
+      const stream = extValue(ext).prompt.fn(
         { text: 'Hello Claude', options: {} },
         ctx
       );
@@ -1022,7 +1023,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ctx = createRuntimeContext();
 
       expectInvalidThrow(
-        () => (ext.value as any).prompt.fn({ text: 'Hello', options: {} }, ctx),
+        () => extValue(ext).prompt.fn({ text: 'Hello', options: {} }, ctx),
         'UNAVAILABLE',
         'Failed to spawn claude binary'
       );
@@ -1045,8 +1046,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ctx = createRuntimeContext();
 
       expectInvalidThrow(
-        () =>
-          (ext.value as any).skill.fn({ name: 'test-skill', args: {} }, ctx),
+        () => extValue(ext).skill.fn({ name: 'test-skill', args: {} }, ctx),
         'UNAVAILABLE',
         'Failed to spawn claude binary'
       );
@@ -1069,11 +1069,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const ctx = createRuntimeContext();
 
       expectInvalidThrow(
-        () =>
-          (ext.value as any).command.fn(
-            { name: 'test-command', args: {} },
-            ctx
-          ),
+        () => extValue(ext).command.fn({ name: 'test-command', args: {} }, ctx),
         'UNAVAILABLE',
         'Failed to spawn claude binary'
       );
@@ -1115,7 +1111,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
             onExit: vi.fn(),
             write: vi.fn(),
             kill: vi.fn(),
-          } as any,
+          } as unknown as IPty,
           exitCode: Promise.resolve(0),
           dispose: vi.fn(),
         });
@@ -1123,7 +1119,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
-        const stream = (ext.value as any).prompt.fn(
+        const stream = extValue(ext).prompt.fn(
           { text: 'Do something', options: {} },
           ctx
         );
@@ -1179,7 +1175,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
             }),
             write: vi.fn(),
             kill: vi.fn(),
-          } as any,
+          } as unknown as IPty,
           exitCode: new Promise<number>((resolve) => {
             setTimeout(() => {
               if (onDataCb) onDataCb('output line\n');
@@ -1193,21 +1189,20 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
-        const stream = (ext.value as any).prompt.fn(
+        const stream = extValue(ext).prompt.fn(
           { text: 'Test', options: {} },
           ctx
         );
 
         // Navigate manually to the done step (replicates collectChunks but keeps the done step)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let current: any = stream;
+        let current: StreamStep = stream as StreamStep;
         while (!current.done) {
-          current = await (current.next as any).fn({}, null);
+          current = (await current.next.fn({}, null)) as StreamStep;
         }
 
         // Re-iterating the done step throws RILL-R002 synchronously
         // (the done step's callable is a sync function that throws, not async)
-        expect(() => (current.next as any).fn({}, null)).toThrow(
+        expect(() => current.next.fn({}, null)).toThrow(
           expect.objectContaining({
             errorId: 'RILL-R002',
             message: 'Stream already consumed; cannot re-iterate',
@@ -1248,7 +1243,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
             onExit: vi.fn(),
             write: vi.fn(),
             kill: vi.fn(),
-          } as any,
+          } as unknown as IPty,
           exitCode: Promise.resolve(0),
           dispose: vi.fn(),
         });
@@ -1256,7 +1251,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
-        const stream = (ext.value as any).prompt.fn(
+        const stream = extValue(ext).prompt.fn(
           { text: 'Empty task', options: {} },
           ctx
         );
@@ -1303,7 +1298,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
             onExit: vi.fn(),
             write: vi.fn(),
             kill: vi.fn(),
-          } as any,
+          } as unknown as IPty,
           exitCode: new Promise(() => {
             /* never resolves — simulates abandoned stream */
           }),
@@ -1313,14 +1308,14 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
-        const stream = (ext.value as any).prompt.fn(
+        const stream = extValue(ext).prompt.fn(
           { text: 'Long task', options: {} },
           ctx
         );
 
         // Simulate abandonment: invoke the hidden dispose property
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const disposeStream = (stream as any).__rill_stream_dispose;
+        const disposeStream = (stream as { __rill_stream_dispose: () => void })
+          .__rill_stream_dispose;
         expect(typeof disposeStream).toBe('function');
 
         disposeStream();
@@ -1359,7 +1354,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
             onExit: vi.fn(),
             write: vi.fn(),
             kill: vi.fn(),
-          } as any,
+          } as unknown as IPty,
           exitCode: new Promise(() => {
             /* never resolves */
           }),
@@ -1369,13 +1364,12 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         const ext = createClaudeCodeExtension({}, makeFactoryCtx());
         const ctx = createRuntimeContext();
 
-        const stream = (ext.value as any).prompt.fn(
+        const stream = extValue(ext).prompt.fn(
           { text: 'Long task', options: {} },
           ctx
         );
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const disposeStream = (stream as any).__rill_stream_dispose;
+        const disposeStream = (stream as { __rill_stream_dispose: () => void })
+          .__rill_stream_dispose;
 
         disposeStream();
         disposeStream();

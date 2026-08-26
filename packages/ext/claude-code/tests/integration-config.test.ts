@@ -7,7 +7,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
-import { makeFactoryCtx } from './_helpers.js';
+import { makeFactoryCtx, extValue } from './_helpers.js';
+import type { IPty } from 'node-pty';
 import { createRuntimeContext } from '@rcrsr/rill';
 
 // ============================================================
@@ -56,9 +57,9 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
 
       expect(which.default.sync).toHaveBeenCalledWith('claude');
-      expect((ext.value as any).prompt).toBeDefined();
-      expect((ext.value as any).skill).toBeDefined();
-      expect((ext.value as any).command).toBeDefined();
+      expect(extValue(ext).prompt).toBeDefined();
+      expect(extValue(ext).skill).toBeDefined();
+      expect(extValue(ext).command).toBeDefined();
       expect(ext.dispose).toBeDefined();
     });
 
@@ -92,7 +93,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -100,10 +101,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      await (ext.value as any).prompt.fn(
-        { text: 'Test prompt', options: {} },
-        ctx
-      );
+      await extValue(ext).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify default timeout 1800000 was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -118,15 +116,15 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
 
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
 
-      expect((ext.value as any).prompt).toBeDefined();
-      expect((ext.value as any).prompt.fn).toBeInstanceOf(Function);
-      expect((ext.value as any).prompt.params).toBeDefined();
-      expect((ext.value as any).skill).toBeDefined();
-      expect((ext.value as any).skill.fn).toBeInstanceOf(Function);
-      expect((ext.value as any).skill.params).toBeDefined();
-      expect((ext.value as any).command).toBeDefined();
-      expect((ext.value as any).command.fn).toBeInstanceOf(Function);
-      expect((ext.value as any).command.params).toBeDefined();
+      expect(extValue(ext).prompt).toBeDefined();
+      expect(extValue(ext).prompt.fn).toBeInstanceOf(Function);
+      expect(extValue(ext).prompt.params).toBeDefined();
+      expect(extValue(ext).skill).toBeDefined();
+      expect(extValue(ext).skill.fn).toBeInstanceOf(Function);
+      expect(extValue(ext).skill.params).toBeDefined();
+      expect(extValue(ext).command).toBeDefined();
+      expect(extValue(ext).command.fn).toBeInstanceOf(Function);
+      expect(extValue(ext).command.params).toBeDefined();
       expect(ext.dispose).toBeInstanceOf(Function);
     });
   });
@@ -144,7 +142,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       );
 
       expect(which.default.sync).toHaveBeenCalledWith('/usr/local/bin/claude');
-      expect((ext.value as any).prompt).toBeDefined();
+      expect(extValue(ext).prompt).toBeDefined();
     });
 
     it('validates binary exists in PATH at factory creation', async () => {
@@ -177,7 +175,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -188,7 +186,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       );
       const ctx = createRuntimeContext();
 
-      await (ext.value as any).prompt.fn({ text: 'Test', options: {} }, ctx);
+      await extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
 
       // Verify custom binary path was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -229,7 +227,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -240,10 +238,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       );
       const ctx = createRuntimeContext();
 
-      await (ext.value as any).prompt.fn(
-        { text: 'Test prompt', options: {} },
-        ctx
-      );
+      await extValue(ext).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify custom default timeout 60000 was used
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -282,7 +277,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
           onExit: vi.fn(),
           write: vi.fn(),
           kill: vi.fn(),
-        } as any,
+        } as unknown as IPty,
         exitCode: Promise.resolve(0),
         dispose: vi.fn(),
       });
@@ -293,10 +288,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
       );
       const ctx = createRuntimeContext();
 
-      await (ext.value as any).prompt.fn(
-        { text: 'Test prompt', options: {} },
-        ctx
-      );
+      await extValue(ext).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
       // Verify maximum timeout was accepted
       expect(spawnClaudeCli).toHaveBeenCalledWith(
@@ -342,7 +334,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.resolve(0),
       dispose: vi.fn(),
     });
@@ -353,7 +345,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     );
     const ctx = createRuntimeContext();
 
-    await (ext.value as any).prompt.fn(
+    await extValue(ext).prompt.fn(
       { text: 'Test prompt', options: { timeout: 90000 } },
       ctx
     );
@@ -395,7 +387,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.resolve(0),
       dispose: vi.fn(),
     });
@@ -406,7 +398,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     );
     const ctx = createRuntimeContext();
 
-    await (ext.value as any).skill.fn(
+    await extValue(ext).skill.fn(
       { name: 'test-skill', args: { timeout: 120000 } },
       ctx
     );
@@ -448,7 +440,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.resolve(0),
       dispose: vi.fn(),
     });
@@ -459,7 +451,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     );
     const ctx = createRuntimeContext();
 
-    await (ext.value as any).command.fn(
+    await extValue(ext).command.fn(
       { name: 'test-command', args: { timeout: 150000 } },
       ctx
     );
@@ -501,7 +493,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
         onExit: vi.fn(),
         write: vi.fn(),
         kill: vi.fn(),
-      } as any,
+      } as unknown as IPty,
       exitCode: Promise.resolve(0),
       dispose: vi.fn(),
     });
@@ -512,10 +504,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
     );
     const ctx = createRuntimeContext();
 
-    await (ext.value as any).prompt.fn(
-      { text: 'Test prompt', options: {} },
-      ctx
-    );
+    await extValue(ext).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
 
     // Verify default timeout was used when option not provided
     expect(spawnClaudeCli).toHaveBeenCalledWith(

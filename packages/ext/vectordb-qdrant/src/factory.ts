@@ -35,12 +35,13 @@ const PROVIDER = 'qdrant';
  * Create Qdrant extension instance.
  *
  * @param config - Extension configuration
- * @param ctx - ExtensionFactoryCtx (rill 0.19); `ctx.signal` triggers
- *   full disposal because the Qdrant SDK does not accept per-call signals.
+ * @param factoryCtx - ExtensionFactoryCtx (rill 0.19); `factoryCtx.signal`
+ *   triggers full disposal because the Qdrant SDK does not accept per-call
+ *   signals.
  */
 export function createQdrantExtension(
   config: QdrantConfig,
-  ctx?: ExtensionFactoryCtx
+  factoryCtx?: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Factory-time validation (RILL-R001 via assertRequired)
   assertRequired(config.url, 'url');
@@ -75,8 +76,8 @@ export function createQdrantExtension(
     });
   };
 
-  if (ctx?.signal !== undefined) {
-    ctx.signal.addEventListener(
+  if (factoryCtx?.signal !== undefined) {
+    factoryCtx.signal.addEventListener(
       'abort',
       () => {
         void disposeExtension();
@@ -239,13 +240,13 @@ export function createQdrantExtension(
           eventMetadata,
           async () => {
             const searchRequest: {
-              vector: number[];
+              query: number[];
               limit: number;
               with_payload: boolean;
               filter?: Record<string, unknown>;
               score_threshold?: number;
             } = {
-              vector: Array.from(vector.data),
+              query: Array.from(vector.data),
               limit: k,
               with_payload: true,
             };
@@ -255,11 +256,11 @@ export function createQdrantExtension(
               searchRequest.score_threshold = scoreThreshold;
             }
 
-            const response = await client.search(
+            const response = await client.query(
               factoryCollection,
               searchRequest
             );
-            const results = response.map((hit) => ({
+            const results = response.points.map((hit) => ({
               id: String(hit.id),
               score: hit.score,
               metadata: hit.payload ?? {},

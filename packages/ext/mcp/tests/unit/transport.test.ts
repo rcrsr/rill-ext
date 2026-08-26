@@ -82,84 +82,98 @@ describe('Transport Creation', () => {
   });
 
   describe('AC-4: Dynamic token refresh', () => {
-    // NOTE: HTTP transport tests are skipped because StreamableHTTPClientTransport
-    // from MCP SDK appears to hang indefinitely on connection failures rather than
-    // failing fast. This is a limitation of the SDK, not our implementation.
-    // The transport creation logic correctly handles dynamic headers - this is
-    // tested by code inspection and will be validated in integration tests with
-    // real MCP servers.
+    // The MCP SDK's StreamableHTTPClientTransport hangs indefinitely on
+    // connection failures to an unreachable endpoint instead of failing fast,
+    // which stalls these HTTP header-config cases. They are therefore opt-in:
+    // set MCP_HTTP_TRANSPORT_TESTS=1 to run them against a reachable HTTP MCP
+    // server. The default suite skips them so it stays fast and deterministic.
+    // The synchronous header-configuration logic is still covered below by
+    // "validates header configuration types", which needs no connection.
+    const runHttpTransportTests = process.env.MCP_HTTP_TRANSPORT_TESTS === '1';
 
-    it.skip('accepts function for headers', async () => {
-      let callCount = 0;
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'http',
-          url: 'http://localhost:59998/mcp',
-          timeout: 2000,
-          headers: () => {
-            callCount++;
-            return {
-              Authorization: `Bearer token-${callCount}`,
-            };
+    it.skipIf(!runHttpTransportTests)(
+      'accepts function for headers',
+      async () => {
+        let callCount = 0;
+        const config: McpExtensionConfig = {
+          transport: {
+            type: 'http',
+            url: 'http://localhost:59998/mcp',
+            timeout: 2000,
+            headers: () => {
+              callCount++;
+              return {
+                Authorization: `Bearer token-${callCount}`,
+              };
+            },
           },
-        },
-      };
+        };
 
-      // Should fail to connect but headers function should be called
-      try {
-        await createMcpExtension(config, makeFactoryCtx());
-      } catch {
-        // Connection will fail, but we're testing that headers function is handled
-      }
+        // Should fail to connect but headers function should be called
+        try {
+          await createMcpExtension(config, makeFactoryCtx());
+        } catch {
+          // Connection will fail, but we're testing that headers function is handled
+        }
 
-      // The function should have been called during transport creation
-      expect(callCount).toBeGreaterThan(0);
-    }, 5000);
+        // The function should have been called during transport creation
+        expect(callCount).toBeGreaterThan(0);
+      },
+      5000
+    );
 
-    it.skip('accepts async function for headers', async () => {
-      let tokenVersion = 1;
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'http',
-          url: 'http://localhost:59997/mcp',
-          timeout: 2000,
-          headers: async () => {
-            // Simulate async token fetch
-            await new Promise((resolve) => setTimeout(resolve, 10));
-            return {
-              Authorization: `Bearer async-token-${tokenVersion++}`,
-            };
+    it.skipIf(!runHttpTransportTests)(
+      'accepts async function for headers',
+      async () => {
+        let tokenVersion = 1;
+        const config: McpExtensionConfig = {
+          transport: {
+            type: 'http',
+            url: 'http://localhost:59997/mcp',
+            timeout: 2000,
+            headers: async () => {
+              // Simulate async token fetch
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              return {
+                Authorization: `Bearer async-token-${tokenVersion++}`,
+              };
+            },
           },
-        },
-      };
+        };
 
-      // Should fail to connect but async headers function should be handled
-      try {
-        await createMcpExtension(config, makeFactoryCtx());
-      } catch (error) {
-        // Connection will fail, we're testing that async headers work
-        expect(error).toBeDefined();
-      }
-    }, 5000);
+        // Should fail to connect but async headers function should be handled
+        try {
+          await createMcpExtension(config, makeFactoryCtx());
+        } catch (error) {
+          // Connection will fail, we're testing that async headers work
+          expect(error).toBeDefined();
+        }
+      },
+      5000
+    );
 
-    it.skip('accepts static headers object', async () => {
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'http',
-          url: 'http://localhost:59996/mcp',
-          timeout: 2000,
-          headers: {
-            Authorization: 'Bearer static-token',
-            'X-Custom-Header': 'custom-value',
+    it.skipIf(!runHttpTransportTests)(
+      'accepts static headers object',
+      async () => {
+        const config: McpExtensionConfig = {
+          transport: {
+            type: 'http',
+            url: 'http://localhost:59996/mcp',
+            timeout: 2000,
+            headers: {
+              Authorization: 'Bearer static-token',
+              'X-Custom-Header': 'custom-value',
+            },
           },
-        },
-      };
+        };
 
-      // Should fail to connect but static headers should be handled
-      await expect(
-        createMcpExtension(config, makeFactoryCtx())
-      ).rejects.toThrow();
-    }, 5000);
+        // Should fail to connect but static headers should be handled
+        await expect(
+          createMcpExtension(config, makeFactoryCtx())
+        ).rejects.toThrow();
+      },
+      5000
+    );
 
     // Test header handling logic without actual connection
     it('validates header configuration types', () => {

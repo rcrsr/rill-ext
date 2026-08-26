@@ -78,8 +78,8 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Assert - Only 2 tools dict entries generated (tool1, tool2)
       expect(tools.tool1).toBeDefined();
@@ -136,8 +136,8 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Assert - All 5 tools dict entries generated
       expect(tools.tool1).toBeDefined();
@@ -183,8 +183,8 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Assert - No tools dict entries generated
       expect(tools.tool1).toBeUndefined();
@@ -230,8 +230,8 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Assert - First collision gets base name, second gets _2 suffix
       expect(tools.read_file).toBeDefined();
@@ -279,8 +279,8 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Assert - Three tools dict entries with collision numbering
       expect(tools.fetch_data).toBeDefined();
@@ -327,8 +327,8 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Assert - No collision, no _2 suffix needed
       expect(tools.read_file).toBeDefined();
@@ -379,10 +379,10 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
-      const resources = fns.resources as Record<string, any>;
-      const prompts = fns.prompts as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
+      const resources = fns.resources as Record<string, unknown>;
+      const prompts = fns.prompts as Record<string, unknown>;
 
       // Assert - Only tool1 tools dict entry generated
       expect(tools.tool1).toBeDefined();
@@ -456,10 +456,10 @@ describe('Filtered Capabilities End-to-End', () => {
 
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
-      const resources = fns.resources as Record<string, any>;
-      const prompts = fns.prompts as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
+      const resources = fns.resources as Record<string, unknown>;
+      const prompts = fns.prompts as Record<string, unknown>;
 
       // Assert - Only filtered tools dict entries generated
       expect(tools.tool1).toBeDefined();

@@ -7,7 +7,7 @@
  * Routing is fixed at factory init.
  */
 
-import OpenAI from 'openai';
+import OpenAI, { APIError } from 'openai';
 import type {
   Response as OAIResponse,
   ResponseInputItem,
@@ -96,10 +96,10 @@ const O_SERIES_PATTERN = /^o\d/;
 
 /**
  * OpenAI-specific error detector for mapProviderError.
- * Extracts status code and message from OpenAI.APIError instances.
+ * Extracts status code and message from APIError instances.
  */
 const detectOpenAIError: ProviderErrorDetector = (error: unknown) => {
-  if (error instanceof OpenAI.APIError) {
+  if (error instanceof APIError) {
     return {
       status: error.status ?? undefined,
       message: error.message,
@@ -146,8 +146,8 @@ function canonicalToCC(
   for (const msg of messages) {
     if (msg.role === 'system') {
       const text = msg.parts
-        .filter((p) => p.type === 'text')
-        .map((p) => (p as { type: 'text'; text: string }).text)
+        .filter((pt) => pt.type === 'text')
+        .map((pt) => (pt as { type: 'text'; text: string }).text)
         .join('');
       result.push({ role: 'system', content: text });
       continue;
@@ -155,12 +155,14 @@ function canonicalToCC(
 
     if (msg.role === 'user') {
       // tool_result parts → role:'tool' messages (before user content)
-      const toolResultParts = msg.parts.filter((p) => p.type === 'tool_result');
+      const toolResultParts = msg.parts.filter(
+        (pt) => pt.type === 'tool_result'
+      );
       for (const part of toolResultParts) {
         const tr = part as { type: 'tool_result'; id: string; parts: Part[] };
         const resultContent = tr.parts
-          .filter((p) => p.type === 'text')
-          .map((p) => (p as { type: 'text'; text: string }).text)
+          .filter((pt) => pt.type === 'text')
+          .map((pt) => (pt as { type: 'text'; text: string }).text)
           .join('');
         result.push({
           role: 'tool',
@@ -169,11 +171,11 @@ function canonicalToCC(
         });
       }
 
-      const contentParts = msg.parts.filter((p) => p.type !== 'tool_result');
+      const contentParts = msg.parts.filter((pt) => pt.type !== 'tool_result');
       if (contentParts.length > 0) {
         const textContent = contentParts
-          .filter((p) => p.type === 'text')
-          .map((p) => (p as { type: 'text'; text: string }).text)
+          .filter((pt) => pt.type === 'text')
+          .map((pt) => (pt as { type: 'text'; text: string }).text)
           .join('');
         result.push({ role: 'user', content: textContent });
       }
@@ -181,17 +183,17 @@ function canonicalToCC(
     }
 
     if (msg.role === 'assistant') {
-      const textParts = msg.parts.filter((p) => p.type === 'text');
-      const toolUseParts = msg.parts.filter((p) => p.type === 'tool_use');
+      const textParts = msg.parts.filter((pt) => pt.type === 'text');
+      const toolUseParts = msg.parts.filter((pt) => pt.type === 'tool_use');
 
       const content =
         textParts
-          .map((p) => (p as { type: 'text'; text: string }).text)
+          .map((pt) => (pt as { type: 'text'; text: string }).text)
           .join('') || null;
 
       if (toolUseParts.length > 0) {
-        const toolCalls = toolUseParts.map((p) => {
-          const tu = p as {
+        const toolCalls = toolUseParts.map((pt) => {
+          const tu = pt as {
             type: 'tool_use';
             id: string;
             name: string;
@@ -275,8 +277,8 @@ function canonicalToResponsesAPI(messages: Message[]): {
   for (const msg of messages) {
     if (msg.role === 'system') {
       const text = msg.parts
-        .filter((p) => p.type === 'text')
-        .map((p) => (p as { type: 'text'; text: string }).text)
+        .filter((pt) => pt.type === 'text')
+        .map((pt) => (pt as { type: 'text'; text: string }).text)
         .join('');
       instructions = text || undefined;
       continue;
@@ -284,12 +286,14 @@ function canonicalToResponsesAPI(messages: Message[]): {
 
     if (msg.role === 'user') {
       // tool_result parts → function_call_output items (use call_id = part.id)
-      const toolResultParts = msg.parts.filter((p) => p.type === 'tool_result');
+      const toolResultParts = msg.parts.filter(
+        (pt) => pt.type === 'tool_result'
+      );
       for (const part of toolResultParts) {
         const tr = part as { type: 'tool_result'; id: string; parts: Part[] };
         const resultContent = tr.parts
-          .filter((p) => p.type === 'text')
-          .map((p) => (p as { type: 'text'; text: string }).text)
+          .filter((pt) => pt.type === 'text')
+          .map((pt) => (pt as { type: 'text'; text: string }).text)
           .join('');
         input.push({
           type: 'function_call_output',
@@ -298,10 +302,10 @@ function canonicalToResponsesAPI(messages: Message[]): {
         } as ResponseInputItem.FunctionCallOutput);
       }
 
-      const contentParts = msg.parts.filter((p) => p.type === 'text');
+      const contentParts = msg.parts.filter((pt) => pt.type === 'text');
       if (contentParts.length > 0) {
         const text = contentParts
-          .map((p) => (p as { type: 'text'; text: string }).text)
+          .map((pt) => (pt as { type: 'text'; text: string }).text)
           .join('');
         input.push({
           role: 'user',
@@ -313,7 +317,7 @@ function canonicalToResponsesAPI(messages: Message[]): {
 
     if (msg.role === 'assistant') {
       // thinking parts → reasoning items (summary_text format)
-      const thinkingParts = msg.parts.filter((p) => p.type === 'thinking');
+      const thinkingParts = msg.parts.filter((pt) => pt.type === 'thinking');
       for (const part of thinkingParts) {
         const th = part as { type: 'thinking'; text: string };
         // Responses API ReasoningItem needs an id; use a synthetic one
@@ -325,7 +329,7 @@ function canonicalToResponsesAPI(messages: Message[]): {
       }
 
       // tool_use parts → function_call items using call_id
-      const toolUseParts = msg.parts.filter((p) => p.type === 'tool_use');
+      const toolUseParts = msg.parts.filter((pt) => pt.type === 'tool_use');
       for (const part of toolUseParts) {
         const tu = part as {
           type: 'tool_use';
@@ -342,10 +346,10 @@ function canonicalToResponsesAPI(messages: Message[]): {
       }
 
       // text parts → assistant message
-      const textParts = msg.parts.filter((p) => p.type === 'text');
+      const textParts = msg.parts.filter((pt) => pt.type === 'text');
       if (textParts.length > 0) {
         const text = textParts
-          .map((p) => (p as { type: 'text'; text: string }).text)
+          .map((pt) => (pt as { type: 'text'; text: string }).text)
           .join('');
         input.push({
           role: 'assistant',

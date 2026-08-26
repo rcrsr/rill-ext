@@ -36,23 +36,22 @@
     "@rcrsr/rill": "~0.20.0"
   },
   "dependencies": {
-    "html-to-text": "^10.0.0",
+    "html-to-text": "^10.0.1",
     "turndown": "^7.2.4",
-    "defuddle": "^0.19.1",
+    "defuddle": "^0.19.3",
     "linkedom": "^0.18.13",
     "entities": "^8.0.0",
-    "linkify-it": "^5.0.2"
+    "linkify-it": "^6.1.0"
   },
   "devDependencies": {
     "@rcrsr/rill": "~0.20.0",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/html-to-text": "^9.0.4",
-    "@types/linkify-it": "^5.0.0",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "@types/turndown": "^5.0.6",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
-    "undici-types": "^8.7.0"
+    "undici-types": "^8.10.0"
   },
   "files": [
     "dist"

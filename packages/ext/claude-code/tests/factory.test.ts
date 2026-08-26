@@ -10,6 +10,7 @@ import {
   makeFactoryCtx,
   makeRuntimeCtx,
   expectInvalidThrow,
+  extValue,
 } from './_helpers.js';
 
 const EXPECTED_RETURN_TYPE = structureToTypeValue({
@@ -61,7 +62,7 @@ describe('createClaudeCodeExtension', () => {
   describe('factory return value', () => {
     it('returns ExtensionResult with prompt, skill, command functions', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
 
       // IR-1: Returns ExtensionResult with host functions
       expect(v).toHaveProperty('prompt');
@@ -88,7 +89,7 @@ describe('createClaudeCodeExtension', () => {
 
     it('creates prompt function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
 
       expect(v.prompt.params).toEqual([
         {
@@ -112,7 +113,7 @@ describe('createClaudeCodeExtension', () => {
 
     it('creates skill function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
 
       expect(v.skill.params).toEqual([
         {
@@ -136,7 +137,7 @@ describe('createClaudeCodeExtension', () => {
 
     it('creates command function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
 
       expect(v.command.params).toEqual([
         {
@@ -160,7 +161,7 @@ describe('createClaudeCodeExtension', () => {
 
     it('validates prompt text before processing', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
       const ctx = makeRuntimeCtx();
 
       // Validation throws an invalid RillValue carrying #INVALID_INPUT (AC-10)
@@ -366,9 +367,9 @@ describe('createClaudeCodeExtension', () => {
     it('handles empty config object', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       expect(ext).toBeDefined();
-      expect((ext.value as any).prompt).toBeDefined();
-      expect((ext.value as any).skill).toBeDefined();
-      expect((ext.value as any).command).toBeDefined();
+      expect(extValue(ext).prompt).toBeDefined();
+      expect(extValue(ext).skill).toBeDefined();
+      expect(extValue(ext).command).toBeDefined();
       expect(ext.dispose).toBeDefined();
     });
 
@@ -381,7 +382,7 @@ describe('createClaudeCodeExtension', () => {
   describe('empty string validation', () => {
     it('invalidates with #INVALID_INPUT for empty prompt text (EC-3)', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
       const ctx = makeRuntimeCtx();
 
       expectInvalidThrow(
@@ -398,7 +399,7 @@ describe('createClaudeCodeExtension', () => {
 
     it('invalidates with #INVALID_INPUT for empty skill name (EC-10)', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
       const ctx = makeRuntimeCtx();
 
       expectInvalidThrow(
@@ -415,7 +416,7 @@ describe('createClaudeCodeExtension', () => {
 
     it('invalidates with #INVALID_INPUT for empty command name (EC-13)', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
       const ctx = makeRuntimeCtx();
 
       expectInvalidThrow(
@@ -434,7 +435,7 @@ describe('createClaudeCodeExtension', () => {
   describe('event emission (AC-17-20)', () => {
     it('functions have event emission structure in place', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = ext.value as any;
+      const v = extValue(ext);
 
       // Functions are defined and can be called (event emission tested in integration tests)
       expect(v.prompt.fn).toBeInstanceOf(Function);

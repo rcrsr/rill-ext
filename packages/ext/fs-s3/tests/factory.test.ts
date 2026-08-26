@@ -8,6 +8,13 @@ import { structureToTypeValue } from '@rcrsr/rill';
 import { createS3FsExtension } from '../src/index.js';
 import type { S3FsConfig } from '../src/types.js';
 
+type FnDefView = {
+  params: unknown[];
+  fn: unknown;
+  annotations?: Record<string, unknown>;
+  returnType: unknown;
+};
+
 describe('createS3FsExtension', () => {
   describe('configuration validation', () => {
     it('throws for missing region', () => {
@@ -139,7 +146,9 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect((ext.value as any).read).toBeDefined();
+      expect(
+        (ext.value as unknown as Record<string, unknown>).read
+      ).toBeDefined();
       ext.dispose?.();
     });
 
@@ -163,7 +172,9 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect((ext.value as any).read).toBeDefined();
+      expect(
+        (ext.value as unknown as Record<string, unknown>).read
+      ).toBeDefined();
       ext.dispose?.();
     });
 
@@ -186,7 +197,9 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect((ext.value as any).read).toBeDefined();
+      expect(
+        (ext.value as unknown as Record<string, unknown>).read
+      ).toBeDefined();
       ext.dispose?.();
     });
 
@@ -204,7 +217,9 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect((ext.value as any).read).toBeDefined();
+      expect(
+        (ext.value as unknown as Record<string, unknown>).read
+      ).toBeDefined();
       ext.dispose?.();
     });
 
@@ -236,7 +251,9 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect((ext.value as any).read).toBeDefined();
+      expect(
+        (ext.value as unknown as Record<string, unknown>).read
+      ).toBeDefined();
       ext.dispose?.();
     });
 
@@ -259,7 +276,9 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect((ext.value as any).read).toBeDefined();
+      expect(
+        (ext.value as unknown as Record<string, unknown>).read
+      ).toBeDefined();
       ext.dispose?.();
     });
 
@@ -282,7 +301,9 @@ describe('createS3FsExtension', () => {
 
       const ext = createS3FsExtension(config);
       expect(ext).toBeDefined();
-      expect((ext.value as any).read).toBeDefined();
+      expect(
+        (ext.value as unknown as Record<string, unknown>).read
+      ).toBeDefined();
       ext.dispose?.();
     });
   });
@@ -305,7 +326,7 @@ describe('createS3FsExtension', () => {
       };
 
       const ext = createS3FsExtension(config);
-      const v = ext.value as any;
+      const v = ext.value as unknown as Record<string, FnDefView>;
 
       // Verify all 12 functions exist
       expect(v.read).toBeDefined();
@@ -341,7 +362,7 @@ describe('createS3FsExtension', () => {
       };
 
       const ext = createS3FsExtension(config);
-      const v = ext.value as any;
+      const v = ext.value as unknown as Record<string, FnDefView>;
 
       // Verify structure for read function (all follow same pattern)
       expect(v.read.params).toBeDefined();

@@ -56,7 +56,7 @@ const PROVIDER = 'chroma';
  */
 export function createChromaExtension(
   config: ChromaConfig,
-  ctx?: ExtensionFactoryCtx
+  factoryCtx?: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Validate required fields (factory-time → RILL-R001 via assertRequired)
   assertRequired(config.collection, 'collection');
@@ -78,8 +78,8 @@ export function createChromaExtension(
   };
 
   // Wire ctx.signal abort → full disposal (SDK has no per-call signal)
-  if (ctx?.signal !== undefined) {
-    ctx.signal.addEventListener(
+  if (factoryCtx?.signal !== undefined) {
+    factoryCtx.signal.addEventListener(
       'abort',
       () => {
         void disposeExtension();

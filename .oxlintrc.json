@@ -10,13 +10,13 @@
   // remaining rules sit in categories this config does not enable, so they stay
   // off through `categories`, not through omission.
   //
-  // `import`, `vitest` and `promise` are deliberately not listed yet. They are
-  // not default-on, so their absence is not the silent failure STD-LINT-8
-  // describes. Measured against src/ and tests/ they cost 1762 further
-  // findings, almost all vitest/require-mock-type-parameters. Adopting them is
-  // real work on the test suite, tracked separately as STD-LINT-5, and not
-  // folded into this change.
-  "plugins": ["typescript", "oxc", "unicorn"],
+  // `import`, `promise` and `vitest` complete the plugin set STD-LINT-5 pins to
+  // the reference config. `import` and `promise` cost a handful of findings,
+  // all fixed. `vitest` is the expensive one: three of its rules are disabled
+  // below (see the STD-LINT-6 count comments), matching the reference baseline
+  // that ships in `@rcrsr/rill-dev`; the rest are enabled and their findings
+  // fixed.
+  "plugins": ["typescript", "oxc", "unicorn", "import", "promise", "vitest"],
   "jsPlugins": ["@rcrsr/rill-dev/lint-rules"],
   "categories": {
     "correctness": "error"
@@ -29,7 +29,9 @@
       "error",
       { "argsIgnorePattern": "^_", "ignoreRestSiblings": true }
     ],
-    "typescript/no-explicit-any": "warn",
+    "eqeqeq": "error",
+    "no-shadow": "error",
+    "typescript/no-explicit-any": "error",
     "typescript/explicit-function-return-type": "off",
     "typescript/no-namespace": "error",
     "typescript/no-this-alias": "error",
@@ -47,7 +49,42 @@
     "typescript/no-duplicate-enum-values": "error",
     "typescript/no-unsafe-function-type": "error",
     "typescript/no-wrapper-object-types": "error",
-    "typescript/no-array-constructor": "error"
+    "typescript/no-array-constructor": "error",
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/no-empty-named-blocks": "error",
+    "import/no-named-as-default-member": "error",
+    // `assertFunctionNames` teaches the rule that assertions reach `expect`
+    // through named helpers (`expectAtom`, `expectRillError`, ...). Without it
+    // the rule reports 411 helper-based tests as assertion-free. Severity stays
+    // `error`, matching the reference baseline (STD-LINT-9).
+    "vitest/expect-expect": [
+      "error",
+      { "assertFunctionNames": ["expect", "expect*", "assert*"] }
+    ],
+    "vitest/valid-expect": "error",
+    "vitest/no-standalone-expect": "error",
+    "vitest/no-identical-title": "error",
+    "vitest/no-focused-tests": "error",
+    "vitest/no-disabled-tests": "error",
+    "vitest/no-commented-out-tests": "error",
+    "promise/catch-or-return": "error",
+    "promise/no-return-wrap": "error",
+    "promise/no-new-statics": "error",
+    // Disabled to match the reference baseline (STD-LINT-9). STD-LINT-6 counts,
+    // measured across src/ and tests/ with the rule flipped on:
+    //   vitest/require-mock-type-parameters — 1240 findings. Requiring an
+    //     explicit type parameter on every `vi.fn()` is test-mock ceremony the
+    //     reference config declines.
+    //   vitest/no-conditional-expect — 67 findings. Assertions inside guarded
+    //     branches are a deliberate pattern in the error-path suites.
+    //   vitest/require-to-throw-message — 35 findings. `.toThrow()` without a
+    //     message argument is accepted.
+    //   promise/valid-params — 0 findings. Off in the baseline; held here.
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/no-conditional-expect": "off",
+    "vitest/require-to-throw-message": "off",
+    "promise/valid-params": "off"
   },
   "ignorePatterns": ["dist", "node_modules", "*.d.ts", "generated"],
   "overrides": [

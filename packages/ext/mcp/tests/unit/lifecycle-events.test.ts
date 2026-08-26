@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { emitExtensionEvent } from '@rcrsr/rill';
+import type { RuntimeContext } from '@rcrsr/rill';
 import { generateToolFunctions, type McpTool } from '../../src/tools.js';
 import { makeRuntimeCtx } from '../_helpers.js';
 import {
@@ -38,7 +39,7 @@ vi.mock('@rcrsr/rill', async () => {
  * Create runtime context for testing. The MCP error helpers depend on
  * `ctx.invalidate`, which only the real RuntimeContext provides.
  */
-function createMockContext(): any {
+function createMockContext(): RuntimeContext {
   return makeRuntimeCtx();
 }
 

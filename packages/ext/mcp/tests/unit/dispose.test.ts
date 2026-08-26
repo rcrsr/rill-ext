@@ -15,6 +15,7 @@ import {
   makeRuntimeCtx,
   expectRejectsInvalid,
 } from '../_helpers.js';
+import type { RuntimeContext } from '@rcrsr/rill';
 import type { McpExtensionConfig } from '../../src/types.js';
 
 describe('dispose() functionality', () => {
@@ -116,7 +117,7 @@ describe('dispose() functionality', () => {
 
     it('disposes during active tool call - pending call rejects (BC-5)', async () => {
       // Mock connection with one tool
-      let resolveToolCall: (value: any) => void;
+      let resolveToolCall: (value: unknown) => void;
       const toolCallPromise = new Promise((resolve) => {
         resolveToolCall = resolve;
       });
@@ -159,8 +160,8 @@ describe('dispose() functionality', () => {
       };
 
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Start a long-running tool call
       const toolCallResultPromise = tools.long_running_tool!.fn(
@@ -225,8 +226,8 @@ describe('dispose() functionality', () => {
       };
 
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // IR-1: Result has dispose function
       expect(result.dispose).toBeDefined();
@@ -241,7 +242,7 @@ describe('dispose() functionality', () => {
       // IR-2: Tool function is callable
       const toolResult = await tools.test_tool.fn({ param1: 'value1' }, {
         _lifecycle: { connectEmitted: false },
-      } as any);
+      } as unknown as RuntimeContext);
       expect(toolResult).toBe('success');
 
       // Cleanup
@@ -290,8 +291,8 @@ describe('dispose() functionality', () => {
       };
 
       const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, any>;
-      const tools = fns.tools as Record<string, any>;
+      const fns = result.value as Record<string, unknown>;
+      const tools = fns.tools as Record<string, unknown>;
 
       // Verify all three tools are present in tools dict
       expect(tools.tool_one).toBeDefined();

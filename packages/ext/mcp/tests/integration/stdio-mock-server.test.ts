@@ -11,39 +11,35 @@
  * Uses a real MCP server process (mock-mcp-server.mjs) to test actual
  * stdio transport, capability discovery, and function generation.
  *
- * Implementation Notes:
+ * History: MCP SDK versions 1.23.0-1.26.0 shipped a zod-compat bug where
+ * v3Schema.safeParseAsync was called on Zod v3 schemas built from JSON Schema
+ * that lack the method, which blocked tool/resource/prompt execution over the
+ * real transport. That bug is fixed in the SDK version this package depends on,
+ * so the end-to-end call tests are enabled.
  *
- * [BUG] SDK zod-compat bug - MCP SDK versions 1.23.0-1.26.0 have a bug in
- * zod-compat.js where v3Schema.safeParseAsync is called but Zod v3 schemas
- * created from JSON Schema lack this method. 11 of 15 integration tests
- * blocked pending SDK fix. Reported upstream.
- *
- * Passing tests (4/15) verify:
- * - stdio transport connection works (AC-1)
- * - Capability discovery works (AC-1)
- * - Introspection functions callable (AC-1)
- * - Multi-server composition works (AC-2)
- *
- * Blocked tests (11/15) require actual MCP server or SDK fix:
- * - Tool call execution (3 tests)
- * - Resource read operations (3 tests)
- * - Prompt get operations (3 tests)
- * - Result type conversion via tool calls (2 tests for AC-8)
- *
- * AC-8 (type conversion logic) validated independently via unit tests in
- * tests/unit/type-conversion.test.ts which test parseToolResult directly.
+ * Host functions are namespaced under the extension value: tools live under
+ * `value.tools`, resources under `value.resources`, prompts under
+ * `value.prompts`; each entry is a callable exposing `.fn(args, ctx)`.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createMcpExtension } from '../../src/factory.js';
-import { makeFactoryCtx } from '../_helpers.js';
+import { makeFactoryCtx, makeRuntimeCtx } from '../_helpers.js';
 
-// Minimal runtime context for calling host functions in tests
-const mockContext = {
-  _lifecycle: { connectEmitted: false },
-} as any;
+// Runtime context for calling host functions in tests.
+const mockContext = makeRuntimeCtx();
+
+/** A namespaced host function entry exposing a callable `.fn`. */
+interface HostFn {
+  fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+}
+
+/** Resolve a callable host function from a namespaced capability dict. */
+function hostFn(dict: unknown, name: string): HostFn {
+  return (dict as Record<string, HostFn>)[name]!;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -65,8 +61,8 @@ afterEach(async () => {
 /** Helper to get the value dict from an ExtensionFactoryResult */
 function fns(
   ext: Awaited<ReturnType<typeof createMcpExtension>>
-): Record<string, any> {
-  return ext.value as Record<string, any>;
+): Record<string, unknown> {
+  return ext.value as Record<string, unknown>;
 }
 
 describe('Integration: stdio mock server', () => {
@@ -106,7 +102,7 @@ describe('Integration: stdio mock server', () => {
       expect(toolsDict['get_image']).toBeDefined();
     }, 15000);
 
-    it.skip('calls tool and receives response', async () => {
+    it('calls tool and receives response', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -122,13 +118,16 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call echo tool
-      const result = await v.echo.fn({ message: 'Hello, MCP!' }, mockContext);
+      const result = await hostFn(v.tools, 'echo').fn(
+        { message: 'Hello, MCP!' },
+        mockContext
+      );
 
       // Verify result
       expect(result).toBe('Hello, MCP!');
     }, 15000);
 
-    it.skip('calls tool with parameters', async () => {
+    it('calls tool with parameters', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -144,15 +143,19 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call add tool with parameters
-      const result = await v.add.fn({ a: 5, b: 7 }, mockContext);
+      const result = await hostFn(v.tools, 'add').fn(
+        { a: 5, b: 7 },
+        mockContext
+      );
 
-      // Verify result (should be string "12")
-      expect(result).toBe('12');
+      // Verify result: the tool returns the numeric text "12", which AC-8
+      // parses as the JSON number 12.
+      expect(result).toBe(12);
     }, 15000);
   });
 
   describe('AC-8: Result type conversion', () => {
-    it.skip('converts JSON text content to dict', async () => {
+    it('converts JSON text content to dict', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -168,7 +171,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call get_status which returns JSON text
-      const result = await v.get_status.fn({}, mockContext);
+      const result = await hostFn(v.tools, 'get_status').fn({}, mockContext);
 
       // AC-8: JSON text {"status": "ok"} → dict [status: "ok"]
       expect(typeof result).toBe('object');
@@ -178,7 +181,7 @@ describe('Integration: stdio mock server', () => {
       expect((result as Record<string, unknown>).uptime).toBe(42);
     }, 15000);
 
-    it.skip('returns plain text as string', async () => {
+    it('returns plain text as string', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -194,14 +197,17 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call echo which returns plain text
-      const result = await v.echo.fn({ message: 'success' }, mockContext);
+      const result = await hostFn(v.tools, 'echo').fn(
+        { message: 'success' },
+        mockContext
+      );
 
       // AC-8: Plain text "success" → string "success"
       expect(typeof result).toBe('string');
       expect(result).toBe('success');
     }, 15000);
 
-    it.skip('converts image content to dict with type/data/mime', async () => {
+    it('converts image content to dict with type/data/mime', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -217,7 +223,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call get_image which returns base64 image
-      const result = await v.get_image.fn({}, mockContext);
+      const result = await hostFn(v.tools, 'get_image').fn({}, mockContext);
 
       // AC-8: Image → dict [type: "image", data: base64, mime: "image/png"]
       expect(typeof result).toBe('object');
@@ -254,7 +260,7 @@ describe('Integration: stdio mock server', () => {
       expect(resourcesDict['read_resource']).toBeDefined();
     }, 15000);
 
-    it.skip('reads static resource', async () => {
+    it('reads static resource', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -270,27 +276,17 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Read test-doc resource
-      const result = await v.read_resource.fn(
+      const result = await hostFn(v.resources, 'read_resource').fn(
         { uri: 'file:///test/doc.txt' },
         mockContext
       );
 
-      // Verify result contains expected text
-      expect(typeof result).toBe('object');
-      expect(result).not.toBe(null);
-      expect(Array.isArray((result as Record<string, unknown>).contents)).toBe(
-        true
-      );
-
-      const contents = (result as Record<string, unknown>)
-        .contents as unknown[];
-      expect(contents.length).toBeGreaterThan(0);
-
-      const firstContent = contents[0] as Record<string, unknown>;
-      expect(firstContent.text).toBe('This is a test document');
+      // A single text content block is returned as the plain text string.
+      expect(typeof result).toBe('string');
+      expect(result).toBe('This is a test document');
     }, 15000);
 
-    it.skip('reads resource template with variables', async () => {
+    it('reads resource template with variables', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -306,7 +302,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Read user profile resource with ID
-      const result = await v.resource_user_profile.fn(
+      const result = await hostFn(v.resources, 'resource_user_profile').fn(
         { id: '123' },
         mockContext
       );
@@ -353,7 +349,7 @@ describe('Integration: stdio mock server', () => {
       expect(promptsDict['code_review']).toBeDefined();
     }, 15000);
 
-    it.skip('gets prompt without arguments', async () => {
+    it('gets prompt without arguments', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -369,24 +365,19 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Get greeting prompt
-      const result = await v.greeting.fn({}, mockContext);
+      const result = await hostFn(v.prompts, 'greeting').fn({}, mockContext);
 
-      // Verify result structure
-      expect(typeof result).toBe('object');
-      expect(result).not.toBe(null);
-      expect(Array.isArray((result as Record<string, unknown>).messages)).toBe(
-        true
-      );
+      // Prompt returns a list of message dicts with role and content
+      expect(Array.isArray(result)).toBe(true);
 
-      const messages = (result as Record<string, unknown>)
-        .messages as unknown[];
+      const messages = result as unknown[];
       expect(messages.length).toBeGreaterThan(0);
 
       const firstMessage = messages[0] as Record<string, unknown>;
       expect(firstMessage.role).toBe('user');
     }, 15000);
 
-    it.skip('gets prompt with arguments', async () => {
+    it('gets prompt with arguments', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -402,7 +393,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Get code_review prompt with arguments
-      const result = await v.code_review.fn(
+      const result = await hostFn(v.prompts, 'code_review').fn(
         {
           language: 'TypeScript',
           code: 'function hello() { return "world"; }',
@@ -410,26 +401,23 @@ describe('Integration: stdio mock server', () => {
         mockContext
       );
 
-      // Verify result structure
-      expect(typeof result).toBe('object');
-      expect(result).not.toBe(null);
-      expect(Array.isArray((result as Record<string, unknown>).messages)).toBe(
-        true
-      );
+      // Prompt returns a list of message dicts with role and content
+      expect(Array.isArray(result)).toBe(true);
 
-      const messages = (result as Record<string, unknown>)
-        .messages as unknown[];
+      const messages = result as unknown[];
       expect(messages.length).toBeGreaterThan(0);
 
       const firstMessage = messages[0] as Record<string, unknown>;
-      const content = firstMessage.content as Record<string, unknown>;
-      expect(content.text).toContain('TypeScript');
-      expect(content.text).toContain('function hello()');
+      expect(firstMessage.role).toBe('user');
+      const content = firstMessage.content;
+      expect(typeof content).toBe('string');
+      expect(content as string).toContain('TypeScript');
+      expect(content as string).toContain('function hello()');
     }, 15000);
   });
 
   describe('AC-2: Multi-server composition', () => {
-    it.skip('combines functions from multiple servers', async () => {
+    it('combines functions from multiple servers', async () => {
       // Create two extension instances to the same server
       // (In real usage, these would be different servers)
       const ext1 = await createMcpExtension(
@@ -462,27 +450,33 @@ describe('Integration: stdio mock server', () => {
       const v2 = fns(ext2);
 
       // Call tools from different extensions
-      const result1 = await v1.echo.fn(
+      const result1 = await hostFn(v1.tools, 'echo').fn(
         { message: 'from server 1' },
         mockContext
       );
-      const result2 = await v2.get_status.fn({}, mockContext);
+      const result2 = await hostFn(v2.tools, 'get_status').fn({}, mockContext);
 
       expect(result1).toBe('from server 1');
       expect(typeof result2).toBe('object');
       expect((result2 as Record<string, unknown>).status).toBe('ok');
 
       // Verify both extensions work independently
-      const add1 = await v1.add.fn({ a: 1, b: 2 }, mockContext);
-      const add2 = await v2.add.fn({ a: 10, b: 20 }, mockContext);
+      const add1 = await hostFn(v1.tools, 'add').fn(
+        { a: 1, b: 2 },
+        mockContext
+      );
+      const add2 = await hostFn(v2.tools, 'add').fn(
+        { a: 10, b: 20 },
+        mockContext
+      );
 
-      expect(add1).toBe('3');
-      expect(add2).toBe('30');
+      expect(add1).toBe(3);
+      expect(add2).toBe(30);
     }, 20000);
   });
 
   describe('Connection lifecycle', () => {
-    it.skip('disposes extension cleanly', async () => {
+    it('disposes extension cleanly', async () => {
       const ext = await createMcpExtension(
         {
           transport: {
@@ -497,7 +491,10 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Verify extension works
-      const result = await v.echo.fn({ message: 'test' }, mockContext);
+      const result = await hostFn(v.tools, 'echo').fn(
+        { message: 'test' },
+        mockContext
+      );
       expect(result).toBe('test');
 
       // Dispose extension
@@ -506,7 +503,7 @@ describe('Integration: stdio mock server', () => {
       // After dispose, calling functions should fail
       // (The exact error depends on transport state)
       await expect(
-        v.echo.fn({ message: 'test' }, mockContext)
+        hostFn(v.tools, 'echo').fn({ message: 'test' }, mockContext)
       ).rejects.toThrow();
     }, 15000);
 

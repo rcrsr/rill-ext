@@ -143,33 +143,50 @@ names.
 `pnpm check:standards` currently reports:
 
 ```
-CONFORMANT  57 checked, 57 passed, 16 not machine-checkable.
+CONFORMANT  70 checked, 70 passed, 7 not machine-checkable.
 ```
 
 Read the summary line, not the exit code: `--` means *not checked*, and the
 element still applies. A green run means the checked subset holds; it is not a
 conformance claim.
 
-16 entries report `--`. None is claimed as N/A — no element here meets a stated
+`@rcrsr/rill-dev` 0.2.2 ships a `baseline.json` snapshot of `rill`'s own config,
+so the cross-repository elements that older `rill-dev` reported `--`
+(`STD-LINT-1`, `STD-LINT-5`, `STD-LINT-9`, `STD-PM-2`, `STD-DEP-1..5`) are now
+machine-checked here and pass. Reaching that took real changes, not just the
+version bump — see **How STD-LINT-5/9 were met** below.
+
+7 entries report `--`. None is claimed as N/A — no element here meets a stated
 N/A condition. They split into:
 
 - **Host-only**, decided by `--remote` from a maintainer shell: `STD-GATE-1..6`,
-  `STD-SET-1..3`, `STD-PROC-1`. `--remote` checks 63 elements and currently
-  finds two failures, both of which need an admin and neither of which a pull
-  request can fix: **`STD-GATE-5`** (linear history required while merge-commit
-  and rebase are both still enabled) and **`STD-SET-2`** (wiki enabled but
-  unused).
-- **Cross-repository comparisons**, undecidable from this tree alone:
-  `STD-LINT-1`, `STD-LINT-5`, `STD-LINT-9`, `STD-PM-2`, `STD-DEP-1..5`.
+  `STD-SET-1..3`, `STD-PROC-1`. `--remote` currently finds two failures, both of
+  which need an admin and neither of which a pull request can fix:
+  **`STD-GATE-5`** (linear history required while merge-commit and rebase are
+  both still enabled) and **`STD-SET-2`** (wiki enabled but unused).
 - **Needs human judgement**: `STD-CI-2`, `STD-SCRIPT-8`, `STD-LINT-6`,
-  `STD-PM-6`, `STD-PROC-4`, `STD-PROC-7`.
-- **Duplicate of a checked element**: `STD-SUP-2` (same as `STD-REL-3`).
+  `STD-PROC-4`.
 
-`STD-LINT-3` (workflow-artifact rule enabled) is reported `--` because the
-checker cannot see a private planning directory. It is satisfied in fact: the
-rule is on and the tree is clean.
+`STD-LINT-6` (disabled rules carry counts) is `--` because the checker cannot
+grade prose. It is satisfied in fact: every `off` rule in `.oxlintrc.json`
+carries a comment with its measured finding count.
 
-Two things a green run does **not** cover, recorded so they are not mistaken for
+**How STD-LINT-5/9 were met.** The `.oxlintrc.json` `plugins` array lists all
+six of `rill`'s plugins — `typescript`, `oxc`, `unicorn`, `import`, `promise`,
+`vitest`. Enabling `vitest` surfaced ~1780 findings; they were cleared three
+ways, all matching `rill`'s baseline rather than suppressing:
+
+- Three expensive rules are set to `off` to match the baseline, each with a
+  STD-LINT-6 count comment: `vitest/require-mock-type-parameters` (1240),
+  `vitest/no-conditional-expect` (67), `vitest/require-to-throw-message` (35).
+- `vitest/expect-expect` stays `error` (matching the baseline severity, so
+  STD-LINT-9 holds) but carries `assertFunctionNames: ["expect", "expect*",
+  "assert*"]`, teaching it that assertions reach `expect` through named helpers.
+- The residual ~410 real findings (`typescript/no-explicit-any` flipped to
+  `error`, `no-shadow`, `eqeqeq`, a few `import`/`promise`/`vitest` singletons,
+  and the graceful-skip integration tests) were fixed in the source and tests.
+
+One thing a green run does **not** cover, recorded so it is not mistaken for
 conformance:
 
 - **`STD-CI-7` (no path filtering) is reported `ok` but is not satisfied.** The
@@ -182,12 +199,6 @@ conformance:
   it means running the full matrix on every pull request and moving the required
   contexts to the `check` legs, which is a branch-protection change an admin
   makes out of band. Tracked, not accepted.
-- **`STD-LINT-5` (same plugin set as `rill`) is unmet.** `rill` enables
-  `import`, `vitest` and `promise`; this repository does not. Measured across
-  `src/` and `tests/` they cost 1762 findings, almost all
-  `vitest/require-mock-type-parameters`. That is real work on the test suite,
-  tracked rather than done. `unicorn` — the one default-on plugin, and so the
-  one whose omission was silent — is enabled.
 
 ## Core Dependency
 

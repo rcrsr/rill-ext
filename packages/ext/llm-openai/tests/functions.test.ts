@@ -20,6 +20,22 @@ import type { OpenAIExtensionConfig } from '../src/types.js';
 // TEST HELPERS
 // ============================================================
 
+/** Minimal view of the RillStream cursor exercised by these tests. */
+interface StreamCursor {
+  __rill_stream?: boolean;
+  __rill_stream_resolve?: () => Promise<unknown>;
+  done: boolean;
+  value?: unknown;
+  next: unknown;
+}
+
+/** Minimal view of a rill vector value exercised by these tests. */
+interface VectorResult {
+  __rill_vector: boolean;
+  model: string;
+  data: Float32Array;
+}
+
 function getCallable(
   ext: { value: unknown },
   name: string
@@ -85,7 +101,7 @@ function createErrorStreamRunner(error: unknown) {
   // as a generator it needed an unreachable `yield` purely to satisfy the
   // inferred type. Rejecting on the first next() is what "throws during
   // iteration" actually means.
-  function asyncChunks(): AsyncIterator<any> {
+  function asyncChunks(): AsyncIterator<unknown> {
     return { next: () => Promise.reject(error) };
   }
 
@@ -103,7 +119,7 @@ function createErrorStreamRunner(error: unknown) {
 function createPartialDisconnectRunner(partialContent: string, error: unknown) {
   const partialCompletion = createMockFinalCompletion(partialContent);
 
-  async function* asyncChunks(): AsyncGenerator<any> {
+  async function* asyncChunks(): AsyncGenerator<unknown> {
     if (partialContent.length > 0) {
       yield {
         choices: [
@@ -132,7 +148,7 @@ function createPartialDisconnectRunner(partialContent: string, error: unknown) {
 async function resolveStream(
   stream: unknown
 ): Promise<Record<string, unknown>> {
-  const resolve = (stream as any)
+  const resolve = (stream as StreamCursor)
     .__rill_stream_resolve as () => Promise<unknown>;
   return (await resolve()) as Record<string, unknown>;
 }
@@ -142,10 +158,13 @@ async function resolveStream(
  */
 async function collectStreamChunks(stream: unknown): Promise<string[]> {
   const chunks: string[] = [];
-  let current = stream as any;
+  let current = stream as StreamCursor;
   while (!current.done) {
-    const fn = (current.next as any).fn ?? (current.next as any);
-    const fnToCall = typeof fn === 'function' ? fn : (fn as any).fn;
+    const nextField = current.next as { fn?: unknown };
+    const fn = nextField.fn ?? current.next;
+    const fnToCall = (
+      typeof fn === 'function' ? fn : (fn as { fn: unknown }).fn
+    ) as (a: object, b: object) => Promise<StreamCursor>;
     current = await fnToCall({}, {});
     if (!current.done && current.value !== undefined) {
       chunks.push(current.value as string);
@@ -173,9 +192,9 @@ vi.mock('openai', () => {
     status: number | undefined;
     constructor(
       status: number | undefined,
-      _error: any,
+      _error: unknown,
       message: string,
-      _headers: any
+      _headers: unknown
     ) {
       super(message);
       this.status = status;
@@ -230,9 +249,9 @@ describe('message() function', () => {
       const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       // RillStream has __rill_stream discriminator
-      expect((stream as any).__rill_stream).toBe(true);
-      expect((stream as any).done).toBe(false);
-      expect(typeof (stream as any).next).toBeDefined();
+      expect((stream as StreamCursor).__rill_stream).toBe(true);
+      expect((stream as StreamCursor).done).toBe(false);
+      expect(typeof (stream as StreamCursor).next).toBeDefined();
     });
 
     // IR-1/AC-5: resolution dict has content, model, usage, stop_reason, id, messages
@@ -616,444 +635,6 @@ describe('message() function', () => {
 // NOTE: messages() verb was removed in the unified prompting migration.
 // Multi-turn message history is now passed via the prompt param of message().
 
-/*
-describe('messages() function (REMOVED)', () => {
-  beforeEach(() => {
-    mockCreate.mockReset();
-    mockStream.mockReset();
-  });
-
-  describe('stream return (IR-1/AC-2)', () => {
-    // IR-1/AC-2: messages() returns RillStream
-    it('returns a RillStream object', () => {
-      const runner = createMockStreamRunner(['Sure'], createMockFinalCompletion('Sure, I can help!'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const inputMessages = [{ role: 'user', content: 'Can you help me?' }];
-
-      const stream = getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-
-      expect((stream as any).__rill_stream).toBe(true);
-      expect((stream as any).done).toBe(false);
-    });
-
-    // IR-1/AC-4: iterating messages() stream yields string chunks
-    it('iterating stream yields string text deltas', async () => {
-      const runner = createMockStreamRunner(['Sure', ', I', ' can', ' help!'], createMockFinalCompletion('Sure, I can help!'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const inputMessages = [{ role: 'user', content: 'Can you help me?' }];
-      const stream = getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-      const chunks = await collectStreamChunks(stream);
-
-      expect(chunks).toEqual(['Sure', ', I', ' can', ' help!']);
-    });
-
-    // Resolution dict shape for messages()
-    it('resolves to dict with conversation history', async () => {
-      const runner = createMockStreamRunner(['Sure, I can help!'], createMockFinalCompletion('Sure, I can help!'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const inputMessages = [
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' },
-        { role: 'user', content: 'Can you help me?' },
-      ];
-
-      const stream = getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-      const result = await resolveStream(stream);
-
-      expect(result['content']).toBe('Sure, I can help!');
-      expect(result['messages']).toEqual([
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' },
-        { role: 'user', content: 'Can you help me?' },
-        { role: 'assistant', content: 'Sure, I can help!' },
-      ]);
-    });
-
-    it('sends system message as first message in OpenAI streaming format', async () => {
-      const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        system: 'You are helpful.',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const inputMessages = [{ role: 'user', content: 'Hello' }];
-      getCallable(ext, 'messages').fn({ messages: inputMessages }, ctx);
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messages: [
-            { role: 'system', content: 'You are helpful.' },
-            { role: 'user', content: 'Hello' },
-          ],
-        })
-      );
-    });
-
-    it('accepts options dict with system override', async () => {
-      const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        system: 'Default system.',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const inputMessages = [{ role: 'user', content: 'Test' }];
-      getCallable(ext, 'messages').fn(
-        { messages: inputMessages, options: { system: 'Override system.' } },
-        ctx
-      );
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          messages: [
-            { role: 'system', content: 'Override system.' },
-            { role: 'user', content: 'Test' },
-          ],
-        })
-      );
-    });
-
-    it('accepts options dict with max_tokens override', async () => {
-      const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const inputMessages = [{ role: 'user', content: 'Test' }];
-      getCallable(ext, 'messages').fn({ messages: inputMessages, options: { max_tokens: 2000 } }, ctx);
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          max_completion_tokens: 2000,
-        })
-      );
-    });
-  });
-
-  describe('validation error cases', () => {
-    // AC-23: Empty messages list raises error before stream creation
-    it('throws RuntimeError for empty messages list', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: [] }, ctx), { message: 'messages list cannot be empty' });
-    });
-
-    // EC-10: Missing role field
-    it('throws RuntimeError for message missing role field', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ content: 'Hello' }];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "message missing required 'role' field" });
-    });
-
-    // EC-11: Invalid role value — thrown synchronously before stream creation
-    it('throws RuntimeError for invalid role value', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ role: 'system', content: 'Hello' }];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "invalid role 'system'" });
-    });
-
-    // EC-12: User message missing content — thrown synchronously
-    it('throws RuntimeError for user message missing content', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ role: 'user' }];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "user message requires 'content'" });
-    });
-
-    // EC-13: Assistant missing both content and tool_calls — thrown synchronously
-    it('throws RuntimeError for assistant message missing content and tool_calls', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ role: 'assistant' }];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "assistant message requires 'content' or 'tool_calls'" });
-    });
-
-    it('accepts assistant message with content — returns stream', () => {
-      const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const validMessages = [
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' },
-      ];
-
-      const stream = getCallable(ext, 'messages').fn({ messages: validMessages }, ctx);
-      expect((stream as any).__rill_stream).toBe(true);
-    });
-
-    it('accepts tool message with content — returns stream', () => {
-      const runner = createMockStreamRunner([], createMockFinalCompletion('Response'));
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const validMessages = [
-        { role: 'user', content: 'Hello' },
-        { role: 'tool', content: 'Tool output' },
-      ];
-
-      const stream = getCallable(ext, 'messages').fn({ messages: validMessages }, ctx);
-      expect((stream as any).__rill_stream).toBe(true);
-    });
-
-    it('throws RuntimeError for tool message missing content', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const invalidMessages = [{ role: 'tool' }];
-
-      expectThrowHalt(() => getCallable(ext, 'messages').fn({ messages: invalidMessages }, ctx), { message: "tool message requires 'content'" });
-    });
-  });
-
-  describe('API error cases', () => {
-    // EC-14: API errors apply to messages() too — thrown during stream iteration
-    it('throws RuntimeError for 401 authentication error during stream iteration', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(401, {}, 'Invalid API key', {});
-      const runner = createErrorStreamRunner(apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'invalid-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-
-      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 401): Invalid API key' });
-    });
-
-    it('throws RuntimeError for 429 rate limit error during stream iteration', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(429, {}, 'Rate limit', {});
-      const runner = createErrorStreamRunner(apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-
-      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 429): Rate limit' });
-    });
-
-    it('throws RuntimeError for timeout error during stream iteration', async () => {
-      const timeoutError = new Error('Request timeout');
-      timeoutError.name = 'AbortError';
-      const runner = createErrorStreamRunner(timeoutError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-
-      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI error: Request timeout' });
-    });
-
-    it('throws RuntimeError for generic API error during stream iteration', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(500, {}, 'Internal server error', {});
-      const runner = createErrorStreamRunner(apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-
-      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 500): Internal server error' });
-    });
-
-    // EC-3/AC-16: Provider disconnect mid-stream for messages()
-    it('throws RuntimeError during iteration on mid-stream disconnect [EC-3]', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(503, {}, 'Service unavailable', {});
-      const runner = createPartialDisconnectRunner('Partial messages text', apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-
-      await expectRejectedHalt(collectStreamChunks(stream), { message: 'OpenAI API error (HTTP 503): Service unavailable' });
-    });
-
-    it('resolves with partial data after mid-stream disconnect [AC-16]', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(503, {}, 'Service unavailable', {});
-      const runner = createPartialDisconnectRunner('Partial multi-turn content', apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-
-      const result = await resolveStream(stream);
-      expect(result['content']).toBe('Partial multi-turn content');
-      expect(result['model']).toBe('gpt-4-turbo');
-    });
-
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
-    it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(500, {}, 'Internal server error', {});
-      const runner = createErrorStreamRunner(apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const messages = [{ role: 'user', content: 'Test' }];
-      const stream = getCallable(ext, 'messages').fn({ messages }, ctx);
-
-      await expectRejectedHalt(resolveStream(stream));
-    });
-  });
-});
-*/
-
 // ============================================================
 // EMBED() TESTS
 // ============================================================
@@ -1085,7 +666,7 @@ describe('embed() function', () => {
       const result = (await getCallable(ext, 'embed').fn(
         { text: 'test text' },
         ctx
-      )) as any;
+      )) as VectorResult;
 
       expect(result.__rill_vector).toBe(true);
       expect(result.model).toBe('text-embedding-3-small');
@@ -1113,7 +694,7 @@ describe('embed() function', () => {
       const result = (await getCallable(ext, 'embed').fn(
         { text: 'different size' },
         ctx
-      )) as any;
+      )) as VectorResult;
 
       expect(result.data.length).toBe(768);
     });
@@ -1246,7 +827,7 @@ describe('embed_batch() function', () => {
       const result = (await getCallable(ext, 'embed_batch').fn(
         { texts: ['text1', 'text2'] },
         ctx
-      )) as any[];
+      )) as VectorResult[];
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(2);
@@ -1270,7 +851,7 @@ describe('embed_batch() function', () => {
       const result = (await getCallable(ext, 'embed_batch').fn(
         { texts: [] },
         ctx
-      )) as any[];
+      )) as VectorResult[];
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(0);
@@ -1420,10 +1001,13 @@ async function collectDictChunks(
   stream: unknown
 ): Promise<Record<string, unknown>[]> {
   const chunks: Record<string, unknown>[] = [];
-  let current = stream as any;
+  let current = stream as StreamCursor;
   while (!current.done) {
-    const fn = (current.next as any).fn ?? (current.next as any);
-    const fnToCall = typeof fn === 'function' ? fn : (fn as any).fn;
+    const nextField = current.next as { fn?: unknown };
+    const fn = nextField.fn ?? current.next;
+    const fnToCall = (
+      typeof fn === 'function' ? fn : (fn as { fn: unknown }).fn
+    ) as (a: object, b: object) => Promise<StreamCursor>;
     current = await fnToCall({}, {});
     if (!current.done && current.value !== undefined) {
       chunks.push(current.value as Record<string, unknown>);
@@ -1474,8 +1058,8 @@ describe('tool_loop() function', () => {
         ctx
       );
 
-      expect((stream as any).__rill_stream).toBe(true);
-      expect((stream as any).done).toBe(false);
+      expect((stream as StreamCursor).__rill_stream).toBe(true);
+      expect((stream as StreamCursor).done).toBe(false);
     });
 
     // AC-8: Iterating tool_loop stream yields text_delta, tool_call, tool_result dicts

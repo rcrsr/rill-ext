@@ -37,12 +37,13 @@ const PROVIDER = 'pinecone';
  * Create Pinecone extension instance.
  *
  * @param config - Extension configuration
- * @param ctx - ExtensionFactoryCtx (rill 0.19); `ctx.signal` triggers
- *   full disposal because the Pinecone SDK does not accept per-call signals.
+ * @param factoryCtx - ExtensionFactoryCtx (rill 0.19); `factoryCtx.signal`
+ *   triggers full disposal because the Pinecone SDK does not accept per-call
+ *   signals.
  */
 export function createPineconeExtension(
   config: PineconeConfig,
-  ctx?: ExtensionFactoryCtx
+  factoryCtx?: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Factory-time validation (RILL-R001 via assertRequired)
   assertRequired(config.apiKey, 'apiKey');
@@ -58,8 +59,8 @@ export function createPineconeExtension(
     await sharedDispose(disposalState);
   };
 
-  if (ctx?.signal !== undefined) {
-    ctx.signal.addEventListener(
+  if (factoryCtx?.signal !== undefined) {
+    factoryCtx.signal.addEventListener(
       'abort',
       () => {
         void dispose();

@@ -36,6 +36,7 @@ describe('ChromaConfig Interface', () => {
 
   describe('readonly modifiers', () => {
     it('enforces readonly on url field', () => {
+      expectTypeOf<ChromaConfig>().toHaveProperty('url');
       const config: ChromaConfig = {
         collection: 'test',
         url: 'http://localhost:8000',
@@ -46,6 +47,7 @@ describe('ChromaConfig Interface', () => {
     });
 
     it('enforces readonly on collection field', () => {
+      expectTypeOf<ChromaConfig>().toHaveProperty('collection');
       const config: ChromaConfig = {
         collection: 'test',
       };
@@ -55,6 +57,7 @@ describe('ChromaConfig Interface', () => {
     });
 
     it('enforces readonly on embeddingFunction field', () => {
+      expectTypeOf<ChromaConfig>().toHaveProperty('embeddingFunction');
       const config: ChromaConfig = {
         collection: 'test',
         embeddingFunction: 'openai',
@@ -65,6 +68,7 @@ describe('ChromaConfig Interface', () => {
     });
 
     it('enforces readonly on timeout field', () => {
+      expectTypeOf<ChromaConfig>().toHaveProperty('timeout');
       const config: ChromaConfig = {
         collection: 'test',
         timeout: 30000,

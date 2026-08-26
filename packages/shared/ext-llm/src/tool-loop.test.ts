@@ -731,7 +731,7 @@ describe('executeToolLoop', () => {
         test_tool: toolFn,
       };
 
-      const buildTools = vi.fn((tools) => tools);
+      const buildTools = vi.fn((toolsArg) => toolsArg);
       const callbacks = createMockCallbacks({
         buildTools,
         extractToolCalls: vi.fn(() => null),
@@ -791,7 +791,7 @@ describe('executeToolLoop', () => {
 
       const tools = { get_weather: scriptTool };
 
-      const buildTools = vi.fn((tools) => tools);
+      const buildTools = vi.fn((toolsArg) => toolsArg);
       const callbacks = createMockCallbacks({
         buildTools,
         extractToolCalls: vi.fn(() => null),
@@ -873,7 +873,7 @@ describe('executeToolLoop', () => {
         test_tool: toolFn,
       };
 
-      const buildTools = vi.fn((tools) => tools);
+      const buildTools = vi.fn((toolsArg) => toolsArg);
       const callbacks = createMockCallbacks({
         buildTools,
         extractToolCalls: vi.fn(() => null),
@@ -938,7 +938,7 @@ describe('executeToolLoop', () => {
         annotations: { description: 'Tool with unconstrained param' },
       };
 
-      const buildTools = vi.fn((tools) => tools);
+      const buildTools = vi.fn((toolsArg) => toolsArg);
       const callbacks = createMockCallbacks({
         buildTools,
         extractToolCalls: vi.fn(() => null),
@@ -975,7 +975,7 @@ describe('executeToolLoop', () => {
         annotations: { description: 'Tool' },
       };
 
-      const buildTools = vi.fn((tools) => tools);
+      const buildTools = vi.fn((toolsArg) => toolsArg);
       const callbacks = createMockCallbacks({
         buildTools,
         extractToolCalls: vi.fn(() => null),
@@ -1015,7 +1015,7 @@ describe('executeToolLoop', () => {
         annotations: { description: 'Tool' },
       };
 
-      const buildTools = vi.fn((tools) => tools);
+      const buildTools = vi.fn((toolsArg) => toolsArg);
       const callbacks = createMockCallbacks({
         buildTools,
         extractToolCalls: vi.fn(() => null),
@@ -1050,7 +1050,7 @@ describe('executeToolLoop', () => {
         annotations: { description: 'Tool' },
       };
 
-      const buildTools = vi.fn((tools) => tools);
+      const buildTools = vi.fn((toolsArg) => toolsArg);
       const callbacks = createMockCallbacks({
         buildTools,
         extractToolCalls: vi.fn(() => null),
