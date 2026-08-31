@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@rcrsr/rill": "~0.20.0",
-    "@types/node": "^26.2.0"
+    "@types/node": "^26.4.0"
   },
   "repository": {
     "type": "git",
