@@ -33,7 +33,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.120.0",
+    "@anthropic-ai/sdk": "^0.122.0",
     "@google/genai": "^2.18.0",
     "@rcrsr/rill": "~0.20.0",
     "@rcrsr/rill-ext-prompt-shared": "workspace:*",
