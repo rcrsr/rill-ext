@@ -37,7 +37,7 @@
     "pnpm": ">=11"
   },
   "devDependencies": {
-    "@rcrsr/rill-dev": "^0.2.2",
+    "@rcrsr/rill-dev": "^0.2.4",
     "@types/node": "^26.2.0",
     "knip": "^6.32.2",
     "lefthook": "^2.1.10",
