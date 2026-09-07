@@ -33,7 +33,7 @@
     "@rcrsr/rill-ext-kv-shared": "workspace:*",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.1",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
     "undici-types": "^8.10.0"
