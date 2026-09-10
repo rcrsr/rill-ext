@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Release process:** `.github/release-sop.md` is the procedure `/conduct:cut-release` follows, and `pnpm run check:changelog` fails a release when a PR merged since the last `v*` tag is cited in no `CHANGELOG.md`. The `[0.21.0]` sections are backfilled with the entries for #66, #102 (issues #87–#101), and #103 that shipped unrecorded. ([#125](https://github.com/rcrsr/rill-ext/pull/125))
+
 ## [0.21.0] - 2026-09-09
 
 ### Changed (Breaking)
