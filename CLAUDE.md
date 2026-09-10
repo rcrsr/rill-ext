@@ -143,15 +143,13 @@ names.
 `pnpm check:standards` currently reports:
 
 ```
-NON-CONFORMANT  1 of 72 checked elements failed: STD-DEP-5   (rill-dev 0.2.5)
+CONFORMANT  72 checked, 72 passed, 7 not machine-checkable.  (rill-dev 0.2.5)
 ```
 
-The one failure is expected between releases. `STD-DEP-5` compares every
-extension's `@rcrsr/rill` peer range against the version currently on npm, and
-the range is bumped only on a release branch (see **Versioning**). It clears on
-the next release that tracks the new rill minor, and any PR between the rill
-release and ours sees it red. It is not a signal to bump the peer range in a
-feature or fix PR.
+`STD-DEP-5` compares every extension's `@rcrsr/rill` peer range against the
+version currently on npm, so it goes red the day rill publishes a new minor and
+stays red until the range is bumped here. That bump is a PR of its own (see
+**Versioning**), not something to fold into an unrelated change.
 
 `@rcrsr/rill-dev` 0.2.5 added two elements this repository now satisfies:
 `STD-SUP-8` (dependabot `open-pull-requests-limit: 0` on both ecosystems, so

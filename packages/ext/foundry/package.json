@@ -28,7 +28,7 @@
   },
   "peerDependencies": {
     "@azure/identity": "^4.13.2",
-    "@rcrsr/rill": "~0.20.0"
+    "@rcrsr/rill": "~0.21.0"
   },
   "peerDependenciesMeta": {
     "@azure/identity": {
@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@azure/identity": "^4.13.2",
-    "@rcrsr/rill": "~0.20.0",
+    "@rcrsr/rill": "~0.21.0",
     "@rcrsr/rill-ext-llm-shared": "workspace:^",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/node": "^26.5.0",

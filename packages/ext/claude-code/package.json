@@ -27,11 +27,11 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.20.0",
+    "@rcrsr/rill": "~0.21.0",
     "node-pty": "^1.0.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.20.0",
+    "@rcrsr/rill": "~0.21.0",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/node": "^26.5.0",
     "@types/which": "^3.0.4",
