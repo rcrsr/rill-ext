@@ -17,6 +17,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Toolchain:** pnpm 12.3.4 (`engines.pnpm` raised to `>=12`), vitest 5.0, oxlint 1.82, oxfmt 0.67, knip 6.35, lefthook 2.1.12, `@types/node` 26.5, `@rcrsr/rill-dev` 0.2.5. The pre-commit format hook now excludes `pnpm-lock.yaml`, and dependabot version-update PRs are disabled in favour of hand-swept bumps (rill-dev STD-HOOK-5 and STD-SUP-8). ([#123](https://github.com/rcrsr/rill-ext/pull/123))
 - **Vendor SDKs:** `@anthropic-ai/sdk` `^0.124.0` (llm-anthropic), `openai` `^7.10.0` (llm-openai, foundry), `@google/genai` `^2.21.0` (llm-gemini), `@aws-sdk/client-s3` `^3.1126.0` (fs-s3). In-use API surfaces unchanged. ([#123](https://github.com/rcrsr/rill-ext/pull/123))
+- **Dependency sweep and lint conformance:** every workspace dependency moves to its latest cooldown-eligible release, with four majors: `openai` 6→7 (llm-openai, foundry), `ioredis` 5→6 (kv-redis), `better-sqlite3` 12→13 (kv-sqlite), `linkify-it` 5→6 (text). `@qdrant/js-client-rest` 1.19 removed `client.search`; vectordb-qdrant now calls `client.query`. `.oxlintrc.json` matches rill's plugin set (`import`, `promise`, `vitest` added) and ~410 real findings were fixed in source and tests, behavior-preserving. Supersedes dependabot #68–#86. ([#103](https://github.com/rcrsr/rill-ext/pull/103))
+- **rill-dev adoption:** `@rcrsr/rill-dev` supplies the standards checker and custom oxlint rules. CI gains top-level `permissions`, scoped `concurrency`, and a tag-vs-manifest publish gate in `release.yml`. Conformance moves from 20 failing elements to `57 checked, 57 passed`. ([#66](https://github.com/rcrsr/rill-ext/pull/66))
+
+### Fixed
+
+- **fetch:** non-retryable 5xx/3xx responses no longer resolve as success; the error atom derives from the status. A missing required argument returns an invalid value with `#INVALID_INPUT` instead of throwing. ([#87](https://github.com/rcrsr/rill-ext/issues/87), [#98](https://github.com/rcrsr/rill-ext/issues/98), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **fs-s3:** `find` honors its `path` argument instead of scanning the whole mount. ([#89](https://github.com/rcrsr/rill-ext/issues/89), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **mcp:** tool calls send the server's original schema keys; rill scripts still call with sanitized snake_case names. ([#90](https://github.com/rcrsr/rill-ext/issues/90), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **outlook:** `create_event` reads the `is_online` option (was `isOnline`). ([#91](https://github.com/rcrsr/rill-ext/issues/91), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **google-workspace:** the token cache is keyed by scope set, so a Gmail-scoped token is no longer reused for a Drive call. Calendar `start`/`end` expose `date_time`, `time_zone`, `date`. ([#93](https://github.com/rcrsr/rill-ext/issues/93), [#97](https://github.com/rcrsr/rill-ext/issues/97), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **foundry:** `tool_loop` preserves `RuntimeHaltSignal` atoms instead of remapping them to `#TIMEOUT`; `search` takes `query_type`, grounding returns `start_index`/`end_index`, safety returns `attack_type`. ([#94](https://github.com/rcrsr/rill-ext/issues/94), [#97](https://github.com/rcrsr/rill-ext/issues/97), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **llm-openai:** Responses-API `message()` issues one request per call (was two) through a single `responses.stream()` runner that `dispose()` aborts. ([#95](https://github.com/rcrsr/rill-ext/issues/95), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **vectordb-pinecone, vectordb-qdrant:** `get` on a missing id returns `#NOT_FOUND` (was `#UNAVAILABLE`). ([#96](https://github.com/rcrsr/rill-ext/issues/96), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **kv-file, kv-redis, kv-sqlite:** `mounts()` returns `max_entries` and `max_value_size` (were camelCase). ([#97](https://github.com/rcrsr/rill-ext/issues/97), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **kv, fs, vectordb factories:** config validation errors unify on `RuntimeError('RILL-R001')` (were `R001`, `R005`, or plain `Error`). ([#98](https://github.com/rcrsr/rill-ext/issues/98), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **llm-anthropic, llm-gemini, llm-openai, foundry:** `meta.provider` is lowercase on every error path; message text keeps the original casing. Calls after `dispose()` return `#DISPOSED`, and `dispose()` aborts in-flight requests through the controllers it previously never used. ([#99](https://github.com/rcrsr/rill-ext/issues/99), [#100](https://github.com/rcrsr/rill-ext/issues/100), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+
+### Security
+
+- **exec:** with `inheritEnv: false` the child no longer receives the parent environment; only `PATH` is kept so bare-name binaries still resolve. ([#88](https://github.com/rcrsr/rill-ext/issues/88), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **fs-local:** create mode no longer follows a symlinked target outside the mount. ([#92](https://github.com/rcrsr/rill-ext/issues/92), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- **prompt-md, google-workspace:** `@@ role` markers are split before interpolation, so an argument value cannot introduce a role message. Gmail header values strip CR/LF, so a subject cannot inject headers. ([#101](https://github.com/rcrsr/rill-ext/issues/101), [#102](https://github.com/rcrsr/rill-ext/pull/102))
 
 ## [0.20.0] - 2026-07-30
 
