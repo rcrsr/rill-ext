@@ -7,7 +7,16 @@
 ### Changed (Breaking)
 
 - `@rcrsr/rill` peer dependency bumped from `~0.20.0` to `~0.21.0`. This package now requires rill `0.21.x`; consumers on rill `0.20.x` must stay on `0.20.x` of this package. ([#123](https://github.com/rcrsr/rill-ext/pull/123))
-- No runtime surface changes. No callable signatures, parameter names, return shapes, or error atoms changed.
+- The peer bump itself changes no runtime surface. Behavior changes in this release are listed under Fixed and Security below.
+
+### Changed
+
+- `better-sqlite3` 12→13. In-use API surface unchanged. ([#103](https://github.com/rcrsr/rill-ext/pull/103))
+
+### Fixed
+
+- `mounts()` returns `max_entries` and `max_value_size` (were camelCase). ([#97](https://github.com/rcrsr/rill-ext/issues/97), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- Factory config validation errors are `RuntimeError('RILL-R001')`. ([#98](https://github.com/rcrsr/rill-ext/issues/98), [#102](https://github.com/rcrsr/rill-ext/pull/102))
 
 ## [0.20.0] - 2026-07-30
 

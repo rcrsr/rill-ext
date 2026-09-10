@@ -7,11 +7,17 @@
 ### Changed (Breaking)
 
 - `@rcrsr/rill` peer dependency bumped from `~0.20.0` to `~0.21.0`. This package now requires rill `0.21.x`; consumers on rill `0.20.x` must stay on `0.20.x` of this package. ([#123](https://github.com/rcrsr/rill-ext/pull/123))
-- No runtime surface changes. No callable signatures, parameter names, return shapes, or error atoms changed.
+- The peer bump itself changes no runtime surface. Behavior changes in this release are listed under Fixed and Security below.
 
 ### Changed
 
 - Bumps `@anthropic-ai/sdk` to `^0.124.0` (from `^0.120.0`). In-use API surface unchanged. ([#123](https://github.com/rcrsr/rill-ext/pull/123))
+
+### Fixed
+
+- `meta.provider` is lowercase on every error path; human-readable messages keep the original casing. ([#99](https://github.com/rcrsr/rill-ext/issues/99), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- Calls after `dispose()` return `#DISPOSED`, and `dispose()` aborts in-flight requests through the factory's AbortControllers, which it previously never used. ([#100](https://github.com/rcrsr/rill-ext/issues/100), [#102](https://github.com/rcrsr/rill-ext/pull/102))
+- Shared `mapProviderError` returns a `RuntimeHaltSignal`'s existing value instead of remapping it to `#TIMEOUT`. ([#94](https://github.com/rcrsr/rill-ext/issues/94), [#102](https://github.com/rcrsr/rill-ext/pull/102))
 
 ## [0.20.0] - 2026-07-30
 

@@ -227,11 +227,12 @@ Extensions use semver with two rules:
 
 Releases are tag-driven. Each extension tracks its own version in its `package.json`; the root `package.json` carries an aggregate version that the release tag matches.
 
-To release:
+The procedure is `.github/release-sop.md`; `/conduct:cut-release X.Y.Z` follows it. In outline:
 
-1. On a `release/vX.Y.Z` branch, set the root `package.json` to `X.Y.Z` and update the root `CHANGELOG.md` through the explicit changelog command (which stamps the `[Unreleased]` section as `[X.Y.Z] - <date>`). Do not hand-edit the changelog.
-2. Open a PR, merge to `main`.
-3. From `main`: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+1. Run `pnpm run check:changelog`. It fails when a PR merged since the last `v*` tag is cited in no `CHANGELOG.md`. Author the missing entries first; the release stamps `[Unreleased]`, it never reads git history.
+2. On a `release/X.Y.Z` branch, set the root `package.json` to `X.Y.Z`, run `pnpm run fix:versions`, and stamp every `[Unreleased]` section (root and `packages/ext/*/CHANGELOG.md`) as `[X.Y.Z] - <date>`. Do not hand-edit entries.
+3. Open a PR, squash-merge to `main`.
+4. From `main`: `git tag -a vX.Y.Z -m "Release X.Y.Z" && git push origin vX.Y.Z`.
 
 The `release.yml` workflow triggers on the tag push, builds, tests, then publishes every non-private `packages/ext/*` whose `name@version` is not yet on npm (already-published versions are skipped). It then creates a GitHub Release with auto-generated notes.
 
