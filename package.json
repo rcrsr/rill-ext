@@ -25,6 +25,7 @@
     "check:deps": "knip",
     "check:standards": "rill-check-standards",
     "check:versions": "bash scripts/check-versions.sh",
+    "check:changelog": "bash scripts/check-changelog-coverage.sh",
     "fix:lint": "oxlint --fix",
     "fix:format": "oxfmt",
     "fix:versions": "bash scripts/sync-versions.sh",
