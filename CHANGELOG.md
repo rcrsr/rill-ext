@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Breaking)
+
+- **rill 0.21 migration:** All 27 extensions and 7 shared packages move to `@rcrsr/rill@~0.21.0`. Both `peerDependencies` and `devDependencies` ranges bump from `~0.20.0` to `~0.21.0`. Extensions at `0.21.x` require rill `0.21.x`; consumers on rill `0.20.x` must stay on extensions `0.20.x`. No extension source changed: build, types, lint, and all tests pass unmodified against 0.21.0. ([#123](https://github.com/rcrsr/rill-ext/pull/123))
+
+### Changed
+
+- **Toolchain:** pnpm 12.3.4 (`engines.pnpm` raised to `>=12`), vitest 5.0, oxlint 1.82, oxfmt 0.67, knip 6.35, lefthook 2.1.12, `@types/node` 26.5, `@rcrsr/rill-dev` 0.2.5. The pre-commit format hook now excludes `pnpm-lock.yaml`, and dependabot version-update PRs are disabled in favour of hand-swept bumps (rill-dev STD-HOOK-5 and STD-SUP-8). ([#123](https://github.com/rcrsr/rill-ext/pull/123))
+- **Vendor SDKs:** `@anthropic-ai/sdk` `^0.124.0` (llm-anthropic), `openai` `^7.10.0` (llm-openai, foundry), `@google/genai` `^2.21.0` (llm-gemini), `@aws-sdk/client-s3` `^3.1126.0` (fs-s3). In-use API surfaces unchanged. ([#123](https://github.com/rcrsr/rill-ext/pull/123))
+
 ## [0.20.0] - 2026-07-30
 
 ### Changed (Breaking)

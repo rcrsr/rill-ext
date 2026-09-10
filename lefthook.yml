@@ -5,6 +5,11 @@ pre-commit:
   commands:
     format:
       glob: '*.{ts,tsx,js,mjs,cjs,json,yaml,yml}'
+      # oxfmt's own ignorePatterns also cover the lockfile; without this
+      # exclude a lockfile-only commit hands oxfmt an all-ignored input list
+      # and it exits non-zero (REPO-STANDARDS.md STD-HOOK-5).
+      exclude:
+        - 'pnpm-lock.yaml'
       run: pnpm exec oxfmt {staged_files}
       stage_fixed: true
     lint:

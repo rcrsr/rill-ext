@@ -15,7 +15,10 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 10
+    # Version-update PRs are disabled (REPO-STANDARDS.md STD-SUP-8); upgrades
+    # are swept by hand. Security updates are a separate host feature and
+    # keep filing PRs for advisories.
+    open-pull-requests-limit: 0
     labels:
       - 'area:dx'
     groups:
@@ -54,6 +57,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    open-pull-requests-limit: 0
     labels:
       - 'area:dx'
     groups:
