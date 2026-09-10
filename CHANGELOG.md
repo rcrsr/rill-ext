@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-09
+
 ### Changed (Breaking)
 
 - **rill 0.21 migration:** All 27 extensions and 7 shared packages move to `@rcrsr/rill@~0.21.0`. Both `peerDependencies` and `devDependencies` ranges bump from `~0.20.0` to `~0.21.0`. Extensions at `0.21.x` require rill `0.21.x`; consumers on rill `0.20.x` must stay on extensions `0.20.x`. No extension source changed: build, types, lint, and all tests pass unmodified against 0.21.0. ([#123](https://github.com/rcrsr/rill-ext/pull/123))
