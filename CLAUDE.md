@@ -143,8 +143,22 @@ names.
 `pnpm check:standards` currently reports:
 
 ```
-CONFORMANT  70 checked, 70 passed, 7 not machine-checkable.
+NON-CONFORMANT  1 of 72 checked elements failed: STD-DEP-5   (rill-dev 0.2.5)
 ```
+
+The one failure is expected between releases. `STD-DEP-5` compares every
+extension's `@rcrsr/rill` peer range against the version currently on npm, and
+the range is bumped only on a release branch (see **Versioning**). It clears on
+the next release that tracks the new rill minor, and any PR between the rill
+release and ours sees it red. It is not a signal to bump the peer range in a
+feature or fix PR.
+
+`@rcrsr/rill-dev` 0.2.5 added two elements this repository now satisfies:
+`STD-SUP-8` (dependabot `open-pull-requests-limit: 0` on both ecosystems, so
+version bumps are swept by hand and only security PRs are filed) and
+`STD-HOOK-5` (the pre-commit format command excludes `pnpm-lock.yaml`, which
+oxfmt already ignores, so a lockfile-only commit no longer hands it an
+all-ignored input).
 
 Read the summary line, not the exit code: `--` means *not checked*, and the
 element still applies. A green run means the checked subset holds; it is not a
