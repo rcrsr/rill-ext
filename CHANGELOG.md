@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Release process:** `.github/release-sop.md` is the procedure `/conduct:cut-release` follows, and `pnpm run check:changelog` fails a release when a PR merged since the last `v*` tag is cited in no `CHANGELOG.md`. The `[0.21.0]` sections are backfilled with the entries for #66, #102 (issues #87–#101), and #103 that shipped unrecorded. ([#125](https://github.com/rcrsr/rill-ext/pull/125))
 
+### Fixed
+
+- **llm:** a tool that raises a `RuntimeHaltSignal` with `catchable: false` now ends `tool_loop` on the first call, and the host receives the tool's original halt. Before, the model saw the refusal as a tool error, could retry up to `max_errors` times, and the run ended with a generic `UNAVAILABLE` / `max_errors_exceeded` halt. A catchable halt still becomes a tool error result, now carrying the halt's own message instead of the `Invalid tool input for X` wrapper. Affects llm-anthropic, llm-openai, llm-gemini, and foundry. ([#126](https://github.com/rcrsr/rill-ext/issues/126), [#129](https://github.com/rcrsr/rill-ext/pull/129))
+- **llm:** `validateApiKey`, `validateModel`, and `validateTemperature` throw `RuntimeError('RILL-R001', message)` instead of a bare `Error`, with the same messages. Hosts catching `RuntimeError` for factory-time config failures now see these cases. Affects llm-anthropic, llm-openai, and llm-gemini. ([#127](https://github.com/rcrsr/rill-ext/issues/127), [#129](https://github.com/rcrsr/rill-ext/pull/129))
+
 ## [0.21.0] - 2026-09-09
 
 ### Changed (Breaking)

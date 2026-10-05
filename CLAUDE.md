@@ -240,7 +240,7 @@ The `release.yml` workflow triggers on the tag push, builds, tests, then publish
 
 Version numbers are release-time actions: the release tooling bumps every `version` field and stamps the `[Unreleased]` changelog section as `[X.Y.Z] - <date>`. A feature or fix PR never edits a `version` field.
 
-Do not update any `CHANGELOG.md` unless explicitly prompted to do so. Implementation and fix PRs write source, tests, and dependency ranges; changelog entries are authored only when explicitly prompted (via the changelog command). When prompted, `[Unreleased]` entries land on the feature or fix PR, never on the release PR. At release time, the release tooling only stamps those accumulated entries with the version and date; it does not write them.
+Never write a `CHANGELOG.md` entry unprompted. Author one only when the user asks for it or runs a command that requests it. When prompted, `[Unreleased]` entries land on the feature or fix PR, never on the release PR. At release time, the release tooling only stamps those accumulated entries with the version and date; it does not write them.
 
 ## Architecture
 

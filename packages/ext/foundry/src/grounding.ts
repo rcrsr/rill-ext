@@ -117,7 +117,7 @@ export async function callGround(
     const response = await client.responses.create({
       model,
       input: query,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bing_grounding is Azure-specific and absent from the openai-node Tool union
       tools: [bingTool] as any,
     });
 

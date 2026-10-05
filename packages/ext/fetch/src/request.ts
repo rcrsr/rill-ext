@@ -307,7 +307,7 @@ export async function executeRequest(
           const response = await fetch(url, {
             ...options,
             signal: combinedSignal,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FetchOptions is a local subset of RequestInit; cast avoids coupling to DOM/undici init typings
           } as any);
 
           clearTimeout(timeoutId);
