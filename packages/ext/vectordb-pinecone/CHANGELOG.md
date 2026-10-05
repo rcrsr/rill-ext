@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Bumps `@pinecone-database/pinecone` to `^9.0.0` (from `^8.2.0`), which requires Node 22 or later. `describe()` reads the index metric through the SDK's legacy `metric` accessor, which v9 throws on while an index is still initializing; v8 returned no value and `describe()` reported `cosine`. ([#131](https://github.com/rcrsr/rill-ext/pull/131))
+
 ## [0.21.0] - 2026-09-09
 
 ### Changed (Breaking)
