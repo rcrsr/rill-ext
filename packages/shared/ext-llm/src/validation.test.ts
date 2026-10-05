@@ -40,12 +40,12 @@ describe('validateApiKey', () => {
   });
 
   it('throws for undefined key', () => {
-    // key is undefined → Error: "api_key is required"
+    // key is undefined → RuntimeError: "api_key is required"
     expectConfigError(() => validateApiKey(undefined), 'api_key is required');
   });
 
   it('throws for empty string key', () => {
-    // key is empty string → Error: "api_key cannot be empty"
+    // key is empty string → RuntimeError: "api_key cannot be empty"
     expectConfigError(() => validateApiKey(''), 'api_key cannot be empty');
   });
 });
@@ -60,12 +60,12 @@ describe('validateModel', () => {
   });
 
   it('throws for undefined model', () => {
-    // model is undefined → Error: "model is required"
+    // model is undefined → RuntimeError: "model is required"
     expectConfigError(() => validateModel(undefined), 'model is required');
   });
 
   it('throws for empty string model', () => {
-    // model is empty string → Error: "model is required"
+    // model is empty string → RuntimeError: "model is required"
     expectConfigError(() => validateModel(''), 'model is required');
   });
 });
@@ -98,7 +98,7 @@ describe('validateTemperature', () => {
   });
 
   it('throws for value above maximum', () => {
-    // temperature > 2.0 → Error
+    // temperature > 2.0 → RuntimeError
     expectConfigError(
       () => validateTemperature(3.0),
       'temperature must be between 0 and 2'
@@ -110,7 +110,7 @@ describe('validateTemperature', () => {
   });
 
   it('throws for value below minimum', () => {
-    // temperature < 0.0 → Error
+    // temperature < 0.0 → RuntimeError
     expectConfigError(
       () => validateTemperature(-0.1),
       'temperature must be between 0 and 2'

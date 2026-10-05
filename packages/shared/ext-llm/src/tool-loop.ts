@@ -650,9 +650,15 @@ export async function executeToolLoop(
 
         emitEvent('tool_result', { tool_name: name, duration });
       } catch (error: unknown) {
-        // Non-catchable halts are policy refusals: propagate with their
-        // original atom instead of counting them as recoverable tool errors.
+        // Abort and programmer-error halts bypass guard/retry semantics:
+        // close the tool_call with a terminal event, then propagate with the
+        // original atom without counting a recoverable tool error.
         if (error instanceof RuntimeHaltSignal && error.catchable === false) {
+          emitEvent('tool_result', {
+            tool_name: name,
+            error: readHaltMessage(error),
+            duration: Date.now() - toolStartTime,
+          });
           throw error;
         }
 

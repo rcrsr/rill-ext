@@ -265,7 +265,7 @@ return {
 
 Canonical example: `packages/ext/kv-file/src/factory.ts`. The legacy shape (named `{ fn, params }` objects at the top level next to `dispose`, checked with `satisfies ExtensionResult`) is retired.
 
-- **Category contract only.** Expose only functions in the category contract; no vendor-only functions. A new host function goes into the shared contract type and is implemented identically in every extension of that category, with a snake_case name.
+- **Category contract only.** Expose only functions in the category contract; no vendor-only functions (recorded exception: foundry). A new host function goes into the shared contract type and is implemented identically in every extension of that category, with a snake_case name.
 - **Rich return types.** Every host function declares a precise `returnType` built with `structureToTypeValue`; no shapeless `dict`, `list`, or `any` when the shape is known. Update the extension's `docs/` response table in the same change.
 - **Clean disposal.** `dispose()` is idempotent and releases every vendor resource, aborting in-flight requests. Streaming results carry their own `dispose` that aborts the underlying stream.
 

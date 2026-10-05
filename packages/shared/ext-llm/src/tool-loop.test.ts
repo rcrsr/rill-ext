@@ -2933,6 +2933,39 @@ describe('executeToolLoop tool halt propagation', () => {
     expect(callbacks.callAPI).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects with a DISPOSED halt and emits a terminal tool_result event', async () => {
+    const disposedValue = createRuntimeContext().invalidate(
+      new Error('disposed'),
+      { code: 'DISPOSED', provider: 'test', raw: { kind: 'disposed' } }
+    );
+    const halt = new RuntimeHaltSignal(disposedValue, false);
+    const toolFn = vi.fn((): RillValue => {
+      throw halt;
+    });
+    const emitEvent = vi.fn();
+
+    const rejection: unknown = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      { halting_tool: createMockTool(toolFn) },
+      3,
+      createSingleCallCallbacks(),
+      emitEvent
+    ).catch((error: unknown) => error);
+
+    expect(rejection).toBe(halt);
+    expect(getStatus((rejection as RuntimeHaltSignal).value).code).toEqual(
+      expect.objectContaining({ name: 'DISPOSED' })
+    );
+    expect(emitEvent).toHaveBeenCalledWith(
+      'tool_result',
+      expect.objectContaining({
+        tool_name: 'halting_tool',
+        error: expect.any(String),
+        duration: expect.any(Number),
+      })
+    );
+  });
+
   it('converts a catchable halt into a tool error result and continues', async () => {
     const halt = new RuntimeHaltSignal(createHaltValue(), true);
     const toolFn = vi.fn((): RillValue => {
