@@ -25,17 +25,17 @@ export const MAX_TEMPERATURE = 2.0;
  * Throws if validation fails.
  *
  * @param key - API key to validate
- * @throws Error if key is undefined or empty
+ * @throws RuntimeError if key is undefined or empty
  */
 export function validateApiKey(key: string | undefined): asserts key is string {
-  // key is undefined → Error: "api_key is required"
+  // key is undefined → RuntimeError: "api_key is required"
   if (key === undefined) {
-    throw new Error('api_key is required');
+    throw new RuntimeError('RILL-R001', 'api_key is required');
   }
 
-  // key is empty string → Error: "api_key cannot be empty"
+  // key is empty string → RuntimeError: "api_key cannot be empty"
   if (key === '') {
-    throw new Error('api_key cannot be empty');
+    throw new RuntimeError('RILL-R001', 'api_key cannot be empty');
   }
 }
 
@@ -48,14 +48,14 @@ export function validateApiKey(key: string | undefined): asserts key is string {
  * Throws if validation fails.
  *
  * @param model - Model name to validate
- * @throws Error if model is undefined or empty
+ * @throws RuntimeError if model is undefined or empty
  */
 export function validateModel(
   model: string | undefined
 ): asserts model is string {
-  // model is undefined or empty → Error: "model is required"
+  // model is undefined or empty → RuntimeError: "model is required"
   if (!model) {
-    throw new Error('model is required');
+    throw new RuntimeError('RILL-R001', 'model is required');
   }
 }
 
@@ -68,7 +68,7 @@ export function validateModel(
  * Throws if validation fails.
  *
  * @param temperature - Temperature value to validate
- * @throws Error if temperature is out of range
+ * @throws RuntimeError if temperature is out of range
  */
 export function validateTemperature(temperature: number | undefined): void {
   // Allow undefined (optional parameter)
@@ -76,9 +76,9 @@ export function validateTemperature(temperature: number | undefined): void {
     return;
   }
 
-  // temperature out of range → Error: "temperature must be between 0 and 2"
+  // temperature out of range → RuntimeError: "temperature must be between 0 and 2"
   if (temperature < MIN_TEMPERATURE || temperature > MAX_TEMPERATURE) {
-    throw new Error('temperature must be between 0 and 2');
+    throw new RuntimeError('RILL-R001', 'temperature must be between 0 and 2');
   }
 }
 

@@ -191,6 +191,12 @@ async function executeToolCall(
     const result = callable.fn(inputDict, ctx);
     return result instanceof Promise ? await result : result;
   } catch (error: unknown) {
+    // Halt signals are not RuntimeErrors; wrapping them would erase the
+    // original atom, so pass every halt through for the caller to classify.
+    if (error instanceof RuntimeHaltSignal) {
+      throw error;
+    }
+
     // Re-throw RuntimeErrors directly
     if (error instanceof RuntimeError) {
       throw error;
@@ -644,6 +650,12 @@ export async function executeToolLoop(
 
         emitEvent('tool_result', { tool_name: name, duration });
       } catch (error: unknown) {
+        // Non-catchable halts are policy refusals: propagate with their
+        // original atom instead of counting them as recoverable tool errors.
+        if (error instanceof RuntimeHaltSignal && error.catchable === false) {
+          throw error;
+        }
+
         const duration = Date.now() - toolStartTime;
         consecutiveErrors++;
 

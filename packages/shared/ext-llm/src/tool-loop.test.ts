@@ -7,8 +7,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   RuntimeError,
+  RuntimeHaltSignal,
   callable,
   createRuntimeContext,
+  getStatus,
   invokeCallable,
   type RillValue,
 } from '@rcrsr/rill';
@@ -2859,5 +2861,101 @@ describe('executeToolLoop max_errors_exceeded', () => {
 
     // Should stop at 3 errors (the default)
     expect(errorCount).toBe(3);
+  });
+});
+
+// ============================================================
+// TOOL HALT PROPAGATION
+// ============================================================
+
+describe('executeToolLoop tool halt propagation', () => {
+  function createHaltValue(): RillValue {
+    return createRuntimeContext().invalidate(new Error('policy refusal'), {
+      code: 'FORBIDDEN',
+      provider: 'test',
+      raw: { kind: 'policy_refusal' },
+    });
+  }
+
+  function createSingleCallCallbacks() {
+    let extractCount = 0;
+    return createMockCallbacks({
+      extractToolCalls: vi.fn(() => {
+        extractCount++;
+        return extractCount === 1
+          ? [{ id: 'call_1', name: 'halting_tool', input: {} }]
+          : null;
+      }),
+    });
+  }
+
+  it('rejects with the original halt when a tool throws a non-catchable halt', async () => {
+    const halt = new RuntimeHaltSignal(createHaltValue(), false);
+    const toolFn = vi.fn((): RillValue => {
+      throw halt;
+    });
+    const callbacks = createSingleCallCallbacks();
+
+    const rejection: unknown = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      { halting_tool: createMockTool(toolFn) },
+      3,
+      callbacks,
+      vi.fn()
+    ).catch((error: unknown) => error);
+
+    expect(rejection).toBe(halt);
+    expect((rejection as RuntimeHaltSignal).catchable).toBe(false);
+    expect(getStatus((rejection as RuntimeHaltSignal).value).code).toEqual(
+      expect.objectContaining({ name: 'FORBIDDEN' })
+    );
+    expect(toolFn).toHaveBeenCalledTimes(1);
+    expect(callbacks.callAPI).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects with the original halt when maxErrors is 1', async () => {
+    const halt = new RuntimeHaltSignal(createHaltValue(), false);
+    const toolFn = vi.fn((): RillValue => {
+      throw halt;
+    });
+    const callbacks = createSingleCallCallbacks();
+
+    const rejection: unknown = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      { halting_tool: createMockTool(toolFn) },
+      1,
+      callbacks,
+      vi.fn()
+    ).catch((error: unknown) => error);
+
+    expect(rejection).toBe(halt);
+    expect(toolFn).toHaveBeenCalledTimes(1);
+    expect(callbacks.callAPI).toHaveBeenCalledTimes(1);
+  });
+
+  it('converts a catchable halt into a tool error result and continues', async () => {
+    const halt = new RuntimeHaltSignal(createHaltValue(), true);
+    const toolFn = vi.fn((): RillValue => {
+      throw halt;
+    });
+    const callbacks = createSingleCallCallbacks();
+
+    await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      { halting_tool: createMockTool(toolFn) },
+      3,
+      callbacks,
+      vi.fn()
+    );
+
+    expect(toolFn).toHaveBeenCalledTimes(1);
+    expect(callbacks.callAPI).toHaveBeenCalledTimes(2);
+    expect(callbacks.formatToolResult).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: 'call_1',
+        name: 'halting_tool',
+        error: expect.stringContaining('policy refusal'),
+      }),
+    ]);
   });
 });
