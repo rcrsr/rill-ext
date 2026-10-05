@@ -620,7 +620,14 @@ export function createPineconeExtension(
               stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
 
             let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
-            const metric = indexInfo.metric;
+            // SDK v9 backs the legacy `metric` accessor with a getter that throws
+            // while the index is initializing; keep the 'cosine' default then.
+            let metric: string | undefined;
+            try {
+              metric = indexInfo.metric;
+            } catch {
+              metric = undefined;
+            }
             if (metric === 'cosine') distance = 'cosine';
             else if (metric === 'euclidean') distance = 'euclidean';
             else if (metric === 'dotproduct') distance = 'dot';
