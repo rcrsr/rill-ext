@@ -40,6 +40,7 @@ rill-ext is a pnpm workspace containing official extensions for the rill languag
 | `packages/ext/foundry` | `@rcrsr/rill-ext-foundry` | openai, @azure/identity (optional) |
 | `packages/ext/prompt-md` | `@rcrsr/rill-ext-prompt-md` | yaml |
 | `packages/ext/text` | `@rcrsr/rill-ext-text` | html-to-text, turndown, defuddle, linkedom, entities, linkify-it |
+| `packages/ext/datetime` | `@rcrsr/rill-ext-datetime` | Intl (built-in) |
 | `packages/shared/ext-llm` | `@rcrsr/rill-ext-llm-shared` (private) | -- |
 | `packages/shared/ext-vector` | `@rcrsr/rill-ext-vector-shared` (private) | -- |
 | `packages/shared/ext-kv` | `@rcrsr/rill-ext-kv-shared` (private) | -- |
@@ -87,6 +88,7 @@ cd packages/ext/llm-anthropic && npx vitest run tests/tool-loop.test.ts
 ```
 
 ## Repository Standards
+<!-- rule-level: operational -->
 
 The conformance checker and the custom oxlint rules ship in
 **`@rcrsr/rill-dev`** (a devDependency). They are not copied into this
@@ -103,7 +105,7 @@ then arrive here as a dependency bump. `@rcrsr/rill-dev` releases from its own
 ### CI checks the tree; a maintainer checks the host
 
 CI runs `pnpm exec rill-check-standards` — **tree only, no `--remote`, no token.**
-Do not re-add the flag. Two reasons:
+Do not re-add the flag, for these reasons:
 
 - A pull request cannot change host state. Branch protection and repository
   settings are altered out of band by an admin, so gating merges on them turns
@@ -125,33 +127,30 @@ registers the rules; they are opt-in. Both are enabled here, scoped to
 `**/src/**/*.{ts,tsx}`, with the rationale for each:
 
 - **`rill/no-spec-id-reference`: on.** This repository carries `conduct/`,
-  a private planning directory, so its stated condition is met. Enabling it
-  cleared 708 references across 86 files; those IDs point at documents that are
-  never published, so they were unresolvable for anyone reading the code.
-- **`rill/no-duplicate-error-id`: on.** The extensions construct `RuntimeError`
-  in 124 places, which is what the rule keys on, so its condition is met. It
-  found zero violations — it is enabled to hold that line, not to fix a backlog.
+  a private planning directory, so its stated condition is met. Those IDs point
+  at documents that are never published, so they are unresolvable for anyone
+  reading the code.
+- **`rill/no-duplicate-error-id`: on.** The extensions construct `RuntimeError`,
+  which is what the rule keys on, so its condition is met. It is enabled to hold
+  a zero-violation line, not to fix a backlog.
 
 The `src/`-only scope is deliberate and outlives STD-LINT-4. Lint now covers
-`src/` **and** `tests/`, but these two rules stay scoped to `src/`: what they
+`src/` **and** `tests/`, but these rules stay scoped to `src/`: what they
 guard is *shipped* source. A planning identifier in a test is not published to
 anyone, so widening them would add findings without closing the leak the rule
 names.
 
 ### Conformance status
 
-`pnpm check:standards` currently reports:
-
-```
-CONFORMANT  72 checked, 72 passed, 7 not machine-checkable.  (rill-dev 0.2.5)
-```
+`pnpm check:standards` currently reports `CONFORMANT` against rill-dev 0.2.5:
+every checked element passes, and the remainder are not machine-checkable.
 
 `STD-DEP-5` compares every extension's `@rcrsr/rill` peer range against the
 version currently on npm, so it goes red the day rill publishes a new minor and
 stays red until the range is bumped here. That bump is a PR of its own (see
 **Versioning**), not something to fold into an unrelated change.
 
-`@rcrsr/rill-dev` 0.2.5 added two elements this repository now satisfies:
+`@rcrsr/rill-dev` 0.2.5 added elements this repository now satisfies:
 `STD-SUP-8` (dependabot `open-pull-requests-limit: 0` on both ecosystems, so
 version bumps are swept by hand and only security PRs are filed) and
 `STD-HOOK-5` (the pre-commit format command excludes `pnpm-lock.yaml`, which
@@ -168,12 +167,12 @@ so the cross-repository elements that older `rill-dev` reported `--`
 machine-checked here and pass. Reaching that took real changes, not just the
 version bump — see **How STD-LINT-5/9 were met** below.
 
-7 entries report `--`. None is claimed as N/A — no element here meets a stated
+The entries reporting `--` are not claimed as N/A — no element here meets a stated
 N/A condition. They split into:
 
 - **Host-only**, decided by `--remote` from a maintainer shell: `STD-GATE-1..6`,
-  `STD-SET-1..3`, `STD-PROC-1`. `--remote` currently finds two failures, both of
-  which need an admin and neither of which a pull request can fix:
+  `STD-SET-1..3`, `STD-PROC-1`. `--remote` currently finds failures that need an
+  admin and that no pull request can fix:
   **`STD-GATE-5`** (linear history required while merge-commit and rebase are
   both still enabled) and **`STD-SET-2`** (wiki enabled but unused).
 - **Needs human judgement**: `STD-CI-2`, `STD-SCRIPT-8`, `STD-LINT-6`,
@@ -183,18 +182,18 @@ N/A condition. They split into:
 grade prose. It is satisfied in fact: every `off` rule in `.oxlintrc.json`
 carries a comment with its measured finding count.
 
-**How STD-LINT-5/9 were met.** The `.oxlintrc.json` `plugins` array lists all
-six of `rill`'s plugins — `typescript`, `oxc`, `unicorn`, `import`, `promise`,
-`vitest`. Enabling `vitest` surfaced ~1780 findings; they were cleared three
-ways, all matching `rill`'s baseline rather than suppressing:
+**How STD-LINT-5/9 were met.** The `.oxlintrc.json` `plugins` array lists every
+one of `rill`'s plugins: `typescript`, `oxc`, `unicorn`, `import`, `promise`,
+`vitest`. The findings `vitest` surfaced were cleared by matching `rill`'s
+baseline rather than suppressing:
 
-- Three expensive rules are set to `off` to match the baseline, each with a
-  STD-LINT-6 count comment: `vitest/require-mock-type-parameters` (1240),
-  `vitest/no-conditional-expect` (67), `vitest/require-to-throw-message` (35).
+- Expensive rules are set to `off` to match the baseline, each with a
+  STD-LINT-6 count comment in `.oxlintrc.json`: `vitest/require-mock-type-parameters`,
+  `vitest/no-conditional-expect`, `vitest/require-to-throw-message`.
 - `vitest/expect-expect` stays `error` (matching the baseline severity, so
   STD-LINT-9 holds) but carries `assertFunctionNames: ["expect", "expect*",
   "assert*"]`, teaching it that assertions reach `expect` through named helpers.
-- The residual ~410 real findings (`typescript/no-explicit-any` flipped to
+- The residual real findings (`typescript/no-explicit-any` flipped to
   `error`, `no-shadow`, `eqeqeq`, a few `import`/`promise`/`vitest` singletons,
   and the graceful-skip integration tests) were fixed in the source and tests.
 
@@ -217,13 +216,16 @@ conformance:
 All extension packages declare `@rcrsr/rill` as a `peerDependency`. The core runtime is consumed from npm, not from source. Types like `RillValue`, `RuntimeError`, `ExtensionResult`, `RuntimeContext`, and helpers like `isDict`, `isCallable`, `invokeCallable` come from this package.
 
 ## Versioning
+<!-- rule-level: operational -->
 
-Extensions use semver with two rules:
+Extensions use semver with these rules:
 
 1. **Minor version compatibility**: an extension's `peerDependency` on `@rcrsr/rill` matches by minor version (e.g., `rill@0.4.x` works with any extension at `0.4.y`). A rill minor bump requires a corresponding extension minor bump.
-2. **Patch version per release**: each published release increments at least the extension's patch version. Versions are decided and applied at release time, never on the feature/fix PR that introduces the change.
+2. **Signature stability**: category function params are added, removed, or renamed only in a minor release, never in a patch.
+3. **Patch version per release**: each published release increments at least the extension's patch version. Versions are decided and applied at release time, never on the feature/fix PR that introduces the change.
 
 ## Release Process
+<!-- rule-level: operational -->
 
 Releases are tag-driven. Each extension tracks its own version in its `package.json`; the root `package.json` carries an aggregate version that the release tag matches.
 
@@ -238,46 +240,48 @@ The `release.yml` workflow triggers on the tag push, builds, tests, then publish
 
 Version numbers are release-time actions: the release tooling bumps every `version` field and stamps the `[Unreleased]` changelog section as `[X.Y.Z] - <date>`. A feature or fix PR never edits a `version` field.
 
-Do not update any `CHANGELOG.md` unless explicitly prompted to do so. Implementation and fix PRs write source, tests, and dependency ranges only; they never touch the changelog. Authoring `[Unreleased]` entries is a separate step that runs only when explicitly prompted (via the changelog command), typically at PR time. At release time, the release tooling only stamps those accumulated entries with the version and date; it does not write them.
+Do not update any `CHANGELOG.md` unless explicitly prompted to do so. Implementation and fix PRs write source, tests, and dependency ranges; changelog entries are authored only when explicitly prompted (via the changelog command). When prompted, `[Unreleased]` entries land on the feature or fix PR, never on the release PR. At release time, the release tooling only stamps those accumulated entries with the version and date; it does not write them.
 
 ## Architecture
 
 ### Extension Factory Pattern
 
-Every extension exports a `create*Extension(config)` factory function that returns an `ExtensionResult`. This result contains named host functions (as `{ fn, params }` objects) and a `dispose()` cleanup function. The factory validates config, instantiates the vendor SDK client, and defines closures over it.
+Every extension exports a `create*Extension(config, ctx)` factory. It validates config, instantiates the vendor SDK client, and defines host-function closures over it. Async factories are allowed when setup needs I/O (e.g. `mcp`, `foundry`).
 
-Parameters use `RillParam` shape (4 fields: `name`, `type`, `defaultValue`, `annotations`). Use `p.*` helpers from `@rcrsr/rill-ext-param-shared` to construct params. Apply a `satisfies ExtensionResult` check on the return expression to catch signature drift at compile time.
+Each host function is a `RillFunction` with `params` (built with `p.*` helpers from `@rcrsr/rill-ext-param-shared`), `fn`, `annotations`, and `returnType`. Wrap each one with `toCallable`, check the resulting dict against the category contract type, and return `{ value, dispose }`:
 
-Example shape:
 ```typescript
-import { p } from '@rcrsr/rill-ext-param-shared';
+const callableDict = {
+  get: toCallable(fnDict.get),
+  get_or: toCallable(fnDict.get_or),
+  // ...
+} satisfies KvExtensionContract;
 
-export function createAnthropicExtension(config: AnthropicExtensionConfig): ExtensionResult {
-  // validate config, create SDK client
-  return {
-    message: {
-      fn: async (args, ctx) => { ... },
-      params: [p.str('text'), p.dict('options')],
-    },
-    tool_loop: {
-      fn: async (args, ctx) => { ... },
-      params: [p.str('text'), p.dict('tools'), p.dict('options')],
-    },
-    dispose: async () => { ... },
-  } satisfies ExtensionResult;
-}
+return {
+  value: callableDict as unknown as RillValue,
+  dispose,
+} satisfies ExtensionFactoryResult;
 ```
+
+Canonical example: `packages/ext/kv-file/src/factory.ts`. The legacy shape (named `{ fn, params }` objects at the top level next to `dispose`, checked with `satisfies ExtensionResult`) is retired.
+
+- **Category contract only.** Expose only functions in the category contract; no vendor-only functions (recorded exception: foundry). A new host function goes into the shared contract type and is implemented identically in every extension of that category, with a snake_case name.
+- **Rich return types.** Every host function declares a precise `returnType` built with `structureToTypeValue`; no shapeless `dict`, `list`, or `any` when the shape is known. Update the extension's `docs/` response table in the same change.
+- **Clean disposal.** `dispose()` is idempotent and releases every vendor resource, aborting in-flight requests. Streaming results carry their own `dispose` that aborts the underlying stream.
 
 ### Shared Packages
 
-Shared packages (`packages/shared/`) are **bundled into** the consuming extension at build time via `tsup.config.ts` (`noExternal`). They are not published to npm.
+Shared packages (`packages/shared/`) are private and **bundled into** the consuming extension at build time via `tsup.config.ts` (`noExternal`). They are not published to npm.
 
-- **ext-llm-shared**: Validation (`validateApiKey`, `validateModel`, `validateTemperature`), error mapping (`mapProviderError`), JSON Schema building (`buildJsonSchema`), and tool loop orchestration (`executeToolLoop`). All 3 LLM extensions depend on this.
-- **ext-vector-shared**: Error mapping, event emission, batch execution, disposal state, distance normalization, and function wrappers. All 3 vector DB extensions depend on this.
-- **ext-kv-shared**: Contract type (`KvExtensionContract`) for compile-time verification of KV extension function signatures. All 3 KV extensions depend on this.
-- **ext-fs-shared**: Contract type (`FsExtensionContract`) for compile-time verification of FS extension function signatures. Both FS extensions depend on this.
+**Import direction.** Extensions import from shared packages and `@rcrsr/rill`, never from other extensions. Shared packages never import extensions or other shared packages.
+
+- **ext-llm-shared**: Validation (`validateApiKey`, `validateModel`, `validateTemperature`), error mapping (`mapProviderError`), JSON Schema building (`buildJsonSchema`), and tool loop orchestration (`executeToolLoop`). Every LLM extension depends on this.
+- **ext-vector-shared**: Error mapping, event emission, batch execution, disposal state, distance normalization, and function wrappers. Every vector DB extension depends on this.
+- **ext-kv-shared**: Contract type (`KvExtensionContract`) for compile-time verification of KV extension function signatures. Every KV extension depends on this.
+- **ext-fs-shared**: Contract type (`FsExtensionContract`) for compile-time verification of FS extension function signatures. Every FS extension depends on this.
 - **ext-param-shared**: Parameter construction helpers (`p.*`) for building `RillParam` objects. All extensions that declare typed host function parameters depend on this.
-- **ext-search-shared**: Validation (`assertRequired`, `validateBaseUrl`), error mapping (`mapSearchError`, `mapProviderSearchError`), event emission, function wrapper (`createSearchFunctionWrapper`), disposal and in-flight request tracking. All 5 search extensions depend on this.
+- **ext-search-shared**: Validation (`assertRequired`, `validateBaseUrl`), error mapping (`mapSearchError`, `mapProviderSearchError`), event emission, function wrapper (`createSearchFunctionWrapper`), disposal and in-flight request tracking. Every search extension depends on this.
+- **ext-prompt-shared**: Prompt template frontmatter parsing, role splitting, interpolation, and the prompt contract type. `prompt-md` depends on this.
 
 ### LLM Extension Call Flow
 
@@ -302,9 +306,9 @@ Tools are passed as a rill dict (JS object) mapping `name → callable`. The cal
 
 ### Error Handling Convention
 
-rill 0.19 removed `RILL-R004` from `ERROR_REGISTRY`. Extensions emit failures as invalid `RillValue`s via `ctx.invalidate(error, meta)` from inside host functions, and as `RuntimeError('RILL-R001', message)` from factory-time config validation. Full policy: `.claude/policies/policy-domain-ext.md` §EXT.7.
+rill 0.19 removed `RILL-R004` from `ERROR_REGISTRY`. Extensions emit failures as invalid `RillValue`s via `ctx.invalidate(error, meta)` from inside host functions, and as `RuntimeError('RILL-R001', message)` from factory-time config validation. Never throw `RILL-R004`.
 
-**Reuse rill core's generic atom taxonomy.** rill core pre-registers 12 atoms at module load: `#ok`, `#R001`, `#TIMEOUT`, `#AUTH`, `#FORBIDDEN`, `#RATE_LIMIT`, `#QUOTA_EXCEEDED`, `#NOT_FOUND`, `#CONFLICT`, `#UNAVAILABLE`, `#PROTOCOL`, `#INVALID_INPUT`, `#DISPOSED`, `#TYPE_MISMATCH`. Use these in `meta.code` directly. Do not define `EXT_<EXTENSION>_*` constants. Do not call `ctx.registerErrorCode` for categories the generic taxonomy already covers.
+**Reuse rill core's generic atom taxonomy.** rill core pre-registers these atoms at module load: `#ok`, `#R001`, `#TIMEOUT`, `#AUTH`, `#FORBIDDEN`, `#RATE_LIMIT`, `#QUOTA_EXCEEDED`, `#NOT_FOUND`, `#CONFLICT`, `#UNAVAILABLE`, `#PROTOCOL`, `#INVALID_INPUT`, `#DISPOSED`, `#TYPE_MISMATCH`. Use these in `meta.code` directly. Do not define `EXT_<EXTENSION>_*` constants. Do not call `ctx.registerErrorCode` for categories the generic taxonomy already covers.
 
 Provider-specific failures decompose into `(generic atom, meta.provider, meta.raw.kind)`. Example: Tavily 432 → `{ code: 'QUOTA_EXCEEDED', provider: 'tavily', raw: { kind: 'plan_limit_exceeded', status: 432 } }`. Host scripts match coarsely (`guard #QUOTA_EXCEEDED`) or finely (`guard #QUOTA_EXCEEDED && raw.kind == 'plan_limit_exceeded'`).
 
@@ -320,6 +324,10 @@ Dict keys exposed at the rill host-function boundary MUST be snake_case. The bou
 Internal TypeScript variables, vendor SDK request/response shapes, and JS-side helper types remain camelCase per JS convention. Map vendor camelCase to/from snake_case at the boundary; do not let it leak into the rill dict.
 
 When in doubt: if a host script written in rill ever sees the key, it is snake_case.
+
+### TypeScript Conventions
+
+Named exports only (no `export default`, no `export *`); `.js` extensions on relative imports; `export type { }` for types; optional properties as `prop?: T | undefined`; no `enum` (use `as const` objects); no `any` (use `unknown` plus a type guard); no class inheritance except `Error`; no classes for state (closures in factories instead); never mutate parameters.
 
 ### Build Toolchain
 

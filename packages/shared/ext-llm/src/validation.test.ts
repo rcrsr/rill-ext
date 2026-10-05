@@ -18,6 +18,18 @@ import {
   MAX_TEMPERATURE,
 } from './validation.js';
 
+function expectConfigError(fn: () => unknown, message: string): void {
+  let thrown: unknown;
+  try {
+    fn();
+  } catch (e) {
+    thrown = e;
+  }
+  expect(thrown).toBeInstanceOf(RuntimeError);
+  expect((thrown as RuntimeError).errorId).toBe('RILL-R001');
+  expect((thrown as RuntimeError).message).toContain(message);
+}
+
 // ============================================================
 // API KEY VALIDATION
 // ============================================================
@@ -28,13 +40,13 @@ describe('validateApiKey', () => {
   });
 
   it('throws for undefined key', () => {
-    // key is undefined → Error: "api_key is required"
-    expect(() => validateApiKey(undefined)).toThrow('api_key is required');
+    // key is undefined → RuntimeError: "api_key is required"
+    expectConfigError(() => validateApiKey(undefined), 'api_key is required');
   });
 
   it('throws for empty string key', () => {
-    // key is empty string → Error: "api_key cannot be empty"
-    expect(() => validateApiKey('')).toThrow('api_key cannot be empty');
+    // key is empty string → RuntimeError: "api_key cannot be empty"
+    expectConfigError(() => validateApiKey(''), 'api_key cannot be empty');
   });
 });
 
@@ -48,13 +60,13 @@ describe('validateModel', () => {
   });
 
   it('throws for undefined model', () => {
-    // model is undefined → Error: "model is required"
-    expect(() => validateModel(undefined)).toThrow('model is required');
+    // model is undefined → RuntimeError: "model is required"
+    expectConfigError(() => validateModel(undefined), 'model is required');
   });
 
   it('throws for empty string model', () => {
-    // model is empty string → Error: "model is required"
-    expect(() => validateModel('')).toThrow('model is required');
+    // model is empty string → RuntimeError: "model is required"
+    expectConfigError(() => validateModel(''), 'model is required');
   });
 });
 
@@ -86,21 +98,25 @@ describe('validateTemperature', () => {
   });
 
   it('throws for value above maximum', () => {
-    // temperature > 2.0 → Error
-    expect(() => validateTemperature(3.0)).toThrow(
+    // temperature > 2.0 → RuntimeError
+    expectConfigError(
+      () => validateTemperature(3.0),
       'temperature must be between 0 and 2'
     );
-    expect(() => validateTemperature(2.1)).toThrow(
+    expectConfigError(
+      () => validateTemperature(2.1),
       'temperature must be between 0 and 2'
     );
   });
 
   it('throws for value below minimum', () => {
-    // temperature < 0.0 → Error
-    expect(() => validateTemperature(-0.1)).toThrow(
+    // temperature < 0.0 → RuntimeError
+    expectConfigError(
+      () => validateTemperature(-0.1),
       'temperature must be between 0 and 2'
     );
-    expect(() => validateTemperature(-1.0)).toThrow(
+    expectConfigError(
+      () => validateTemperature(-1.0),
       'temperature must be between 0 and 2'
     );
   });

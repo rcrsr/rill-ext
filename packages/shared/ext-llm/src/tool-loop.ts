@@ -191,6 +191,12 @@ async function executeToolCall(
     const result = callable.fn(inputDict, ctx);
     return result instanceof Promise ? await result : result;
   } catch (error: unknown) {
+    // Halt signals are not RuntimeErrors; wrapping them would erase the
+    // original atom, so pass every halt through for the caller to classify.
+    if (error instanceof RuntimeHaltSignal) {
+      throw error;
+    }
+
     // Re-throw RuntimeErrors directly
     if (error instanceof RuntimeError) {
       throw error;
@@ -644,6 +650,18 @@ export async function executeToolLoop(
 
         emitEvent('tool_result', { tool_name: name, duration });
       } catch (error: unknown) {
+        // Abort and programmer-error halts bypass guard/retry semantics:
+        // close the tool_call with a terminal event, then propagate with the
+        // original atom without counting a recoverable tool error.
+        if (error instanceof RuntimeHaltSignal && error.catchable === false) {
+          emitEvent('tool_result', {
+            tool_name: name,
+            error: readHaltMessage(error),
+            duration: Date.now() - toolStartTime,
+          });
+          throw error;
+        }
+
         const duration = Date.now() - toolStartTime;
         consecutiveErrors++;
 
