@@ -307,7 +307,7 @@ export async function executeRequest(
           const response = await fetch(url, {
             ...options,
             signal: combinedSignal,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FetchOptions.body is `string | undefined`, which RequestInit rejects under exactOptionalPropertyTypes (TS2379)
           } as any);
 
           clearTimeout(timeoutId);

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **any-cast suppression reason:** Suppression comments now document why `as any` casts are needed. No runtime change. ([#130](https://github.com/rcrsr/rill-ext/pull/130))
+
 ## [0.21.0] - 2026-09-09
 
 ### Changed (Breaking)
