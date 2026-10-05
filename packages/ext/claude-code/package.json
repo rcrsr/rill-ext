@@ -33,11 +33,11 @@
   "devDependencies": {
     "@rcrsr/rill": "~0.21.0",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
-    "@types/node": "^26.5.0",
+    "@types/node": "^26.6.4",
     "@types/which": "^3.0.4",
     "dts-bundle-generator": "^9.5.1",
     "tsup": "^8.5.1",
-    "undici-types": "^8.10.2"
+    "undici-types": "^8.11.2"
   },
   "files": [
     "dist"
