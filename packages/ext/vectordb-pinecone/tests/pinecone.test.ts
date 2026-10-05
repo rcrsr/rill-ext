@@ -697,6 +697,27 @@ describe('Collection lifecycle operations', () => {
       expect(result['distance']).toBe('cosine');
     });
 
+    it('defaults distance to cosine when metric getter throws', async () => {
+      mockDescribeIndexStats.mockResolvedValue(
+        createMockIndexStatsResponse('', 100, 384)
+      );
+      mockDescribeIndex.mockResolvedValue({
+        name: 'test_index',
+        dimension: 384,
+        get metric(): string {
+          throw new Error('index property unavailable');
+        },
+      });
+
+      const result = (await getCallable(ext, 'describe').fn({}, ctx)) as Record<
+        string,
+        unknown
+      >;
+
+      expect(result['distance']).toBe('cosine');
+      expect(result['count']).toBe(100);
+    });
+
     it('describes empty collection (AC-29)', async () => {
       mockDescribeIndexStats.mockResolvedValue(
         createMockIndexStatsResponse('', 0, 384)

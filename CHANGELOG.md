@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dependencies:** adopts `@rcrsr/rill-dev` 0.2.6 and the tooling pins its baseline records (`@types/node ^26.6.4`, `knip ^6.39.0`, `lefthook ^2.1.16`, `oxfmt ^0.71.0`, `oxlint ^1.86.0`, `vitest ^5.0.3`), moves `packageManager` to `pnpm@12.9.1`, and bumps every remaining dependency to its latest release. `@pinecone-database/pinecone` 8 to 9 is the one major; `describe()` keeps its v8 behavior. Vendor SDK bumps are recorded in each affected package's changelog. ([#131](https://github.com/rcrsr/rill-ext/pull/131))
 - **Release process:** `.github/release-sop.md` is the procedure `/conduct:cut-release` follows, and `pnpm run check:changelog` fails a release when a PR merged since the last `v*` tag is cited in no `CHANGELOG.md`. The `[0.21.0]` sections are backfilled with the entries for #66, #102 (issues #87–#101), and #103 that shipped unrecorded. ([#125](https://github.com/rcrsr/rill-ext/pull/125))
 - **Lint:** `as any` suppressions in fetch and foundry now carry stated reasons. No runtime change. ([#130](https://github.com/rcrsr/rill-ext/pull/130))
 

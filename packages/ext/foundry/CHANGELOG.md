@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Bumps `openai` to `^7.27.0` (from `^7.10.0`) and the optional `@azure/identity` to `^4.13.3` (from `^4.13.2`). In-use API surface unchanged. ([#131](https://github.com/rcrsr/rill-ext/pull/131))
 - **Grounding any-cast:** Lint suppression now explains why `bing_grounding` is absent from openai-node's `Tool` union. ([#130](https://github.com/rcrsr/rill-ext/pull/130))
 
 ## [0.21.0] - 2026-09-09

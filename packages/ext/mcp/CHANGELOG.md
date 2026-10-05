@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Bumps `@modelcontextprotocol/sdk` to `^1.32.0` (from `^1.30.0`). In-use API surface unchanged. ([#131](https://github.com/rcrsr/rill-ext/pull/131))
+
 ## [0.21.0] - 2026-09-09
 
 ### Changed (Breaking)

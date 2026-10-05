@@ -142,7 +142,7 @@ names.
 
 ### Conformance status
 
-`pnpm check:standards` currently reports `CONFORMANT` against rill-dev 0.2.5:
+`pnpm check:standards` currently reports `CONFORMANT` against rill-dev 0.2.6:
 every checked element passes, and the remainder are not machine-checkable.
 
 `STD-DEP-5` compares every extension's `@rcrsr/rill` peer range against the

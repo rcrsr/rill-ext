@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Bumps `@aws-sdk/client-s3` to `^3.1146.0` (from `^3.1126.0`). In-use API surface unchanged. ([#131](https://github.com/rcrsr/rill-ext/pull/131))
+
 ## [0.21.0] - 2026-09-09
 
 ### Changed (Breaking)
