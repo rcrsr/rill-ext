@@ -1,6 +1,6 @@
 /**
  * Integration tests for Claude Code extension event emission.
- * Tests that all event types (AC-17 to AC-21) are emitted correctly with proper fields.
+ * Tests that all event types (prompt, skill, command, error) are emitted correctly with proper fields.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -126,9 +126,9 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const event = events[0]!;
       expect(event.event).toBe('claude-code:prompt');
       expect(event.subsystem).toBe('extension:claude-code');
-      expect(event.prompt).toBe('Hello Claude');
-      expect(typeof event.duration).toBe('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      expect(event['prompt']).toBe('Hello Claude');
+      expect(typeof event['duration']).toBe('number');
+      expect(event['duration']).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
     });
 
@@ -185,8 +185,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
-      expect(event.prompt).toBe('a'.repeat(100) + '...');
-      expect((event.prompt as string).length).toBe(103);
+      expect(event['prompt']).toBe('a'.repeat(100) + '...');
+      expect((event['prompt'] as string).length).toBe(103);
     });
   });
 
@@ -247,10 +247,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const event = events[0]!;
       expect(event.event).toBe('claude-code:skill');
       expect(event.subsystem).toBe('extension:claude-code');
-      expect(event.name).toBe('test-skill');
-      expect(event.args).toEqual(skillArgs);
-      expect(typeof event.duration).toBe('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      expect(event['name']).toBe('test-skill');
+      expect(event['args']).toEqual(skillArgs);
+      expect(typeof event['duration']).toBe('number');
+      expect(event['duration']).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
     });
 
@@ -306,7 +306,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
 
       expect(events).toHaveLength(1);
       const event = events[0]!;
-      expect(event.args).toEqual({});
+      expect(event['args']).toEqual({});
     });
   });
 
@@ -367,10 +367,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const event = events[0]!;
       expect(event.event).toBe('claude-code:command');
       expect(event.subsystem).toBe('extension:claude-code');
-      expect(event.name).toBe('test-command');
-      expect(event.args).toEqual(commandArgs);
-      expect(typeof event.duration).toBe('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      expect(event['name']).toBe('test-command');
+      expect(event['args']).toEqual(commandArgs);
+      expect(typeof event['duration']).toBe('number');
+      expect(event['duration']).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
     });
   });
@@ -420,8 +420,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
 
       const event = errorEvents[0]!;
       expect(event.subsystem).toBe('extension:claude-code');
-      expect(event.error).toBe('Process timeout');
-      expect(typeof event.duration).toBe('number');
+      expect(event['error']).toBe('Process timeout');
+      expect(typeof event['duration']).toBe('number');
       expect(typeof event.timestamp).toBe('string');
     });
 
@@ -464,7 +464,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       expect(errorEvents).toHaveLength(1);
 
       const event = errorEvents[0]!;
-      expect(event.error).toBe('Skill execution failed');
+      expect(event['error']).toBe('Skill execution failed');
     });
 
     it('emits error event with error message on command failure', async () => {
@@ -506,7 +506,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       expect(errorEvents).toHaveLength(1);
 
       const event = errorEvents[0]!;
-      expect(event.error).toBe('Command failed');
+      expect(event['error']).toBe('Command failed');
     });
 
     it('includes generic error message for non-Error exceptions', async () => {
@@ -549,17 +549,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       expect(errorEvents).toHaveLength(1);
 
       const event = errorEvents[0]!;
-      expect(event.error).toBe('Unknown error');
-    });
-  });
-
-  describe('AC-21: claude-code:warning event emitted on recoverable parse issue', () => {
-    it('is not yet implemented - warnings not emitted by stream parser', () => {
-      // NOTE: AC-21 requires adding warning emission to stream-parser.ts
-      // Current implementation throws RuntimeError on invalid JSON (non-recoverable)
-      // No recoverable parse warnings exist yet in the implementation
-      // This test documents the gap and should be expanded when warnings are implemented
-      expect(true).toBe(true);
+      expect(event['error']).toBe('Unknown error');
     });
   });
 

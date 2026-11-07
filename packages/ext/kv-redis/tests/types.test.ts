@@ -125,9 +125,9 @@ describe('RedisKvConfig', () => {
     };
 
     expect(Object.keys(config.mounts)).toHaveLength(3);
-    expect(config.mounts.user.prefix).toBe('app:user:');
-    expect(config.mounts.cache.ttl).toBe(300);
-    expect(config.mounts.readonly.mode).toBe('read');
+    expect(config.mounts['user']?.prefix).toBe('app:user:');
+    expect(config.mounts['cache']?.ttl).toBe(300);
+    expect(config.mounts['readonly']?.mode).toBe('read');
   });
 
   it('accepts all optional fields', () => {
@@ -274,9 +274,9 @@ describe('Integration examples', () => {
       writePolicy: 'dispose',
     };
 
-    expect(config.mounts.user.schema).toHaveProperty('name');
-    expect(config.mounts.cache.ttl).toBe(300);
-    expect(config.mounts.logs.mode).toBe('write');
+    expect(config.mounts['user']?.schema).toHaveProperty('name');
+    expect(config.mounts['cache']?.ttl).toBe(300);
+    expect(config.mounts['logs']?.mode).toBe('write');
   });
 
   it('supports open mode without schema', () => {
@@ -291,6 +291,6 @@ describe('Integration examples', () => {
       },
     };
 
-    expect(config.mounts.dynamic.schema).toBeUndefined();
+    expect(config.mounts['dynamic']?.schema).toBeUndefined();
   });
 });

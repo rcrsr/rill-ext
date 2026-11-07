@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Test suite trust:** Tests are type-checked, and default-limit tests assert a non-invalid result with `limit=10`. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

@@ -7,6 +7,7 @@ import {
   createRuntimeContext,
   isInvalid,
   getStatus,
+  type ApplicationCallable,
   type ExtensionFactoryCtx,
   type RillValue,
   type RuntimeContext,
@@ -29,7 +30,7 @@ export function makeRuntimeCtx(): RuntimeContext {
  * a plain object that vitest's toThrow matcher cannot inspect).
  */
 export async function expectRejectsInvalid(
-  promise: Promise<unknown>,
+  promise: unknown,
   needle?: string | RegExp
 ): Promise<RillValue> {
   let caught: unknown;
@@ -48,4 +49,22 @@ export async function expectRejectsInvalid(
     }
   }
   return caught as RillValue;
+}
+
+/**
+ * Look up a named callable in a generated dict (tools, resources, prompts).
+ * Fails the test when the entry is absent.
+ */
+export function getCallable(
+  dict: Record<string, unknown>,
+  name: string
+): ApplicationCallable {
+  const entry = dict[name];
+  expect(entry).toBeDefined();
+  return entry as ApplicationCallable;
+}
+
+/** Narrow a host-function result to a list, failing the test when it is not one. */
+export function assertRillList(value: RillValue): asserts value is RillValue[] {
+  expect(Array.isArray(value)).toBe(true);
 }

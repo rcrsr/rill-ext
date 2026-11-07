@@ -7,6 +7,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
 
+type HostFns = Record<
+  string,
+  { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
+>;
+
+/** Narrow an extension result value to its name-keyed host functions. */
+function getHostFns(ext: { value: unknown }): HostFns {
+  return ext.value as HostFns;
+}
+
 // ============================================================
 // MODULE MOCK
 // ============================================================
@@ -137,10 +147,7 @@ describe('usage accumulator', () => {
     const { createFoundryExtension } = await import('../src/factory.js');
     const ext = await createFoundryExtension(validConfig());
 
-    const value = ext.value as Record<
-      string,
-      { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-    >;
+    const value = getHostFns(ext);
     const usageFn = value['usage']!;
 
     const result = usageFn.fn({}, {}) as Record<string, number>;
@@ -153,10 +160,7 @@ describe('usage accumulator', () => {
     const { createFoundryExtension } = await import('../src/factory.js');
     const ext = await createFoundryExtension(validConfig());
 
-    const value = ext.value as Record<
-      string,
-      { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-    >;
+    const value = getHostFns(ext);
     const usageFn = value['usage']!;
 
     const result = usageFn.fn({}, {}) as Record<string, unknown>;
@@ -177,10 +181,7 @@ describe('usage accumulator', () => {
     const ctx = createRuntimeContext({
       callbacks: { onLog: vi.fn(), onLogEvent: vi.fn() },
     });
-    const value = ext.value as Record<
-      string,
-      { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-    >;
+    const value = getHostFns(ext);
 
     // Trigger resolve to run the LLM call and accumulate usage
     const stream = value['message']!.fn({ prompt: 'Hi' }, ctx);
@@ -204,10 +205,7 @@ describe('usage accumulator', () => {
     const ctx = createRuntimeContext({
       callbacks: { onLog: vi.fn(), onLogEvent: vi.fn() },
     });
-    const value = ext.value as Record<
-      string,
-      { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-    >;
+    const value = getHostFns(ext);
 
     // First call
     await resolveStream(value['message']!.fn({ prompt: 'First' }, ctx));

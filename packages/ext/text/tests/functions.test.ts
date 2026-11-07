@@ -7,22 +7,13 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTextExtension } from '../src/factory.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 // ---------------------------------------------------------------------------
 // Shared extension instance — no state, so one instance works for all tests.
 // ---------------------------------------------------------------------------
 
 const ext = createTextExtension({}, makeFactoryCtx());
-const val = ext.value as Record<
-  string,
-  {
-    fn: (
-      args: Record<string, unknown>,
-      ctx: ReturnType<typeof makeRuntimeCtx>
-    ) => Promise<unknown>;
-  }
->;
 
 // ---------------------------------------------------------------------------
 // html_to_text
@@ -30,7 +21,7 @@ const val = ext.value as Record<
 
 describe('html_to_text', () => {
   it('AC-1: strips tags from nested HTML', async () => {
-    const result = await val['html_to_text'].fn(
+    const result = await getCallable(ext, 'html_to_text').fn(
       { html: '<p>Hello <b>world</b></p>' },
       makeRuntimeCtx()
     );
@@ -38,7 +29,7 @@ describe('html_to_text', () => {
   });
 
   it('AC-2: decodes &nbsp; to a space character', async () => {
-    const result = await val['html_to_text'].fn(
+    const result = await getCallable(ext, 'html_to_text').fn(
       { html: '<p>a&nbsp;b</p>' },
       makeRuntimeCtx()
     );
@@ -50,7 +41,7 @@ describe('html_to_text', () => {
   });
 
   it('AC-3: strips <script> content', async () => {
-    const result = await val['html_to_text'].fn(
+    const result = await getCallable(ext, 'html_to_text').fn(
       { html: '<script>alert("x")</script><p>c</p>', word_wrap: false },
       makeRuntimeCtx()
     );
@@ -64,7 +55,7 @@ describe('html_to_text', () => {
 
 describe('html_to_markdown', () => {
   it('AC-4: converts heading and paragraph to ATX markdown', async () => {
-    const result = await val['html_to_markdown'].fn(
+    const result = await getCallable(ext, 'html_to_markdown').fn(
       { html: '<h1>T</h1><p>B</p>' },
       makeRuntimeCtx()
     );
@@ -72,7 +63,7 @@ describe('html_to_markdown', () => {
   });
 
   it('AC-41: empty input returns empty output', async () => {
-    const result = await val['html_to_markdown'].fn(
+    const result = await getCallable(ext, 'html_to_markdown').fn(
       { html: '' },
       makeRuntimeCtx()
     );
@@ -97,7 +88,10 @@ describe('extract_content', () => {
     </article>
   </body>
 </html>`;
-    const result = await val['extract_content'].fn({ html }, makeRuntimeCtx());
+    const result = await getCallable(ext, 'extract_content').fn(
+      { html },
+      makeRuntimeCtx()
+    );
     const text = result as string;
     expect(text).toContain('Main Article');
     expect(text).toContain('main article content');
@@ -114,7 +108,10 @@ describe('extract_content', () => {
     </div>
   </body>
 </html>`;
-    const result = await val['extract_content'].fn({ html }, makeRuntimeCtx());
+    const result = await getCallable(ext, 'extract_content').fn(
+      { html },
+      makeRuntimeCtx()
+    );
     const text = result as string;
     expect(text).toContain('plain body content');
   });
@@ -126,7 +123,7 @@ describe('extract_content', () => {
 
 describe('decode_entities', () => {
   it('AC-6: decodes named entities', async () => {
-    const result = await val['decode_entities'].fn(
+    const result = await getCallable(ext, 'decode_entities').fn(
       { text: 'Title &amp; Subtitle' },
       makeRuntimeCtx()
     );
@@ -134,7 +131,7 @@ describe('decode_entities', () => {
   });
 
   it('AC-7: decodes numeric entities', async () => {
-    const result = await val['decode_entities'].fn(
+    const result = await getCallable(ext, 'decode_entities').fn(
       { text: '&#65;&#66;&#67;' },
       makeRuntimeCtx()
     );
@@ -142,7 +139,7 @@ describe('decode_entities', () => {
   });
 
   it('AC-36: input with no entities is returned unchanged', async () => {
-    const result = await val['decode_entities'].fn(
+    const result = await getCallable(ext, 'decode_entities').fn(
       { text: 'plain text no entities' },
       makeRuntimeCtx()
     );
@@ -156,7 +153,7 @@ describe('decode_entities', () => {
 
 describe('decode_quoted_printable', () => {
   it('AC-8: decodes =XX sequences', async () => {
-    const result = await val['decode_quoted_printable'].fn(
+    const result = await getCallable(ext, 'decode_quoted_printable').fn(
       { text: 'Hello=20World' },
       makeRuntimeCtx()
     );
@@ -164,7 +161,7 @@ describe('decode_quoted_printable', () => {
   });
 
   it('AC-9: removes soft line breaks (=\\n)', async () => {
-    const result = await val['decode_quoted_printable'].fn(
+    const result = await getCallable(ext, 'decode_quoted_printable').fn(
       { text: 'long=\ntext' },
       makeRuntimeCtx()
     );
@@ -172,7 +169,7 @@ describe('decode_quoted_printable', () => {
   });
 
   it('AC-37: plain text without MIME encoding passes through unchanged', async () => {
-    const result = await val['decode_quoted_printable'].fn(
+    const result = await getCallable(ext, 'decode_quoted_printable').fn(
       { text: 'plain text no encoding' },
       makeRuntimeCtx()
     );
@@ -186,7 +183,7 @@ describe('decode_quoted_printable', () => {
 
 describe('strip_diacritics', () => {
   it('AC-10: removes diacritical marks', async () => {
-    const result = await val['strip_diacritics'].fn(
+    const result = await getCallable(ext, 'strip_diacritics').fn(
       { text: 'café' },
       makeRuntimeCtx()
     );
@@ -194,7 +191,7 @@ describe('strip_diacritics', () => {
   });
 
   it('AC-38: ASCII-only input is returned unchanged', async () => {
-    const result = await val['strip_diacritics'].fn(
+    const result = await getCallable(ext, 'strip_diacritics').fn(
       { text: 'hello world' },
       makeRuntimeCtx()
     );
@@ -208,7 +205,7 @@ describe('strip_diacritics', () => {
 
 describe('collapse_whitespace', () => {
   it('AC-11: collapses multiple spaces to single space', async () => {
-    const result = await val['collapse_whitespace'].fn(
+    const result = await getCallable(ext, 'collapse_whitespace').fn(
       { text: 'hello    world' },
       makeRuntimeCtx()
     );
@@ -216,7 +213,7 @@ describe('collapse_whitespace', () => {
   });
 
   it('AC-12: preserve_newlines keeps blank-line boundaries', async () => {
-    const result = await val['collapse_whitespace'].fn(
+    const result = await getCallable(ext, 'collapse_whitespace').fn(
       { text: 'a\n\nb', preserve_newlines: true },
       makeRuntimeCtx()
     );
@@ -228,7 +225,7 @@ describe('collapse_whitespace', () => {
   });
 
   it('AC-45: tab-only whitespace collapses to single space', async () => {
-    const result = await val['collapse_whitespace'].fn(
+    const result = await getCallable(ext, 'collapse_whitespace').fn(
       { text: '\t\t\t' },
       makeRuntimeCtx()
     );
@@ -242,7 +239,7 @@ describe('collapse_whitespace', () => {
 
 describe('dedent', () => {
   it('AC-13: removes common indent from all lines', async () => {
-    const result = await val['dedent'].fn(
+    const result = await getCallable(ext, 'dedent').fn(
       { text: '  line one\n  line two\n  line three' },
       makeRuntimeCtx()
     );
@@ -250,7 +247,7 @@ describe('dedent', () => {
   });
 
   it('AC-43: text with no common indent is unchanged', async () => {
-    const result = await val['dedent'].fn(
+    const result = await getCallable(ext, 'dedent').fn(
       { text: 'line one\nline two' },
       makeRuntimeCtx()
     );
@@ -264,7 +261,7 @@ describe('dedent', () => {
 
 describe('trim_lines', () => {
   it('AC-14: trims leading/trailing spaces and removes blank lines', async () => {
-    const result = await val['trim_lines'].fn(
+    const result = await getCallable(ext, 'trim_lines').fn(
       { text: '  hello  \n   \n  world  ' },
       makeRuntimeCtx()
     );
@@ -272,7 +269,7 @@ describe('trim_lines', () => {
   });
 
   it('AC-44: all-blank input returns empty list', async () => {
-    const result = await val['trim_lines'].fn(
+    const result = await getCallable(ext, 'trim_lines').fn(
       { text: '   \n\t\n  ' },
       makeRuntimeCtx()
     );
@@ -286,7 +283,7 @@ describe('trim_lines', () => {
 
 describe('extract_urls', () => {
   it('AC-15: extracts URL from text', async () => {
-    const result = await val['extract_urls'].fn(
+    const result = await getCallable(ext, 'extract_urls').fn(
       { text: 'Visit https://example.com for info' },
       makeRuntimeCtx()
     );
@@ -294,7 +291,7 @@ describe('extract_urls', () => {
   });
 
   it('AC-32: text with no URLs returns empty list', async () => {
-    const result = await val['extract_urls'].fn(
+    const result = await getCallable(ext, 'extract_urls').fn(
       { text: 'no links here at all' },
       makeRuntimeCtx()
     );
@@ -308,7 +305,7 @@ describe('extract_urls', () => {
 
 describe('extract_emails', () => {
   it('AC-16: extracts email address from text', async () => {
-    const result = await val['extract_emails'].fn(
+    const result = await getCallable(ext, 'extract_emails').fn(
       { text: 'Contact user@example.com for help' },
       makeRuntimeCtx()
     );
@@ -316,7 +313,7 @@ describe('extract_emails', () => {
   });
 
   it('AC-33: text with no emails returns empty list', async () => {
-    const result = await val['extract_emails'].fn(
+    const result = await getCallable(ext, 'extract_emails').fn(
       { text: 'no email addresses here' },
       makeRuntimeCtx()
     );
@@ -330,7 +327,7 @@ describe('extract_emails', () => {
 
 describe('split_paragraphs', () => {
   it('AC-17: splits two paragraphs separated by blank line', async () => {
-    const result = await val['split_paragraphs'].fn(
+    const result = await getCallable(ext, 'split_paragraphs').fn(
       { text: 'first paragraph\n\nsecond paragraph' },
       makeRuntimeCtx()
     );
@@ -338,7 +335,7 @@ describe('split_paragraphs', () => {
   });
 
   it('AC-34: trailing blank lines are removed', async () => {
-    const result = await val['split_paragraphs'].fn(
+    const result = await getCallable(ext, 'split_paragraphs').fn(
       { text: 'only one paragraph\n\n' },
       makeRuntimeCtx()
     );
@@ -346,7 +343,7 @@ describe('split_paragraphs', () => {
   });
 
   it('AC-35: multiple consecutive blank lines treated as single separator', async () => {
-    const result = await val['split_paragraphs'].fn(
+    const result = await getCallable(ext, 'split_paragraphs').fn(
       { text: 'para one\n\n\n\npara two' },
       makeRuntimeCtx()
     );
@@ -361,7 +358,7 @@ describe('split_paragraphs', () => {
 describe('window', () => {
   it('AC-18: 100 chars, size 30, step 30 → non-overlapping windows', async () => {
     const text = 'a'.repeat(100);
-    const result = await val['window'].fn(
+    const result = await getCallable(ext, 'window').fn(
       { text, size: 30, step: 30 },
       makeRuntimeCtx()
     );
@@ -376,7 +373,7 @@ describe('window', () => {
 
   it('AC-19: 100 chars, size 30, step 20 → overlapping windows', async () => {
     const text = 'a'.repeat(100);
-    const result = await val['window'].fn(
+    const result = await getCallable(ext, 'window').fn(
       { text, size: 30, step: 20 },
       makeRuntimeCtx()
     );
@@ -389,7 +386,7 @@ describe('window', () => {
   });
 
   it('AC-29: empty string returns empty list', async () => {
-    const result = await val['window'].fn(
+    const result = await getCallable(ext, 'window').fn(
       { text: '', size: 5, step: 5 },
       makeRuntimeCtx()
     );
@@ -397,7 +394,7 @@ describe('window', () => {
   });
 
   it('AC-30: text length < size returns single window with full text', async () => {
-    const result = await val['window'].fn(
+    const result = await getCallable(ext, 'window').fn(
       { text: 'hi', size: 30, step: 30 },
       makeRuntimeCtx()
     );
@@ -412,7 +409,7 @@ describe('window', () => {
 describe('truncate', () => {
   it('AC-20: truncates to first max characters', async () => {
     const text = 'x'.repeat(500);
-    const result = await val['truncate'].fn(
+    const result = await getCallable(ext, 'truncate').fn(
       { text, max: 100, ellipsis: '' },
       makeRuntimeCtx()
     );
@@ -421,7 +418,7 @@ describe('truncate', () => {
   });
 
   it('AC-21: word_boundary truncates at last word boundary ≤ max', async () => {
-    const result = await val['truncate'].fn(
+    const result = await getCallable(ext, 'truncate').fn(
       {
         text: 'one two three four',
         max: 12,
@@ -435,7 +432,7 @@ describe('truncate', () => {
   });
 
   it('AC-31: text length < max is returned unchanged', async () => {
-    const result = await val['truncate'].fn(
+    const result = await getCallable(ext, 'truncate').fn(
       { text: 'short', max: 100, ellipsis: '' },
       makeRuntimeCtx()
     );

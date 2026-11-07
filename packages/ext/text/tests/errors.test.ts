@@ -9,27 +9,19 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import type { RillValue } from '@rcrsr/rill';
 import { createTextExtension } from '../src/factory.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 // ---------------------------------------------------------------------------
 // Shared extension instance — stateless, one instance covers all tests.
 // ---------------------------------------------------------------------------
 
 const ext = createTextExtension({}, makeFactoryCtx());
-const val = ext.value as Record<
-  string,
-  {
-    fn: (
-      args: Record<string, unknown>,
-      ctx: ReturnType<typeof makeRuntimeCtx>
-    ) => Promise<unknown>;
-  }
->;
 
 // Helper: extract function by name
 function fn(name: string) {
-  return val[name].fn;
+  return getCallable(ext, name).fn;
 }
 
 // ---------------------------------------------------------------------------
@@ -44,7 +36,7 @@ describe('html_to_text errors', () => {
     await fn('html_to_text')({ html: '<p>x</p>', include_links: 'maybe' }, ctx);
 
     expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0];
+    const [, meta] = invalidateSpy.mock.calls[0]!;
     expect(meta.code).toBe('INVALID_INPUT');
     expect(meta.provider).toBe('text');
     expect(meta.raw).toMatchObject({ kind: 'invalid_option_type' });
@@ -58,7 +50,7 @@ describe('html_to_text errors', () => {
     await fn('html_to_text')({ html: '<p>x</p>', word_wrap_width: 0 }, ctx);
 
     expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0];
+    const [, meta] = invalidateSpy.mock.calls[0]!;
     expect(meta.code).toBe('INVALID_INPUT');
     expect(meta.provider).toBe('text');
     expect(meta.raw).toMatchObject({ kind: 'invalid_word_wrap_width' });
@@ -72,7 +64,7 @@ describe('html_to_text errors', () => {
     await fn('html_to_text')({ html: '<p>x</p>', word_wrap_width: -1 }, ctx);
 
     expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0];
+    const [, meta] = invalidateSpy.mock.calls[0]!;
     expect(meta.code).toBe('INVALID_INPUT');
     expect(meta.provider).toBe('text');
     expect(meta.raw).toMatchObject({ kind: 'invalid_word_wrap_width' });
@@ -91,7 +83,7 @@ describe('truncate errors', () => {
     await fn('truncate')({ text: 'hello', max: -5 }, ctx);
 
     expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0];
+    const [, meta] = invalidateSpy.mock.calls[0]!;
     expect(meta.code).toBe('INVALID_INPUT');
     expect(meta.provider).toBe('text');
     expect(meta.raw).toMatchObject({ kind: 'invalid_max' });
@@ -104,7 +96,7 @@ describe('truncate errors', () => {
     await fn('truncate')({ text: 'hello', max: 0 }, ctx);
 
     expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0];
+    const [, meta] = invalidateSpy.mock.calls[0]!;
     expect(meta.code).toBe('INVALID_INPUT');
     expect(meta.provider).toBe('text');
     expect(meta.raw).toMatchObject({ kind: 'invalid_max' });
@@ -123,7 +115,7 @@ describe('window errors', () => {
     await fn('window')({ text: 'hello', size: -10, step: 5 }, ctx);
 
     expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0];
+    const [, meta] = invalidateSpy.mock.calls[0]!;
     expect(meta.code).toBe('INVALID_INPUT');
     expect(meta.provider).toBe('text');
     expect(meta.raw).toMatchObject({ kind: 'invalid_window_size' });
@@ -136,7 +128,7 @@ describe('window errors', () => {
     await fn('window')({ text: 'hello', size: 5, step: 0 }, ctx);
 
     expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0];
+    const [, meta] = invalidateSpy.mock.calls[0]!;
     expect(meta.code).toBe('INVALID_INPUT');
     expect(meta.provider).toBe('text');
     expect(meta.raw).toMatchObject({ kind: 'invalid_window_step' });
@@ -154,7 +146,7 @@ describe('window errors', () => {
 type FnEntry = {
   name: string;
   argKey: 'html' | 'text';
-  extraArgs?: Record<string, unknown>;
+  extraArgs?: Record<string, RillValue>;
 };
 
 const HTML_FUNCTIONS: FnEntry[] = [
@@ -179,7 +171,7 @@ const TEXT_FUNCTIONS: FnEntry[] = [
 
 const ALL_FUNCTIONS: FnEntry[] = [...HTML_FUNCTIONS, ...TEXT_FUNCTIONS];
 
-const INVALID_INPUTS: Array<[string, unknown]> = [
+const INVALID_INPUTS: Array<[string, RillValue | undefined]> = [
   ['number 42', 42],
   ['null', null],
   ['undefined', undefined],
@@ -196,15 +188,16 @@ describe('non-string input across all functions (EC-6 / AC-28)', () => {
           const ctx = makeRuntimeCtx();
           const invalidateSpy = vi.spyOn(ctx, 'invalidate');
 
-          const args: Record<string, unknown> = {
-            [argKey]: invalidValue,
-            ...extraArgs,
-          };
+          // undefined models an absent argument, which RillValue cannot hold.
+          const args: Record<string, RillValue> = { ...extraArgs };
+          if (invalidValue !== undefined) {
+            args[argKey] = invalidValue;
+          }
 
           await fn(name)(args, ctx);
 
           expect(invalidateSpy).toHaveBeenCalled();
-          const [, meta] = invalidateSpy.mock.calls[0];
+          const [, meta] = invalidateSpy.mock.calls[0]!;
           expect(meta.code).toBe('INVALID_INPUT');
           expect(meta.provider).toBe('text');
           expect(meta.raw).toMatchObject({ kind: 'non_string_input' });

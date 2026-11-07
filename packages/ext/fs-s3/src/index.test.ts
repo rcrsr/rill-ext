@@ -74,7 +74,7 @@ describe('S3 FS Extension', () => {
       };
       expect(config.region).toBe('us-west-2');
       expect(config.credentials?.accessKeyId).toBe('test-key');
-      expect(config.mounts.uploads.bucket).toBe('test-bucket');
+      expect(config.mounts['uploads']?.bucket).toBe('test-bucket');
     });
 
     it('accepts S3FsConfig without credentials (uses default chain)', () => {
@@ -141,9 +141,9 @@ describe('S3 FS Extension', () => {
         },
       };
       expect(Object.keys(config.mounts)).toHaveLength(3);
-      expect(config.mounts.uploads.mode).toBe('write');
-      expect(config.mounts.downloads.mode).toBe('read');
-      expect(config.mounts.cache.mode).toBe('read-write');
+      expect(config.mounts['uploads']?.mode).toBe('write');
+      expect(config.mounts['downloads']?.mode).toBe('read');
+      expect(config.mounts['cache']?.mode).toBe('read-write');
     });
   });
 

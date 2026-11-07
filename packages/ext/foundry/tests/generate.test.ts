@@ -280,10 +280,7 @@ describe('generate() function', () => {
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
-        getCallable(ext, 'generate').fn(
-          { prompt: 'test', schema: undefined, options: {} },
-          ctx
-        ),
+        getCallable(ext, 'generate').fn({ prompt: 'test', options: {} }, ctx),
         { message: 'generate requires a type expression as schema' }
       );
     });

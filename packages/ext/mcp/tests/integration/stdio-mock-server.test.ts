@@ -48,12 +48,13 @@ const __dirname = dirname(__filename);
 const MOCK_SERVER_PATH = join(__dirname, 'mock-mcp-server.mjs');
 
 // Track extensions for cleanup
-const activeExtensions: Array<{ dispose: () => Promise<void> }> = [];
+const activeExtensions: Array<Awaited<ReturnType<typeof createMcpExtension>>> =
+  [];
 
 afterEach(async () => {
   // Clean up all active extensions
   for (const ext of activeExtensions) {
-    await ext.dispose();
+    await ext.dispose?.();
   }
   activeExtensions.length = 0;
 });
@@ -83,15 +84,15 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Verify introspection dicts exist
-      expect(v.tools).toBeDefined();
-      expect(typeof v.tools).toBe('object');
-      expect(v.resources).toBeDefined();
-      expect(typeof v.resources).toBe('object');
-      expect(v.prompts).toBeDefined();
-      expect(typeof v.prompts).toBe('object');
+      expect(v['tools']).toBeDefined();
+      expect(typeof v['tools']).toBe('object');
+      expect(v['resources']).toBeDefined();
+      expect(typeof v['resources']).toBe('object');
+      expect(v['prompts']).toBeDefined();
+      expect(typeof v['prompts']).toBe('object');
 
       // tools is already a callable dict keyed by tool name
-      const toolsDict = v.tools as Record<string, unknown>;
+      const toolsDict = v['tools'] as Record<string, unknown>;
       expect(typeof toolsDict).toBe('object');
       expect(Object.keys(toolsDict).length).toBeGreaterThan(0);
 
@@ -118,7 +119,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call echo tool
-      const result = await hostFn(v.tools, 'echo').fn(
+      const result = await hostFn(v['tools'], 'echo').fn(
         { message: 'Hello, MCP!' },
         mockContext
       );
@@ -143,7 +144,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call add tool with parameters
-      const result = await hostFn(v.tools, 'add').fn(
+      const result = await hostFn(v['tools'], 'add').fn(
         { a: 5, b: 7 },
         mockContext
       );
@@ -171,14 +172,14 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call get_status which returns JSON text
-      const result = await hostFn(v.tools, 'get_status').fn({}, mockContext);
+      const result = await hostFn(v['tools'], 'get_status').fn({}, mockContext);
 
       // AC-8: JSON text {"status": "ok"} → dict [status: "ok"]
       expect(typeof result).toBe('object');
       expect(result).not.toBe(null);
       expect(Array.isArray(result)).toBe(false);
-      expect((result as Record<string, unknown>).status).toBe('ok');
-      expect((result as Record<string, unknown>).uptime).toBe(42);
+      expect((result as Record<string, unknown>)['status']).toBe('ok');
+      expect((result as Record<string, unknown>)['uptime']).toBe(42);
     }, 15000);
 
     it('returns plain text as string', async () => {
@@ -197,7 +198,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call echo which returns plain text
-      const result = await hostFn(v.tools, 'echo').fn(
+      const result = await hostFn(v['tools'], 'echo').fn(
         { message: 'success' },
         mockContext
       );
@@ -223,14 +224,14 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Call get_image which returns base64 image
-      const result = await hostFn(v.tools, 'get_image').fn({}, mockContext);
+      const result = await hostFn(v['tools'], 'get_image').fn({}, mockContext);
 
       // AC-8: Image → dict [type: "image", data: base64, mime: "image/png"]
       expect(typeof result).toBe('object');
       expect(result).not.toBe(null);
-      expect((result as Record<string, unknown>).type).toBe('image');
-      expect(typeof (result as Record<string, unknown>).data).toBe('string');
-      expect((result as Record<string, unknown>).mime).toBe('image/png');
+      expect((result as Record<string, unknown>)['type']).toBe('image');
+      expect(typeof (result as Record<string, unknown>)['data']).toBe('string');
+      expect((result as Record<string, unknown>)['mime']).toBe('image/png');
     }, 15000);
   });
 
@@ -251,7 +252,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // resources is a dict of callable closures keyed by function name
-      const resourcesDict = v.resources as Record<string, unknown>;
+      const resourcesDict = v['resources'] as Record<string, unknown>;
 
       expect(typeof resourcesDict).toBe('object');
       expect(resourcesDict).not.toBe(null);
@@ -276,7 +277,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Read test-doc resource
-      const result = await hostFn(v.resources, 'read_resource').fn(
+      const result = await hostFn(v['resources'], 'read_resource').fn(
         { uri: 'file:///test/doc.txt' },
         mockContext
       );
@@ -302,7 +303,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Read user profile resource with ID
-      const result = await hostFn(v.resources, 'resource_user_profile').fn(
+      const result = await hostFn(v['resources'], 'resource_user_profile').fn(
         { id: '123' },
         mockContext
       );
@@ -312,9 +313,9 @@ describe('Integration: stdio mock server', () => {
       expect(result).not.toBe(null);
 
       // Result should be the parsed JSON (due to AC-8)
-      expect((result as Record<string, unknown>).id).toBe('123');
-      expect((result as Record<string, unknown>).name).toBe('User 123');
-      expect((result as Record<string, unknown>).email).toBe(
+      expect((result as Record<string, unknown>)['id']).toBe('123');
+      expect((result as Record<string, unknown>)['name']).toBe('User 123');
+      expect((result as Record<string, unknown>)['email']).toBe(
         'user123@example.com'
       );
     }, 15000);
@@ -337,7 +338,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // prompts is a dict of callable closures keyed by sanitized function name
-      const promptsDict = v.prompts as Record<string, unknown>;
+      const promptsDict = v['prompts'] as Record<string, unknown>;
 
       expect(typeof promptsDict).toBe('object');
       expect(promptsDict).not.toBe(null);
@@ -365,7 +366,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Get greeting prompt
-      const result = await hostFn(v.prompts, 'greeting').fn({}, mockContext);
+      const result = await hostFn(v['prompts'], 'greeting').fn({}, mockContext);
 
       // Prompt returns a list of message dicts with role and content
       expect(Array.isArray(result)).toBe(true);
@@ -374,7 +375,7 @@ describe('Integration: stdio mock server', () => {
       expect(messages.length).toBeGreaterThan(0);
 
       const firstMessage = messages[0] as Record<string, unknown>;
-      expect(firstMessage.role).toBe('user');
+      expect(firstMessage['role']).toBe('user');
     }, 15000);
 
     it('gets prompt with arguments', async () => {
@@ -393,7 +394,7 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Get code_review prompt with arguments
-      const result = await hostFn(v.prompts, 'code_review').fn(
+      const result = await hostFn(v['prompts'], 'code_review').fn(
         {
           language: 'TypeScript',
           code: 'function hello() { return "world"; }',
@@ -408,8 +409,8 @@ describe('Integration: stdio mock server', () => {
       expect(messages.length).toBeGreaterThan(0);
 
       const firstMessage = messages[0] as Record<string, unknown>;
-      expect(firstMessage.role).toBe('user');
-      const content = firstMessage.content;
+      expect(firstMessage['role']).toBe('user');
+      const content = firstMessage['content'];
       expect(typeof content).toBe('string');
       expect(content as string).toContain('TypeScript');
       expect(content as string).toContain('function hello()');
@@ -450,22 +451,25 @@ describe('Integration: stdio mock server', () => {
       const v2 = fns(ext2);
 
       // Call tools from different extensions
-      const result1 = await hostFn(v1.tools, 'echo').fn(
+      const result1 = await hostFn(v1['tools'], 'echo').fn(
         { message: 'from server 1' },
         mockContext
       );
-      const result2 = await hostFn(v2.tools, 'get_status').fn({}, mockContext);
+      const result2 = await hostFn(v2['tools'], 'get_status').fn(
+        {},
+        mockContext
+      );
 
       expect(result1).toBe('from server 1');
       expect(typeof result2).toBe('object');
-      expect((result2 as Record<string, unknown>).status).toBe('ok');
+      expect((result2 as Record<string, unknown>)['status']).toBe('ok');
 
       // Verify both extensions work independently
-      const add1 = await hostFn(v1.tools, 'add').fn(
+      const add1 = await hostFn(v1['tools'], 'add').fn(
         { a: 1, b: 2 },
         mockContext
       );
-      const add2 = await hostFn(v2.tools, 'add').fn(
+      const add2 = await hostFn(v2['tools'], 'add').fn(
         { a: 10, b: 20 },
         mockContext
       );
@@ -491,19 +495,19 @@ describe('Integration: stdio mock server', () => {
       const v = fns(ext);
 
       // Verify extension works
-      const result = await hostFn(v.tools, 'echo').fn(
+      const result = await hostFn(v['tools'], 'echo').fn(
         { message: 'test' },
         mockContext
       );
       expect(result).toBe('test');
 
       // Dispose extension
-      await ext.dispose();
+      await ext.dispose?.();
 
       // After dispose, calling functions should fail
       // (The exact error depends on transport state)
       await expect(
-        hostFn(v.tools, 'echo').fn({ message: 'test' }, mockContext)
+        hostFn(v['tools'], 'echo').fn({ message: 'test' }, mockContext)
       ).rejects.toThrow();
     }, 15000);
 
@@ -521,10 +525,10 @@ describe('Integration: stdio mock server', () => {
       );
 
       // First dispose
-      await ext.dispose();
+      await ext.dispose?.();
 
       // Second dispose should not throw
-      await expect(ext.dispose()).resolves.not.toThrow();
+      await expect(Promise.resolve(ext.dispose?.())).resolves.toBeUndefined();
     }, 15000);
   });
 });

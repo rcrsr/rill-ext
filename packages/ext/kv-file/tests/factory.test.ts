@@ -9,7 +9,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createFileKvExtension } from '../src/factory.js';
-import { makeFactoryCtx } from './_setup.js';
+import { makeFactoryCtx, fnOf } from './_setup.js';
 
 describe('kv-file extension factory', () => {
   let tempDir: string;
@@ -51,7 +51,7 @@ describe('kv-file extension factory', () => {
     it('wraps functions as ApplicationCallable', () => {
       const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
 
-      expect(ext.value.get).toMatchObject({
+      expect(fnOf(ext, 'get')).toMatchObject({
         __type: 'callable',
         kind: 'application',
         params: expect.any(Array),

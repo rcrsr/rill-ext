@@ -4,10 +4,11 @@
  * Verifies factory creation, dynamic function generation, config defaults, and dispose.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { isInvalid } from '@rcrsr/rill';
 import { createExecExtension } from '../src/factory.js';
 import type { ExecExtensionConfig } from '../src/types.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 describe('exec extension factory', () => {
   describe('factory creation', () => {
@@ -34,7 +35,7 @@ describe('exec extension factory', () => {
       };
 
       const ext = createExecExtension(config, makeFactoryCtx());
-      const callable = ext.value.echo as Record<string, unknown>;
+      const callable = getCallable(ext, 'echo');
 
       expect(callable).toMatchObject({
         __type: 'callable',
@@ -74,7 +75,7 @@ describe('exec extension factory', () => {
         makeFactoryCtx()
       );
 
-      expect(ext.value.echo.params).toEqual([
+      expect(getCallable(ext, 'echo').params).toEqual([
         {
           name: 'args',
           type: { kind: 'list' },
@@ -100,7 +101,7 @@ describe('exec extension factory', () => {
         makeFactoryCtx()
       );
 
-      expect(ext.value.git.annotations?.['description']).toBe(
+      expect(getCallable(ext, 'git').annotations?.['description']).toBe(
         'Git version control'
       );
     });
@@ -113,7 +114,7 @@ describe('exec extension factory', () => {
         makeFactoryCtx()
       );
 
-      expect(ext.value.echo.annotations?.['description']).toBe(
+      expect(getCallable(ext, 'echo').annotations?.['description']).toBe(
         'Execute echo command'
       );
     });
@@ -126,7 +127,7 @@ describe('exec extension factory', () => {
         makeFactoryCtx()
       );
 
-      expect(ext.value.echo.returnType).toMatchObject({
+      expect(getCallable(ext, 'echo').returnType).toMatchObject({
         __rill_type: true,
         structure: { kind: 'dict' },
       });
@@ -145,7 +146,10 @@ describe('exec extension factory', () => {
         makeFactoryCtx()
       );
 
-      const result = await ext.value.commands.fn({}, makeRuntimeCtx());
+      const result = await getCallable(ext, 'commands').fn(
+        {},
+        makeRuntimeCtx()
+      );
 
       expect(result).toEqual([
         { name: 'git', description: 'Git VCS' },
@@ -161,13 +165,19 @@ describe('exec extension factory', () => {
         makeFactoryCtx()
       );
 
-      const result = await ext.value.commands.fn({}, makeRuntimeCtx());
+      const result = await getCallable(ext, 'commands').fn(
+        {},
+        makeRuntimeCtx()
+      );
       expect(result).toEqual([{ name: 'echo', description: '' }]);
     });
 
     it('returns empty list when no commands configured', async () => {
       const ext = createExecExtension({ commands: {} }, makeFactoryCtx());
-      const result = await ext.value.commands.fn({}, makeRuntimeCtx());
+      const result = await getCallable(ext, 'commands').fn(
+        {},
+        makeRuntimeCtx()
+      );
       expect(result).toEqual([]);
     });
   });
@@ -179,24 +189,27 @@ describe('exec extension factory', () => {
       if (ext?.dispose) await ext.dispose();
     });
 
-    it('aborts in-flight processes', async () => {
+    it('aborts in-flight processes and returns invalid aborted', async () => {
       ext = createExecExtension(
         {
           commands: { sleep: { binary: 'sleep', timeout: 10000 } },
         },
         makeFactoryCtx()
       );
+      const ctx = makeRuntimeCtx();
+      const invalidateSpy = vi.spyOn(ctx, 'invalidate');
 
-      const promise = ext.value.sleep.fn({ args: ['5'] }, makeRuntimeCtx());
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      const start = Date.now();
+      const promise = getCallable(ext, 'sleep').fn({ args: ['5'] }, ctx);
       await ext.dispose!();
+      const result = await promise;
 
-      try {
-        const result = await promise;
-        expect(result).toMatchObject({ exit_code: expect.not.toBe(0) });
-      } catch {
-        // AbortError is acceptable
-      }
+      expect(Date.now() - start).toBeLessThan(2000);
+      expect(isInvalid(result)).toBe(true);
+      expect(invalidateSpy).toHaveBeenCalledOnce();
+      expect(invalidateSpy.mock.calls[0]![1].raw).toMatchObject({
+        kind: 'aborted',
+      });
     });
 
     it('disposes cleanly with no in-flight processes', async () => {
@@ -215,19 +228,20 @@ describe('exec extension factory', () => {
         { commands: { sleep: { binary: 'sleep', timeout: 10000 } } },
         makeFactoryCtx(controller.signal)
       );
+      const ctx = makeRuntimeCtx();
+      const invalidateSpy = vi.spyOn(ctx, 'invalidate');
 
       const start = Date.now();
-      const promise = ext.value.sleep.fn({ args: ['5'] }, makeRuntimeCtx());
-      // give the process a moment to spawn
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      const promise = getCallable(ext, 'sleep').fn({ args: ['5'] }, ctx);
       controller.abort();
+      const result = await promise;
 
-      // Should resolve promptly (well under the 5s sleep)
-      const result = await promise.catch((e) => e);
-      const elapsed = Date.now() - start;
-      expect(elapsed).toBeLessThan(2000);
-      // Either resolves to invalid value or rejects — both acceptable
-      expect(result).toBeDefined();
+      expect(Date.now() - start).toBeLessThan(2000);
+      expect(isInvalid(result)).toBe(true);
+      expect(invalidateSpy).toHaveBeenCalledOnce();
+      expect(invalidateSpy.mock.calls[0]![1].raw).toMatchObject({
+        kind: 'aborted',
+      });
     });
   });
 

@@ -6,7 +6,15 @@
  * Covers: AC-9, AC-18, AC-33, EC-7.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
 import { expectRejectedHalt } from './_halt-helpers.js';
@@ -62,15 +70,12 @@ function getHostFn(ext: { value: unknown }, name: string) {
 }
 
 /** Build a fetch mock returning a JSON response with the given status. */
-function mockFetchJson(
-  status: number,
-  body: unknown
-): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
+function mockFetchJson(status: number, body: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: vi.fn().mockResolvedValue(body),
-  });
+  } as unknown as Response);
 }
 
 /** Minimum valid config with contentSafety configured. */

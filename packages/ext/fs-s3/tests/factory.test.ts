@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { structureToTypeValue } from '@rcrsr/rill';
 import { createS3FsExtension } from '../src/index.js';
 import type { S3FsConfig } from '../src/types.js';
+import { makeFactoryCtx } from './_setup.js';
 
 type FnDefView = {
   params: unknown[];
@@ -15,20 +16,30 @@ type FnDefView = {
   returnType: unknown;
 };
 
+function getDef(view: Record<string, FnDefView>, name: string): FnDefView {
+  const def = view[name];
+  if (def === undefined) {
+    throw new Error(`function ${name} missing from extension value`);
+  }
+  return def;
+}
+
 describe('createS3FsExtension', () => {
   describe('configuration validation', () => {
     it('throws for missing region', () => {
-      const config = {
+      const config: Omit<S3FsConfig, 'region'> = {
         mounts: {
           test: {
-            mode: 'read-write' as const,
+            mode: 'read-write',
             bucket: 'test-bucket',
             prefix: '',
           },
         },
-      } as S3FsConfig;
+      };
 
-      expect(() => createS3FsExtension(config)).toThrow('region');
+      expect(() =>
+        createS3FsExtension(config as S3FsConfig, makeFactoryCtx())
+      ).toThrow('region');
     });
 
     it('throws for empty region', () => {
@@ -43,7 +54,9 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      expect(() => createS3FsExtension(config)).toThrow('region');
+      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
+        'region'
+      );
     });
 
     it('throws for whitespace-only region', () => {
@@ -58,7 +71,9 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      expect(() => createS3FsExtension(config)).toThrow('region');
+      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
+        'region'
+      );
     });
 
     it('throws for missing mounts', () => {
@@ -66,7 +81,9 @@ describe('createS3FsExtension', () => {
         region: 'us-west-2',
       } as S3FsConfig;
 
-      expect(() => createS3FsExtension(config)).toThrow('at least one mount');
+      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
+        'at least one mount'
+      );
     });
 
     it('throws for empty mounts object', () => {
@@ -75,7 +92,9 @@ describe('createS3FsExtension', () => {
         mounts: {},
       };
 
-      expect(() => createS3FsExtension(config)).toThrow('at least one mount');
+      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
+        'at least one mount'
+      );
     });
 
     it('throws for invalid endpoint (empty string)', () => {
@@ -91,7 +110,9 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      expect(() => createS3FsExtension(config)).toThrow('non-empty string');
+      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
+        'non-empty string'
+      );
     });
 
     it('throws for invalid endpoint (whitespace only)', () => {
@@ -107,7 +128,9 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      expect(() => createS3FsExtension(config)).toThrow('non-empty string');
+      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
+        'non-empty string'
+      );
     });
 
     it('throws for invalid endpoint (malformed URL)', () => {
@@ -123,7 +146,9 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      expect(() => createS3FsExtension(config)).toThrow('valid URL');
+      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
+        'valid URL'
+      );
     });
   });
 
@@ -144,10 +169,10 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       expect(ext).toBeDefined();
       expect(
-        (ext.value as unknown as Record<string, unknown>).read
+        (ext.value as unknown as Record<string, unknown>)['read']
       ).toBeDefined();
       ext.dispose?.();
     });
@@ -170,10 +195,10 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       expect(ext).toBeDefined();
       expect(
-        (ext.value as unknown as Record<string, unknown>).read
+        (ext.value as unknown as Record<string, unknown>)['read']
       ).toBeDefined();
       ext.dispose?.();
     });
@@ -195,10 +220,10 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       expect(ext).toBeDefined();
       expect(
-        (ext.value as unknown as Record<string, unknown>).read
+        (ext.value as unknown as Record<string, unknown>)['read']
       ).toBeDefined();
       ext.dispose?.();
     });
@@ -215,10 +240,10 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       expect(ext).toBeDefined();
       expect(
-        (ext.value as unknown as Record<string, unknown>).read
+        (ext.value as unknown as Record<string, unknown>)['read']
       ).toBeDefined();
       ext.dispose?.();
     });
@@ -249,10 +274,10 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       expect(ext).toBeDefined();
       expect(
-        (ext.value as unknown as Record<string, unknown>).read
+        (ext.value as unknown as Record<string, unknown>)['read']
       ).toBeDefined();
       ext.dispose?.();
     });
@@ -274,10 +299,10 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       expect(ext).toBeDefined();
       expect(
-        (ext.value as unknown as Record<string, unknown>).read
+        (ext.value as unknown as Record<string, unknown>)['read']
       ).toBeDefined();
       ext.dispose?.();
     });
@@ -299,10 +324,10 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       expect(ext).toBeDefined();
       expect(
-        (ext.value as unknown as Record<string, unknown>).read
+        (ext.value as unknown as Record<string, unknown>)['read']
       ).toBeDefined();
       ext.dispose?.();
     });
@@ -325,22 +350,22 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       const v = ext.value as unknown as Record<string, FnDefView>;
 
       // Verify all 12 functions exist
-      expect(v.read).toBeDefined();
-      expect(v.write).toBeDefined();
-      expect(v.append).toBeDefined();
-      expect(v.list).toBeDefined();
-      expect(v.find).toBeDefined();
-      expect(v.exists).toBeDefined();
-      expect(v.remove).toBeDefined();
-      expect(v.stat).toBeDefined();
-      expect(v.mkdir).toBeDefined();
-      expect(v.copy).toBeDefined();
-      expect(v.move).toBeDefined();
-      expect(v.mounts).toBeDefined();
+      expect(v['read']).toBeDefined();
+      expect(v['write']).toBeDefined();
+      expect(v['append']).toBeDefined();
+      expect(v['list']).toBeDefined();
+      expect(v['find']).toBeDefined();
+      expect(v['exists']).toBeDefined();
+      expect(v['remove']).toBeDefined();
+      expect(v['stat']).toBeDefined();
+      expect(v['mkdir']).toBeDefined();
+      expect(v['copy']).toBeDefined();
+      expect(v['move']).toBeDefined();
+      expect(v['mounts']).toBeDefined();
 
       ext.dispose?.();
     });
@@ -361,35 +386,41 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
       const v = ext.value as unknown as Record<string, FnDefView>;
 
       // Verify structure for read function (all follow same pattern)
-      expect(v.read.params).toBeDefined();
-      expect(Array.isArray(v.read.params)).toBe(true);
-      expect(v.read.params.length).toBeGreaterThan(0);
-      expect(v.read.fn).toBeTypeOf('function');
-      expect(v.read.annotations?.['description']).toBeTypeOf('string');
-      expect(v.read.returnType).toEqual(
+      expect(getDef(v, 'read').params).toBeDefined();
+      expect(Array.isArray(getDef(v, 'read').params)).toBe(true);
+      expect(getDef(v, 'read').params.length).toBeGreaterThan(0);
+      expect(getDef(v, 'read').fn).toBeTypeOf('function');
+      expect(getDef(v, 'read').annotations?.['description']).toBeTypeOf(
+        'string'
+      );
+      expect(getDef(v, 'read').returnType).toEqual(
         structureToTypeValue({ kind: 'string' })
       );
 
       // Verify structure for write function
-      expect(v.write.params).toBeDefined();
-      expect(Array.isArray(v.write.params)).toBe(true);
-      expect(v.write.fn).toBeTypeOf('function');
-      expect(v.write.annotations?.['description']).toBeTypeOf('string');
-      expect(v.write.returnType).toEqual(
+      expect(getDef(v, 'write').params).toBeDefined();
+      expect(Array.isArray(getDef(v, 'write').params)).toBe(true);
+      expect(getDef(v, 'write').fn).toBeTypeOf('function');
+      expect(getDef(v, 'write').annotations?.['description']).toBeTypeOf(
+        'string'
+      );
+      expect(getDef(v, 'write').returnType).toEqual(
         structureToTypeValue({ kind: 'string' })
       );
 
       // Verify structure for mounts function (no params)
-      expect(v.mounts.params).toBeDefined();
-      expect(Array.isArray(v.mounts.params)).toBe(true);
-      expect(v.mounts.params.length).toBe(0);
-      expect(v.mounts.fn).toBeTypeOf('function');
-      expect(v.mounts.annotations?.['description']).toBeTypeOf('string');
-      expect(v.mounts.returnType).toEqual(
+      expect(getDef(v, 'mounts').params).toBeDefined();
+      expect(Array.isArray(getDef(v, 'mounts').params)).toBe(true);
+      expect(getDef(v, 'mounts').params.length).toBe(0);
+      expect(getDef(v, 'mounts').fn).toBeTypeOf('function');
+      expect(getDef(v, 'mounts').annotations?.['description']).toBeTypeOf(
+        'string'
+      );
+      expect(getDef(v, 'mounts').returnType).toEqual(
         structureToTypeValue({
           kind: 'list',
           element: {
@@ -424,7 +455,7 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
 
       expect(ext.dispose).toBeDefined();
       expect(ext.dispose).toBeTypeOf('function');
@@ -434,7 +465,7 @@ describe('createS3FsExtension', () => {
   });
 
   describe('dispose lifecycle', () => {
-    it('handles dispose without error', () => {
+    it('handles dispose without error', async () => {
       const config: S3FsConfig = {
         region: 'us-west-2',
         credentials: {
@@ -450,14 +481,12 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
 
-      expect(() => {
-        ext.dispose?.();
-      }).not.toThrow();
+      await expect(ext.dispose?.()).resolves.toBeUndefined();
     });
 
-    it('is idempotent (can call dispose multiple times)', () => {
+    it('is idempotent (can call dispose multiple times)', async () => {
       const config: S3FsConfig = {
         region: 'us-west-2',
         credentials: {
@@ -473,13 +502,11 @@ describe('createS3FsExtension', () => {
         },
       };
 
-      const ext = createS3FsExtension(config);
+      const ext = createS3FsExtension(config, makeFactoryCtx());
 
-      expect(() => {
-        ext.dispose?.();
-        ext.dispose?.();
-        ext.dispose?.();
-      }).not.toThrow();
+      await expect(ext.dispose?.()).resolves.toBeUndefined();
+      await expect(ext.dispose?.()).resolves.toBeUndefined();
+      await expect(ext.dispose?.()).resolves.toBeUndefined();
     });
   });
 });

@@ -5,30 +5,30 @@
 import { describe, it, expect } from 'vitest';
 import { getStatus } from '@rcrsr/rill';
 import { createDatetimeExtension } from '../src/factory.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import { makeFactoryCtx, makeRuntimeCtx, fnOf } from './_setup.js';
 
 function getExt() {
   return createDatetimeExtension({}, makeFactoryCtx());
 }
 
 function getIso(ext: ReturnType<typeof getExt>) {
-  return ext.value.iso.fn;
+  return fnOf(ext, 'iso').fn;
 }
 
 function getDate(ext: ReturnType<typeof getExt>) {
-  return ext.value.date.fn;
+  return fnOf(ext, 'date').fn;
 }
 
 function getTime(ext: ReturnType<typeof getExt>) {
-  return ext.value.time.fn;
+  return fnOf(ext, 'time').fn;
 }
 
 function getOffset(ext: ReturnType<typeof getExt>) {
-  return ext.value.offset.fn;
+  return fnOf(ext, 'offset').fn;
 }
 
 function getZones(ext: ReturnType<typeof getExt>) {
-  return ext.value.zones.fn;
+  return fnOf(ext, 'zones').fn;
 }
 
 // ============================================================

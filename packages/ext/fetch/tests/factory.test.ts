@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getStatus, type ApplicationCallable } from '@rcrsr/rill';
+import { getStatus, isInvalid, type ApplicationCallable } from '@rcrsr/rill';
 import {
   createFetchExtension,
   type FetchExtensionConfig,
@@ -26,12 +26,14 @@ type MockResponse = {
 
 let mockResponses: MockResponse[] = [];
 let fetchCallCount = 0;
+let requestedUrls: string[] = [];
 
 function mockFetch(
   _url: string,
   options?: { signal?: AbortSignal }
 ): Promise<Response> {
   fetchCallCount++;
+  requestedUrls.push(_url);
 
   const mockResponse = mockResponses.shift();
   if (!mockResponse) {
@@ -77,6 +79,7 @@ function mockFetch(
 beforeEach(() => {
   mockResponses = [];
   fetchCallCount = 0;
+  requestedUrls = [];
   vi.stubGlobal('fetch', mockFetch);
 });
 
@@ -339,9 +342,14 @@ describe('createFetchExtension', () => {
 
       const ext = createFetchExtension(config, makeFactoryCtx());
 
-      await expect(
-        getCallable(ext, 'listUsers').fn({}, makeRuntimeCtx())
-      ).resolves.toBeDefined();
+      const result = await getCallable(ext, 'listUsers').fn(
+        {},
+        makeRuntimeCtx()
+      );
+
+      expect(isInvalid(result)).toBe(false);
+      expect(requestedUrls).toHaveLength(1);
+      expect(new URL(requestedUrls[0]!).searchParams.get('limit')).toBe('10');
     });
 
     it('does not throw when parameter has required: false', async () => {
@@ -367,9 +375,14 @@ describe('createFetchExtension', () => {
 
       const ext = createFetchExtension(config, makeFactoryCtx());
 
-      await expect(
-        getCallable(ext, 'listUsers').fn({}, makeRuntimeCtx())
-      ).resolves.toBeDefined();
+      const result = await getCallable(ext, 'listUsers').fn(
+        {},
+        makeRuntimeCtx()
+      );
+
+      expect(isInvalid(result)).toBe(false);
+      expect(requestedUrls).toHaveLength(1);
+      expect(new URL(requestedUrls[0]!).searchParams.has('filter')).toBe(false);
     });
   });
 
@@ -583,10 +596,12 @@ describe('createFetchExtension', () => {
       };
 
       const ext = createFetchExtension(config, makeFactoryCtx());
+      const dispose = ext.dispose;
+      expect(dispose).toBeDefined();
 
-      expect(() => ext.dispose()).not.toThrow();
-      expect(() => ext.dispose()).not.toThrow();
-      expect(() => ext.dispose()).not.toThrow();
+      expect(() => dispose!()).not.toThrow();
+      expect(() => dispose!()).not.toThrow();
+      expect(() => dispose!()).not.toThrow();
     });
 
     it('dispose aborts in-flight requests', async () => {
@@ -611,7 +626,8 @@ describe('createFetchExtension', () => {
       );
 
       // Abort all in-flight requests via dispose
-      ext.dispose();
+      expect(ext.dispose).toBeDefined();
+      ext.dispose!();
 
       const result = await requestPromise;
       const status = getStatus(result);

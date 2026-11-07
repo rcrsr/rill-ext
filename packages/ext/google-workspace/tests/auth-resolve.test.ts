@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createRuntimeContext,
+  createChildContext,
   isInvalid,
   getStatus,
   type RillValue,
@@ -164,8 +165,7 @@ describe('resolveToken — session', () => {
     const parent = createRuntimeContext({
       variables: { MY_TOKEN: 'parent-token' },
     });
-    const child = createRuntimeContext();
-    child.parent = parent;
+    const child = createChildContext(parent);
 
     const result = await resolveToken(auth, child, cache, SCOPES, SIGNAL);
 
@@ -178,10 +178,8 @@ describe('resolveToken — session', () => {
     const grandparent = createRuntimeContext({
       variables: { MY_TOKEN: 'grandparent-token' },
     });
-    const parent = createRuntimeContext();
-    const child = createRuntimeContext();
-    parent.parent = grandparent;
-    child.parent = parent;
+    const parent = createChildContext(grandparent);
+    const child = createChildContext(parent);
 
     const result = await resolveToken(auth, child, cache, SCOPES, SIGNAL);
 

@@ -3,39 +3,22 @@
  * Validates config validation and lifecycle management
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import { createOpenAIExtension } from '../src/factory.js';
-import type {
-  OpenAIExtensionConfig,
-  LLMExtensionConfig,
-} from '../src/index.js';
-
-// ============================================================
-// TYPE EXPORT TESTS
-// ============================================================
-
-describe('Type Exports', () => {
-  // AC-6: LLMExtensionConfig importable from package
-  it('exports LLMExtensionConfig type', () => {
-    // Type-only test: verify LLMExtensionConfig is importable
-    const config: LLMExtensionConfig = {
-      on_llm_start: () => {},
-      on_llm_end: () => {},
-      on_llm_error: () => {},
-      on_tool_start: () => {},
-      on_tool_end: () => {},
-      on_tool_error: () => {},
-    };
-
-    expect(config).toBeDefined();
-  });
-});
+import type { OpenAIExtensionConfig } from '../src/index.js';
+import type { LLMExtensionConfig } from '../src/index.js';
 
 // ============================================================
 // VALIDATION TESTS
 // ============================================================
 
 describe('createOpenAIExtension', () => {
+  describe('barrel types', () => {
+    it('exports LLMExtensionConfig as an object type', () => {
+      expectTypeOf<LLMExtensionConfig>().toBeObject();
+    });
+  });
+
   describe('configuration validation', () => {
     // EC-1: Missing api_key
     it('throws when api_key is missing', () => {

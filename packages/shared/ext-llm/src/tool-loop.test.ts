@@ -12,7 +12,10 @@ import {
   createRuntimeContext,
   getStatus,
   invokeCallable,
+  anyTypeValue,
+  type ApplicationCallable,
   type RillValue,
+  type ScriptCallable,
 } from '@rcrsr/rill';
 import { executeToolLoop, buildResponseMessages } from './tool-loop.js';
 import type { ToolLoopCallbacks } from './types.js';
@@ -175,8 +178,8 @@ describe('executeToolLoop', () => {
       );
 
       expect(result.toolCalls).toHaveLength(2);
-      expect(result.toolCalls[0].name).toBe('tool1');
-      expect(result.toolCalls[1].name).toBe('tool2');
+      expect(result.toolCalls[0]?.name).toBe('tool1');
+      expect(result.toolCalls[1]?.name).toBe('tool2');
       expect(tool1Fn).toHaveBeenCalledTimes(1);
       expect(tool2Fn).toHaveBeenCalledTimes(1);
     });
@@ -762,9 +765,11 @@ describe('executeToolLoop', () => {
 
     it('generates JSON Schema from ScriptCallable params', async () => {
       // ScriptCallable with typed params (from tool 3-arg form) builds correct schema
-      const scriptTool: RillValue = {
+      const scriptTool: ScriptCallable = {
         __type: 'callable',
         kind: 'script',
+        returnType: anyTypeValue,
+        isProperty: false,
         params: [
           {
             name: 'city',
@@ -788,7 +793,6 @@ describe('executeToolLoop', () => {
         body: {} as never, // Not invoked in schema-build step
         definingScope: {} as never,
         annotations: { description: 'Weather lookup tool' },
-        paramAnnotations: {},
       };
 
       const tools = { get_weather: scriptTool };
@@ -826,9 +830,8 @@ describe('executeToolLoop', () => {
 
     it('generates JSON Schema from ApplicationCallable params', async () => {
       // Tool descriptors include params metadata
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'application',
+      const toolFn: ApplicationCallable = {
+        ...callable(() => ''),
         params: [
           {
             name: 'str_param',
@@ -925,9 +928,8 @@ describe('executeToolLoop', () => {
 
     it('produces unconstrained property {} when param.type is undefined', async () => {
       // param.type undefined → JSON Schema property {}
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'application',
+      const toolFn: ApplicationCallable = {
+        ...callable(() => ''),
         params: [
           {
             name: 'unconstrained',
@@ -962,9 +964,8 @@ describe('executeToolLoop', () => {
 
     it('omits description field when annotations is empty', async () => {
       // empty annotations → no description in schema property
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'application',
+      const toolFn: ApplicationCallable = {
+        ...callable(() => ''),
         params: [
           {
             name: 'param',
@@ -1002,9 +1003,8 @@ describe('executeToolLoop', () => {
 
     it('includes param in required[] when defaultValue is undefined', async () => {
       // defaultValue === undefined → param appears in required[]
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'application',
+      const toolFn: ApplicationCallable = {
+        ...callable(() => ''),
         params: [
           {
             name: 'required_param',
@@ -1037,9 +1037,8 @@ describe('executeToolLoop', () => {
 
     it('excludes param from required[] when defaultValue is 0 (falsy but defined)', async () => {
       // defaultValue: 0 → absent from required[]
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'application',
+      const toolFn: ApplicationCallable = {
+        ...callable(() => ''),
         params: [
           {
             name: 'optional_num',
@@ -1074,15 +1073,10 @@ describe('executeToolLoop', () => {
   describe('argument conversion', () => {
     it('passes dict input as named args to application callable', async () => {
       // Dict input passed as named args
-      const mockFn = vi.fn((args: Record<string, RillValue>) => {
-        // Verify named args received correctly
-        expect(args).toEqual({ param_a: 'value_a', param_b: 42 });
-        return 'success';
-      });
+      const mockFn = vi.fn((_args: Record<string, RillValue>) => 'success');
 
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'application',
+      const toolFn: ApplicationCallable = {
+        ...callable(() => ''),
         params: [
           {
             name: 'param_a',
@@ -1139,19 +1133,10 @@ describe('executeToolLoop', () => {
 
     it('passes all named args regardless of input key order', async () => {
       // Named args passed correctly regardless of input key order
-      const mockFn = vi.fn((args: Record<string, RillValue>) => {
-        // Verify all named args received
-        expect(args).toEqual({
-          first: 'first_value',
-          second: 'second_value',
-          third: 'third_value',
-        });
-        return 'success';
-      });
+      const mockFn = vi.fn((_args: Record<string, RillValue>) => 'success');
 
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'application',
+      const toolFn: ApplicationCallable = {
+        ...callable(() => ''),
         params: [
           {
             name: 'first',
@@ -1211,6 +1196,10 @@ describe('executeToolLoop', () => {
       );
 
       expect(mockFn).toHaveBeenCalledTimes(1);
+      expect(mockFn).toHaveBeenCalledWith(
+        { first: 'first_value', second: 'second_value', third: 'third_value' },
+        expect.anything()
+      );
     });
 
     it('passes correct named args to tool execution', async () => {
@@ -1219,9 +1208,8 @@ describe('executeToolLoop', () => {
         return `received: ${args['name']}, ${args['age']}`;
       });
 
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'application',
+      const toolFn: ApplicationCallable = {
+        ...callable(() => ''),
         params: [
           {
             name: 'name',
@@ -1275,12 +1263,10 @@ describe('executeToolLoop', () => {
 
     it('handles application callable without params metadata', async () => {
       // Application callable without params gets dict as named args
-      const mockFn = vi.fn((args: Record<string, RillValue>) => {
-        expect(args).toEqual({ param: 'value' });
-        return 'success';
-      });
+      const mockFn = vi.fn((_args: Record<string, RillValue>) => 'success');
 
-      const toolFn: RillValue = {
+      // Malformed callable: params is absent, which the typed shape forbids
+      const toolFn = {
         __type: 'callable',
         kind: 'application',
         params: undefined,
@@ -1290,7 +1276,7 @@ describe('executeToolLoop', () => {
 
       const tools = {
         app_tool: toolFn,
-      };
+      } as unknown as RillValue;
 
       let apiCallCount = 0;
       const callbacks = createMockCallbacks({
@@ -1318,20 +1304,24 @@ describe('executeToolLoop', () => {
       );
 
       expect(mockFn).toHaveBeenCalledTimes(1);
+      expect(mockFn).toHaveBeenCalledWith(
+        { param: 'value' },
+        expect.anything()
+      );
     });
 
     it('executes 0-parameter script callable tool successfully', async () => {
       // A script callable with no params — like || { "result" } => $my_tool
       // Provider sends {} as tool input; the else branch must pass [] not [{}].
       // invokeCallable is mocked to capture args and return a known result.
-      const zeroParamScriptTool: RillValue = {
-        __type: 'callable' as const,
-        kind: 'script' as const,
+      const zeroParamScriptTool: ScriptCallable = {
+        __type: 'callable',
+        kind: 'script',
+        returnType: anyTypeValue,
         params: [],
         body: {} as never,
         definingScope: { variables: new Map(), pipeValue: null } as never,
         annotations: { description: 'A tool with no parameters' },
-        paramAnnotations: {},
         isProperty: false,
       };
 
@@ -1554,8 +1544,8 @@ describe('executeToolLoop', () => {
 
       // Both tool calls should be in results
       expect(result.toolCalls).toHaveLength(2);
-      expect(result.toolCalls[0].name).toBe('tool1');
-      expect(result.toolCalls[1].name).toBe('tool2');
+      expect(result.toolCalls[0]?.name).toBe('tool1');
+      expect(result.toolCalls[1]?.name).toBe('tool2');
     });
 
     it('appends tool results to message history', async () => {
@@ -1680,7 +1670,7 @@ describe('executeToolLoop', () => {
       };
 
       let apiCallCount = 0;
-      const mockFormatAssistantMessage = vi.fn(() => ({
+      const mockFormatAssistantMessage = vi.fn((_response: unknown) => ({
         role: 'assistant',
         content: '',
       }));
@@ -1728,7 +1718,7 @@ describe('executeToolLoop', () => {
       };
 
       let apiCallCount = 0;
-      const mockFormatAssistantMessage = vi.fn(() => ({
+      const mockFormatAssistantMessage = vi.fn((_response: unknown) => ({
         role: 'assistant',
         content: '',
       }));
@@ -1792,9 +1782,10 @@ describe('executeToolLoop', () => {
 
   describe('dict-form tools validation', () => {
     // Shared mock ScriptCallable with annotations
-    const mockScriptCallable: RillValue = {
-      __type: 'callable' as const,
-      kind: 'script' as const,
+    const mockScriptCallable: ScriptCallable = {
+      __type: 'callable',
+      kind: 'script',
+      returnType: anyTypeValue,
       params: [
         {
           name: 'query',
@@ -1809,14 +1800,12 @@ describe('executeToolLoop', () => {
         pipeValue: null,
       } as never,
       annotations: { description: 'Search the web' },
-      paramAnnotations: {},
       isProperty: false,
     };
 
     // Shared mock ApplicationCallable with description
-    const mockAppCallable: RillValue = {
-      __type: 'callable' as const,
-      kind: 'application' as const,
+    const mockAppCallable: ApplicationCallable = {
+      ...callable(() => ''),
       params: [
         {
           name: 'q',
@@ -1825,7 +1814,7 @@ describe('executeToolLoop', () => {
           annotations: {},
         },
       ],
-      fn: (args: Record<string, RillValue>) => args['q'],
+      fn: (args: Record<string, RillValue>) => args['q'] ?? null,
       annotations: { description: 'My tool description' },
       isProperty: false,
     };
@@ -1996,9 +1985,8 @@ describe('executeToolLoop', () => {
 
     describe('callable with no params is valid', () => {
       it('accepts callable with empty params array', async () => {
-        const noParamsTool: RillValue = {
-          __type: 'callable' as const,
-          kind: 'application' as const,
+        const noParamsTool: ApplicationCallable = {
+          ...callable(() => ''),
           params: [],
           fn: () => 'result',
           isProperty: false,
@@ -2013,7 +2001,8 @@ describe('executeToolLoop', () => {
 
     describe('ApplicationCallable with params: undefined is valid', () => {
       it('accepts ApplicationCallable with undefined params', async () => {
-        const unparamTool: RillValue = {
+        // Malformed callable: params is absent, which the typed shape forbids
+        const unparamTool = {
           __type: 'callable' as const,
           kind: 'application' as const,
           params: undefined,
@@ -2030,9 +2019,8 @@ describe('executeToolLoop', () => {
 
     describe('callable with no description produces empty string', () => {
       it('uses empty string when ApplicationCallable has no description', async () => {
-        const noDescTool: RillValue = {
-          __type: 'callable' as const,
-          kind: 'application' as const,
+        const noDescTool: ApplicationCallable = {
+          ...callable(() => ''),
           params: [],
           fn: () => 'result',
           isProperty: false,
@@ -2059,14 +2047,14 @@ describe('executeToolLoop', () => {
       });
 
       it('uses empty string when ScriptCallable has no description annotation', async () => {
-        const noDescScript: RillValue = {
-          __type: 'callable' as const,
-          kind: 'script' as const,
+        const noDescScript: ScriptCallable = {
+          __type: 'callable',
+          kind: 'script',
+          returnType: anyTypeValue,
           params: [],
           body: {} as never,
           definingScope: { variables: new Map(), pipeValue: null } as never,
           annotations: {},
-          paramAnnotations: {},
           isProperty: false,
         };
         const tools = { quiet: noDescScript } as unknown as RillValue;

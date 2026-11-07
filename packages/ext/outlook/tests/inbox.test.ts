@@ -3,7 +3,15 @@
  * Covers: AC-2, AC-5, AC-16, AC-17, AC-18, AC-19, AC-22, AC-31, AC-32, AC-33, EC-3, EC-4.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   createRuntimeContext,
   type ApplicationCallable,
@@ -25,15 +33,12 @@ function getCallable(
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
-function mockFetchJson(
-  status: number,
-  body: unknown
-): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
+function mockFetchJson(status: number, body: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: vi.fn().mockResolvedValue(body),
-  });
+  } as unknown as Response);
 }
 
 // ============================================================
@@ -175,10 +180,13 @@ describe('inbox() host function', () => {
   it('caps top at configured maxResults [AC-32]', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension({
-      ...BEARER_CONFIG,
-      mail: { maxResults: 10 },
-    });
+    const ext = createOutlookExtension(
+      {
+        ...BEARER_CONFIG,
+        mail: { maxResults: 10 },
+      },
+      makeFactoryCtx()
+    );
     const ctx = createRuntimeContext();
 
     // Request 999, but maxResults is 10
@@ -242,12 +250,21 @@ describe('inbox() host function', () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
 
-    const ext = createOutlookExtension({
-      auth: { type: 'session', tokenVar: 'myToken' },
-      capabilities: {
-        mail: { read: true, send: true, draft: true, flag: true, search: true },
+    const ext = createOutlookExtension(
+      {
+        auth: { type: 'session', tokenVar: 'myToken' },
+        capabilities: {
+          mail: {
+            read: true,
+            send: true,
+            draft: true,
+            flag: true,
+            search: true,
+          },
+        },
       },
-    });
+      makeFactoryCtx()
+    );
     const ctx = createRuntimeContext();
     ctx.variables.set('myToken', 'session-token-abc');
 
@@ -322,10 +339,13 @@ describe('inbox() host function', () => {
     it('uses mailFolders/{folder}/messages path when folder is in allowlist [AC-22]', async () => {
       const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
       globalThis.fetch = mockFetch;
-      const ext = createOutlookExtension({
-        ...BEARER_CONFIG,
-        mail: { folders: ['inbox', 'sent'] },
-      });
+      const ext = createOutlookExtension(
+        {
+          ...BEARER_CONFIG,
+          mail: { folders: ['inbox', 'sent'] },
+        },
+        makeFactoryCtx()
+      );
       const ctx = createRuntimeContext();
 
       await getCallable(ext, 'inbox').fn({ folder: 'sent' }, ctx);

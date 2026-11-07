@@ -88,8 +88,11 @@ describe('text extension factory', () => {
     it('calling dispose() twice does not throw', async () => {
       const ext = createTextExtensionT();
 
-      await expect(ext.dispose()).resolves.toBeUndefined();
-      await expect(ext.dispose()).resolves.toBeUndefined();
+      const dispose = ext.dispose;
+      expect(dispose).toBeDefined();
+
+      await expect(dispose!()).resolves.toBeUndefined();
+      await expect(dispose!()).resolves.toBeUndefined();
     });
   });
 });

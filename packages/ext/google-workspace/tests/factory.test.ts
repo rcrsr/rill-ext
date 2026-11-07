@@ -10,6 +10,7 @@ import {
   RuntimeError,
   createRuntimeContext,
   type ApplicationCallable,
+  type ExtensionFactoryResult,
   isInvalid,
   getStatus,
   type RillValue,
@@ -20,6 +21,13 @@ import { createGoogleWorkspaceExtension } from '../src/factory.js';
 // ============================================================
 // HELPERS
 // ============================================================
+
+async function disposeExt(ext: ExtensionFactoryResult): Promise<void> {
+  if (ext.dispose === undefined) {
+    throw new Error('extension result has no dispose');
+  }
+  await ext.dispose();
+}
 
 function getCallable(
   ext: { value: unknown },
@@ -291,7 +299,7 @@ describe('createGoogleWorkspaceExtension', () => {
         makeFactoryCtx()
       );
       const ctx = createRuntimeContext();
-      await ext.dispose();
+      await disposeExt(ext);
       const caught = (await getCallable(ext, 'gmail_search').fn(
         { query: 'hello' },
         ctx
@@ -307,7 +315,7 @@ describe('createGoogleWorkspaceExtension', () => {
         makeFactoryCtx()
       );
       const ctx = createRuntimeContext();
-      await ext.dispose();
+      await disposeExt(ext);
       for (const name of EXPECTED_CALLABLE_NAMES) {
         const caught = (await getCallable(ext, name).fn({}, ctx)) as RillValue;
         expect(isInvalid(caught)).toBe(true);
@@ -327,9 +335,9 @@ describe('createGoogleWorkspaceExtension', () => {
         BEARER_CONFIG,
         makeFactoryCtx()
       );
-      await ext.dispose();
+      await disposeExt(ext);
       // Second call must not throw
-      await expect(ext.dispose()).resolves.toBeUndefined();
+      await expect(disposeExt(ext)).resolves.toBeUndefined();
     });
 
     it('third dispose call also succeeds', async () => {
@@ -337,9 +345,9 @@ describe('createGoogleWorkspaceExtension', () => {
         BEARER_CONFIG,
         makeFactoryCtx()
       );
-      await ext.dispose();
-      await ext.dispose();
-      await expect(ext.dispose()).resolves.toBeUndefined();
+      await disposeExt(ext);
+      await disposeExt(ext);
+      await expect(disposeExt(ext)).resolves.toBeUndefined();
     });
   });
 
@@ -359,7 +367,7 @@ describe('createGoogleWorkspaceExtension', () => {
       );
       const ctx = createRuntimeContext();
 
-      await ext.dispose();
+      await disposeExt(ext);
 
       const caught = (await getCallable(ext, 'gmail_search').fn(
         { query: 'test' },
@@ -379,7 +387,7 @@ describe('createGoogleWorkspaceExtension', () => {
         makeFactoryCtx()
       );
       const ctx = createRuntimeContext();
-      await ext.dispose();
+      await disposeExt(ext);
 
       for (const name of EXPECTED_CALLABLE_NAMES) {
         const caught = (await getCallable(ext, name).fn({}, ctx)) as RillValue;
@@ -448,7 +456,7 @@ describe('createGoogleWorkspaceExtension', () => {
       // Because notImplemented() stubs throw synchronously before touching
       // the controller, we verify the EC-20 path at the level that matters:
       // a post-dispose call must not produce "request timeout".
-      await ext.dispose();
+      await disposeExt(ext);
 
       const result = (await getCallable(ext, 'gmail_read').fn(
         { message_id: 'abc' },
@@ -552,7 +560,7 @@ describe('createGoogleWorkspaceExtension', () => {
       await Promise.resolve();
 
       // Dispose while the call is in-flight: sets isDisposed=true and aborts controllers
-      await ext.dispose();
+      await disposeExt(ext);
 
       // Assert: the in-flight call resolves to an invalid #DISPOSED RillValue
       const result = (await inflight) as RillValue;
@@ -600,7 +608,7 @@ describe('createGoogleWorkspaceExtension', () => {
       await Promise.resolve();
 
       // Dispose aborts all three in-flight controllers
-      await ext.dispose();
+      await disposeExt(ext);
 
       // All three resolve to invalid #DISPOSED RillValues (aborted by dispose)
       const results = await Promise.allSettled(calls);
@@ -651,7 +659,7 @@ describe('createGoogleWorkspaceExtension', () => {
       );
       await Promise.resolve();
       await Promise.resolve();
-      await ext.dispose();
+      await disposeExt(ext);
 
       // a) In-flight call: dispose sets isDisposed=true and aborts → "operation cancelled"
       const inflightErr = (await inflight) as RillValue;
@@ -727,7 +735,7 @@ describe('createGoogleWorkspaceExtension', () => {
       );
 
       // dispose() must complete without throwing
-      await expect(ext.dispose()).resolves.toBeUndefined();
+      await expect(disposeExt(ext)).resolves.toBeUndefined();
 
       // Post-dispose: cache is cleared and all calls emit #DISPOSED (not a cache hit)
       const caught = (await getCallable(ext, 'gmail_search').fn(

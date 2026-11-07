@@ -3,15 +3,22 @@
  * Validates config validation and lifecycle management
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
+import type { LLMExtensionConfig } from '../src/index.js';
 
 // ============================================================
 // VALIDATION TESTS
 // ============================================================
 
 describe('createGeminiExtension', () => {
+  describe('barrel types', () => {
+    it('exports LLMExtensionConfig as an object type', () => {
+      expectTypeOf<LLMExtensionConfig>().toBeObject();
+    });
+  });
+
   describe('configuration validation', () => {
     // EC-1: Missing api_key
     it('throws when api_key is missing', () => {

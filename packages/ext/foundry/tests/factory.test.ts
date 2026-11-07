@@ -9,6 +9,16 @@ import { createRuntimeContext } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
 import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
+type HostFns = Record<
+  string,
+  { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
+>;
+
+/** Narrow an extension result value to its name-keyed host functions. */
+function getHostFns(ext: { value: unknown }): HostFns {
+  return ext.value as HostFns;
+}
+
 // ============================================================
 // MODULE MOCK
 // ============================================================
@@ -168,12 +178,12 @@ describe('createFoundryExtension', () => {
       } catch (e) {
         thrown = e;
       }
-      // If it threw, it must NOT be the auth.type error
-      if (thrown !== undefined) {
-        expect((thrown as Error).message).not.toBe(
-          "foundry: auth.type must be 'api-key' or 'entra'"
-        );
-      }
+      // Any failure must be unrelated to auth.type; success leaves thrown undefined
+      const thrownMessage =
+        thrown instanceof Error ? thrown.message : undefined;
+      expect(thrownMessage).not.toBe(
+        "foundry: auth.type must be 'api-key' or 'entra'"
+      );
     });
   });
 
@@ -227,10 +237,7 @@ describe('createFoundryExtension', () => {
       };
 
       const ext = await createFoundryExtension(config);
-      const value = ext.value as Record<
-        string,
-        { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-      >;
+      const value = getHostFns(ext);
       const messageFn = value['message']!;
       const ctx = createRuntimeContext();
 
@@ -250,10 +257,7 @@ describe('createFoundryExtension', () => {
       } as FoundryConfig;
 
       const ext = await createFoundryExtension(config);
-      const value = ext.value as Record<
-        string,
-        { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-      >;
+      const value = getHostFns(ext);
       const messageFn = value['message']!;
       const ctx = createRuntimeContext();
 
@@ -273,10 +277,7 @@ describe('createFoundryExtension', () => {
       } as FoundryConfig;
 
       const ext = await createFoundryExtension(config);
-      const value = ext.value as Record<
-        string,
-        { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-      >;
+      const value = getHostFns(ext);
       const messageFn = value['message']!;
       const ctx = createRuntimeContext();
 
@@ -380,10 +381,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-      >;
+      const value = getHostFns(ext);
       const messageFn = value['message']!;
       const ctx = createRuntimeContext();
 
@@ -398,15 +396,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        {
-          fn: (
-            args: Record<string, unknown>,
-            ctx: unknown
-          ) => unknown | Promise<unknown>;
-        }
-      >;
+      const value = getHostFns(ext);
       const embedFn = value['embed']!;
       const ctx = createRuntimeContext();
 
@@ -424,10 +414,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-      >;
+      const value = getHostFns(ext);
       const usageFn = value['usage']!;
       const ctx = createRuntimeContext();
 
@@ -442,15 +429,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        {
-          fn: (
-            args: Record<string, unknown>,
-            ctx: unknown
-          ) => unknown | Promise<unknown>;
-        }
-      >;
+      const value = getHostFns(ext);
       const shieldFn = value['shield']!;
       const ctx = createRuntimeContext();
 
@@ -468,15 +447,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        {
-          fn: (
-            args: Record<string, unknown>,
-            ctx: unknown
-          ) => unknown | Promise<unknown>;
-        }
-      >;
+      const value = getHostFns(ext);
       const groundFn = value['ground']!;
       const ctx = createRuntimeContext();
 
@@ -494,15 +465,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        {
-          fn: (
-            args: Record<string, unknown>,
-            ctx: unknown
-          ) => unknown | Promise<unknown>;
-        }
-      >;
+      const value = getHostFns(ext);
       const searchFn = value['search']!;
       const ctx = createRuntimeContext();
 
@@ -523,15 +486,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        {
-          fn: (
-            args: Record<string, unknown>,
-            ctx: unknown
-          ) => unknown | Promise<unknown>;
-        }
-      >;
+      const value = getHostFns(ext);
       const embedBatchFn = value['embed_batch']!;
       const ctx = createRuntimeContext();
 
@@ -549,10 +504,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        { fn: (args: Record<string, unknown>, ctx: unknown) => unknown }
-      >;
+      const value = getHostFns(ext);
       const toolLoopFn = value['tool_loop']!;
       const ctx = createRuntimeContext();
 
@@ -570,15 +522,7 @@ describe('createFoundryExtension', () => {
       const ext = await createFoundryExtension(validConfig());
       await ext.dispose?.();
 
-      const value = ext.value as Record<
-        string,
-        {
-          fn: (
-            args: Record<string, unknown>,
-            ctx: unknown
-          ) => unknown | Promise<unknown>;
-        }
-      >;
+      const value = getHostFns(ext);
       const generateFn = value['generate']!;
       const ctx = createRuntimeContext();
 

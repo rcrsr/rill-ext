@@ -303,7 +303,7 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
       api_key: 'test-key-anthropic',
       model: 'claude-sonnet-4-5-20250929',
     });
-    const anthropicResult = getCallable(anthropicExt, 'message').fn(
+    const anthropicResult = await getCallable(anthropicExt, 'message').fn(
       { prompt: closureResult },
       ctx
     );
@@ -314,7 +314,7 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
       api_key: 'test-key-openai',
       model: 'gpt-4-turbo',
     });
-    const openaiResult = getCallable(openaiExt, 'message').fn(
+    const openaiResult = await getCallable(openaiExt, 'message').fn(
       { prompt: closureResult },
       ctx
     );

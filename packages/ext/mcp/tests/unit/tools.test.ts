@@ -116,7 +116,7 @@ describe('generateToolFunctions', () => {
       const functions = generateToolFunctions([TOOL_WITH_PARAMS], mockClient);
 
       expect(functions).toHaveProperty('calculate_bmi');
-      const fn = functions.calculate_bmi!;
+      const fn = functions['calculate_bmi']!;
 
       expect(fn.params).toHaveLength(2);
       expect(fn.params[0]).toMatchObject({
@@ -129,7 +129,7 @@ describe('generateToolFunctions', () => {
         type: { kind: 'number' },
         annotations: { description: 'Height in meters' },
       });
-      expect(fn.annotations?.description).toBe('Calculate Body Mass Index');
+      expect(fn.annotations?.['description']).toBe('Calculate Body Mass Index');
       expect(fn.returnType).toEqual(anyTypeValue);
       expect(typeof fn.fn).toBe('function');
     });
@@ -139,7 +139,7 @@ describe('generateToolFunctions', () => {
       const functions = generateToolFunctions([TOOL_NO_PARAMS], mockClient);
 
       expect(functions).toHaveProperty('get_status');
-      const fn = functions.get_status!;
+      const fn = functions['get_status']!;
 
       expect(fn.params).toHaveLength(0);
       expect(fn.returnType).toEqual(anyTypeValue);
@@ -152,7 +152,7 @@ describe('generateToolFunctions', () => {
         mockClient
       );
 
-      const fn = functions.search!;
+      const fn = functions['search']!;
       expect(fn.params).toHaveLength(2);
       expect(fn.params[0]!.defaultValue).toBeUndefined();
       expect(fn.params[1]!.defaultValue).toBeUndefined();
@@ -193,7 +193,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
 
       expect(result).toEqual(mockData);
     });
@@ -205,7 +205,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
 
       expect(result).toBe('success');
     });
@@ -221,7 +221,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
 
       expect(result).toEqual({
         type: 'image',
@@ -239,7 +239,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
 
       expect(result).toBe('line 1\nline 2\nline 3');
     });
@@ -255,7 +255,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
 
       expect(result).toEqual({
         content: [
@@ -272,7 +272,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
 
       expect(result).toBe('');
     });
@@ -285,7 +285,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
 
       expect(result).toEqual(arrayData);
     });
@@ -297,7 +297,7 @@ describe('generateToolFunctions', () => {
         [TOOL_NO_PARAMS],
         mockClient as unknown as Client
       );
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
 
       expect(result).toBe(42);
     });
@@ -318,7 +318,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp tool "get-status": invalid input'
       );
     });
@@ -333,7 +333,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.calculate_bmi!.fn(
+        functions['calculate_bmi']!.fn(
           { weight_kg: 70, height_m: 1.75 },
           makeRuntimeCtx()
         ),
@@ -359,7 +359,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp: protocol error'
       );
     });
@@ -374,7 +374,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp: protocol error'
       );
     });
@@ -398,7 +398,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp tool "get-status": timeout after 50ms'
       );
     });
@@ -416,7 +416,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.calculate_bmi!.fn(
+        functions['calculate_bmi']!.fn(
           { weight_kg: 70, height_m: 1.75 },
           makeRuntimeCtx()
         ),
@@ -439,7 +439,7 @@ describe('generateToolFunctions', () => {
         100
       );
 
-      const result = await functions.get_status!.fn({}, makeRuntimeCtx());
+      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
       expect(result).toBe('ok');
     });
   });
@@ -459,7 +459,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp: connection lost'
       );
     });
@@ -476,7 +476,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp: connection lost'
       );
     });
@@ -497,7 +497,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp: authentication failed'
       );
     });
@@ -512,7 +512,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'token may be expired'
       );
     });
@@ -527,7 +527,7 @@ describe('generateToolFunctions', () => {
       );
 
       await expectRejectsInvalid(
-        functions.get_status!.fn({}, makeRuntimeCtx()),
+        functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp: authentication failed'
       );
     });
@@ -547,7 +547,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await functions.calculate_bmi!.fn(
+      await functions['calculate_bmi']!.fn(
         { weight_kg: 70, height_m: 1.75 },
         makeRuntimeCtx()
       );
@@ -572,7 +572,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      await functions.search!.fn({ query: 'test' }, makeRuntimeCtx());
+      await functions['search']!.fn({ query: 'test' }, makeRuntimeCtx());
 
       expect(mockClient.callTool).toHaveBeenCalledWith({
         name: 'search',
@@ -611,7 +611,7 @@ describe('generateToolFunctions', () => {
         mockClient as unknown as Client
       );
 
-      const fn = functions.large_tool;
+      const fn = functions['large_tool'];
       expect(fn).toBeDefined();
       expect(fn!.params).toHaveLength(100);
 
@@ -634,7 +634,7 @@ describe('generateToolFunctions', () => {
       const mockClient = createMockClient() as unknown as Client;
       const functions = generateToolFunctions([TOOL_NO_PARAMS], mockClient);
 
-      expect(functions.get_status!.returnType).toEqual(anyTypeValue);
+      expect(functions['get_status']!.returnType).toEqual(anyTypeValue);
     });
 
     it('returns structureToTypeValue for object outputSchema with properties', () => {
@@ -654,7 +654,7 @@ describe('generateToolFunctions', () => {
       const mockClient = createMockClient() as unknown as Client;
       const functions = generateToolFunctions([tool], mockClient);
 
-      expect(functions.get_status!.returnType).toEqual(
+      expect(functions['get_status']!.returnType).toEqual(
         structureToTypeValue({
           kind: 'dict',
           fields: {
@@ -676,7 +676,7 @@ describe('generateToolFunctions', () => {
       const mockClient = createMockClient() as unknown as Client;
       const functions = generateToolFunctions([tool], mockClient);
 
-      expect(functions.get_status!.returnType).toEqual(
+      expect(functions['get_status']!.returnType).toEqual(
         structureToTypeValue({ kind: 'string' })
       );
     });
@@ -695,7 +695,7 @@ describe('generateToolFunctions', () => {
       const mockClient = createMockClient() as unknown as Client;
       const functions = generateToolFunctions([tool], mockClient);
 
-      expect(functions.get_status!.returnType).toEqual(
+      expect(functions['get_status']!.returnType).toEqual(
         structureToTypeValue({ kind: 'list', element: { kind: 'string' } })
       );
     });
@@ -711,7 +711,7 @@ describe('generateToolFunctions', () => {
       const mockClient = createMockClient() as unknown as Client;
       const functions = generateToolFunctions([tool], mockClient);
 
-      expect(functions.get_status!.returnType).toEqual(
+      expect(functions['get_status']!.returnType).toEqual(
         structureToTypeValue({ kind: 'dict' })
       );
     });

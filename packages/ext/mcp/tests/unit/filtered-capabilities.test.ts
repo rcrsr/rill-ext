@@ -51,10 +51,10 @@ describe('Filtered Capabilities End-to-End', () => {
       const allTools = Array.from({ length: 10 }, (_, i) => ({
         name: `tool${i + 1}`,
         description: `Tool ${i + 1}`,
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: { type: 'object' as const, properties: {} },
       }));
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: allTools,
       });
@@ -79,25 +79,25 @@ describe('Filtered Capabilities End-to-End', () => {
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // Assert - Only 2 tools dict entries generated (tool1, tool2)
-      expect(tools.tool1).toBeDefined();
-      expect(tools.tool2).toBeDefined();
+      expect(tools['tool1']).toBeDefined();
+      expect(tools['tool2']).toBeDefined();
 
       // Other tools NOT generated as tools dict entries
-      expect(tools.tool3).toBeUndefined();
-      expect(tools.tool4).toBeUndefined();
-      expect(tools.tool5).toBeUndefined();
-      expect(tools.tool6).toBeUndefined();
-      expect(tools.tool7).toBeUndefined();
-      expect(tools.tool8).toBeUndefined();
-      expect(tools.tool9).toBeUndefined();
-      expect(tools.tool10).toBeUndefined();
+      expect(tools['tool3']).toBeUndefined();
+      expect(tools['tool4']).toBeUndefined();
+      expect(tools['tool5']).toBeUndefined();
+      expect(tools['tool6']).toBeUndefined();
+      expect(tools['tool7']).toBeUndefined();
+      expect(tools['tool8']).toBeUndefined();
+      expect(tools['tool9']).toBeUndefined();
+      expect(tools['tool10']).toBeUndefined();
 
       // Assert - Introspection returns callable dict for filtered tools
-      expect(fns.tools).toBeDefined();
-      const allToolsDict = fns.tools as Record<string, unknown>;
+      expect(fns['tools']).toBeDefined();
+      const allToolsDict = fns['tools'] as Record<string, unknown>;
       // Only filtered tools (tool1, tool2) are present in the callable dict
       expect(Object.keys(allToolsDict)).toHaveLength(2);
       expect(allToolsDict['tool1']).toBeDefined();
@@ -109,10 +109,10 @@ describe('Filtered Capabilities End-to-End', () => {
       const allTools = Array.from({ length: 5 }, (_, i) => ({
         name: `tool${i + 1}`,
         description: `Tool ${i + 1}`,
-        inputSchema: { type: 'object', properties: {} },
+        inputSchema: { type: 'object' as const, properties: {} },
       }));
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: allTools,
       });
@@ -137,29 +137,41 @@ describe('Filtered Capabilities End-to-End', () => {
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // Assert - All 5 tools dict entries generated
-      expect(tools.tool1).toBeDefined();
-      expect(tools.tool2).toBeDefined();
-      expect(tools.tool3).toBeDefined();
-      expect(tools.tool4).toBeDefined();
-      expect(tools.tool5).toBeDefined();
+      expect(tools['tool1']).toBeDefined();
+      expect(tools['tool2']).toBeDefined();
+      expect(tools['tool3']).toBeDefined();
+      expect(tools['tool4']).toBeDefined();
+      expect(tools['tool5']).toBeDefined();
 
       // Assert - Introspection returns callable dict for all 5 tools
-      const allToolsDict = fns.tools as Record<string, unknown>;
+      const allToolsDict = fns['tools'] as Record<string, unknown>;
       expect(Object.keys(allToolsDict)).toHaveLength(5);
     });
 
     it('generates no functions when filter matches no tools', async () => {
       // Arrange - Mock server with 3 tools, filter matches none
       const allTools = [
-        { name: 'tool1', description: 'Tool 1', inputSchema: {} },
-        { name: 'tool2', description: 'Tool 2', inputSchema: {} },
-        { name: 'tool3', description: 'Tool 3', inputSchema: {} },
+        {
+          name: 'tool1',
+          description: 'Tool 1',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'tool2',
+          description: 'Tool 2',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'tool3',
+          description: 'Tool 3',
+          inputSchema: { type: 'object' as const },
+        },
       ];
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: allTools,
       });
@@ -184,15 +196,15 @@ describe('Filtered Capabilities End-to-End', () => {
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // Assert - No tools dict entries generated
-      expect(tools.tool1).toBeUndefined();
-      expect(tools.tool2).toBeUndefined();
-      expect(tools.tool3).toBeUndefined();
+      expect(tools['tool1']).toBeUndefined();
+      expect(tools['tool2']).toBeUndefined();
+      expect(tools['tool3']).toBeUndefined();
 
       // Assert - Introspection returns empty callable dict (filter matched nothing)
-      const allToolsDict = fns.tools as Record<string, unknown>;
+      const allToolsDict = fns['tools'] as Record<string, unknown>;
       expect(Object.keys(allToolsDict)).toHaveLength(0);
     });
   });
@@ -201,12 +213,24 @@ describe('Filtered Capabilities End-to-End', () => {
     it('applies _2 suffix to colliding names within filtered set', async () => {
       // Arrange - Mock server with colliding tool names
       const allTools = [
-        { name: 'read-file', description: 'Read file tool', inputSchema: {} },
-        { name: 'readFile', description: 'Read file alt', inputSchema: {} },
-        { name: 'other-tool', description: 'Other tool', inputSchema: {} },
+        {
+          name: 'read-file',
+          description: 'Read file tool',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'readFile',
+          description: 'Read file alt',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'other-tool',
+          description: 'Other tool',
+          inputSchema: { type: 'object' as const },
+        },
       ];
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: allTools,
       });
@@ -231,17 +255,17 @@ describe('Filtered Capabilities End-to-End', () => {
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // Assert - First collision gets base name, second gets _2 suffix
-      expect(tools.read_file).toBeDefined();
-      expect(tools.read_file_2).toBeDefined();
+      expect(tools['read_file']).toBeDefined();
+      expect(tools['read_file_2']).toBeDefined();
 
       // Assert - Other tool not included (not in filter)
-      expect(tools.other_tool).toBeUndefined();
+      expect(tools['other_tool']).toBeUndefined();
 
       // Assert - Introspection returns callable dict for filtered tools only
-      const allToolsDict = fns.tools as Record<string, unknown>;
+      const allToolsDict = fns['tools'] as Record<string, unknown>;
       // Both read-file and readFile are in the filter (2 tools, collision-renamed)
       expect(Object.keys(allToolsDict)).toHaveLength(2);
     });
@@ -249,13 +273,29 @@ describe('Filtered Capabilities End-to-End', () => {
     it('handles three-way collision in filtered set', async () => {
       // Arrange - Three tools that collide when sanitized
       const allTools = [
-        { name: 'fetch-data', description: 'Fetch 1', inputSchema: {} },
-        { name: 'fetchData', description: 'Fetch 2', inputSchema: {} },
-        { name: 'fetch.data', description: 'Fetch 3', inputSchema: {} },
-        { name: 'other-tool', description: 'Other', inputSchema: {} },
+        {
+          name: 'fetch-data',
+          description: 'Fetch 1',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'fetchData',
+          description: 'Fetch 2',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'fetch.data',
+          description: 'Fetch 3',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'other-tool',
+          description: 'Other',
+          inputSchema: { type: 'object' as const },
+        },
       ];
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: allTools,
       });
@@ -280,30 +320,42 @@ describe('Filtered Capabilities End-to-End', () => {
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // Assert - Three tools dict entries with collision numbering
-      expect(tools.fetch_data).toBeDefined();
-      expect(tools.fetch_data_2).toBeDefined();
-      expect(tools.fetch_data_3).toBeDefined();
+      expect(tools['fetch_data']).toBeDefined();
+      expect(tools['fetch_data_2']).toBeDefined();
+      expect(tools['fetch_data_3']).toBeDefined();
 
       // Assert - Other tool not included
-      expect(tools.other_tool).toBeUndefined();
+      expect(tools['other_tool']).toBeUndefined();
 
       // Assert - Introspection returns callable dict for filtered tools only (3 collision-renamed)
-      const allToolsDict = fns.tools as Record<string, unknown>;
+      const allToolsDict = fns['tools'] as Record<string, unknown>;
       expect(Object.keys(allToolsDict)).toHaveLength(3);
     });
 
     it('collision numbering independent when different tools filtered', async () => {
       // Arrange - Same colliding names but only one in filter
       const allTools = [
-        { name: 'read-file', description: 'Read file tool', inputSchema: {} },
-        { name: 'readFile', description: 'Read file alt', inputSchema: {} },
-        { name: 'other-tool', description: 'Other tool', inputSchema: {} },
+        {
+          name: 'read-file',
+          description: 'Read file tool',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'readFile',
+          description: 'Read file alt',
+          inputSchema: { type: 'object' as const },
+        },
+        {
+          name: 'other-tool',
+          description: 'Other tool',
+          inputSchema: { type: 'object' as const },
+        },
       ];
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: allTools,
       });
@@ -328,12 +380,12 @@ describe('Filtered Capabilities End-to-End', () => {
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // Assert - No collision, no _2 suffix needed
-      expect(tools.read_file).toBeDefined();
-      expect(tools.other_tool).toBeDefined();
-      expect(tools.read_file_2).toBeUndefined(); // Second not included in filter
+      expect(tools['read_file']).toBeDefined();
+      expect(tools['other_tool']).toBeDefined();
+      expect(tools['read_file_2']).toBeUndefined(); // Second not included in filter
     });
   });
 
@@ -341,9 +393,9 @@ describe('Filtered Capabilities End-to-End', () => {
     it('filters tools while leaving resources and prompts unfiltered', async () => {
       // Arrange - Multiple capability types
       const allTools = [
-        { name: 'tool1', inputSchema: {} },
-        { name: 'tool2', inputSchema: {} },
-        { name: 'tool3', inputSchema: {} },
+        { name: 'tool1', inputSchema: { type: 'object' as const } },
+        { name: 'tool2', inputSchema: { type: 'object' as const } },
+        { name: 'tool3', inputSchema: { type: 'object' as const } },
       ];
       const allResources = [
         { uri: 'file://resource1', name: 'Resource 1' },
@@ -354,7 +406,7 @@ describe('Filtered Capabilities End-to-End', () => {
         { name: 'prompt2', description: 'Prompt 2' },
       ];
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: allTools,
       });
@@ -380,36 +432,36 @@ describe('Filtered Capabilities End-to-End', () => {
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
-      const resources = fns.resources as Record<string, unknown>;
-      const prompts = fns.prompts as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
+      const resources = fns['resources'] as Record<string, unknown>;
+      const prompts = fns['prompts'] as Record<string, unknown>;
 
       // Assert - Only tool1 tools dict entry generated
-      expect(tools.tool1).toBeDefined();
-      expect(tools.tool2).toBeUndefined();
-      expect(tools.tool3).toBeUndefined();
+      expect(tools['tool1']).toBeDefined();
+      expect(tools['tool2']).toBeUndefined();
+      expect(tools['tool3']).toBeUndefined();
 
       // Assert - read_resource exists in resources dict (not filtered)
-      expect(resources.read_resource).toBeDefined();
+      expect(resources['read_resource']).toBeDefined();
 
       // Assert - Prompt functions generated for all prompts (not filtered)
-      expect(prompts.prompt1).toBeDefined();
-      expect(prompts.prompt2).toBeDefined();
+      expect(prompts['prompt1']).toBeDefined();
+      expect(prompts['prompt2']).toBeDefined();
 
       // Assert - tools returns callable dict for filtered tools only (tool1)
-      const toolsDict = fns.tools as Record<string, unknown>;
+      const toolsDict = fns['tools'] as Record<string, unknown>;
       expect(Object.keys(toolsDict)).toHaveLength(1);
       expect(toolsDict['tool1']).toBeDefined();
 
       // Assert - resources returns callable dict (read_resource + 2 static resource functions)
-      const resourcesDict = fns.resources as Record<string, unknown>;
+      const resourcesDict = fns['resources'] as Record<string, unknown>;
       expect(Object.keys(resourcesDict)).toHaveLength(3);
       expect(resourcesDict['read_resource']).toBeDefined();
       expect(resourcesDict['resource_resource_1']).toBeDefined();
       expect(resourcesDict['resource_resource_2']).toBeDefined();
 
       // Assert - prompts returns callable dict for all unfiltered prompts
-      const promptsDict = fns.prompts as Record<string, unknown>;
+      const promptsDict = fns['prompts'] as Record<string, unknown>;
       expect(Object.keys(promptsDict)).toHaveLength(2);
       expect(promptsDict['prompt1']).toBeDefined();
       expect(promptsDict['prompt2']).toBeDefined();
@@ -418,8 +470,8 @@ describe('Filtered Capabilities End-to-End', () => {
     it('applies filters to all capability types independently', async () => {
       // Arrange - All capability types with filters
       const allTools = [
-        { name: 'tool1', inputSchema: {} },
-        { name: 'tool2', inputSchema: {} },
+        { name: 'tool1', inputSchema: { type: 'object' as const } },
+        { name: 'tool2', inputSchema: { type: 'object' as const } },
       ];
       const allResources = [
         { uri: 'file://resource1', name: 'Resource 1' },
@@ -430,7 +482,7 @@ describe('Filtered Capabilities End-to-End', () => {
         { name: 'prompt2', description: 'Prompt 2' },
       ];
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: allTools,
       });
@@ -457,33 +509,33 @@ describe('Filtered Capabilities End-to-End', () => {
       // Act
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
-      const resources = fns.resources as Record<string, unknown>;
-      const prompts = fns.prompts as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
+      const resources = fns['resources'] as Record<string, unknown>;
+      const prompts = fns['prompts'] as Record<string, unknown>;
 
       // Assert - Only filtered tools dict entries generated
-      expect(tools.tool1).toBeDefined();
-      expect(tools.tool2).toBeUndefined();
+      expect(tools['tool1']).toBeDefined();
+      expect(tools['tool2']).toBeUndefined();
 
-      expect(prompts.prompt1).toBeDefined();
-      expect(prompts.prompt2).toBeUndefined();
+      expect(prompts['prompt1']).toBeDefined();
+      expect(prompts['prompt2']).toBeUndefined();
 
       // Assert - read_resource exists in resources dict (resource filter doesn't affect its existence)
-      expect(resources.read_resource).toBeDefined();
+      expect(resources['read_resource']).toBeDefined();
 
       // Assert - tools returns callable dict for filtered tools only (tool1)
-      const toolsDict = fns.tools as Record<string, unknown>;
+      const toolsDict = fns['tools'] as Record<string, unknown>;
       expect(Object.keys(toolsDict)).toHaveLength(1);
       expect(toolsDict['tool1']).toBeDefined();
 
       // Assert - resources returns callable dict (read_resource + filtered static resource)
-      const resourcesDict = fns.resources as Record<string, unknown>;
+      const resourcesDict = fns['resources'] as Record<string, unknown>;
       expect(Object.keys(resourcesDict)).toHaveLength(2);
       expect(resourcesDict['read_resource']).toBeDefined();
       expect(resourcesDict['resource_resource_2']).toBeDefined();
 
       // Assert - prompts returns callable dict for filtered prompts only (prompt1)
-      const promptsDict = fns.prompts as Record<string, unknown>;
+      const promptsDict = fns['prompts'] as Record<string, unknown>;
       expect(Object.keys(promptsDict)).toHaveLength(1);
       expect(promptsDict['prompt1']).toBeDefined();
     });

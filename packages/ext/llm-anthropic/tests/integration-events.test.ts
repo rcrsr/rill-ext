@@ -9,6 +9,7 @@ import {
   createRuntimeContext,
   callable,
   type ApplicationCallable,
+  type RillValue,
   type ExtensionEvent,
 } from '@rcrsr/rill';
 import { APIError } from '@anthropic-ai/sdk';
@@ -27,6 +28,32 @@ function getCallable(
  */
 function createEventCollector(): ExtensionEvent[] {
   return [];
+}
+
+/**
+ * Create an ApplicationCallable carrying a description and typed params.
+ */
+function makeTool(
+  fn: (args: Record<string, RillValue>) => RillValue | Promise<RillValue>,
+  description: string,
+  params: Array<{
+    name: string;
+    type: 'string' | 'number';
+    description?: string;
+  }> = []
+): ApplicationCallable {
+  const base = callable(fn);
+  return {
+    ...base,
+    annotations: { description },
+    params: params.map((p) => ({
+      name: p.name,
+      type: { kind: p.type },
+      defaultValue: undefined,
+      annotations:
+        p.description !== undefined ? { description: p.description } : {},
+    })),
+  };
 }
 
 /**
@@ -174,12 +201,12 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const event = events[0]!;
       expect(event.event).toBe('anthropic:message');
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.model).toBe(TEST_MODEL);
-      expect(event.usage).toEqual({ input: 10, output: 8 });
-      expect(typeof event.duration).toBe('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      expect(event['model']).toBe(TEST_MODEL);
+      expect(event['usage']).toEqual({ input: 10, output: 8 });
+      expect(typeof event['duration']).toBe('number');
+      expect(event['duration']).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
-      expect(event.request).toBeDefined();
+      expect(event['request']).toBeDefined();
       // content field removed from anthropic:message event in new factory
     });
   });
@@ -234,12 +261,12 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       // Event name is anthropic:message (messages verb removed)
       expect(event.event).toBe('anthropic:message');
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.model).toBe(TEST_MODEL);
-      expect(event.usage).toEqual({ input: 20, output: 15 });
-      expect(typeof event.duration).toBe('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      expect(event['model']).toBe(TEST_MODEL);
+      expect(event['usage']).toEqual({ input: 20, output: 15 });
+      expect(typeof event['duration']).toBe('number');
+      expect(event['duration']).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
-      expect(event.request).toBeDefined();
+      expect(event['request']).toBeDefined();
     });
   });
 
@@ -271,8 +298,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const event = errorEvents[0]!;
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.error).toContain('embeddings API not available');
-      expect(typeof event.duration).toBe('number');
+      expect(event['error']).toContain('embeddings API not available');
+      expect(typeof event['duration']).toBe('number');
       expect(typeof event.timestamp).toBe('string');
     });
   });
@@ -303,7 +330,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const event = errorEvents[0]!;
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.error).toContain('embeddings API not available');
+      expect(event['error']).toContain('embeddings API not available');
     });
   });
 
@@ -359,25 +386,14 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // Define tool
-      const weatherFn = callable(
-        vi.fn().mockReturnValue('18°C, partly cloudy')
+      const weatherFn = makeTool(
+        vi.fn().mockReturnValue('18°C, partly cloudy'),
+        'Get weather for location',
+        [
+          { name: 'location', type: 'string', description: 'City name' },
+          { name: 'unit', type: 'string', description: 'Temperature unit' },
+        ]
       );
-      (weatherFn as Record<string, unknown>)['description'] =
-        'Get weather for location';
-      (weatherFn as Record<string, unknown>)['params'] = [
-        {
-          name: 'location',
-          type: { kind: 'string' },
-          defaultValue: undefined,
-          annotations: { description: 'City name' },
-        },
-        {
-          name: 'unit',
-          type: { kind: 'string' },
-          defaultValue: undefined,
-          annotations: { description: 'Temperature unit' },
-        },
-      ];
 
       const stream = getCallable(ext, 'tool_loop').fn(
         {
@@ -397,8 +413,8 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const event = toolCallEvents[0]!;
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.tool_name).toBe('get_weather');
-      expect(event.args).toEqual({
+      expect(event['tool_name']).toBe('get_weather');
+      expect(event['args']).toEqual({
         location: 'San Francisco',
         unit: 'celsius',
       });
@@ -456,23 +472,14 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const calculateFn = callable(vi.fn().mockReturnValue(8));
-      (calculateFn as Record<string, unknown>)['description'] =
-        'Add two numbers';
-      (calculateFn as Record<string, unknown>)['params'] = [
-        {
-          name: 'a',
-          type: { kind: 'number' },
-          defaultValue: undefined,
-          annotations: {},
-        },
-        {
-          name: 'b',
-          type: { kind: 'number' },
-          defaultValue: undefined,
-          annotations: {},
-        },
-      ];
+      const calculateFn = makeTool(
+        vi.fn().mockReturnValue(8),
+        'Add two numbers',
+        [
+          { name: 'a', type: 'number' },
+          { name: 'b', type: 'number' },
+        ]
+      );
 
       const stream = getCallable(ext, 'tool_loop').fn(
         {
@@ -492,9 +499,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const event = toolResultEvents[0]!;
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.tool_name).toBe('calculate');
-      expect(typeof event.duration).toBe('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      expect(event['tool_name']).toBe('calculate');
+      expect(typeof event['duration']).toBe('number');
+      expect(event['duration']).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
     });
 
@@ -545,10 +552,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const failingTool = callable(() => {
+      const failingTool = makeTool(() => {
         throw new Error('Tool execution error');
-      });
-      (failingTool as Record<string, unknown>)['description'] = 'Always fails';
+      }, 'Always fails');
 
       const stream = getCallable(ext, 'tool_loop').fn(
         {
@@ -567,9 +573,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       expect(toolResultEvents).toHaveLength(1);
 
       const event = toolResultEvents[0]!;
-      expect(event.tool_name).toBe('failing_tool');
-      expect(event.error).toBe('Tool execution error');
-      expect(typeof event.duration).toBe('number');
+      expect(event['tool_name']).toBe('failing_tool');
+      expect(event['error']).toBe('Tool execution error');
+      expect(typeof event['duration']).toBe('number');
     });
   });
 
@@ -603,8 +609,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       });
 
       // EC-14: tools dict must not be empty; provide a dummy tool so the loop can run
-      const dummyTool = callable(() => 'ok');
-      (dummyTool as Record<string, unknown>)['description'] = 'Dummy tool';
+      const dummyTool = makeTool(() => 'ok', 'Dummy tool');
 
       const stream = getCallable(ext, 'tool_loop').fn(
         { prompt: 'Simple question', tools: { dummy: dummyTool }, options: {} },
@@ -620,12 +625,12 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const event = toolLoopEvents[0]!;
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.turns).toBe(1);
-      expect(event.usage).toEqual({ input: 25, output: 10 });
-      expect(typeof event.total_duration).toBe('number');
-      expect(event.total_duration).toBeGreaterThanOrEqual(0);
+      expect(event['turns']).toBe(1);
+      expect(event['usage']).toEqual({ input: 25, output: 10 });
+      expect(typeof event['total_duration']).toBe('number');
+      expect(event['total_duration']).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
-      expect(event.request).toBeDefined();
+      expect(event['request']).toBeDefined();
       // content field removed from anthropic:tool_loop event in new factory
     });
 
@@ -695,10 +700,14 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
         },
       });
 
-      const step1Fn = callable(vi.fn().mockReturnValue('step1 done'));
-      (step1Fn as Record<string, unknown>)['description'] = 'First step';
-      const step2Fn = callable(vi.fn().mockReturnValue('step2 done'));
-      (step2Fn as Record<string, unknown>)['description'] = 'Second step';
+      const step1Fn = makeTool(
+        vi.fn().mockReturnValue('step1 done'),
+        'First step'
+      );
+      const step2Fn = makeTool(
+        vi.fn().mockReturnValue('step2 done'),
+        'Second step'
+      );
 
       const stream = getCallable(ext, 'tool_loop').fn(
         {
@@ -717,9 +726,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       expect(toolLoopEvents).toHaveLength(1);
 
       const event = toolLoopEvents[0]!;
-      expect(event.turns).toBe(3);
+      expect(event['turns']).toBe(3);
       // Accumulated usage: 100+120+130 input, 50+60+20 output
-      expect(event.usage).toEqual({ input: 350, output: 130 });
+      expect(event['usage']).toEqual({ input: 350, output: 130 });
     });
   });
 
@@ -733,7 +742,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
           error: { type: 'authentication_error', message: 'Invalid API key' },
         },
         'Authentication failed',
-        {}
+        new Headers()
       );
 
       // Create a stream whose finalMessage rejects
@@ -769,9 +778,9 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const event = errorEvents[0]!;
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.error).toContain('Authentication failed');
-      expect(typeof event.duration).toBe('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      expect(event['error']).toContain('Authentication failed');
+      expect(typeof event['duration']).toBe('number');
+      expect(event['duration']).toBeGreaterThanOrEqual(0);
       expect(typeof event.timestamp).toBe('string');
     });
 
@@ -818,7 +827,6 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       const stream = getCallable(ext, 'tool_loop').fn(
         {
           prompt: 'Test',
-          tools: undefined as unknown as Record<string, unknown>,
           options: {},
         },
         ctx
@@ -831,7 +839,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
       expect(errorEvents).toHaveLength(1);
 
       const event = errorEvents[0]!;
-      expect(event.error).toContain('tools parameter is required');
+      expect(event['error']).toContain('tools parameter is required');
     });
   });
 
@@ -931,8 +939,7 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       // Test message and tool_loop — messages() verb removed; use message() for both
       // EC-14: tools dict must not be empty; provide a dummy tool
-      const dummyTool = callable(() => 'ok');
-      (dummyTool as Record<string, unknown>)['description'] = 'Dummy tool';
+      const dummyTool = makeTool(() => 'ok', 'Dummy tool');
 
       const stream1 = getCallable(ext, 'message').fn(
         { prompt: 'Test message' },

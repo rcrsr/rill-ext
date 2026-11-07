@@ -30,7 +30,7 @@ describe('Package scaffolding', () => {
 
     it('exports SqliteKvConfig type', () => {
       // Type-only export test - compilation validates this
-      const config: SqliteKvConfig = {};
+      const config: SqliteKvConfig = { mounts: {} };
       expect(config).toBeDefined();
     });
   });

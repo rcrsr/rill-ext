@@ -5,7 +5,15 @@
  * Covers: AC-23, AC-24, AC-25, AC-26, AC-27, AC-28, EC-11, EC-12.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   createRuntimeContext,
   getStatus,
@@ -44,17 +52,17 @@ function expectInvalid(result: unknown, atom: string, message?: string): void {
 }
 
 /** Build a fetch mock returning a non-OK response with the given status. */
-function mockHttpError(status: number): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
+function mockHttpError(status: number): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue({
     ok: false,
     status,
     json: vi.fn().mockResolvedValue({}),
-  });
+  } as unknown as Response);
 }
 
 /** Build a fetch mock that rejects with the given error. */
-function mockFetchReject(error: unknown): ReturnType<typeof vi.fn> {
-  return vi.fn().mockRejectedValue(error);
+function mockFetchReject(error: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockRejectedValue(error);
 }
 
 const BEARER_CONFIG = {

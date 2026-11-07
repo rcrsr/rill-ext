@@ -5,11 +5,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getStatus } from '@rcrsr/rill';
 import { createExecExtension } from '../src/factory.js';
 import { runCommand } from '../src/runner.js';
 import type { CommandConfig } from '../src/types.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import {
+  getCallable,
+  invalidStatus,
+  makeFactoryCtx,
+  makeRuntimeCtx,
+} from './_setup.js';
 
 describe('command execution', () => {
   it('executes command and returns stdout, stderr, exit_code', async () => {
@@ -20,7 +24,7 @@ describe('command execution', () => {
       makeFactoryCtx()
     );
 
-    const result = await ext.value.echo.fn(
+    const result = await getCallable(ext, 'echo').fn(
       { args: ['hello', 'world'] },
       makeRuntimeCtx()
     );
@@ -40,7 +44,7 @@ describe('command execution', () => {
       makeFactoryCtx()
     );
 
-    const result = await ext.value.pwd.fn({}, makeRuntimeCtx());
+    const result = await getCallable(ext, 'pwd').fn({}, makeRuntimeCtx());
 
     expect(result).toMatchObject({
       stdout: expect.any(String),
@@ -57,7 +61,7 @@ describe('command execution', () => {
       makeFactoryCtx()
     );
 
-    const result = await ext.value.echo.fn(
+    const result = await getCallable(ext, 'echo').fn(
       { args: [123, 456, true] },
       makeRuntimeCtx()
     );
@@ -75,7 +79,10 @@ describe('command execution', () => {
       makeFactoryCtx()
     );
 
-    const result = await ext.value.pwd.fn({ args: [] }, makeRuntimeCtx());
+    const result = await getCallable(ext, 'pwd').fn(
+      { args: [] },
+      makeRuntimeCtx()
+    );
     expect((result as { stdout: string }).stdout.trim()).toBe('/tmp');
   });
 
@@ -93,7 +100,7 @@ describe('command execution', () => {
       makeFactoryCtx()
     );
 
-    const result = await ext.value.printenv.fn(
+    const result = await getCallable(ext, 'printenv').fn(
       { args: ['CUSTOM_VAR'] },
       makeRuntimeCtx()
     );
@@ -134,7 +141,7 @@ describe('runner: argument validation', () => {
       undefined,
       makeRuntimeCtx()
     );
-    const status = getStatus(result);
+    const status = invalidStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/not permitted/);
   });
@@ -170,7 +177,7 @@ describe('runner: argument validation', () => {
       undefined,
       makeRuntimeCtx()
     );
-    const status = getStatus(result);
+    const status = invalidStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/is blocked/);
   });
@@ -188,7 +195,7 @@ describe('runner: stdin validation', () => {
       undefined,
       makeRuntimeCtx()
     );
-    const status = getStatus(result);
+    const status = invalidStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/does not support stdin/);
   });
@@ -229,7 +236,7 @@ describe('runner: error handling', () => {
       undefined,
       makeRuntimeCtx()
     );
-    const status = getStatus(result);
+    const status = invalidStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/binary not found/);
   });
@@ -243,7 +250,7 @@ describe('runner: error handling', () => {
       undefined,
       makeRuntimeCtx()
     );
-    const status = getStatus(result);
+    const status = invalidStatus(result);
     expect(status.code.name).toBe('TIMEOUT');
     expect(status.message).toMatch(/timed out.*100ms/);
   });
@@ -257,7 +264,7 @@ describe('runner: error handling', () => {
       undefined,
       makeRuntimeCtx()
     );
-    const status = getStatus(result);
+    const status = invalidStatus(result);
     expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.message).toMatch(/exceeds size limit/);
   });

@@ -6,13 +6,22 @@
  *         EC-4, EC-5, EC-6, EC-12, EC-17.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   createRuntimeContext,
   getStatus,
   isInvalid,
   type ApplicationCallable,
   type ExtensionFactoryCtx,
+  type ExtensionFactoryResult,
   type RillValue,
 } from '@rcrsr/rill';
 import { createSearxngExtension } from '../src/factory.js';
@@ -25,10 +34,10 @@ function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
 }
 
 async function expectInvalidWithMessage(
-  promise: Promise<unknown>,
+  promise: Promise<RillValue> | RillValue,
   needle: string
 ): Promise<RillValue> {
-  const result = (await promise) as RillValue;
+  const result = await promise;
   expect(isInvalid(result)).toBe(true);
   expect(getStatus(result).message).toContain(needle);
   return result;
@@ -46,32 +55,38 @@ function getCallable(
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
+/** Partial Response stand-in: tests supply only the members the extension reads. */
+function asResponse(partial: object): Response {
+  return partial as unknown as Response;
+}
+
 /** Build a fetch mock that returns a JSON response with given status. */
-function mockFetchJson(
-  status: number,
-  body: unknown
-): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: vi.fn().mockResolvedValue(body),
-  });
+function mockFetchJson(status: number, body: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue(
+    asResponse({
+      ok: status >= 200 && status < 300,
+      status,
+      json: vi.fn().mockResolvedValue(body),
+    })
+  );
 }
 
 /** Build a fetch mock that rejects with the given error. */
-function mockFetchReject(error: unknown): ReturnType<typeof vi.fn> {
-  return vi.fn().mockRejectedValue(error);
+function mockFetchReject(error: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockRejectedValue(error);
 }
 
 /** Build a fetch mock whose json() rejects with a SyntaxError (non-JSON response). */
-function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: vi
-      .fn()
-      .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
-  });
+function mockFetchNonJson(status = 200): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue(
+    asResponse({
+      ok: status >= 200 && status < 300,
+      status,
+      json: vi
+        .fn()
+        .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
+    })
+  );
 }
 
 /**
@@ -80,12 +95,14 @@ function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
  */
 async function createTestExtension(
   config?: Partial<SearxngConfig>
-): Promise<{ value: unknown; dispose?: () => Promise<void> }> {
-  globalThis.fetch = vi.fn().mockResolvedValueOnce({
-    ok: true,
-    status: 200,
-    json: vi.fn().mockResolvedValue({ formats: ['html', 'json'] }),
-  });
+): Promise<ExtensionFactoryResult> {
+  globalThis.fetch = vi.fn<typeof fetch>().mockResolvedValueOnce(
+    asResponse({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({ formats: ['html', 'json'] }),
+    })
+  );
   return createSearxngExtension(
     { baseUrl: 'http://localhost:8888', ...config },
     makeFactoryCtx()
@@ -125,7 +142,7 @@ describe('SearXNG extension host functions', () => {
 
   beforeEach(() => {
     originalFetch = globalThis.fetch;
-  }, makeFactoryCtx());
+  });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -291,6 +308,9 @@ describe('SearXNG extension host functions', () => {
           ctx
         )
       ).resolves.toBeDefined();
+
+      const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('time_range=month');
     });
 
     it('accepts time_range: "year" [AC-39]', async () => {
@@ -305,6 +325,9 @@ describe('SearXNG extension host functions', () => {
           ctx
         )
       ).resolves.toBeDefined();
+
+      const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('time_range=year');
     });
 
     it('maps HTTP 401 to server error (no auth header) [AC-17]', async () => {

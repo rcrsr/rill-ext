@@ -67,7 +67,7 @@ function expectInvalid(result: unknown, atom: string, msg?: string): void {
 }
 
 async function expectForbidden(
-  promise: Promise<unknown>,
+  promise: RillValue | Promise<RillValue>,
   msg: string
 ): Promise<void> {
   const result = await promise;

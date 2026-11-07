@@ -182,10 +182,10 @@ describe('sanitizeNames', () => {
         'read.file',
       ]);
       const values = Array.from(result.entries());
-      expect(values[0][1]).toBe('read_file');
-      expect(values[1][1]).toBe('read_file_2');
-      expect(values[2][1]).toBe('read_file_3');
-      expect(values[3][1]).toBe('read_file_4');
+      expect(values[0]?.[1]).toBe('read_file');
+      expect(values[1]?.[1]).toBe('read_file_2');
+      expect(values[2]?.[1]).toBe('read_file_3');
+      expect(values[3]?.[1]).toBe('read_file_4');
     });
   });
 });

@@ -4,14 +4,14 @@
  * Tests config validation and extension shape.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { getStatus } from '@rcrsr/rill';
+import { getStatus, isDict, isInvalid } from '@rcrsr/rill';
 import { createLocalFsExtension } from '../src/factory.js';
 import type { FsLocalExtensionConfig } from '../src/types.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 describe('createLocalFsExtension - factory', () => {
   let tempDir: string;
@@ -26,11 +26,7 @@ describe('createLocalFsExtension - factory', () => {
   });
 
   afterEach(async () => {
-    try {
-      await fs.rm(tempDir, { recursive: true, force: true });
-    } catch {
-      // Ignore cleanup errors
-    }
+    await fs.rm(tempDir, { recursive: true, force: true });
   });
 
   describe('config validation', () => {
@@ -64,7 +60,8 @@ describe('createLocalFsExtension - factory', () => {
         makeFactoryCtx()
       );
 
-      const value = ext.value as Record<string, unknown>;
+      const value = ext.value;
+      if (!isDict(value)) throw new Error('extension value is not a dict');
       expect(value['read']).toBeDefined();
       expect(value['write']).toBeDefined();
       expect(value['append']).toBeDefined();
@@ -94,7 +91,7 @@ describe('createLocalFsExtension - factory', () => {
       await expect(ext.dispose?.()).resolves.toBeUndefined();
     });
 
-    it('applies default maxFileSize of 10MB', async () => {
+    it('accepts a write at the 10MB default limit and rejects one byte over', async () => {
       const ext = await createLocalFsExtension(
         {
           mounts: {
@@ -103,22 +100,34 @@ describe('createLocalFsExtension - factory', () => {
         },
         makeFactoryCtx()
       );
+      const limit = 10485760;
+      const atLimitPath = path.join(testMount, 'at-limit.txt');
+      const overLimitPath = path.join(testMount, 'over-limit.txt');
 
-      const value = ext.value as Record<
-        string,
-        {
-          fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
-        }
-      >;
+      const atLimit = await getCallable(ext, 'write').fn(
+        { path: '/workspace/at-limit.txt', content: 'x'.repeat(limit) },
+        makeRuntimeCtx()
+      );
 
-      // Write content just under 10MB (should succeed)
-      const content = 'x'.repeat(10485760 - 100);
-      await expect(
-        value['write']!.fn(
-          { path: '/workspace/large.txt', content },
-          makeRuntimeCtx()
-        )
-      ).resolves.toBeDefined();
+      expect(isInvalid(atLimit)).toBe(false);
+      expect(atLimit).toBe(String(limit));
+      expect((await fs.stat(atLimitPath)).size).toBe(limit);
+
+      const ctx = makeRuntimeCtx();
+      const invalidateSpy = vi.spyOn(ctx, 'invalidate');
+      const overLimit = await getCallable(ext, 'write').fn(
+        { path: '/workspace/over-limit.txt', content: 'x'.repeat(limit + 1) },
+        ctx
+      );
+
+      expect(isInvalid(overLimit)).toBe(true);
+      expect(getStatus(overLimit).code.name).toBe('UNAVAILABLE');
+      expect(invalidateSpy.mock.calls[0]![1].raw).toMatchObject({
+        kind: 'file_too_large',
+        size: limit + 1,
+        max: limit,
+      });
+      await expect(fs.stat(overLimitPath)).rejects.toThrow(/ENOENT/);
     });
 
     it('applies custom maxFileSize', async () => {
@@ -131,20 +140,13 @@ describe('createLocalFsExtension - factory', () => {
         },
         makeFactoryCtx()
       );
-
-      const value = ext.value as Record<
-        string,
-        {
-          fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
-        }
-      >;
       const content = 'x'.repeat(1001);
 
-      const result = await value['write']!.fn(
+      const result = await getCallable(ext, 'write').fn(
         { path: '/workspace/too-large.txt', content },
         makeRuntimeCtx()
       );
-      const status = getStatus(result as never);
+      const status = getStatus(result);
       expect(status.code.name).toBe('UNAVAILABLE');
       expect(status.message).toMatch(/exceeds size limit/);
     });

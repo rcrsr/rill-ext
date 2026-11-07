@@ -236,7 +236,7 @@ describe('p.list', () => {
     const result = p.list('items');
     expect(result.name).toBe('items');
     expect(result.type).toEqual({ kind: 'list' });
-    expect('element' in result.type).toBe(false);
+    expect('element' in result.type!).toBe(false);
     expect(result.defaultValue).toBeUndefined();
     expect(result.annotations).toEqual({});
   });

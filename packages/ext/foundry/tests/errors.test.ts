@@ -65,7 +65,7 @@ describe('detectFoundryError', () => {
     const OpenAI = await import('openai');
     const { detectFoundryError } = await import('../src/errors.js');
 
-    const error = new OpenAI.APIError(401, {}, 'Unauthorized', {});
+    const error = new OpenAI.APIError(401, {}, 'Unauthorized', new Headers());
     const result = detectFoundryError(error);
 
     expect(result).not.toBeNull();
@@ -278,7 +278,7 @@ describe('mapProviderError + detectFoundryError integration', () => {
   // EC-12 / AC-23: 401 → #AUTH
   it('produces #AUTH for 401 APIError (EC-12)', async () => {
     const OpenAI = await import('openai');
-    const error = new OpenAI.APIError(401, {}, 'Unauthorized', {});
+    const error = new OpenAI.APIError(401, {}, 'Unauthorized', new Headers());
     const { code, message } = await runMap(error);
     expect(code).toBe('AUTH');
     expect(message).toBe('Foundry API error (HTTP 401): Unauthorized');
@@ -287,7 +287,12 @@ describe('mapProviderError + detectFoundryError integration', () => {
   // EC-13 / AC-24: 429 → #RATE_LIMIT
   it('produces #RATE_LIMIT for 429 APIError (EC-13)', async () => {
     const OpenAI = await import('openai');
-    const error = new OpenAI.APIError(429, {}, 'Too Many Requests', {});
+    const error = new OpenAI.APIError(
+      429,
+      {},
+      'Too Many Requests',
+      new Headers()
+    );
     const { code, message } = await runMap(error);
     expect(code).toBe('RATE_LIMIT');
     expect(message).toBe('Foundry API error (HTTP 429): Too Many Requests');
@@ -303,7 +308,12 @@ describe('mapProviderError + detectFoundryError integration', () => {
   // EC-15 / AC-26: 404 → #NOT_FOUND
   it('produces #NOT_FOUND for 404 APIError (EC-15)', async () => {
     const OpenAI = await import('openai');
-    const error = new OpenAI.APIError(404, {}, 'Deployment not found', {});
+    const error = new OpenAI.APIError(
+      404,
+      {},
+      'Deployment not found',
+      new Headers()
+    );
     const { code, message } = await runMap(error);
     expect(code).toBe('NOT_FOUND');
     expect(message).toBe('Foundry API error (HTTP 404): Deployment not found');

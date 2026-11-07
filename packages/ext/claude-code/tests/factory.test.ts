@@ -323,27 +323,6 @@ describe('createClaudeCodeExtension', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('logs warning on cleanup failure, does not throw', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-
-      // Simulate cleanup failure by manually adding a failing disposer
-      // This tests EC-16: cleanup failure logs warning, not thrown
-      const tracker = (ext as unknown as { disposers?: Set<() => void> })
-        .disposers;
-      if (tracker) {
-        tracker.add(() => {
-          throw new Error('Cleanup failed');
-        });
-      }
-
-      // Should not throw
-      expect(() => ext.dispose?.()).not.toThrow();
-
-      // Note: This test verifies the disposal doesn't throw.
-      // The internal tracker is private, so we test the public contract:
-      // dispose() should never throw, even on internal errors.
-    });
-
     it('dispose does not throw even without processes', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
 

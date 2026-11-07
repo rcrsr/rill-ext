@@ -17,7 +17,7 @@ vi.mock('../src/auth/resolve.js', () => ({
 }));
 
 import { googleFetch } from '../src/fetch.js';
-import { resolveToken } from '../src/auth/resolve.js';
+import { resolveToken, type TokenCache } from '../src/auth/resolve.js';
 
 const mockResolveToken = vi.mocked(resolveToken);
 
@@ -25,8 +25,8 @@ const mockResolveToken = vi.mocked(resolveToken);
 // Helpers
 // ============================================================
 
-function makeCache() {
-  return { slot: null };
+function makeCache(): TokenCache {
+  return { slots: new Map() };
 }
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
@@ -468,7 +468,7 @@ describe('HTTP error mapping', () => {
       caught = e;
     }
 
-    expect(getStatus(caught).message).toBe(
+    expect(getStatus(caught as RillValue).message).toBe(
       'google: insufficient Gmail scopes for send'
     );
 
@@ -505,7 +505,7 @@ describe('HTTP error mapping', () => {
       caught = e;
     }
 
-    expect(getStatus(caught).message).toBe(
+    expect(getStatus(caught as RillValue).message).toBe(
       "google: Gmail resource 'msg-abc' not found"
     );
 
@@ -539,7 +539,7 @@ describe('HTTP error mapping', () => {
       caught = e;
     }
 
-    expect(getStatus(caught).message).toBe(
+    expect(getStatus(caught as RillValue).message).toBe(
       'google: rate limit exceeded; retry after delay'
     );
 
@@ -573,7 +573,7 @@ describe('HTTP error mapping', () => {
       caught = e;
     }
 
-    expect(getStatus(caught).message).toBe(
+    expect(getStatus(caught as RillValue).message).toBe(
       'google: Gmail server error (500); temporarily unavailable'
     );
 
@@ -648,7 +648,9 @@ describe('network and abort error mapping', () => {
       caught = e;
     }
 
-    expect(getStatus(caught).message).toBe('google: gmail connection failed');
+    expect(getStatus(caught as RillValue).message).toBe(
+      'google: gmail connection failed'
+    );
 
     vi.unstubAllGlobals();
   });

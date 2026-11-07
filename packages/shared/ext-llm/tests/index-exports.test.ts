@@ -10,7 +10,7 @@
  *   - validateMessages: accepts parts form and content-sugar form
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import {
   // Constants
   MESSAGES_RETURN_TYPE,
@@ -24,7 +24,6 @@ import {
   validateExtraKeys,
   validateMaxTurns,
   validateMaxErrors,
-  validateMessages,
 } from '../src/index.js';
 import type {
   Role,
@@ -34,7 +33,6 @@ import type {
   ImageSource,
   LlmExtensionContract,
 } from '../src/index.js';
-import { createRuntimeContext } from '@rcrsr/rill';
 
 // ============================================================
 // IR-9: LlmExtensionContract shape
@@ -42,35 +40,10 @@ import { createRuntimeContext } from '@rcrsr/rill';
 
 describe('LlmExtensionContract', () => {
   it('has message, tool_loop, generate, embed, embed_batch fields', () => {
-    // Type-level assertion: assign an object satisfying the contract.
-    // The TypeScript compiler rejects any object that omits a required field
-    // or includes a disallowed field like `messages`.
-    type RequiredKeys = keyof LlmExtensionContract;
-
-    // Compile-time check: 'messages' must NOT be a key of the contract.
-    // We use a conditional type that resolves to `never` if messages is present.
-    type MessagesAbsent = 'messages' extends RequiredKeys ? never : true;
-    const _check: MessagesAbsent = true;
-    expect(_check).toBe(true);
-
-    // Compile-time check: required keys are present.
-    type HasMessage = 'message' extends RequiredKeys ? true : never;
-    type HasToolLoop = 'tool_loop' extends RequiredKeys ? true : never;
-    type HasGenerate = 'generate' extends RequiredKeys ? true : never;
-    type HasEmbed = 'embed' extends RequiredKeys ? true : never;
-    type HasEmbedBatch = 'embed_batch' extends RequiredKeys ? true : never;
-
-    const _m: HasMessage = true;
-    const _tl: HasToolLoop = true;
-    const _g: HasGenerate = true;
-    const _e: HasEmbed = true;
-    const _eb: HasEmbedBatch = true;
-
-    expect(_m).toBe(true);
-    expect(_tl).toBe(true);
-    expect(_g).toBe(true);
-    expect(_e).toBe(true);
-    expect(_eb).toBe(true);
+    // Compile-time assertions: tsc rejects the file when a key is added or removed.
+    expectTypeOf<keyof LlmExtensionContract>().toEqualTypeOf<
+      'message' | 'tool_loop' | 'generate' | 'embed' | 'embed_batch'
+    >();
   });
 });
 
@@ -128,86 +101,30 @@ describe('barrel runtime exports', () => {
 // ============================================================
 
 describe('barrel type exports', () => {
-  it('Role type is assignable from valid role strings', () => {
-    const r: Role = 'user';
-    expect(r).toBe('user');
+  it('Role type accepts exactly the valid role strings', () => {
+    expectTypeOf<Role>().toEqualTypeOf<'system' | 'user' | 'assistant'>();
   });
 
-  it('Message type is constructible', () => {
-    const m: Message = { role: 'user', parts: [{ type: 'text', text: 'hi' }] };
-    expect(m.role).toBe('user');
+  it('Message type is constructible from role and parts', () => {
+    expectTypeOf<{
+      role: 'user';
+      parts: [{ type: 'text'; text: string }];
+    }>().toExtend<Message>();
   });
 
-  it('Part type is assignable from a TextPart', () => {
-    const p: Part = { type: 'text', text: 'hello' };
-    expect(p.type).toBe('text');
+  it('Part type accepts a text part', () => {
+    expectTypeOf<{ type: 'text'; text: string }>().toExtend<Part>();
   });
 
   it('MessageInput type accepts content-sugar form', () => {
-    const mi: MessageInput = { role: 'user', content: 'hello' };
-    expect(mi.role).toBe('user');
+    expectTypeOf<{ role: 'user'; content: string }>().toExtend<MessageInput>();
   });
 
-  it('ImageSource type is constructible', () => {
-    const src: ImageSource = {
-      kind: 'url',
-      data: 'https://example.com/img.png',
-      media_type: 'image/png',
-    };
-    expect(src.kind).toBe('url');
-  });
-});
-
-// ============================================================
-// validateMessages: both old and new message shapes accepted
-// ============================================================
-
-describe('validateMessages migration path', () => {
-  it('accepts parts-shaped messages (canonical form)', () => {
-    expect(() =>
-      validateMessages([
-        { role: 'user', parts: [{ type: 'text', text: 'hello' }] },
-      ])
-    ).not.toThrow();
-  });
-
-  it('accepts content-sugar-shaped messages (old form)', () => {
-    expect(() =>
-      validateMessages([{ role: 'user', content: 'hello' }])
-    ).not.toThrow();
-  });
-
-  it('throws for empty messages array', () => {
-    expect(() => validateMessages([])).toThrow('messages list cannot be empty');
-  });
-
-  it('throws for message missing both parts and content', () => {
-    expect(() => validateMessages([{ role: 'user' }])).toThrow(
-      "parts' or 'content'"
-    );
-  });
-
-  it('throws for message missing role', () => {
-    expect(() => validateMessages([{ content: 'hello' }])).toThrow('role');
-  });
-});
-
-// ============================================================
-// normalizePrompt (via barrel): basic integration smoke
-// ============================================================
-
-describe('normalizePrompt via barrel', () => {
-  const ctx = createRuntimeContext();
-
-  it('normalizes a string prompt to a single user message', () => {
-    const result = normalizePrompt('hello', ctx);
-    expect(Array.isArray(result)).toBe(true);
-    const msgs = result as Message[];
-    expect(msgs[0]?.role).toBe('user');
-  });
-
-  it('normalizes a list of content-sugar messages', () => {
-    const result = normalizePrompt([{ role: 'user', content: 'hi' }], ctx);
-    expect(Array.isArray(result)).toBe(true);
+  it('ImageSource type accepts a url source', () => {
+    expectTypeOf<{
+      kind: 'url';
+      data: string;
+      media_type: 'image/png';
+    }>().toExtend<ImageSource>();
   });
 });

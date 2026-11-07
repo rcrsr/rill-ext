@@ -392,8 +392,10 @@ describe('extension event emission', () => {
       });
 
       // Create mock tool
-      const testToolFn = callable(vi.fn().mockResolvedValue('Tool result'));
-      (testToolFn as Record<string, unknown>)['description'] = 'Test tool';
+      const testToolFn = {
+        ...callable(vi.fn().mockResolvedValue('Tool result')),
+        annotations: { description: 'Test tool' },
+      };
 
       const tools = { test_tool: testToolFn };
 
@@ -465,8 +467,10 @@ describe('extension event emission', () => {
         },
       });
 
-      const testTool = callable(vi.fn());
-      (testTool as Record<string, unknown>)['description'] = 'Test tool';
+      const testTool = {
+        ...callable(vi.fn()),
+        annotations: { description: 'Test tool' },
+      };
 
       const tools = { test_tool: testTool };
 
@@ -527,10 +531,12 @@ describe('extension event emission', () => {
       });
 
       // Create mock tool that throws an error
-      const failingTool = callable(
-        vi.fn().mockRejectedValue(new Error('Tool execution failed'))
-      );
-      (failingTool as Record<string, unknown>)['description'] = 'Test tool';
+      const failingTool = {
+        ...callable(
+          vi.fn().mockRejectedValue(new Error('Tool execution failed'))
+        ),
+        annotations: { description: 'Test tool' },
+      };
 
       const tools = { test_tool: failingTool };
 

@@ -18,8 +18,9 @@ describe('Package Scaffold', () => {
         with: { type: 'json' },
       });
       expect(tsconfig.default.extends).toBe('../tsconfig.ext.json');
-      expect(tsconfig.default.compilerOptions.rootDir).toBe('./src');
-      expect(tsconfig.default.compilerOptions.outDir).toBe('./dist');
+      expect(tsconfig.default.compilerOptions.rootDir).toBe('.');
+      expect(tsconfig.default.compilerOptions.noEmit).toBe(true);
+      expect(tsconfig.default.include).toEqual(['src/**/*', 'tests/**/*']);
     });
   });
 });

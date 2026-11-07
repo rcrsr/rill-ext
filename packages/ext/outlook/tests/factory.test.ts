@@ -28,6 +28,13 @@ function getCallable(
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
+async function expectNotInvalid(
+  result: RillValue | Promise<RillValue>
+): Promise<void> {
+  const value = await result;
+  expect(isInvalid(value)).toBe(false);
+}
+
 const BEARER_CONFIG: OutlookConfig = {
   auth: { type: 'bearer', token: 'test-token' },
 };
@@ -459,10 +466,7 @@ describe('createOutlookExtension', () => {
         json: vi.fn().mockResolvedValue({ value: [] }),
       });
       const ctx = createRuntimeContext();
-      // Should not throw a capability error
-      await expect(
-        getCallable(ext, 'inbox').fn({ top: 10 }, ctx)
-      ).resolves.toBeDefined();
+      await expectNotInvalid(getCallable(ext, 'inbox').fn({ top: 10 }, ctx));
     });
 
     it('mail.send defaults to false — send emits #FORBIDDEN', async () => {
@@ -486,12 +490,12 @@ describe('createOutlookExtension', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       // draft is enabled by default — should not throw a capability error
-      await expect(
+      await expectNotInvalid(
         getCallable(ext, 'draft').fn(
           { to: ['a@b.com'], subject: 'Hi', body: 'Hello' },
           ctx
         )
-      ).resolves.toBeDefined();
+      );
     });
 
     it('mail.flag defaults to true', async () => {
@@ -502,9 +506,9 @@ describe('createOutlookExtension', () => {
       });
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      await expect(
+      await expectNotInvalid(
         getCallable(ext, 'flag').fn({ message_id: 'msg-1' }, ctx)
-      ).resolves.toBeDefined();
+      );
     });
 
     it('mail.search defaults to true', async () => {
@@ -515,9 +519,9 @@ describe('createOutlookExtension', () => {
       });
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      await expect(
+      await expectNotInvalid(
         getCallable(ext, 'search').fn({ query: 'hello' }, ctx)
-      ).resolves.toBeDefined();
+      );
     });
 
     it('calendar.read defaults to true', async () => {
@@ -528,9 +532,9 @@ describe('createOutlookExtension', () => {
       });
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      await expect(
+      await expectNotInvalid(
         getCallable(ext, 'events').fn({ start: 0, end: 1000 }, ctx)
-      ).resolves.toBeDefined();
+      );
     });
 
     it('calendar.create defaults to false — create_event emits #FORBIDDEN', async () => {
@@ -638,21 +642,20 @@ describe('createOutlookExtension', () => {
   // Module import no side effects [AC-38]
   // ============================================================
 
-  describe('module import no side effects [AC-38]', () => {
-    it('importing the module does not call fetch', () => {
-      // If fetch were called at import time, this mock would capture it.
-      // The module was already imported above; we verify fetch was not called.
-      const mockFetch = vi.fn();
-      globalThis.fetch = mockFetch;
-      // Re-importing via dynamic import triggers no additional side effects
-      // because modules are cached. The static import at file top is sufficient.
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
+  describe('passive provision', () => {
+    it('makes no fetch call at import or factory time', async () => {
+      const fetchSpy = vi.fn<typeof fetch>();
+      globalThis.fetch = fetchSpy;
 
-    it('importing the module does not throw', () => {
-      // The static import at the top of this file is the test.
-      // If the module had a top-level throw, this file would not load.
-      expect(createOutlookExtension).toBeDefined();
+      vi.resetModules();
+      const fresh = await import('../src/factory.js');
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      const ext = fresh.createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      await ext.dispose!();
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 });

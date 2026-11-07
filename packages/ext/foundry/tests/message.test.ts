@@ -142,8 +142,7 @@ async function collectStreamChunks(stream: unknown): Promise<string[]> {
   let current = stream as StreamNode;
   while (!current.done) {
     const next = current.next;
-    const resolved = typeof next === 'function' ? next : (next.fn ?? next);
-    const fnToCall = typeof resolved === 'function' ? resolved : resolved.fn;
+    const fnToCall = typeof next === 'function' ? next : next.fn;
     current = await fnToCall({}, {});
     if (!current.done && current.value !== undefined) {
       chunks.push(current.value as string);

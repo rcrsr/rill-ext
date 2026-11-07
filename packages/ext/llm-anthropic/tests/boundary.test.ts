@@ -10,6 +10,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  callable,
   createRuntimeContext,
   RuntimeHaltSignal,
   getStatus,
@@ -436,12 +437,7 @@ describe('error cases', () => {
       const ctx = createRuntimeContext();
 
       const tools = {
-        my_tool: {
-          __type: 'callable',
-          kind: 'runtime',
-          isProperty: false,
-          fn: () => 'result',
-        },
+        my_tool: callable(() => 'result'),
       };
 
       expectThrowHalt(

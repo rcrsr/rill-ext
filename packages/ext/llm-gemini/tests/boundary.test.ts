@@ -64,9 +64,7 @@ function makeTool(
   fn: (args: Record<string, RillValue>) => RillValue | Promise<RillValue>,
   description = 'A test tool'
 ): RillValue {
-  const tool = callable(fn);
-  (tool as Record<string, unknown>)['description'] = description;
-  return tool;
+  return { ...callable(fn), annotations: { description } };
 }
 
 // ============================================================

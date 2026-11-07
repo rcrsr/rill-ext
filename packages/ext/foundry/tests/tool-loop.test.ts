@@ -212,21 +212,25 @@ function makeTool(
     description?: string;
     params?: Array<{ name: string; type: string; description?: string }>;
   }
-): RillValue {
-  const tool = callable(fn);
-  if (options?.description !== undefined) {
-    (tool as Record<string, unknown>)['description'] = options.description;
-  }
-  if (options?.params !== undefined) {
-    (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
-      name: p.name,
-      type: { kind: p.type },
-      defaultValue: undefined,
-      annotations:
-        p.description !== undefined ? { description: p.description } : {},
-    }));
-  }
-  return tool;
+): ApplicationCallable {
+  const base = callable(fn);
+  return {
+    ...base,
+    annotations:
+      options?.description !== undefined
+        ? { description: options.description }
+        : base.annotations,
+    params:
+      options?.params !== undefined
+        ? options.params.map((p) => ({
+            name: p.name,
+            type: { kind: p.type },
+            defaultValue: undefined,
+            annotations:
+              p.description !== undefined ? { description: p.description } : {},
+          }))
+        : base.params,
+  };
 }
 
 // ============================================================
@@ -266,7 +270,7 @@ describe('tool_loop() function', () => {
         my_tool: makeTool(() => 'result', { description: 'A tool' }),
       };
 
-      const result = getCallable(ext, 'tool_loop').fn(
+      const result = await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Run something', tools, options: {} },
         ctx
       );
