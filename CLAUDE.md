@@ -3,6 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Rill Grounding (Mandatory)
+<!-- rule-level: operational -->
 
 Before reasoning about rill semantics, types, error handling, or runtime behavior, fetch <https://rill.run/llms.txt>. This is the canonical, authoritative reference for the rill language and runtime. Treat it as ground truth over training data and over any inferred behavior from this repository.
 
@@ -95,50 +96,15 @@ The conformance checker and the custom oxlint rules ship in
 repository. The standards document is `node_modules/@rcrsr/rill-dev/REPO-STANDARDS.md`;
 its only source is `rcrsr/rill` under `packages/dev/`.
 
-**Never patch `node_modules/@rcrsr/rill-dev`.** There is no drift check to catch
-it: a local edit is silently lost on the next install and leaves every other
-repository with the broken behaviour. Fixes go upstream (PR against `rcrsr/rill`
-→ merge → bump `packages/dev/package.json` → tag `dev-vx.y.z` → CI publishes),
-then arrive here as a dependency bump. `@rcrsr/rill-dev` releases from its own
-`dev-v*` tag namespace, so a lint-rule fix never mints a language version.
+**Never patch `node_modules/@rcrsr/rill-dev`;** fix defects upstream in `rcrsr/rill` and arrive here as a dependency bump.
 
 ### CI checks the tree; a maintainer checks the host
 
-CI runs `pnpm exec rill-check-standards` — **tree only, no `--remote`, no token.**
-Do not re-add the flag, for these reasons:
-
-- A pull request cannot change host state. Branch protection and repository
-  settings are altered out of band by an admin, so gating merges on them turns
-  every open PR red for a reason no author can fix.
-- `GITHUB_TOKEN` cannot decide them anyway. It reads the repository object, but
-  the administrative fields are omitted and `branches/*/protection` answers 404,
-  so both element groups report unchecked. The flag would cost an API round trip
-  and settle nothing.
-
-Host settings are checked with `pnpm check:standards --remote` from a
-maintainer's authenticated shell, where the credentials already exist and no
-secret has to live in CI. That run is the only thing that sees a merge-strategy
-setting disagreeing with a protection rule, which is invisible in the tree.
+CI runs `pnpm exec rill-check-standards` on the tree only, never with `--remote` or a token; a maintainer runs `pnpm check:standards --remote` from an authenticated shell for host settings.
 
 ### Custom lint rules
 
-Loading the plugin via `"jsPlugins": ["@rcrsr/rill-dev/lint-rules"]` only
-registers the rules; they are opt-in. Both are enabled here, scoped to
-`**/src/**/*.{ts,tsx}`, with the rationale for each:
-
-- **`rill/no-spec-id-reference`: on.** This repository carries `conduct/`,
-  a private planning directory, so its stated condition is met. Those IDs point
-  at documents that are never published, so they are unresolvable for anyone
-  reading the code.
-- **`rill/no-duplicate-error-id`: on.** The extensions construct `RuntimeError`,
-  which is what the rule keys on, so its condition is met. It is enabled to hold
-  a zero-violation line, not to fix a backlog.
-
-The `src/`-only scope is deliberate and outlives STD-LINT-4. Lint now covers
-`src/` **and** `tests/`, but these rules stay scoped to `src/`: what they
-guard is *shipped* source. A planning identifier in a test is not published to
-anyone, so widening them would add findings without closing the leak the rule
-names.
+Both custom oxlint rules, `rill/no-spec-id-reference` and `rill/no-duplicate-error-id`, are enabled (via `"jsPlugins": ["@rcrsr/rill-dev/lint-rules"]`, which only registers them) and scoped to `src/` only, not `tests/`.
 
 ### Conformance status
 
@@ -248,26 +214,16 @@ Never write a `CHANGELOG.md` entry unprompted. Author one only when the user ask
 
 Every extension exports a `create*Extension(config, ctx)` factory. It validates config, instantiates the vendor SDK client, and defines host-function closures over it. Async factories are allowed when setup needs I/O (e.g. `mcp`, `foundry`).
 
-Each host function is a `RillFunction` with `params` (built with `p.*` helpers from `@rcrsr/rill-ext-param-shared`), `fn`, `annotations`, and `returnType`. Wrap each one with `toCallable`, check the resulting dict against the category contract type, and return `{ value, dispose }`:
-
-```typescript
-const callableDict = {
-  get: toCallable(fnDict.get),
-  get_or: toCallable(fnDict.get_or),
-  // ...
-} satisfies KvExtensionContract;
-
-return {
-  value: callableDict as unknown as RillValue,
-  dispose,
-} satisfies ExtensionFactoryResult;
-```
-
-Canonical example: `packages/ext/kv-file/src/factory.ts`. The legacy shape (named `{ fn, params }` objects at the top level next to `dispose`, checked with `satisfies ExtensionResult`) is retired.
+Each host function is a `RillFunction` with `params` (built with `p.*` helpers from `@rcrsr/rill-ext-param-shared`), `fn`, `annotations`, and `returnType`. Wrap each with `toCallable`, check the dict with `satisfies <Category>ExtensionContract`, and return `{ value, dispose } satisfies ExtensionFactoryResult` (canonical: `packages/ext/kv-file/src/factory.ts`).
 
 - **Category contract only.** Expose only functions in the category contract; no vendor-only functions (recorded exception: foundry). A new host function goes into the shared contract type and is implemented identically in every extension of that category, with a snake_case name.
 - **Rich return types.** Every host function declares a precise `returnType` built with `structureToTypeValue`; no shapeless `dict`, `list`, or `any` when the shape is known. Update the extension's `docs/` response table in the same change.
 - **Clean disposal.** `dispose()` is idempotent and releases every vendor resource, aborting in-flight requests. Streaming results carry their own `dispose` that aborts the underlying stream.
+- **Passive provision.** Extensions register nothing at import or factory time; gate optional operations behind config capability flags that deny with `#FORBIDDEN`.
+- **Return type constants.** Build each `returnType` once as a module-level `FOO_RT` constant via `structureToTypeValue` with snake_case field keys, and reuse it across callables sharing the shape.
+- **Post-dispose calls.** After `dispose()`, halt calls with `#DISPOSED` and `raw.kind: 'extension_disposed'`, never `'disposed'`.
+- **Host events.** Emit host events through `emitExtensionEvent` as `<provider>:<verb>` or `<provider>:error` with `subsystem: 'extension:<provider>'`.
+- **Host-declared targets.** Scripts name a host-configured endpoint, command, or mount and never supply a raw URL, binary, shell string, or path; `exec` uses `execFile` with no shell.
 
 ### Shared Packages
 
@@ -286,12 +242,14 @@ Shared packages (`packages/shared/`) are private and **bundled into** the consum
 ### LLM Extension Call Flow
 
 1. Factory creates vendor SDK client and returns host functions
-2. `message()` / `messages()` — single/multi-turn LLM calls, provider-specific request formatting
+2. `message()` — LLM call taking one `prompt` (string or message list), provider-specific request formatting
 3. `tool_loop()` — multi-turn tool calling loop:
    - Extension factory validates options and builds provider-specific callbacks (`ToolLoopCallbacks`)
    - Delegates to shared `executeToolLoop()` which handles the loop, tool dispatch via `invokeCallable()`, error tracking, and token aggregation
    - `buildJsonSchema()` converts rill callable parameter metadata to JSON Schema for the provider API
 4. `embed()` / `embed_batch()` — text embedding via provider embedding API
+
+LLM verbs take one `prompt` param (string or message list); `max_turns`, `max_errors` and `extra` live in factory config, and `extra` rejects reserved keys.
 
 ### Search Extension Call Flow
 
@@ -306,28 +264,21 @@ Tools are passed as a rill dict (JS object) mapping `name → callable`. The cal
 
 ### Error Handling Convention
 
-rill 0.19 removed `RILL-R004` from `ERROR_REGISTRY`. Extensions emit failures as invalid `RillValue`s via `ctx.invalidate(error, meta)` from inside host functions, and as `RuntimeError('RILL-R001', message)` from factory-time config validation. Never throw `RILL-R004`.
+Host functions return failures with `ctx.invalidate(error, { code, provider, raw })`, where `code` is a rill core generic atom and provider-specific detail goes in `raw.kind`. Factory config errors throw `RuntimeError('RILL-R001', message)`. Never throw `RILL-R004`, define `EXT_*` atoms, or call `ctx.registerErrorCode`.
 
-**Reuse rill core's generic atom taxonomy.** rill core pre-registers these atoms at module load: `#ok`, `#R001`, `#TIMEOUT`, `#AUTH`, `#FORBIDDEN`, `#RATE_LIMIT`, `#QUOTA_EXCEEDED`, `#NOT_FOUND`, `#CONFLICT`, `#UNAVAILABLE`, `#PROTOCOL`, `#INVALID_INPUT`, `#DISPOSED`, `#TYPE_MISMATCH`. Use these in `meta.code` directly. Do not define `EXT_<EXTENSION>_*` constants. Do not call `ctx.registerErrorCode` for categories the generic taxonomy already covers.
-
-Provider-specific failures decompose into `(generic atom, meta.provider, meta.raw.kind)`. Example: Tavily 432 → `{ code: 'QUOTA_EXCEEDED', provider: 'tavily', raw: { kind: 'plan_limit_exceeded', status: 432 } }`. Host scripts match coarsely (`guard #QUOTA_EXCEEDED`) or finely (`guard #QUOTA_EXCEEDED && raw.kind == 'plan_limit_exceeded'`).
+Non-LLM extensions declare one lowercase `PROVIDER` constant per package for `meta.provider` and import it elsewhere in the package.
 
 ### Boundary Key Naming
 
-Dict keys exposed at the rill host-function boundary MUST be snake_case. The boundary covers four surfaces:
-
-1. Param names declared via `p.*` helpers (e.g., `p.str('message_id')`, not `p.str('messageId')`).
-2. Keys read from the `args` dict inside host functions (`args['file_id']`, not `args['fileId']`).
-3. Keys in returned dict object literals (`{ result_count, exit_code }`, not `{ resultCount, exitCode }`).
-4. Field names in `returnType` / `retType` structure declarations passed to the runtime.
-
-Internal TypeScript variables, vendor SDK request/response shapes, and JS-side helper types remain camelCase per JS convention. Map vendor camelCase to/from snake_case at the boundary; do not let it leak into the rill dict.
-
-When in doubt: if a host script written in rill ever sees the key, it is snake_case.
+Keys a rill script can see (param names, `args` keys, returned dict keys, `returnType` fields) are snake_case; internal TypeScript and vendor shapes stay camelCase, mapped at the edge. New extension config fields use snake_case (`api_key`), though existing config is mixed.
 
 ### TypeScript Conventions
 
 Named exports only (no `export default`, no `export *`); `.js` extensions on relative imports; `export type { }` for types; optional properties as `prop?: T | undefined`; no `enum` (use `as const` objects); no `any` (use `unknown` plus a type guard); no class inheritance except `Error`; no classes for state (closures in factories instead); never mutate parameters.
+
+`as any` is allowed only at a vendor-SDK type gap under a suppression comment; every lint suppression carries a `-- reason`.
+
+New source files use `kebab-case.ts`; literal module-level constants are `ALL_CAPS_SNAKE_CASE`. Every exported function declares an explicit return type, including `Promise<T>` for async.
 
 ### Build Toolchain
 
@@ -337,10 +288,10 @@ Named exports only (no `export default`, no `export *`); `.js` extensions on rel
 
 ### Test Patterns
 
-- SDK clients are mocked at module level with `vi.mock()` (not real API calls)
-- Tests use `createRuntimeContext()` from `@rcrsr/rill` to create test contexts
-- Callable values in tests use either `callable()` helper or manual `{ __type: 'callable', kind: 'runtime', isProperty: false, fn }` objects
-- Integration tests for external services (Redis, MinIO, ChromaDB) skip gracefully when the service is unavailable
+Mock SDK clients at module level with `vi.mock()`, build contexts with `createRuntimeContext()`, and skip integration tests gracefully when their service is unavailable.
+
+- Group tests in nested `describe` blocks, start each `it` name with a verb, and mark a test `async` only when it awaits.
+- Place new tests where the package's existing tests live (`tests/` or co-located in `src/`); a new package uses `tests/`.
 
 ## Extension Authoring
 
