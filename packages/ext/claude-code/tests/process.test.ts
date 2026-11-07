@@ -288,6 +288,7 @@ describe('Process Manager', () => {
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 
       const result = spawnClaudeCli('test');
+      result.exitCode.catch(() => {});
       result.dispose();
 
       expect(mockPty.kill).toHaveBeenCalled();
@@ -299,6 +300,7 @@ describe('Process Manager', () => {
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 
       const result = spawnClaudeCli('test', { timeoutMs: 5000 });
+      result.exitCode.catch(() => {});
       result.dispose();
 
       // Advance time - timeout should not fire
@@ -307,7 +309,7 @@ describe('Process Manager', () => {
       expect(mockPty.kill).toHaveBeenCalledTimes(1);
     });
 
-    it('does not throw when dispose is called multiple times', () => {
+    it('does not throw when dispose is called multiple times', async () => {
       // EC-16: Idempotent cleanup
       const mockPty = createMockPty();
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
@@ -320,6 +322,37 @@ describe('Process Manager', () => {
         result.dispose();
       }).not.toThrow();
       expect(mockPty.kill).toHaveBeenCalledTimes(1);
+      await expect(result.exitCode).rejects.toMatchObject({
+        kind: 'request_cancelled',
+      });
+    });
+
+    it('rejects exitCode with request_cancelled when dispose is called before exit', async () => {
+      const mockPty = createMockPty();
+      vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
+
+      const result = spawnClaudeCli('test');
+      result.dispose();
+
+      await expect(result.exitCode).rejects.toMatchObject({
+        name: 'SpawnError',
+        kind: 'request_cancelled',
+      });
+    });
+
+    it('keeps exitCode resolved when dispose is called after a clean exit', async () => {
+      const mockPty = createMockPty();
+      let exitCallback: ((event: { exitCode: number }) => void) | undefined;
+      mockPty.onExit.mockImplementation((cb) => {
+        exitCallback = cb;
+      });
+      vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
+
+      const result = spawnClaudeCli('test');
+      exitCallback?.({ exitCode: 0 });
+      result.dispose();
+
+      await expect(result.exitCode).resolves.toBe(0);
     });
 
     it('logs warning but does not throw when kill fails', () => {
@@ -337,6 +370,7 @@ describe('Process Manager', () => {
 
       const result = spawnClaudeCli('test');
 
+      result.exitCode.catch(() => {});
       expect(() => result.dispose()).not.toThrow();
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to kill claude process')
@@ -451,6 +485,7 @@ describe('Process Manager', () => {
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 
       const result = spawnClaudeCli('test', { timeoutMs: 5000 });
+      result.exitCode.catch(() => {});
       result.dispose();
 
       // Late exit event after disposal should not throw or cause issues

@@ -193,6 +193,11 @@ export function spawnClaudeCli(
       clearTimeout(timeoutId);
     }
 
+    // Exit has not settled: report the cancellation to the exit promise
+    rejectExit(
+      new SpawnError('request_cancelled', 'Claude CLI process cancelled')
+    );
+
     // Cleanup failure warning
     try {
       ptyProcess.kill();

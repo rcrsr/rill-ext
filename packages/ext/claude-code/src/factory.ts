@@ -21,7 +21,7 @@ import type { ClaudeCodeConfig, ClaudeMessage } from './types.js';
 import { spawnClaudeCli } from './process.js';
 import { createStreamParser } from './stream-parser.js';
 import { extractResult } from './result.js';
-import { failDisposed, mapSpawnError } from './errors.js';
+import { SpawnError, failDisposed, mapSpawnError } from './errors.js';
 
 // ============================================================
 // TYPES
@@ -120,13 +120,15 @@ interface PtyStreamEventOptions {
  * @param tracker - Active process tracker for cleanup registration
  * @param ctx - Runtime context for event emission
  * @param eventOpts - Event name and extra fields for emission on resolve
+ * @param isExtensionDisposed - Whether the owning extension was disposed
  * @returns RillStream value
  */
 function createPtyStream(
   spawn: import('./process.js').SpawnResult,
   tracker: ProcessTracker,
   ctx: RuntimeContext,
-  eventOpts: PtyStreamEventOptions
+  eventOpts: PtyStreamEventOptions,
+  isExtensionDisposed: () => boolean
 ): RillValue {
   // Accumulate parsed messages for the resolve callback
   const messages: ClaudeMessage[] = [];
@@ -252,6 +254,15 @@ function createPtyStream(
       });
       tracker.disposers.delete(spawn.dispose);
       spawn.dispose();
+      // Only the abort caused by extension dispose() reports DISPOSED; every
+      // other exit error keeps its mapping.
+      if (
+        isExtensionDisposed() &&
+        exitError instanceof SpawnError &&
+        exitError.kind === 'request_cancelled'
+      ) {
+        return failDisposed(ctx).value;
+      }
       return mapSpawnError(ctx, exitError);
     }
     const startTime = Date.now();
@@ -449,10 +460,16 @@ export function createClaudeCodeExtension(
         tracker.disposers.add(spawn.dispose);
         ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx, {
-          event: 'claude-code:prompt',
-          eventData: { prompt: truncateText(text) },
-        });
+        return createPtyStream(
+          spawn,
+          tracker,
+          ctx,
+          {
+            event: 'claude-code:prompt',
+            eventData: { prompt: truncateText(text) },
+          },
+          () => disposed
+        );
       },
       annotations: {
         description:
@@ -537,10 +554,16 @@ export function createClaudeCodeExtension(
         tracker.disposers.add(spawn.dispose);
         ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx, {
-          event: 'claude-code:skill',
-          eventData: { name, args },
-        });
+        return createPtyStream(
+          spawn,
+          tracker,
+          ctx,
+          {
+            event: 'claude-code:skill',
+            eventData: { name, args },
+          },
+          () => disposed
+        );
       },
       annotations: {
         description:
@@ -625,10 +648,16 @@ export function createClaudeCodeExtension(
         tracker.disposers.add(spawn.dispose);
         ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx, {
-          event: 'claude-code:command',
-          eventData: { name, args },
-        });
+        return createPtyStream(
+          spawn,
+          tracker,
+          ctx,
+          {
+            event: 'claude-code:command',
+            eventData: { name, args },
+          },
+          () => disposed
+        );
       },
       annotations: {
         description:

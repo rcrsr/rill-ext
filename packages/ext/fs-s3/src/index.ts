@@ -251,6 +251,15 @@ export function createS3FsExtension(
     );
   }
 
+  /**
+   * Maps a failed S3 call. A failure after dispose() is the cancelled
+   * in-flight request, so it reports #DISPOSED instead of the raw cause.
+   */
+  function mapError(runCtx: RuntimeContext, error: unknown): RillValue {
+    if (disposed) return disposedInvalid(runCtx).value;
+    return mapS3Error(runCtx, error);
+  }
+
   // ============================================================
   // HELPERS
   // ============================================================
@@ -420,7 +429,7 @@ export function createS3FsExtension(
       const content = await streamToString(runCtx, getResult);
       return content;
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -449,7 +458,7 @@ export function createS3FsExtension(
       );
       return String(contentSize);
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -475,7 +484,7 @@ export function createS3FsExtension(
     } catch (error) {
       const name = (error as S3ErrorLike)?.name;
       if (name !== 'NoSuchKey' && name !== 'NotFound') {
-        return mapS3Error(runCtx, error);
+        return mapError(runCtx, error);
       }
     }
 
@@ -496,7 +505,7 @@ export function createS3FsExtension(
       );
       return String(Buffer.byteLength(content, 'utf-8'));
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -546,7 +555,7 @@ export function createS3FsExtension(
 
       return items;
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -592,7 +601,7 @@ export function createS3FsExtension(
 
       return results;
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -616,7 +625,7 @@ export function createS3FsExtension(
       const status = (error as S3ErrorLike)?.$metadata?.httpStatusCode;
       if (name === 'NotFound' || name === 'NoSuchKey' || status === 404)
         return false;
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -640,7 +649,7 @@ export function createS3FsExtension(
         const status = (error as S3ErrorLike)?.$metadata?.httpStatusCode;
         if (name === 'NotFound' || name === 'NoSuchKey' || status === 404)
           return false;
-        return mapS3Error(runCtx, error);
+        return mapError(runCtx, error);
       }
 
       await s3Client.send(
@@ -649,7 +658,7 @@ export function createS3FsExtension(
       );
       return true;
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -675,7 +684,7 @@ export function createS3FsExtension(
         modified: result.LastModified?.toISOString() ?? '',
       };
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -736,7 +745,7 @@ export function createS3FsExtension(
       );
       return true;
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 
@@ -756,7 +765,7 @@ export function createS3FsExtension(
       );
       return true;
     } catch (error) {
-      return mapS3Error(runCtx, error);
+      return mapError(runCtx, error);
     }
   };
 

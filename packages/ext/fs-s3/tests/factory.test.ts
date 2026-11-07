@@ -396,6 +396,101 @@ describe('createS3FsExtension', () => {
       expect(resolved).toBe(false);
       expect(getStatus(thrown as RillValue).code.name).toBe('DISPOSED');
     });
+
+    describe('in-flight requests', () => {
+      function deferredSend(): {
+        spy: { mockRestore: () => void };
+        rejectWith: (e: unknown) => void;
+      } {
+        let rejectFn: (e: unknown) => void = () => {};
+        const spy = vi.spyOn(S3Client.prototype, 'send').mockImplementation(
+          () =>
+            new Promise((_, reject) => {
+              rejectFn = reject;
+            }) as never
+        );
+        return { spy, rejectWith: (e) => rejectFn(e) };
+      }
+
+      async function statusOfInFlight(
+        name: 'read' | 'append',
+        disposeFirst: boolean
+      ): Promise<{ code: string; kind: unknown; provider: unknown }> {
+        const { spy, rejectWith } = deferredSend();
+        try {
+          const ext = createTestExtension();
+          const fns = ext.value as unknown as Record<string, HostFn>;
+          const pending = fns[name]!.fn(
+            { path: 'test/file.txt', content: 'x' },
+            makeRuntimeCtx()
+          );
+          await Promise.resolve();
+          if (disposeFirst) await ext.dispose?.();
+          rejectWith(new Error('socket hang up'));
+          const result = (await pending) as RillValue;
+          expect(isInvalid(result)).toBe(true);
+          const status = getStatus(result);
+          return {
+            code: status.code.name,
+            kind: status.raw['kind'],
+            provider: status.provider,
+          };
+        } finally {
+          spy.mockRestore();
+        }
+      }
+
+      it('returns #DISPOSED when read fails after dispose', async () => {
+        const status = await statusOfInFlight('read', true);
+
+        expect(status).toEqual({
+          code: 'DISPOSED',
+          kind: 'extension_disposed',
+          provider: 'fs-s3',
+        });
+      });
+
+      it('returns #UNAVAILABLE when read fails before dispose', async () => {
+        const status = await statusOfInFlight('read', false);
+
+        expect(status.code).toBe('UNAVAILABLE');
+      });
+
+      it('returns #DISPOSED when append NoSuchKey bypass hits a socket error after dispose', async () => {
+        const noSuchKey = Object.assign(new Error('missing'), {
+          name: 'NoSuchKey',
+        });
+        let calls = 0;
+        let rejectPut: (e: unknown) => void = () => {};
+        const spy = vi
+          .spyOn(S3Client.prototype, 'send')
+          .mockImplementation(() => {
+            calls += 1;
+            if (calls === 1) return Promise.reject(noSuchKey) as never;
+            return new Promise((_, reject) => {
+              rejectPut = reject;
+            }) as never;
+          });
+        try {
+          const ext = createTestExtension();
+          const fns = ext.value as unknown as Record<string, HostFn>;
+          const pending = fns['append']!.fn(
+            { path: 'test/file.txt', content: 'x' },
+            makeRuntimeCtx()
+          );
+          await vi.waitFor(() => expect(calls).toBe(2));
+          await ext.dispose?.();
+          rejectPut(new Error('socket hang up'));
+          const result = (await pending) as RillValue;
+
+          const status = getStatus(result);
+          expect(status.code.name).toBe('DISPOSED');
+          expect(status.raw['kind']).toBe('extension_disposed');
+        } finally {
+          spy.mockRestore();
+        }
+      });
+    });
   });
 });
 

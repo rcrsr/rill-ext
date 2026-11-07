@@ -478,8 +478,9 @@ export function createOpenAIExtension(
     }
   };
 
-  // After dispose() the abortController is cleared; reject further calls so
-  // in-flight-free requests do not proceed on a disposed extension.
+  // After dispose() the abortController is cleared. Called at the top of each
+  // host function and first in every catch block, so later calls and requests
+  // aborted by dispose() both report #DISPOSED.
   function assertNotDisposed(ctx: RuntimeContext): void {
     if (!abortController) {
       throw haltInvalid(
@@ -585,6 +586,8 @@ export function createOpenAIExtension(
               }
             }
           } catch (error: unknown) {
+            // Disposal wins over every other classification.
+            assertNotDisposed(ctx as RuntimeContext);
             throwProviderHalt(
               ctx as RuntimeContext,
               'OpenAI',
@@ -626,6 +629,8 @@ export function createOpenAIExtension(
 
             return result as RillValue;
           } catch (error: unknown) {
+            // Disposal wins over every other classification.
+            assertNotDisposed(ctx as RuntimeContext);
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -742,6 +747,8 @@ export function createOpenAIExtension(
               }
             }
           } catch (error: unknown) {
+            // Disposal wins over every other classification.
+            assertNotDisposed(ctx as RuntimeContext);
             throwProviderHalt(
               ctx as RuntimeContext,
               'OpenAI',
@@ -784,6 +791,8 @@ export function createOpenAIExtension(
 
             return result as RillValue;
           } catch (error: unknown) {
+            // Disposal wins over every other classification.
+            assertNotDisposed(ctx as RuntimeContext);
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -1115,6 +1124,8 @@ export function createOpenAIExtension(
               yield chunk;
             }
           } catch (error: unknown) {
+            // Disposal wins over every other classification.
+            assertNotDisposed(ctx as RuntimeContext);
             if (error instanceof RuntimeHaltSignal) throw error;
             throwProviderHalt(
               ctx as RuntimeContext,
@@ -1162,6 +1173,8 @@ export function createOpenAIExtension(
 
             return result as RillValue;
           } catch (error: unknown) {
+            // Disposal wins over every other classification.
+            assertNotDisposed(ctx as RuntimeContext);
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -1405,6 +1418,8 @@ export function createOpenAIExtension(
               yield chunk;
             }
           } catch (error: unknown) {
+            // Disposal wins over every other classification.
+            assertNotDisposed(ctx as RuntimeContext);
             if (error instanceof RuntimeHaltSignal) throw error;
             throwProviderHalt(
               ctx as RuntimeContext,
@@ -1451,6 +1466,8 @@ export function createOpenAIExtension(
 
             return result as RillValue;
           } catch (error: unknown) {
+            // Disposal wins over every other classification.
+            assertNotDisposed(ctx as RuntimeContext);
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -1677,6 +1694,8 @@ export function createOpenAIExtension(
 
         return result as RillValue;
       } catch (error: unknown) {
+        // Disposal wins over every other classification.
+        assertNotDisposed(ctx as RuntimeContext);
         const duration = Date.now() - startTime;
         if (error instanceof RuntimeError) {
           emitExtensionEvent(ctx as RuntimeContext, {
@@ -1794,6 +1813,8 @@ export function createOpenAIExtension(
 
         return vector as RillValue;
       } catch (error: unknown) {
+        // Disposal wins over every other classification.
+        assertNotDisposed(ctx as RuntimeContext);
         const duration = Date.now() - startTime;
 
         if (error instanceof RuntimeHaltSignal) {
@@ -1887,6 +1908,8 @@ export function createOpenAIExtension(
 
         return vectors as RillValue;
       } catch (error: unknown) {
+        // Disposal wins over every other classification.
+        assertNotDisposed(ctx as RuntimeContext);
         const duration = Date.now() - startTime;
 
         if (error instanceof RuntimeHaltSignal) {

@@ -423,6 +423,7 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
 | Other SDK / unknown failure | `#UNAVAILABLE` | `unknown_error` |
 | Called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
+| In-flight request aborted by `dispose()` (thrown) | `#DISPOSED` | `extension_disposed` |
 
 ## Events
 

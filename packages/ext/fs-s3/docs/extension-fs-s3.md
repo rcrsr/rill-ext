@@ -190,6 +190,7 @@ All `path`, `src`, and `dest` arguments use `/mount/path` format. `stat` returns
 | Failure | Atom | `meta.raw.kind` |
 |---|---|---|
 | Called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
+| In-flight request aborted by `dispose()` (returned) | `#DISPOSED` | `extension_disposed` |
 
 ## See Also
 

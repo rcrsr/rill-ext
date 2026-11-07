@@ -20,7 +20,8 @@ export type SpawnErrorKind =
   | 'binary_eacces'
   | 'spawn_failed'
   | 'cli_timeout'
-  | 'exit_nonzero';
+  | 'exit_nonzero'
+  | 'request_cancelled';
 
 /**
  * Typed error thrown by `spawnClaudeCli` and rejected from the exit promise.
@@ -51,6 +52,7 @@ export class SpawnError extends Error {
  * - `spawn_failed` → `#UNAVAILABLE`
  * - `cli_timeout` → `#TIMEOUT`
  * - `exit_nonzero` → `#UNAVAILABLE`
+ * - `request_cancelled` → `#TIMEOUT` (process killed by dispose or abort)
  * - `RuntimeHaltSignal` carrying `#TIMEOUT` → `#TIMEOUT` (cooperative cancel)
  * - anything else → `#UNAVAILABLE` with `kind: 'unknown_error'`.
  */
@@ -102,6 +104,7 @@ function codeForKind(
     case 'binary_eacces':
       return 'FORBIDDEN';
     case 'cli_timeout':
+    case 'request_cancelled':
       return 'TIMEOUT';
     default:
       return 'UNAVAILABLE';
