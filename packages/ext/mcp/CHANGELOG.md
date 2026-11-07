@@ -6,6 +6,10 @@
 
 - **Test suite trust:** Tests are type-checked, false-pass tests are fixed, and HTTP transport tests run offline with no env gate. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 
+### Fixed
+
+- **dispose:** Calls after `dispose()` halt with `#DISPOSED`, including in-flight ([#139](https://github.com/rcrsr/rill-ext/issues/139)); transport drops still give `connection_lost`. ([#148](https://github.com/rcrsr/rill-ext/pull/148))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

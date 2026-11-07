@@ -11,13 +11,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { emitExtensionEvent } from '@rcrsr/rill';
-import type { RuntimeContext } from '@rcrsr/rill';
+import { emitExtensionEvent, getStatus } from '@rcrsr/rill';
+import type { RillFunction, RillValue, RuntimeContext } from '@rcrsr/rill';
 import { generateToolFunctions, type McpTool } from '../../src/tools.js';
-import { makeRuntimeCtx } from '../_helpers.js';
+import { expectRejectsInvalid, makeRuntimeCtx } from '../_helpers.js';
 import {
   createReadResourceFunction,
   generateResourceTemplateFunctions,
+  generateStaticResourceFunctions,
   type McpResourceTemplate,
 } from '../../src/resources.js';
 import { generatePromptFunctions, type McpPrompt } from '../../src/prompts.js';
@@ -791,5 +792,184 @@ describe('mcp:error event', () => {
       .mocked(emitExtensionEvent)
       .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
+  });
+});
+
+// ============================================================
+// DISPOSED GUARD TESTS
+// ============================================================
+
+describe('disposed guard', () => {
+  function createDisposedHarness(disposed = true): {
+    client: {
+      callTool: ReturnType<typeof vi.fn>;
+      readResource: ReturnType<typeof vi.fn>;
+      getPrompt: ReturnType<typeof vi.fn>;
+    };
+    lifecycleState: { connectEmitted: boolean; disposed: boolean };
+    closures: Record<
+      string,
+      { fn: RillFunction['fn']; args: Record<string, unknown> }
+    >;
+  } {
+    const client = {
+      callTool: vi.fn(),
+      readResource: vi.fn(),
+      getPrompt: vi.fn(),
+    };
+    const lifecycleState = { connectEmitted: false, disposed };
+    const sdkClient = client as unknown as Client;
+
+    const tools = generateToolFunctions(
+      [{ name: 'test-tool', inputSchema: { type: 'object', properties: {} } }],
+      sdkClient,
+      30000,
+      lifecycleState
+    );
+    const statics = generateStaticResourceFunctions(
+      [{ uri: 'config://app', name: 'app' }],
+      sdkClient,
+      30000,
+      lifecycleState
+    );
+    const templates = generateResourceTemplateFunctions(
+      [{ uriTemplate: 'db://table/{tableName}', name: 'read_table' }],
+      sdkClient,
+      30000,
+      lifecycleState
+    );
+    const prompts = generatePromptFunctions(
+      [{ name: 'test-prompt', arguments: [] }],
+      sdkClient,
+      30000,
+      lifecycleState
+    );
+    const readResource = createReadResourceFunction(
+      sdkClient,
+      30000,
+      lifecycleState
+    );
+
+    return {
+      client,
+      lifecycleState,
+      closures: {
+        tool: { fn: tools['test_tool']!.fn, args: {} },
+        read_resource: { fn: readResource.fn, args: { uri: 'test://r' } },
+        static_resource: { fn: statics['resource_app']!.fn, args: {} },
+        resource_template: {
+          fn: templates['resource_read_table']!.fn,
+          args: { tableName: 'users' },
+        },
+        prompt: { fn: prompts['test_prompt']!.fn, args: {} },
+      },
+    };
+  }
+
+  const CLOSURE_NAMES = [
+    'tool',
+    'read_resource',
+    'static_resource',
+    'resource_template',
+    'prompt',
+  ] as const;
+
+  describe.each(CLOSURE_NAMES)('%s closure', (name) => {
+    it('rejects with DISPOSED and raw.kind extension_disposed', async () => {
+      const { closures } = createDisposedHarness();
+      const closure = closures[name]!;
+
+      const caught = await expectRejectsInvalid(
+        closure.fn(closure.args as never, createMockContext())
+      );
+
+      const status = getStatus(caught);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+    });
+
+    it('emits no events', async () => {
+      const { closures } = createDisposedHarness();
+      const closure = closures[name]!;
+
+      await expectRejectsInvalid(
+        closure.fn(closure.args as never, createMockContext())
+      );
+
+      expect(emitExtensionEvent).not.toHaveBeenCalled();
+    });
+
+    it('leaves the client untouched', async () => {
+      const { client, closures } = createDisposedHarness();
+      const closure = closures[name]!;
+
+      await expectRejectsInvalid(
+        closure.fn(closure.args as never, createMockContext())
+      );
+
+      expect(client.callTool).not.toHaveBeenCalled();
+      expect(client.readResource).not.toHaveBeenCalled();
+      expect(client.getPrompt).not.toHaveBeenCalled();
+    });
+
+    it('keeps connectEmitted false', async () => {
+      const { lifecycleState, closures } = createDisposedHarness();
+      const closure = closures[name]!;
+
+      await expectRejectsInvalid(
+        closure.fn(closure.args as never, createMockContext())
+      );
+
+      expect(lifecycleState.connectEmitted).toBe(false);
+    });
+  });
+
+  it('reports DISPOSED for a template call with a non-string argument', async () => {
+    const { closures } = createDisposedHarness();
+    const closure = closures['resource_template']!;
+
+    const caught = await expectRejectsInvalid(
+      closure.fn({ tableName: 42 } as never, createMockContext())
+    );
+
+    expect(getStatus(caught).code.name).toBe('DISPOSED');
+  });
+
+  describe.each(CLOSURE_NAMES)('%s closure with a call in flight', (name) => {
+    function runInFlight(disposeFirst: boolean): Promise<RillValue> {
+      const harness = createDisposedHarness(false);
+      let rejectCall: (reason: Error) => void = () => {};
+      const pending = new Promise<never>((_, reject) => {
+        rejectCall = reject;
+      });
+      harness.client.callTool.mockReturnValue(pending);
+      harness.client.readResource.mockReturnValue(pending);
+      harness.client.getPrompt.mockReturnValue(pending);
+      const closure = harness.closures[name]!;
+
+      const call = closure.fn(closure.args as never, createMockContext());
+      if (disposeFirst) harness.lifecycleState.disposed = true;
+      rejectCall(new Error('MCP error -32000: Connection closed'));
+
+      return expectRejectsInvalid(call);
+    }
+
+    it('reports DISPOSED when dispose closes the connection', async () => {
+      const status = getStatus(await runInFlight(true));
+
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+      expect(emitExtensionEvent).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ event: 'mcp:error' })
+      );
+    });
+
+    it('reports connection_lost when the transport drops without dispose', async () => {
+      const status = getStatus(await runInFlight(false));
+
+      expect(status.code.name).toBe('UNAVAILABLE');
+      expect(status.raw['kind']).toBe('connection_lost');
+    });
   });
 });

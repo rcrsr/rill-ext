@@ -46,6 +46,12 @@ export type McpTransportConfig =
 // EXTENSION CONFIGURATION
 // ============================================================
 
+/** Per-extension lifecycle flags shared by tool, resource and prompt functions. */
+export interface McpLifecycleState {
+  connectEmitted: boolean;
+  disposed?: boolean | undefined;
+}
+
 /**
  * Configuration for MCP extension initialization.
  *

@@ -2,9 +2,9 @@
  * Integration tests for dispose and connection lifecycle.
  *
  * Coverage:
- * - BC-5: Dispose during active call - kills process, pending call rejects
+ * - BC-5: Dispose during active call - kills process, pending call rejects with #DISPOSED
  * - BC-5: Idempotent dispose - second call is no-op
- * - BC-5: Calls after dispose throw connection lost error
+ * - BC-5: Calls after dispose halt with #DISPOSED
  *
  * These integration tests use real MCP client/transport (mocked at SDK level)
  * to verify disposal behavior in realistic scenarios.
@@ -12,6 +12,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { getStatus, type RillValue } from '@rcrsr/rill';
 import { createMcpExtension } from '../src/factory.js';
 import {
   makeFactoryCtx,
@@ -20,6 +21,15 @@ import {
   expectRejectsInvalid,
 } from './_helpers.js';
 import type { McpExtensionConfig } from '../src/types.js';
+
+function expectDisposedStatus(value: RillValue): void {
+  const status = getStatus(value);
+  expect(status.code.name).toBe('DISPOSED');
+  expect(status.provider).toBe('mcp');
+  expect((status.raw as Record<string, unknown>)['kind']).toBe(
+    'extension_disposed'
+  );
+}
 
 describe('Integration: Dispose and Connection Lifecycle', () => {
   beforeEach(() => {
@@ -36,7 +46,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
   });
 
   describe('BC-5: Dispose during active tool call', () => {
-    it('kills connection and pending call rejects with connection lost error', async () => {
+    it('kills connection and pending call rejects with DISPOSED', async () => {
       // Mock a tool that simulates a long-running operation
       let toolCallController: {
         resolve: (value: unknown) => void;
@@ -100,8 +110,10 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       // Immediately dispose while the tool call is pending
       await extension.dispose?.();
 
-      // The pending tool call should reject with connection lost error
-      await expectRejectsInvalid(toolCallPromise, 'connection lost');
+      // The pending tool call reports the disposal, not the transport error
+      const pendingError = await expectRejectsInvalid(toolCallPromise);
+      expect(getStatus(pendingError).code.name).toBe('DISPOSED');
+      expect(getStatus(pendingError).raw['kind']).toBe('extension_disposed');
     });
 
     it('handles disposal with multiple pending calls', async () => {
@@ -172,9 +184,11 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       // Dispose while both calls are pending
       await extension.dispose?.();
 
-      // Both pending calls should reject
-      await expectRejectsInvalid(call1, 'connection lost');
-      await expectRejectsInvalid(call2, 'connection lost');
+      // Both pending calls report the disposal
+      for (const call of [call1, call2]) {
+        const error = await expectRejectsInvalid(call);
+        expect(getStatus(error).code.name).toBe('DISPOSED');
+      }
     });
   });
 
@@ -266,8 +280,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
     });
   });
 
-  describe('BC-5: Calls after dispose throw connection lost error', () => {
-    it('tool calls after dispose throw connection lost error', async () => {
+  describe('BC-5: Calls after dispose halt with #DISPOSED', () => {
+    it('halts tool calls after dispose with #DISPOSED', async () => {
       vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
       vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
@@ -324,20 +338,18 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       // Dispose the extension
       await extension.dispose?.();
 
-      // Mock callTool to throw after disposal (connection closed)
-      mockCallTool.mockRejectedValue(new Error('connection closed'));
-
-      // Tool call after dispose should throw connection lost error
-      await expectRejectsInvalid(
+      // Tool call after dispose halts without touching the client
+      const caught = await expectRejectsInvalid(
         getCallable(tools, 'test_tool').fn(
           { param1: 'value' },
           makeRuntimeCtx()
-        ),
-        'mcp: connection lost'
+        )
       );
+      expectDisposedStatus(caught);
+      expect(mockCallTool).toHaveBeenCalledTimes(1);
     });
 
-    it('resource reads after dispose throw connection lost error', async () => {
+    it('halts resource reads after dispose with #DISPOSED', async () => {
       vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
       vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
@@ -353,7 +365,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         ],
       });
       vi.spyOn(Client.prototype, 'listResourceTemplates').mockResolvedValue({
-        resourceTemplates: [],
+        resourceTemplates: [{ uriTemplate: 'test://item/{id}', name: 'item' }],
       });
       vi.spyOn(Client.prototype, 'listPrompts').mockResolvedValue({
         prompts: [],
@@ -388,20 +400,35 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       // Dispose the extension
       await extension.dispose?.();
 
-      // Mock readResource to throw after disposal (connection lost)
-      mockReadResource.mockRejectedValue(new Error('connection lost'));
-
-      // Resource read after dispose should throw
-      await expectRejectsInvalid(
+      // Every resource path halts without touching the client
+      const readCaught = await expectRejectsInvalid(
         getCallable(resources, 'read_resource').fn(
           { uri: 'test://resource' },
           makeRuntimeCtx()
-        ),
-        'mcp: connection lost'
+        )
       );
+      expectDisposedStatus(readCaught);
+
+      const staticCaught = await expectRejectsInvalid(
+        getCallable(resources, 'resource_test_resource').fn(
+          {},
+          makeRuntimeCtx()
+        )
+      );
+      expectDisposedStatus(staticCaught);
+
+      const templateCaught = await expectRejectsInvalid(
+        getCallable(resources, 'resource_item').fn(
+          { id: 'x' },
+          makeRuntimeCtx()
+        )
+      );
+      expectDisposedStatus(templateCaught);
+
+      expect(mockReadResource).toHaveBeenCalledTimes(1);
     });
 
-    it('prompt calls after dispose throw connection lost error', async () => {
+    it('halts prompt calls after dispose with #DISPOSED', async () => {
       vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
       vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
@@ -458,14 +485,12 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       // Dispose the extension
       await extension.dispose?.();
 
-      // Mock getPrompt to throw after disposal (connection lost)
-      mockGetPrompt.mockRejectedValue(new Error('connection lost'));
-
-      // Prompt call after dispose should throw
-      await expectRejectsInvalid(
-        getCallable(prompts, 'test').fn({}, makeRuntimeCtx()),
-        'mcp: connection lost'
+      // Prompt call after dispose halts without touching the client
+      const caught = await expectRejectsInvalid(
+        getCallable(prompts, 'test').fn({}, makeRuntimeCtx())
       );
+      expectDisposedStatus(caught);
+      expect(mockGetPrompt).toHaveBeenCalledTimes(1);
     });
   });
 

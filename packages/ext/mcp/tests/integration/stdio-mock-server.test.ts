@@ -26,7 +26,12 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createMcpExtension } from '../../src/factory.js';
-import { makeFactoryCtx, makeRuntimeCtx } from '../_helpers.js';
+import { getStatus, type RillValue } from '@rcrsr/rill';
+import {
+  expectRejectsInvalid,
+  makeFactoryCtx,
+  makeRuntimeCtx,
+} from '../_helpers.js';
 
 // Runtime context for calling host functions in tests.
 const mockContext = makeRuntimeCtx();
@@ -504,11 +509,16 @@ describe('Integration: stdio mock server', () => {
       // Dispose extension
       await ext.dispose?.();
 
-      // After dispose, calling functions should fail
-      // (The exact error depends on transport state)
-      await expect(
+      // After dispose, calls halt with #DISPOSED without touching the client
+      const caught = await expectRejectsInvalid(
         hostFn(v['tools'], 'echo').fn({ message: 'test' }, mockContext)
-      ).rejects.toThrow();
+      );
+      const status = getStatus(caught as RillValue);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.provider).toBe('mcp');
+      expect((status.raw as { kind?: unknown }).kind).toBe(
+        'extension_disposed'
+      );
     }, 15000);
 
     it('handles multiple dispose calls (idempotent)', async () => {

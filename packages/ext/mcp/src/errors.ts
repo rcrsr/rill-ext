@@ -15,6 +15,7 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
+import type { McpLifecycleState } from './types.js';
 
 const PROVIDER = 'mcp';
 
@@ -161,6 +162,23 @@ export function failUnavailable(
     code: 'UNAVAILABLE',
     provider: PROVIDER,
     raw: { kind: 'unknown_error', detail: message, ...raw },
+  });
+}
+
+/**
+ * Whether dispose() has run. A call, not a property read, so the check in a
+ * catch block is re-evaluated after the awaited client call.
+ */
+export function isDisposed(state: McpLifecycleState): boolean {
+  return state.disposed === true;
+}
+
+/** Call made after the extension was disposed. */
+export function failDisposed(ctx: RuntimeContext): RillValue {
+  return ctx.invalidate(new Error('mcp: extension disposed'), {
+    code: 'DISPOSED',
+    provider: PROVIDER,
+    raw: { kind: 'extension_disposed' },
   });
 }
 
