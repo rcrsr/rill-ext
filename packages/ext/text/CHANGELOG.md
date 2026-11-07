@@ -2,8 +2,12 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-06
+
 ### Changed
 
+- **rill 0.23 migration:** `@rcrsr/rill` peer and dev ranges move from `~0.21.0` to `~0.23.0`. Extensions at `0.23.x` require rill `0.23.x`; consumers on rill `0.21.x` must stay on extensions `0.21.x`. ([#145](https://github.com/rcrsr/rill-ext/pull/145))
+- Bumps `entities` to `^9.0.0` (from `^8.1.0`, major), `defuddle` to `^0.19.6`, `linkedom` to `^0.18.15`, and `turndown` to `^7.2.5`. In-use API surface unchanged. ([#145](https://github.com/rcrsr/rill-ext/pull/145))
 - Bumps `defuddle` to `^0.19.4` (from `^0.19.3`) and `entities` to `^8.1.0` (from `^8.0.0`). In-use API surface unchanged. ([#131](https://github.com/rcrsr/rill-ext/pull/131))
 
 ## [0.21.0] - 2026-09-09

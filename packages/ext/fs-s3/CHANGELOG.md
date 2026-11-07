@@ -2,8 +2,12 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-06
+
 ### Changed
 
+- **rill 0.23 migration:** `@rcrsr/rill` peer and dev ranges move from `~0.21.0` to `~0.23.0`. Extensions at `0.23.x` require rill `0.23.x`; consumers on rill `0.21.x` must stay on extensions `0.21.x`. ([#145](https://github.com/rcrsr/rill-ext/pull/145))
+- Bumps `@aws-sdk/client-s3` to `^3.1163.0` (from `^3.1146.0`). In-use API surface unchanged. ([#145](https://github.com/rcrsr/rill-ext/pull/145))
 - Bumps `@aws-sdk/client-s3` to `^3.1146.0` (from `^3.1126.0`). In-use API surface unchanged. ([#131](https://github.com/rcrsr/rill-ext/pull/131))
 
 ## [0.21.0] - 2026-09-09

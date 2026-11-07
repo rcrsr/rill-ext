@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-06
+
 ### Changed
 
+- **rill 0.23 migration:** `@rcrsr/rill` peer and dev ranges move from `~0.21.0` to `~0.23.0`. Extensions at `0.23.x` require rill `0.23.x`; consumers on rill `0.21.x` must stay on extensions `0.21.x`. ([#145](https://github.com/rcrsr/rill-ext/pull/145))
+- **tool_loop:** a rill builtin passed in the tools dict is now accepted and invoked as a tool. rill 0.23 makes builtins ordinary application callables, so the `raw.kind: 'builtin_tool_unsupported'` halt is gone. No parameter, returned key, or error atom changes. ([#145](https://github.com/rcrsr/rill-ext/pull/145))
+- Bumps `@anthropic-ai/sdk` to `^0.137.0` (from `^0.131.0`), held below 1.x because 1.0 removes `temperature` from message params. In-use API surface unchanged. ([#145](https://github.com/rcrsr/rill-ext/pull/145))
 - Bumps `@anthropic-ai/sdk` to `^0.131.0` (from `^0.124.0`). In-use API surface unchanged. ([#131](https://github.com/rcrsr/rill-ext/pull/131))
 
 ## [0.21.0] - 2026-09-09
