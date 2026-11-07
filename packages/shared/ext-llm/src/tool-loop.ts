@@ -4,11 +4,11 @@
  */
 
 import {
+  createRuntimeContext,
   getStatus,
   invokeCallable,
   isCallable,
   isDict,
-  isRuntimeCallable,
   RuntimeError,
   RuntimeHaltSignal,
   type ApplicationCallable,
@@ -139,17 +139,13 @@ async function executeToolCall(
   const callable = toolFn;
 
   // ScriptCallable has no .fn property — requires invokeCallable with a full RuntimeContext.
-  // RuntimeCallable and ApplicationCallable use .fn directly and only need RuntimeContextLike.
-  if (
-    callable.kind !== 'runtime' &&
-    callable.kind !== 'application' &&
-    callable.kind !== 'script'
-  ) {
+  // ApplicationCallable (host functions and builtins) uses .fn directly.
+  if (callable.kind !== 'application' && callable.kind !== 'script') {
     throwToolLoopHalt(
       context,
       'INVALID_INPUT',
       'tool_kind_unsupported',
-      `Invalid tool input for ${toolName}: tool must be application, runtime, or script callable`
+      `Invalid tool input for ${toolName}: tool must be application or script callable`
     );
   }
 
@@ -180,14 +176,10 @@ async function executeToolCall(
       return await invokeCallable(callable, args, context as RuntimeContext);
     }
 
-    // Runtime/Application callables use .fn directly with named args (Record<string, RillValue>).
-    // If no context provided, create minimal context-like object for callable signature.
-    const ctx: RuntimeContextLike = context ?? {
-      parent: undefined,
-      variables: new Map<string, RillValue>(),
-      pipeValue: null,
-      hostContext: {},
-    };
+    // Application callables use .fn directly with named args (Record<string, RillValue>).
+    // CallableFn requires a full RuntimeContext; create a fresh one when none was provided.
+    const ctx: RuntimeContext =
+      (context as RuntimeContext | undefined) ?? createRuntimeContext();
     const result = callable.fn(inputDict, ctx);
     return result instanceof Promise ? await result : result;
   } catch (error: unknown) {
@@ -386,16 +378,6 @@ export async function executeToolLoop(
   // Build provider-specific tool format
   const toolDescriptors = Object.entries(toolsDict).map(([name, fn]) => {
     const fnValue = fn as RillValue;
-
-    // RuntimeCallable (builtins) cannot be used as tools
-    if (isRuntimeCallable(fnValue)) {
-      throwToolLoopHalt(
-        context,
-        'INVALID_INPUT',
-        'builtin_tool_unsupported',
-        `tool_loop: builtin "${name}" cannot be used as a tool — wrap in a closure`
-      );
-    }
 
     // Value must be a callable
     if (!isCallable(fnValue)) {

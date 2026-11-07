@@ -14,15 +14,15 @@
     "build": "tsc --build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint --config ../../../.oxlintrc.json src/ tests/",
+    "lint": "oxlint --type-aware --config ../../../.oxlintrc.json src/ tests/",
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.21.0"
+    "@rcrsr/rill": "~0.23.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.21.0",
-    "@types/node": "^26.6.4"
+    "@rcrsr/rill": "~0.23.0",
+    "@types/node": "^26.6.6"
   },
   "repository": {
     "type": "git",

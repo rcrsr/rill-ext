@@ -26,32 +26,32 @@
     "build": "tsup && dts-bundle-generator --config dts-bundle-generator.config.cjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint --config ../../../.oxlintrc.json src/ tests/",
+    "lint": "oxlint --type-aware --config ../../../.oxlintrc.json src/ tests/",
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "engines": {
     "node": ">=22.16.0"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.21.0"
+    "@rcrsr/rill": "~0.23.0"
   },
   "dependencies": {
-    "defuddle": "^0.19.4",
-    "entities": "^8.1.0",
+    "defuddle": "^0.19.6",
+    "entities": "^9.0.0",
     "html-to-text": "^10.0.1",
-    "linkedom": "^0.18.13",
+    "linkedom": "^0.18.15",
     "linkify-it": "^6.1.0",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.5"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.21.0",
+    "@rcrsr/rill": "~0.23.0",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/html-to-text": "^9.0.4",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.6",
     "@types/turndown": "^5.0.6",
     "dts-bundle-generator": "^9.5.1",
-    "tsup": "^8.5.1",
-    "undici-types": "^8.11.2"
+    "tsup": "^9.0.0",
+    "undici-types": "^8.12.4"
   },
   "files": [
     "dist"

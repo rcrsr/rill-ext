@@ -44,20 +44,6 @@ minimumReleaseAgeExclude:
 # provenance-only.
 trustPolicy: no-downgrade
 
-# Enabling the policy above found exactly one real downgrade in this tree.
-# chokidar carried SLSA provenance at 4.0.0 and 4.0.1, published 4.0.2 and
-# 4.0.3 without it, and carries it again at 5.0.0. So the drop is real, and it
-# is not reachable by upgrading: tsup 8.5.1 (the newest release) depends on
-# chokidar ^4.0.3, and no 4.x at or above 4.0.3 carries provenance. Forcing
-# chokidar 5 through a nested override would put tsup on an untested major to
-# satisfy a policy check, which trades a real breakage risk for a paper fix.
-#
-# Excluded by name rather than at 4.0.3, so the entry does not silently stop
-# applying at the next 4.x — and so it starts failing again, correctly, if the
-# situation changes shape. Remove this once tsup accepts chokidar 5.
-trustPolicyExclude:
-  - 'chokidar'
-
 # dts-bundle-generator@9.5.1 (latest) consumes the classic TypeScript compiler
 # API (ts.sys, ts.createProgram) which TypeScript 7's native compiler no
 # longer ships. Pin dts-bundle-generator's own nested typescript resolution
@@ -65,3 +51,9 @@ trustPolicyExclude:
 # `typescript` devDependency stays on ^7.0.2 for typecheck/tsup.
 overrides:
   'dts-bundle-generator>typescript': '6.0.3'
+  # openai and @qdrant/js-client-rest resolve undici 7.29.x, which carries
+  # high-severity advisories patched in 7.30.1 (e.g. GHSA-2m5v-pch6-74hx).
+  # Scoped to the two dependents (STD-DEP-3). Remove each entry once that
+  # dependent resolves >=7.30.1 on its own.
+  'openai>undici': '^7.30.2'
+  '@qdrant/js-client-rest>undici': '^7.30.2'

@@ -1203,10 +1203,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         // Re-iterating the done step throws RILL-R002 synchronously
         // (the done step's callable is a sync function that throws, not async)
         expect(() => current.next.fn({}, null)).toThrow(
-          expect.objectContaining({
-            errorId: 'RILL-R002',
-            message: 'Stream already consumed; cannot re-iterate',
-          })
+          /#RILL_R002: Stream already consumed; cannot re-iterate/
         );
       });
     });
