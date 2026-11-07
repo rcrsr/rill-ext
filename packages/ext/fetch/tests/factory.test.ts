@@ -31,6 +31,9 @@ type MockResponse = {
   headers?: Record<string, string> | undefined;
   body: string;
   delay?: number | undefined;
+  // Resolve after `delay` even when the signal aborts, simulating a response
+  // that completed while dispose() ran.
+  ignoreAbort?: boolean | undefined;
 };
 
 let mockResponses: MockResponse[] = [];
@@ -52,7 +55,8 @@ function mockFetch(
   }
 
   const delay = mockResponse.delay ?? 0;
-  const signal = options?.signal;
+  const signal =
+    mockResponse.ignoreAbort === true ? undefined : options?.signal;
 
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -554,6 +558,37 @@ describe('createFetchExtension', () => {
       expect(status.code.name).toBe('DISPOSED');
       expect(status.provider).toBe('fetch');
       expect(status.raw).toMatchObject({ kind: 'extension_disposed' });
+    });
+
+    it('keeps the original atom when a response fails while dispose runs', async () => {
+      mockResponses.push({
+        status: 404,
+        body: '{"error":"missing"}',
+        delay: 50,
+        ignoreAbort: true,
+      });
+
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+          },
+        },
+      };
+
+      const ext = createFetchExtension(config, makeFactoryCtx());
+      const requestPromise = getCallable(ext, 'getUser').fn(
+        { id: '123' },
+        makeRuntimeCtx()
+      );
+      ext.dispose!();
+
+      const status = getStatus(await requestPromise);
+      expect(status.code.name).not.toBe('DISPOSED');
+      expect(status.raw['kind']).not.toBe('extension_disposed');
     });
 
     it('aborts when ctx.signal fires', async () => {

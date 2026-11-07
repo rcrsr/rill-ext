@@ -5,6 +5,7 @@
  */
 
 import {
+  getStatus,
   isInvalid,
   structureToTypeValue,
   toCallable,
@@ -101,7 +102,13 @@ export function createExecExtension(
 
         if (isInvalid(result as RillValue)) {
           // dispose() cancelled this command: report DISPOSED, not TIMEOUT.
-          if (disposed && controller.signal.aborted) {
+          // Only the abort-shaped failure is remapped; a genuine failure that
+          // resolved while dispose ran keeps its own atom.
+          if (
+            disposed &&
+            controller.signal.aborted &&
+            getStatus(result as RillValue).raw['kind'] === 'aborted'
+          ) {
             return runCtx.invalidate(new Error('exec: extension disposed'), {
               code: 'DISPOSED',
               provider: 'exec',

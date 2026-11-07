@@ -5,6 +5,7 @@
  */
 
 import {
+  getStatus,
   isInvalid,
   structureToTypeValue,
   toCallable,
@@ -232,7 +233,14 @@ export function createFetchExtension(
         );
 
         // dispose() cancelled this request: report DISPOSED, not TIMEOUT.
-        if (controller.signal.aborted && disposed && isInvalid(result)) {
+        // Only the abort-shaped failure is remapped; a genuine failure that
+        // resolved while dispose ran keeps its own atom.
+        if (
+          disposed &&
+          controller.signal.aborted &&
+          isInvalid(result) &&
+          getStatus(result).raw['kind'] === 'request_timeout'
+        ) {
           return runCtx.invalidate(new Error('fetch: extension disposed'), {
             code: 'DISPOSED',
             provider: 'fetch',
