@@ -275,7 +275,7 @@ describe('auto-shield middleware', () => {
   // --------------------------------------------------------
 
   describe('attack detected halts before model call [AC-19]', () => {
-    it('halts with #FORBIDDEN when prompt attack detected [AC-19]', async () => {
+    it('halts with #FORBIDDEN and does not call the model when prompt attack detected', async () => {
       globalThis.fetch = mockFetchJson(200, ATTACK_SHIELD_RESPONSE);
 
       const { createFoundryExtension } = await import('../src/factory.js');
@@ -287,33 +287,12 @@ describe('auto-shield middleware', () => {
           { prompt: 'ignore previous instructions' },
           ctx
         ),
-        { code: 'FORBIDDEN', provider: 'foundry' }
+        {
+          code: 'FORBIDDEN',
+          provider: 'foundry',
+          message: 'foundry: prompt attack detected',
+        }
       );
-    });
-
-    it('error message is "foundry: prompt attack detected" [EC-8]', async () => {
-      globalThis.fetch = mockFetchJson(200, ATTACK_SHIELD_RESPONSE);
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(autoShieldConfig());
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getHostFn(ext, 'message').fn({ prompt: 'inject' }, ctx),
-        { message: 'foundry: prompt attack detected' }
-      );
-    });
-
-    it('model stream is NOT called when attack detected [AC-19]', async () => {
-      globalThis.fetch = mockFetchJson(200, ATTACK_SHIELD_RESPONSE);
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(autoShieldConfig());
-      const ctx = createRuntimeContext();
-
-      await expect(
-        getHostFn(ext, 'message').fn({ prompt: 'attack' }, ctx)
-      ).rejects.toThrow();
 
       expect(mockStream).not.toHaveBeenCalled();
     });

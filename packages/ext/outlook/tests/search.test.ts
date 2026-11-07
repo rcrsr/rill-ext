@@ -84,10 +84,10 @@ describe('search() host function', () => {
   });
 
   // ============================================================
-  // AC-4: uses $search parameter
+  // uses $search parameter
   // ============================================================
 
-  it('includes $search parameter in URL [AC-4]', async () => {
+  it('includes $search parameter in URL', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
@@ -100,7 +100,7 @@ describe('search() host function', () => {
     expect(url).toContain('meeting%20notes');
   });
 
-  it('wraps query value in double quotes in $search [AC-4]', async () => {
+  it('wraps query value in double quotes in $search', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
@@ -113,7 +113,7 @@ describe('search() host function', () => {
     expect(url).toMatch(/\$search=%22.*%22|\$search=".*"/);
   });
 
-  it('returns MailMessageDict list from search results [AC-4]', async () => {
+  it('returns MailMessageDict list from search results', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -127,16 +127,7 @@ describe('search() host function', () => {
     expect(Array.isArray(messages)).toBe(true);
     expect(messages).toHaveLength(1);
 
-    const msg = messages[0]!;
-    expect(msg).toHaveProperty('id');
-    expect(msg).toHaveProperty('subject');
-    expect(msg).toHaveProperty('preview');
-    expect(msg).toHaveProperty('from');
-    expect(msg).toHaveProperty('to');
-    expect(msg).toHaveProperty('date');
-    expect(msg).toHaveProperty('unread');
-    expect(msg).toHaveProperty('flagged');
-    expect(msg).toHaveProperty('has_attachments');
+    expect(messages[0]!['id']).toBe('msg-search-001');
   });
 
   it('includes query in return value', async () => {
@@ -166,10 +157,10 @@ describe('search() host function', () => {
   });
 
   // ============================================================
-  // EC-3: empty query throws #INVALID_INPUT
+  // empty query throws #INVALID_INPUT
   // ============================================================
 
-  it('throws #INVALID_INPUT for empty query [EC-3]', async () => {
+  it('throws #INVALID_INPUT for empty query', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -182,7 +173,7 @@ describe('search() host function', () => {
     expect(getStatus(caught).message).toContain('query is required');
   });
 
-  it('throws #INVALID_INPUT for whitespace-only query [EC-3]', async () => {
+  it('throws #INVALID_INPUT for whitespace-only query', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -195,10 +186,10 @@ describe('search() host function', () => {
   });
 
   // ============================================================
-  // AC-19: event emission
+  // event emission
   // ============================================================
 
-  it('emits outlook:mail:search event on success [AC-19]', async () => {
+  it('emits outlook:mail:search event on success', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();

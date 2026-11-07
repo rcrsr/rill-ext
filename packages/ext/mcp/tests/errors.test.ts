@@ -67,11 +67,15 @@ describe('Runtime helpers emit invalid RillValues', () => {
 
   it('failTool maps to #UNAVAILABLE with tool_error kind', () => {
     const ctx = makeRuntimeCtx();
-    expectAtom(
-      failTool(ctx, 'read_file', 'file not found'),
-      'UNAVAILABLE',
-      'read_file'
-    );
+    const value = failTool(ctx, 'read_file', 'file not found');
+    expectAtom(value, 'UNAVAILABLE', 'mcp tool "read_file": file not found');
+    const status = getStatus(value);
+    expect(status.provider).toBe('mcp');
+    expect(status.raw).toMatchObject({
+      kind: 'tool_error',
+      toolName: 'read_file',
+      errorText: 'file not found',
+    });
   });
 
   it('failNotFound maps to #NOT_FOUND', () => {
@@ -134,37 +138,60 @@ describe('mapMcpError detector', () => {
     expect(mapped).toBe(original);
   });
 
-  it('detects connection-lost messages', () => {
+  it.each([
+    { message: 'connection closed unexpectedly' },
+    { message: 'connection lost' },
+    { message: 'disconnected from server' },
+  ])('detects connection-lost message "$message"', ({ message }) => {
     const ctx = makeRuntimeCtx();
-    const mapped = mapMcpError(
-      ctx,
-      new Error('connection closed unexpectedly'),
-      'tool'
-    );
-    expect(getStatus(mapped).code.name).toBe('UNAVAILABLE');
+    const status = getStatus(mapMcpError(ctx, new Error(message), 'tool'));
+    expect(status.code.name).toBe('UNAVAILABLE');
+    expect(status.message).toContain('mcp: connection lost');
+    expect(status.raw).toMatchObject({ kind: 'connection_lost' });
   });
 
-  it('detects auth messages', () => {
+  it.each([
+    { message: 'unauthorized' },
+    { message: 'authentication failed' },
+    { message: 'invalid token' },
+  ])('detects auth message "$message"', ({ message }) => {
     const ctx = makeRuntimeCtx();
-    const mapped = mapMcpError(ctx, new Error('unauthorized'), 'tool');
-    expect(getStatus(mapped).code.name).toBe('AUTH');
+    const status = getStatus(mapMcpError(ctx, new Error(message), 'tool'));
+    expect(status.code.name).toBe('AUTH');
+    expect(status.message).toContain(
+      'mcp: authentication failed -- token may be expired'
+    );
+    expect(status.raw).toMatchObject({ kind: 'auth_failed' });
   });
 
-  it('detects protocol messages', () => {
+  it.each([
+    { message: 'malformed JSON-RPC response' },
+    { message: 'protocol error: invalid json' },
+    { message: 'invalid response format' },
+    { message: 'parse failed' },
+  ])('detects protocol message "$message"', ({ message }) => {
     const ctx = makeRuntimeCtx();
-    const mapped = mapMcpError(
-      ctx,
-      new Error('malformed JSON-RPC response'),
-      'tool'
-    );
-    expect(getStatus(mapped).code.name).toBe('PROTOCOL');
+    const status = getStatus(mapMcpError(ctx, new Error(message), 'tool'));
+    expect(status.code.name).toBe('PROTOCOL');
+    expect(status.message).toContain('mcp: protocol error');
+    expect(status.raw).toMatchObject({
+      kind: 'protocol_error',
+      detail: message,
+    });
   });
 
   it('falls back to #UNAVAILABLE tool_error for unknown errors', () => {
     const ctx = makeRuntimeCtx();
-    const mapped = mapMcpError(ctx, new Error('some other failure'), 'my_tool');
-    expect(getStatus(mapped).code.name).toBe('UNAVAILABLE');
-    expect(getStatus(mapped).message).toContain('my_tool');
+    const status = getStatus(
+      mapMcpError(ctx, new Error('some other failure'), 'my_tool')
+    );
+    expect(status.code.name).toBe('UNAVAILABLE');
+    expect(status.message).toContain('my_tool');
+    expect(status.raw).toMatchObject({
+      kind: 'tool_error',
+      toolName: 'my_tool',
+      errorText: 'some other failure',
+    });
   });
 
   it('handles non-Error throwables', () => {

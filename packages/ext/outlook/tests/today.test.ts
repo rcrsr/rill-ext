@@ -57,8 +57,8 @@ describe('today() host function', () => {
     vi.restoreAllMocks();
   });
 
-  // AC-11: today returns CalendarEventDict list for current UTC day
-  it('returns CalendarEventDict list for current UTC day [AC-11]', async () => {
+  // today returns CalendarEventDict list for current UTC day
+  it('returns CalendarEventDict list for current UTC day', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -83,8 +83,8 @@ describe('today() host function', () => {
     );
   });
 
-  // AC-11: returns empty list when no events today
-  it('returns empty events list when no events today [AC-11]', async () => {
+  // returns empty list when no events today
+  it('maps an empty Graph value list to empty events', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -101,8 +101,8 @@ describe('today() host function', () => {
     expect(result['events']).toEqual([]);
   });
 
-  // AC-11: uses calendarView endpoint with today's UTC day bounds
-  it('calls calendarView with current UTC day start and end [AC-11]', async () => {
+  // uses calendarView endpoint with today's UTC day bounds
+  it('calls calendarView with current UTC day start and end', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -126,8 +126,8 @@ describe('today() host function', () => {
     expect(url).toContain(encodeURIComponent(todayUtcDate));
   });
 
-  // AC-19: today emits outlook:calendar:read event
-  it('emits outlook:calendar:read event on success [AC-19]', async () => {
+  // today event includes event_count
+  it('emits event with correct event_count', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -144,27 +144,6 @@ describe('today() host function', () => {
       expect.objectContaining({
         event: 'outlook:calendar:read',
         subsystem: 'extension:outlook',
-      })
-    );
-  });
-
-  // AC-19: today event includes event_count
-  it('emits event with correct event_count [AC-19]', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: vi.fn().mockResolvedValue({ value: [GRAPH_EVENT_TODAY] }),
-    });
-    const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
-    ctx.callbacks.onLogEvent = onLogEvent;
-
-    await getCallable(ext, 'today').fn({}, ctx);
-
-    expect(onLogEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event: 'outlook:calendar:read',
         event_count: 1,
         range: 'today',
       })

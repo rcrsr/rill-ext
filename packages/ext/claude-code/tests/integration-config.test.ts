@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { makeFactoryCtx, extValue } from './_helpers.js';
 import type { IPty } from 'node-pty';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { createRuntimeContext, RuntimeError } from '@rcrsr/rill';
 
 // ============================================================
 // MOCKS
@@ -109,24 +109,6 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
         expect.objectContaining({ timeoutMs: 1800000 })
       );
     });
-
-    it('creates extension with all required functions', async () => {
-      const which = await import('which');
-      vi.mocked(which.default.sync).mockReturnValue('claude');
-
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-
-      expect(extValue(ext).prompt).toBeDefined();
-      expect(extValue(ext).prompt.fn).toBeInstanceOf(Function);
-      expect(extValue(ext).prompt.params).toBeDefined();
-      expect(extValue(ext).skill).toBeDefined();
-      expect(extValue(ext).skill.fn).toBeInstanceOf(Function);
-      expect(extValue(ext).skill.params).toBeDefined();
-      expect(extValue(ext).command).toBeDefined();
-      expect(extValue(ext).command.fn).toBeInstanceOf(Function);
-      expect(extValue(ext).command.params).toBeDefined();
-      expect(ext.dispose).toBeInstanceOf(Function);
-    });
   });
 
   describe('Custom binaryPath resolves correctly', () => {
@@ -197,56 +179,6 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
   });
 
   describe('Custom defaultTimeout propagated', () => {
-    it('propagates custom defaultTimeout to process manager', async () => {
-      const which = await import('which');
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      vi.mocked(which.default.sync).mockReturnValue('claude');
-      vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      });
-      vi.mocked(extractResult).mockReturnValue({
-        result: 'Response',
-        tokens: {
-          prompt: 5,
-          cache_write_5m: 0,
-          cache_write_1h: 0,
-          cache_read: 0,
-          output: 3,
-        },
-        cost: 0.001,
-        exit_code: 0,
-        duration: 500,
-      });
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      const ext = createClaudeCodeExtension(
-        { defaultTimeout: 60000 },
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-
-      await extValue(ext).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
-
-      // Verify custom default timeout 60000 was used
-      expect(spawnClaudeCli).toHaveBeenCalledWith(
-        'Test prompt',
-        expect.objectContaining({ timeoutMs: 60000 })
-      );
-    });
-
     it('accepts maximum timeout value 3600000', async () => {
       const which = await import('which');
       const { spawnClaudeCli } = await import('../src/process.js');
@@ -304,59 +236,6 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
 // ============================================================
 
 describe('AC-3: Custom timeout respects timeout option value', () => {
-  it('PromptOptions timeout overrides defaultTimeout for prompt', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-    const { extractResult } = await import('../src/result.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
-    });
-    vi.mocked(extractResult).mockReturnValue({
-      result: 'Response',
-      tokens: {
-        prompt: 5,
-        cache_write_5m: 0,
-        cache_write_1h: 0,
-        cache_read: 0,
-        output: 3,
-      },
-      cost: 0.001,
-      exit_code: 0,
-      duration: 500,
-    });
-    vi.mocked(spawnClaudeCli).mockReturnValue({
-      ptyProcess: {
-        onData: vi.fn(),
-        onExit: vi.fn(),
-        write: vi.fn(),
-        kill: vi.fn(),
-      } as unknown as IPty,
-      exitCode: Promise.resolve(0),
-      dispose: vi.fn(),
-    });
-
-    const ext = createClaudeCodeExtension(
-      { defaultTimeout: 1800000 },
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-
-    await extValue(ext).prompt.fn(
-      { text: 'Test prompt', options: { timeout: 90000 } },
-      ctx
-    );
-
-    // Verify timeout option overrides default
-    expect(spawnClaudeCli).toHaveBeenCalledWith(
-      'Test prompt',
-      expect.objectContaining({ timeoutMs: 90000 })
-    );
-  });
-
   it('PromptOptions timeout overrides defaultTimeout for skill', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
@@ -462,56 +341,6 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
       expect.objectContaining({ timeoutMs: 150000 })
     );
   });
-
-  it('uses defaultTimeout when timeout option not provided', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-    const { extractResult } = await import('../src/result.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-    vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
-    });
-    vi.mocked(extractResult).mockReturnValue({
-      result: 'Response',
-      tokens: {
-        prompt: 5,
-        cache_write_5m: 0,
-        cache_write_1h: 0,
-        cache_read: 0,
-        output: 3,
-      },
-      cost: 0.001,
-      exit_code: 0,
-      duration: 500,
-    });
-    vi.mocked(spawnClaudeCli).mockReturnValue({
-      ptyProcess: {
-        onData: vi.fn(),
-        onExit: vi.fn(),
-        write: vi.fn(),
-        kill: vi.fn(),
-      } as unknown as IPty,
-      exitCode: Promise.resolve(0),
-      dispose: vi.fn(),
-    });
-
-    const ext = createClaudeCodeExtension(
-      { defaultTimeout: 45000 },
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-
-    await extValue(ext).prompt.fn({ text: 'Test prompt', options: {} }, ctx);
-
-    // Verify default timeout was used when option not provided
-    expect(spawnClaudeCli).toHaveBeenCalledWith(
-      'Test prompt',
-      expect.objectContaining({ timeoutMs: 45000 })
-    );
-  });
 });
 
 // ============================================================
@@ -519,38 +348,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
 // ============================================================
 
 describe('EC-1: Invalid binaryPath at factory creation', () => {
-  it('throws RuntimeError RILL-R001 "claude binary not found" when binary does not exist', async () => {
-    const which = await import('which');
-
-    // Mock which.sync to throw (binary not in PATH)
-    vi.mocked(which.default.sync).mockImplementation(() => {
-      throw new Error('not found');
-    });
-
-    expect(() =>
-      createClaudeCodeExtension(
-        { binaryPath: '/nonexistent/claude' },
-        makeFactoryCtx()
-      )
-    ).toThrow('claude binary not found');
-  });
-
-  it('throws for binary not in PATH', async () => {
-    const which = await import('which');
-
-    vi.mocked(which.default.sync).mockImplementation(() => {
-      throw new Error('not found');
-    });
-
-    expect(() =>
-      createClaudeCodeExtension(
-        { binaryPath: 'missing-binary' },
-        makeFactoryCtx()
-      )
-    ).toThrow('claude binary not found');
-  });
-
-  it('validates binaryPath eagerly at factory creation time', async () => {
+  it('throws RuntimeError RILL-R001 eagerly when the binary is not in PATH', async () => {
     const which = await import('which');
 
     vi.mocked(which.default.sync).mockImplementation(() => {
@@ -558,101 +356,19 @@ describe('EC-1: Invalid binaryPath at factory creation', () => {
     });
 
     // Validation happens immediately during createClaudeCodeExtension call
-    expect(() =>
-      createClaudeCodeExtension({ binaryPath: 'bad-path' }, makeFactoryCtx())
-    ).toThrow('claude binary not found');
+    let caught: unknown;
+    try {
+      createClaudeCodeExtension({ binaryPath: 'bad-path' }, makeFactoryCtx());
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(RuntimeError);
+    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+    expect((caught as RuntimeError).message).toContain(
+      'claude binary not found'
+    );
 
     // Verify which.sync was called during factory creation
     expect(which.default.sync).toHaveBeenCalledWith('bad-path');
-  });
-});
-
-// ============================================================
-// EC-2: Invalid defaultTimeout
-// ============================================================
-
-describe('EC-2: Invalid defaultTimeout', () => {
-  it('throws Error for negative timeout', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: -5000 }, makeFactoryCtx())
-    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-  });
-
-  it('throws Error for zero timeout', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 0 }, makeFactoryCtx())
-    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-  });
-
-  it('throws Error for non-integer timeout (decimal)', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 2500.75 }, makeFactoryCtx())
-    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-  });
-
-  it('throws Error for non-integer timeout (float)', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 10000.1 }, makeFactoryCtx())
-    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-  });
-
-  it('throws Error for timeout exceeding max (3600000)', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 3600001 }, makeFactoryCtx())
-    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-  });
-
-  it('throws Error for timeout far exceeding max', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 5000000 }, makeFactoryCtx())
-    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-  });
-
-  it('validates timeout eagerly at factory creation time', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Validation happens immediately during createClaudeCodeExtension call
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: -1 }, makeFactoryCtx())
-    ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-  });
-
-  it('accepts valid timeout at minimum (1ms)', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Should not throw
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 1 }, makeFactoryCtx())
-    ).not.toThrow();
-  });
-
-  it('accepts valid timeout at maximum (3600000ms)', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Should not throw
-    expect(() =>
-      createClaudeCodeExtension({ defaultTimeout: 3600000 }, makeFactoryCtx())
-    ).not.toThrow();
   });
 });

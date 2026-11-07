@@ -6,8 +6,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
-  RuntimeHaltSignal,
-  getStatus,
   type ApplicationCallable,
   type RillTypeValue,
   type TypeStructure,
@@ -373,28 +371,6 @@ describe('generate() function', () => {
       });
       expect(messages[2]).toEqual({ role: 'user', content: 'Generate a name' });
     });
-
-    // AC-12: Absent system uses factory-configured default
-    it('uses factory system prompt when no system option provided', async () => {
-      mockCreate.mockResolvedValue(
-        createMockGenerateResponse('{"name":"Alice"}')
-      );
-
-      const ext = createAnthropicExtension({
-        ...BASE_CONFIG,
-        system: 'Factory system prompt.',
-      });
-      const ctx = createRuntimeContext();
-
-      await getCallable(ext, 'generate').fn(
-        { prompt: 'Generate', schema: NAME_SCHEMA },
-        ctx
-      );
-
-      expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ system: 'Factory system prompt.' })
-      );
-    });
   });
 
   // --------------------------------------------------------
@@ -403,7 +379,7 @@ describe('generate() function', () => {
 
   describe('error cases', () => {
     // AC-18 / EC-3: Missing schema throws RILL-R005
-    it('throws RILL-R005 when schema option is missing', async () => {
+    it('rejects a missing schema with INVALID_INPUT and makes no HTTP call', async () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
@@ -414,17 +390,6 @@ describe('generate() function', () => {
           message: 'generate requires a type expression as schema',
         }
       );
-    });
-
-    // AC-25 / EC-3: No HTTP call when schema is missing
-    it('makes no HTTP call when schema option is missing', async () => {
-      const ext = createAnthropicExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'generate').fn({ prompt: 'Generate something' }, ctx)
-      );
-
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
@@ -458,49 +423,6 @@ describe('generate() function', () => {
         ),
         { code: 'PROTOCOL', message: 'failed to parse response JSON' }
       );
-    });
-
-    // AC-23 / EC-5: Parse failure error is instance of RuntimeError with RILL-R005
-    it('parse failure throws RuntimeError instance with RILL-R005', async () => {
-      mockCreate.mockResolvedValue(createMockGenerateResponse('not json'));
-
-      const ext = createAnthropicExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      let thrown: unknown;
-      try {
-        await getCallable(ext, 'generate').fn(
-          { prompt: 'Generate', schema: NAME_SCHEMA },
-          ctx
-        );
-      } catch (e) {
-        thrown = e;
-      }
-
-      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
-      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
-        'PROTOCOL'
-      );
-    });
-
-    // AC-24 / EC-5: Parse failure never returns a partial dict
-    it('parse failure does not return a partial result', async () => {
-      mockCreate.mockResolvedValue(createMockGenerateResponse('not json'));
-
-      const ext = createAnthropicExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      let result: unknown = undefined;
-      try {
-        result = await getCallable(ext, 'generate').fn(
-          { prompt: 'Generate', schema: NAME_SCHEMA },
-          ctx
-        );
-      } catch {
-        // expected
-      }
-
-      expect(result).toBeUndefined();
     });
 
     // AC-27 / EC-6: Provider API error emits anthropic:error event

@@ -88,10 +88,10 @@ describe('draft() host function', () => {
   });
 
   // ============================================================
-  // AC-7: returns MailMessageDict from 201 response body
+  // returns MailMessageDict from 201 response body
   // ============================================================
 
-  it('returns MailMessageDict from 201 response body [AC-7]', async () => {
+  it('returns MailMessageDict from 201 response body', async () => {
     globalThis.fetch = mockFetchJson(201, GRAPH_DRAFT_MESSAGE);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -110,32 +110,6 @@ describe('draft() host function', () => {
     expect(result).toHaveProperty('unread');
     expect(result).toHaveProperty('flagged');
     expect(result).toHaveProperty('has_attachments');
-  });
-
-  it('returns all 9 MailMessageDict fields [AC-7]', async () => {
-    globalThis.fetch = mockFetchJson(201, GRAPH_DRAFT_MESSAGE);
-    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    const result = (await getCallable(ext, 'draft').fn(
-      DRAFT_ARGS,
-      ctx
-    )) as Record<string, unknown>;
-
-    const requiredFields = [
-      'id',
-      'subject',
-      'preview',
-      'from',
-      'to',
-      'date',
-      'unread',
-      'flagged',
-      'has_attachments',
-    ];
-    for (const field of requiredFields) {
-      expect(result).toHaveProperty(field);
-    }
   });
 
   it('posts to messages endpoint with draft body', async () => {
@@ -169,10 +143,10 @@ describe('draft() host function', () => {
   });
 
   // ============================================================
-  // AC-37: to as string auto-wraps to list
+  // to as string auto-wraps to list
   // ============================================================
 
-  it('auto-wraps string to into single-element toRecipients array [AC-37]', async () => {
+  it('auto-wraps string to into single-element toRecipients array', async () => {
     const mockFetch = mockFetchJson(201, GRAPH_DRAFT_MESSAGE);
     globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
@@ -203,49 +177,36 @@ describe('draft() host function', () => {
   });
 
   // ============================================================
-  // EC-6: empty to/subject/body throws #INVALID_INPUT
+  // empty to/subject/body throws #INVALID_INPUT
   // ============================================================
 
-  it('throws #INVALID_INPUT for empty to [EC-6]', async () => {
+  it.each([
+    {
+      field: 'to',
+      args: { to: [], subject: 'Subject', body: 'Body' },
+      message: 'to is required',
+    },
+    {
+      field: 'subject',
+      args: { to: ['r@example.com'], subject: '', body: 'Body' },
+      message: 'subject is required',
+    },
+    {
+      field: 'body',
+      args: { to: ['r@example.com'], subject: 'Subject', body: '' },
+      message: 'body is required',
+    },
+  ])('throws #INVALID_INPUT for empty $field', async ({ args, message }) => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'draft').fn(
-      { to: [], subject: 'Subject', body: 'Body' },
-      ctx
-    )) as RillValue;
+    const caught = (await getCallable(ext, 'draft').fn(args, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught).message).toContain('to is required');
+    expect(getStatus(caught).message).toContain(message);
   });
 
-  it('throws #INVALID_INPUT for empty subject [EC-6]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    const caught = (await getCallable(ext, 'draft').fn(
-      { to: ['r@example.com'], subject: '', body: 'Body' },
-      ctx
-    )) as RillValue;
-    expect(isInvalid(caught)).toBe(true);
-    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught).message).toContain('subject is required');
-  });
-
-  it('throws #INVALID_INPUT for empty body [EC-6]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    const caught = (await getCallable(ext, 'draft').fn(
-      { to: ['r@example.com'], subject: 'Subject', body: '' },
-      ctx
-    )) as RillValue;
-    expect(isInvalid(caught)).toBe(true);
-    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught).message).toContain('body is required');
-  });
-
-  it('throws #INVALID_INPUT for missing to (undefined) [EC-6]', async () => {
+  it('throws #INVALID_INPUT for missing to (undefined)', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -258,10 +219,10 @@ describe('draft() host function', () => {
   });
 
   // ============================================================
-  // AC-19: event emission
+  // event emission
   // ============================================================
 
-  it('emits outlook:mail:draft event on success [AC-19]', async () => {
+  it('emits outlook:mail:draft event on success', async () => {
     globalThis.fetch = mockFetchJson(201, GRAPH_DRAFT_MESSAGE);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();

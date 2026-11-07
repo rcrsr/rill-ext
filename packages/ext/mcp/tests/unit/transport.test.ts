@@ -21,20 +21,6 @@ import type {
 
 describe('Transport Creation', () => {
   describe('EC-3: Server process exits', () => {
-    it('maps ENOENT error to process exit error', async () => {
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'stdio',
-          command: 'nonexistent-command-xyz123',
-          args: [],
-        },
-      };
-
-      await expect(
-        createMcpExtension(config, makeFactoryCtx())
-      ).rejects.toThrow(/mcp: server process exited with code/);
-    });
-
     it('maps exit code from error message', async () => {
       const config: McpExtensionConfig = {
         transport: {
@@ -68,23 +54,27 @@ describe('Transport Creation', () => {
   });
 
   describe('EC-5: Auth required', () => {
-    it('detects 401 unauthorized response', async () => {
-      // This test requires a real server returning 401
-      // The httpbin.org service should return 401
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('maps a 401 connect failure to the auth-required error', async () => {
+      vi.spyOn(Client.prototype, 'connect').mockRejectedValue(
+        new Error('HTTP 401 Unauthorized')
+      );
       const config: McpExtensionConfig = {
         transport: {
           type: 'http',
-          url: 'http://httpbin.org/status/401',
+          url: 'http://localhost:59997/mcp',
         },
-        timeout: 5000,
       };
 
-      // The error may come from the MCP SDK as a different format
-      // We just verify it throws (401 handling is tested in error mapping)
       await expect(
         createMcpExtension(config, makeFactoryCtx())
-      ).rejects.toThrow();
-    }, 10000);
+      ).rejects.toThrow(
+        /server requires authentication -- complete OAuth flow before connecting/
+      );
+    });
   });
 
   describe('AC-4: Dynamic token refresh', () => {
@@ -159,67 +149,5 @@ describe('Transport Creation', () => {
       expect(resolved.get('Authorization')).toBe('Bearer static-token');
       expect(resolved.get('X-Custom-Header')).toBe('custom-value');
     });
-
-    // Test header handling logic without actual connection
-    it('validates header configuration types', () => {
-      // Static headers
-      const staticConfig: McpExtensionConfig = {
-        transport: {
-          type: 'http',
-          url: 'http://localhost:3000/mcp',
-          headers: { Authorization: 'Bearer token' },
-        },
-      };
-      expect(staticConfig.transport.type).toBe('http');
-
-      // Function headers
-      const fnTransport: McpHttpTransportConfig = {
-        type: 'http',
-        url: 'http://localhost:3000/mcp',
-        headers: () => ({ Authorization: 'Bearer token' }),
-      };
-      expect(typeof fnTransport.headers).toBe('function');
-
-      // Async function headers
-      const asyncFnTransport: McpHttpTransportConfig = {
-        type: 'http',
-        url: 'http://localhost:3000/mcp',
-        headers: async () => ({ Authorization: 'Bearer token' }),
-      };
-      expect(typeof asyncFnTransport.headers).toBe('function');
-    });
-  });
-
-  describe('Transport type routing', () => {
-    it('creates stdio transport for stdio config', async () => {
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'stdio',
-          command: 'test-stdio-command',
-          args: ['--arg'],
-          env: { KEY: 'value' },
-        },
-      };
-
-      // Will fail because command doesn't exist, but confirms stdio path
-      await expect(
-        createMcpExtension(config, makeFactoryCtx())
-      ).rejects.toThrow();
-    });
-
-    it('creates HTTP transport for http config', async () => {
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'http',
-          url: 'http://localhost:59995/mcp',
-        },
-        timeout: 2000,
-      };
-
-      // Will fail because server doesn't exist, but confirms http path
-      await expect(
-        createMcpExtension(config, makeFactoryCtx())
-      ).rejects.toThrow();
-    }, 5000);
   });
 });

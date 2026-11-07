@@ -1,18 +1,17 @@
 /**
- * Unit tests for splitRoleMessages and VALID_ROLES.
+ * Unit tests for splitRoleMessages.
  *
  * Covers:
  * happy path: ordered role list with correct content
  * ## heading inside a role section stays as body text
  * no @@ role marker → RuntimeError RILL-R001
- * VALID_ROLES exported constant
  * role allowlist enforcement in splitRoleMessages
  * invalid role marker → RuntimeError RILL-R001 with role + line number
  */
 
 import { describe, it, expect } from 'vitest';
 import { RuntimeError } from '@rcrsr/rill';
-import { splitRoleMessages, VALID_ROLES } from './roles.js';
+import { splitRoleMessages } from './roles.js';
 
 // ============================================================
 // HAPPY PATH
@@ -150,82 +149,44 @@ describe('splitRoleMessages', () => {
   });
 
   // ============================================================
-  // VALID_ROLES CONSTANT
-  // ============================================================
-
-  describe('VALID_ROLES', () => {
-    it('exports VALID_ROLES as a readonly tuple', () => {
-      expect(VALID_ROLES).toEqual(['system', 'user', 'assistant']);
-    });
-
-    it('contains exactly system, user, and assistant', () => {
-      expect(VALID_ROLES).toHaveLength(3);
-      expect(VALID_ROLES).toContain('system');
-      expect(VALID_ROLES).toContain('user');
-      expect(VALID_ROLES).toContain('assistant');
-    });
-  });
-
-  // ============================================================
   // ROLE ALLOWLIST ENFORCEMENT
   // ============================================================
 
   describe('role allowlist enforcement', () => {
-    it('accepts @@ system without error', () => {
-      const body = '@@ system\nYou are helpful.';
-      expect(() => splitRoleMessages(body)).not.toThrow();
-    });
+    it.each([
+      { role: 'tool', body: '@@ tool\nsome tool output', line: 1 },
+      { role: 'model', body: '@@ model\nsome model name', line: 1 },
+      { role: 'foo', body: '@@ foo\nsome content', line: 1 },
+      {
+        role: 'foo',
+        body: 'preamble line 1\npreamble line 2\n@@ foo\noutput',
+        line: 3,
+      },
+      {
+        role: 'invalid',
+        body: '@@ user\nline 1\nline 2\nline 3\n@@ invalid\noutput',
+        line: 5,
+      },
+    ])(
+      'rejects @@ $role at line $line with RILL-R001 naming role, line and valid roles',
+      (row) => {
+        let thrown: unknown;
+        try {
+          splitRoleMessages(row.body);
+        } catch (err) {
+          thrown = err;
+        }
 
-    it('accepts @@ user without error', () => {
-      const body = '@@ user\nHello!';
-      expect(() => splitRoleMessages(body)).not.toThrow();
-    });
-
-    it('accepts @@ assistant without error', () => {
-      const body = '@@ assistant\nI can help.';
-      expect(() => splitRoleMessages(body)).not.toThrow();
-    });
-
-    it('rejects @@ tool with RuntimeError RILL-R001', () => {
-      const body = '@@ tool\nsome tool output';
-      expect(() => splitRoleMessages(body)).toThrow(RuntimeError);
-    });
-
-    it('rejects @@ model with RuntimeError RILL-R001', () => {
-      const body = '@@ model\nsome model name';
-      expect(() => splitRoleMessages(body)).toThrow(RuntimeError);
-    });
-
-    it('rejects @@ foo with RuntimeError RILL-R001', () => {
-      const body = '@@ foo\nsome content';
-      expect(() => splitRoleMessages(body)).toThrow(RuntimeError);
-    });
-
-    it('error message contains the offending role name', () => {
-      const body = '@@ tool\noutput';
-      expect(() => splitRoleMessages(body)).toThrow("'@@ tool'");
-    });
-
-    it('error message contains the valid roles list', () => {
-      const body = '@@ model\noutput';
-      expect(() => splitRoleMessages(body)).toThrow(
-        'Valid roles are: system, user, assistant.'
-      );
-    });
-
-    it('error message contains the correct 1-based line number for a marker on line 1', () => {
-      const body = '@@ tool\noutput';
-      expect(() => splitRoleMessages(body)).toThrow('at line 1');
-    });
-
-    it('error message contains the correct 1-based line number for a marker on line 3', () => {
-      const body = 'preamble line 1\npreamble line 2\n@@ foo\noutput';
-      expect(() => splitRoleMessages(body)).toThrow('at line 3');
-    });
-
-    it('error message contains the correct 1-based line number for a marker on line 5', () => {
-      const body = '@@ user\nline 1\nline 2\nline 3\n@@ invalid\noutput';
-      expect(() => splitRoleMessages(body)).toThrow('at line 5');
-    });
+        expect(thrown).toBeInstanceOf(RuntimeError);
+        expect((thrown as RuntimeError).errorId).toBe('RILL-R001');
+        expect((thrown as RuntimeError).message).toContain(`'@@ ${row.role}'`);
+        expect((thrown as RuntimeError).message).toContain(
+          `at line ${row.line}`
+        );
+        expect((thrown as RuntimeError).message).toContain(
+          'Valid roles are: system, user, assistant.'
+        );
+      }
+    );
   });
 });

@@ -141,6 +141,13 @@ describe('validateMessages', () => {
     expect(() => validateMessages(messages)).not.toThrow();
   });
 
+  it('passes for parts-shaped message (canonical form)', () => {
+    const messages = [
+      { role: 'user', parts: [{ type: 'text', text: 'hello' }] },
+    ];
+    expect(() => validateMessages(messages)).not.toThrow();
+  });
+
   it('throws for empty array', () => {
     // Messages array empty → RuntimeError
     expect(() => validateMessages([])).toThrow(RuntimeError);

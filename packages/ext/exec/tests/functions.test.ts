@@ -4,7 +4,7 @@
  * Verifies command execution, argument validation, security controls, and error handling.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createExecExtension } from '../src/factory.js';
 import { runCommand } from '../src/runner.js';
 import type { CommandConfig } from '../src/types.js';
@@ -66,7 +66,7 @@ describe('command execution', () => {
       makeRuntimeCtx()
     );
     expect(result).toMatchObject({
-      stdout: expect.stringContaining('123'),
+      stdout: '123 456 true\n',
       exit_code: 0,
     });
   });
@@ -86,25 +86,68 @@ describe('command execution', () => {
     expect((result as { stdout: string }).stdout.trim()).toBe('/tmp');
   });
 
-  it('merges command env with inherited env', async () => {
-    const ext = createExecExtension(
-      {
-        inheritEnv: true,
-        commands: {
-          printenv: {
-            binary: 'printenv',
-            env: { CUSTOM_VAR: 'test_value' },
+  describe('environment handling', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('merges command env with inherited env when inheritEnv is true', async () => {
+      vi.stubEnv('RILL_EXEC_TEST_PARENT_VAR', 'parent_value');
+      const ext = createExecExtension(
+        {
+          inheritEnv: true,
+          commands: {
+            printenv: {
+              binary: 'printenv',
+              env: { CUSTOM_VAR: 'test_value' },
+            },
           },
         },
-      },
-      makeFactoryCtx()
-    );
+        makeFactoryCtx()
+      );
 
-    const result = await getCallable(ext, 'printenv').fn(
-      { args: ['CUSTOM_VAR'] },
-      makeRuntimeCtx()
-    );
-    expect((result as { stdout: string }).stdout.trim()).toBe('test_value');
+      const custom = await getCallable(ext, 'printenv').fn(
+        { args: ['CUSTOM_VAR'] },
+        makeRuntimeCtx()
+      );
+      const inherited = await getCallable(ext, 'printenv').fn(
+        { args: ['RILL_EXEC_TEST_PARENT_VAR'] },
+        makeRuntimeCtx()
+      );
+
+      expect((custom as { stdout: string }).stdout.trim()).toBe('test_value');
+      expect((inherited as { stdout: string }).stdout.trim()).toBe(
+        'parent_value'
+      );
+    });
+
+    it('withholds parent env but keeps command env when inheritEnv is false', async () => {
+      vi.stubEnv('RILL_EXEC_TEST_PARENT_VAR', 'parent_value');
+      const ext = createExecExtension(
+        {
+          commands: {
+            printenv: {
+              binary: 'printenv',
+              env: { CUSTOM_VAR: 'test_value' },
+            },
+          },
+        },
+        makeFactoryCtx()
+      );
+
+      const custom = await getCallable(ext, 'printenv').fn(
+        { args: ['CUSTOM_VAR'] },
+        makeRuntimeCtx()
+      );
+      const parent = await getCallable(ext, 'printenv').fn(
+        { args: ['RILL_EXEC_TEST_PARENT_VAR'] },
+        makeRuntimeCtx()
+      );
+
+      expect((custom as { stdout: string }).stdout.trim()).toBe('test_value');
+      expect((parent as { stdout: string }).stdout).toBe('');
+      expect((parent as { exit_code: number }).exit_code).toBe(1);
+    });
   });
 });
 
@@ -271,41 +314,34 @@ describe('runner: error handling', () => {
 });
 
 describe('runner: shell injection prevention', () => {
-  it('does not interpret shell metacharacters', async () => {
-    const result = await runCommand(
-      'echo',
-      { binary: 'echo' },
-      ['$HOME', '&&', 'ls'],
-      undefined,
-      undefined,
-      makeRuntimeCtx()
-    );
-    expect((result as { stdout: string }).stdout.trim()).toBe('$HOME && ls');
-  });
-
-  it('does not execute command injection via backticks', async () => {
-    const result = await runCommand(
-      'echo',
-      { binary: 'echo' },
-      ['`whoami`'],
-      undefined,
-      undefined,
-      makeRuntimeCtx()
-    );
-    expect((result as { stdout: string }).stdout.trim()).toBe('`whoami`');
-  });
-
-  it('does not execute pipe attempts', async () => {
-    const result = await runCommand(
-      'echo',
-      { binary: 'echo' },
-      ['test', '|', 'grep', 'test'],
-      undefined,
-      undefined,
-      makeRuntimeCtx()
-    );
-    expect((result as { stdout: string }).stdout.trim()).toBe(
-      'test | grep test'
-    );
-  });
+  it.each([
+    {
+      label: 'shell metacharacters',
+      args: ['$HOME', '&&', 'ls'],
+      expected: '$HOME && ls',
+    },
+    {
+      label: 'command injection via backticks',
+      args: ['`whoami`'],
+      expected: '`whoami`',
+    },
+    {
+      label: 'pipe attempts',
+      args: ['test', '|', 'grep', 'test'],
+      expected: 'test | grep test',
+    },
+  ])(
+    'passes $label through as literal arguments',
+    async ({ args, expected }) => {
+      const result = await runCommand(
+        'echo',
+        { binary: 'echo' },
+        args,
+        undefined,
+        undefined,
+        makeRuntimeCtx()
+      );
+      expect((result as { stdout: string }).stdout.trim()).toBe(expected);
+    }
+  );
 });

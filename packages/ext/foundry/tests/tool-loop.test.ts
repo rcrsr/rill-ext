@@ -300,8 +300,9 @@ describe('tool_loop() function', () => {
 
       const chunks = await collectChunks(stream);
       const textDeltas = chunks.filter((c) => c['type'] === 'text_delta');
-      expect(textDeltas.length).toBeGreaterThan(0);
-      expect(textDeltas.every((c) => typeof c['text'] === 'string')).toBe(true);
+      expect(textDeltas.map((c) => c['text']).join('')).toBe(
+        'Here is your answer: 42'
+      );
     });
 
     // AC-7: tool_call and tool_result chunks appear during tool execution
@@ -463,7 +464,7 @@ describe('tool_loop() function', () => {
     });
 
     // AC-7: respects max_turns option
-    it('respects max_turns limit and sets stop_reason to max_turns', async () => {
+    it('halts with #INVALID_INPUT when max_turns is exceeded', async () => {
       mockStream.mockReturnValueOnce(
         createMockStreamRunner(
           createMockToolCallResponse([

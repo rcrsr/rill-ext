@@ -650,9 +650,13 @@ describe('mcp:error event', () => {
     expect(errorEvents[0]![1]['error']).toContain('timeout');
   });
 
-  it('emits on connection lost error', async () => {
+  it.each([
+    { title: 'emits on connection lost error', message: 'connection closed' },
+    { title: 'emits on authentication error', message: 'unauthorized' },
+    { title: 'emits on protocol error', message: 'invalid response' },
+  ])('$title', async ({ message }) => {
     const mockClient = {
-      callTool: vi.fn().mockRejectedValue(new Error('connection closed')),
+      callTool: vi.fn().mockRejectedValue(new Error(message)),
     } as unknown as Client;
 
     const tools: McpTool[] = [
@@ -672,57 +676,7 @@ describe('mcp:error event', () => {
       .mocked(emitExtensionEvent)
       .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0]![1]['error']).toContain('connection closed');
-  });
-
-  it('emits on authentication error', async () => {
-    const mockClient = {
-      callTool: vi.fn().mockRejectedValue(new Error('unauthorized')),
-    } as unknown as Client;
-
-    const tools: McpTool[] = [
-      {
-        name: 'test-tool',
-        inputSchema: { type: 'object', properties: {} },
-      },
-    ];
-
-    const functions = generateToolFunctions(tools, mockClient, 30000);
-    const ctx = createMockContext();
-
-    await expect(functions['test_tool']!.fn({}, ctx)).rejects.toThrow();
-
-    // Verify mcp:error emitted
-    const errorEvents = vi
-      .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
-    expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0]![1]['error']).toContain('unauthorized');
-  });
-
-  it('emits on protocol error', async () => {
-    const mockClient = {
-      callTool: vi.fn().mockRejectedValue(new Error('invalid response')),
-    } as unknown as Client;
-
-    const tools: McpTool[] = [
-      {
-        name: 'test-tool',
-        inputSchema: { type: 'object', properties: {} },
-      },
-    ];
-
-    const functions = generateToolFunctions(tools, mockClient, 30000);
-    const ctx = createMockContext();
-
-    await expect(functions['test_tool']!.fn({}, ctx)).rejects.toThrow();
-
-    // Verify mcp:error emitted
-    const errorEvents = vi
-      .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
-    expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0]![1]['error']).toContain('invalid response');
+    expect(errorEvents[0]![1]['error']).toContain(message);
   });
 
   it('emits on resource read errors', async () => {
@@ -768,30 +722,6 @@ describe('mcp:error event', () => {
       .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
     expect(errorEvents[0]![1]['error']).toContain('prompt not found');
-  });
-
-  it('emits error event before throwing exception', async () => {
-    const mockClient = {
-      callTool: vi.fn().mockRejectedValue(new Error('test error')),
-    } as unknown as Client;
-
-    const tools: McpTool[] = [
-      {
-        name: 'test-tool',
-        inputSchema: { type: 'object', properties: {} },
-      },
-    ];
-
-    const functions = generateToolFunctions(tools, mockClient, 30000);
-    const ctx = createMockContext();
-
-    // Verify that error event is emitted AND exception is thrown
-    await expect(functions['test_tool']!.fn({}, ctx)).rejects.toThrow();
-
-    const errorEvents = vi
-      .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
-    expect(errorEvents).toHaveLength(1);
   });
 });
 

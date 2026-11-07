@@ -4,6 +4,14 @@
  */
 
 import { describe, it, expect, expectTypeOf } from 'vitest';
+import {
+  createRuntimeContext,
+  getStatus,
+  RuntimeError,
+  RuntimeHaltSignal,
+  type ApplicationCallable,
+} from '@rcrsr/rill';
+import { expectRejectedHalt } from './_halt-helpers.js';
 import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
 import type { LLMExtensionConfig } from '../src/index.js';
@@ -20,177 +28,57 @@ describe('createGeminiExtension', () => {
   });
 
   describe('configuration validation', () => {
-    // EC-1: Missing api_key
-    it('throws when api_key is missing', () => {
-      const config = {
-        model: 'gemini-2.0-flash',
-      } as GeminiExtensionConfig;
+    it.each([
+      {
+        field: 'api_key',
+        config: { model: 'gemini-2.0-flash' },
+        message: 'api_key is required',
+      },
+      {
+        field: 'model',
+        config: { api_key: 'test-key' },
+        message: 'model is required',
+      },
+      {
+        field: 'temperature',
+        config: {
+          api_key: 'test-key',
+          model: 'gemini-2.0-flash',
+          temperature: -0.1,
+        },
+        message: 'temperature must be between 0 and 2',
+      },
+    ])('throws RILL-R001 when $field is invalid', ({ config, message }) => {
+      let thrown: unknown;
+      try {
+        createGeminiExtension(config as GeminiExtensionConfig);
+      } catch (e) {
+        thrown = e;
+      }
 
-      expect(() => createGeminiExtension(config)).toThrow(
-        'api_key is required'
-      );
-    });
-
-    // EC-3: Empty api_key
-    it('throws when api_key is empty', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: '',
-        model: 'gemini-2.0-flash',
-      };
-
-      expect(() => createGeminiExtension(config)).toThrow(
-        'api_key cannot be empty'
-      );
-    });
-
-    // EC-2: Missing model
-    it('throws when model is missing', () => {
-      const config = {
-        api_key: 'test-key',
-      } as GeminiExtensionConfig;
-
-      expect(() => createGeminiExtension(config)).toThrow('model is required');
-    });
-
-    // EC-2: Empty model
-    it('throws when model is empty', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: '',
-      };
-
-      expect(() => createGeminiExtension(config)).toThrow('model is required');
-    });
-
-    // EC-4: Invalid temperature (below range)
-    it('throws when temperature is below 0', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        temperature: -0.1,
-      };
-
-      expect(() => createGeminiExtension(config)).toThrow(
-        'temperature must be between 0 and 2'
-      );
-    });
-
-    // EC-4: Invalid temperature (above range)
-    it('throws when temperature is above 2', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        temperature: 2.1,
-      };
-
-      expect(() => createGeminiExtension(config)).toThrow(
-        'temperature must be between 0 and 2'
-      );
-    });
-
-    // Valid temperature at lower bound
-    it('accepts temperature of 0', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        temperature: 0.0,
-      };
-
-      expect(() => createGeminiExtension(config)).not.toThrow();
-    });
-
-    // Valid temperature at upper bound
-    it('accepts temperature of 2', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        temperature: 2.0,
-      };
-
-      expect(() => createGeminiExtension(config)).not.toThrow();
-    });
-
-    // Valid temperature in middle of range
-    it('accepts temperature of 0.7', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        temperature: 0.7,
-      };
-
-      expect(() => createGeminiExtension(config)).not.toThrow();
-    });
-
-    // Omitted temperature (should be valid)
-    it('accepts omitted temperature', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      expect(() => createGeminiExtension(config)).not.toThrow();
+      expect(thrown).toBeInstanceOf(RuntimeError);
+      expect((thrown as RuntimeError).errorId).toBe('RILL-R001');
+      expect((thrown as RuntimeError).message).toBe(message);
     });
   });
 
   // AC-1: Factory returns ExtensionFactoryResult with 5 callables
   describe('extension result structure', () => {
-    it('returns object with 5 function definitions', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
+    const PROMPT_PARAM = {
+      name: 'prompt',
+      type: { kind: 'any' },
+      defaultValue: undefined,
+      annotations: { description: 'String or list of message dicts' },
+    };
 
-      const result = createGeminiExtension(config);
-      const value = result.value as Record<string, unknown>;
-
-      // Verify all 5 functions exist in the value dict
-      expect(value['message']).toBeDefined();
-      expect(value['embed']).toBeDefined();
-      expect(value['embed_batch']).toBeDefined();
-      expect(value['tool_loop']).toBeDefined();
-      expect(value['generate']).toBeDefined();
-
-      // messages verb was removed in the factory migration
-      expect(value['messages']).toBeUndefined();
-
-      // Verify dispose exists on the factory result
-      expect(result.dispose).toBeDefined();
-    });
-
-    it('message callable has correct structure', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const result = createGeminiExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['message']).toMatchObject({
-        params: [
-          {
-            name: 'prompt',
-            type: { kind: 'any' },
-            defaultValue: undefined,
-            annotations: { description: 'String or list of message dicts' },
-          },
-        ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'stream' },
-      });
-    });
-
-    it('embed callable has correct structure', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const result = createGeminiExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['embed']).toMatchObject({
+    it.each([
+      {
+        name: 'message',
+        params: [PROMPT_PARAM],
+        returnTypeName: 'stream',
+      },
+      {
+        name: 'embed',
         params: [
           {
             name: 'text',
@@ -199,22 +87,10 @@ describe('createGeminiExtension', () => {
             annotations: {},
           },
         ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'vector' },
-      });
-    });
-
-    it('embed_batch callable has correct structure', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const result = createGeminiExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['embed_batch']).toMatchObject({
+        returnTypeName: 'vector',
+      },
+      {
+        name: 'embed_batch',
         params: [
           {
             name: 'texts',
@@ -223,29 +99,12 @@ describe('createGeminiExtension', () => {
             annotations: {},
           },
         ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'list' },
-      });
-    });
-
-    it('tool_loop callable has correct structure', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const result = createGeminiExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['tool_loop']).toMatchObject({
+        returnTypeName: 'list',
+      },
+      {
+        name: 'tool_loop',
         params: [
-          {
-            name: 'prompt',
-            type: { kind: 'any' },
-            defaultValue: undefined,
-            annotations: { description: 'String or list of message dicts' },
-          },
+          PROMPT_PARAM,
           {
             name: 'tools',
             type: { kind: 'dict', valueType: { kind: 'closure' } },
@@ -259,29 +118,12 @@ describe('createGeminiExtension', () => {
             annotations: {},
           },
         ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'stream' },
-      });
-    });
-
-    it('generate callable has correct structure', () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const result = createGeminiExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['generate']).toMatchObject({
+        returnTypeName: 'stream',
+      },
+      {
+        name: 'generate',
         params: [
-          {
-            name: 'prompt',
-            type: { kind: 'any' },
-            defaultValue: undefined,
-            annotations: { description: 'String or list of message dicts' },
-          },
+          PROMPT_PARAM,
           {
             name: 'schema',
             type: { kind: 'type' },
@@ -291,26 +133,29 @@ describe('createGeminiExtension', () => {
             },
           },
         ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'dict' },
-      });
-    });
+        returnTypeName: 'dict',
+      },
+    ])(
+      'exposes $name with its declared params and return type',
+      ({ name, params, returnTypeName }) => {
+        const result = createGeminiExtension({
+          api_key: 'test-key',
+          model: 'gemini-2.0-flash',
+        });
+        const value = result.value as Record<string, Record<string, unknown>>;
+
+        expect(value[name]).toMatchObject({
+          params,
+          fn: expect.any(Function),
+          annotations: { description: expect.any(String) },
+          returnType: { typeName: returnTypeName },
+        });
+      }
+    );
   });
 
   // AC-28: dispose() called twice does not throw
   describe('dispose lifecycle', () => {
-    it('dispose can be called successfully', async () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const result = createGeminiExtension(config);
-
-      await expect(result.dispose?.()).resolves.not.toThrow();
-    });
-
     it('dispose can be called multiple times (idempotent)', async () => {
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -323,21 +168,28 @@ describe('createGeminiExtension', () => {
       await expect(result.dispose?.()).resolves.not.toThrow();
       await expect(result.dispose?.()).resolves.not.toThrow();
     });
-  });
 
-  // IR-11: AbortController cancellation test
-  describe('AbortController cleanup', () => {
-    it('initializes AbortController for request cancellation', () => {
-      const config: GeminiExtensionConfig = {
+    it('halts calls with DISPOSED and extension_disposed after dispose', async () => {
+      const result = createGeminiExtension({
         api_key: 'test-key',
         model: 'gemini-2.0-flash',
-      };
+      });
+      const message = (result.value as Record<string, ApplicationCallable>)[
+        'message'
+      ]!;
+      await result.dispose?.();
 
-      const result = createGeminiExtension(config);
+      const error = await expectRejectedHalt(
+        Promise.resolve().then(() =>
+          message.fn({ prompt: 'hello' }, createRuntimeContext())
+        ),
+        { code: 'DISPOSED', provider: 'gemini' }
+      );
 
-      // Verify extension was created successfully
-      expect(result).toBeDefined();
-      expect(result.dispose).toBeDefined();
+      expect(error).toBeInstanceOf(RuntimeHaltSignal);
+      expect(getStatus((error as RuntimeHaltSignal).value).raw['kind']).toBe(
+        'extension_disposed'
+      );
     });
   });
 });

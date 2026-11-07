@@ -113,10 +113,10 @@ every checked element passes, and the remainder are not machine-checkable.
 
 `STD-LINT-10`, `STD-LINT-11` and `STD-LINT-12` are met by configuration, not
 yet by clean code. Every package `lint` script passes `--type-aware`, and the
-24 baseline rules sit at `error` in the top-level `rules` of `.oxlintrc.json`.
+baseline rules sit at `error` in the top-level `rules` of `.oxlintrc.json`.
 Files that violated a rule when it was enabled are relaxed to `warn` for that
-rule in per-rule `overrides` blocks, so `check:lint` prints about 4,360
-warnings and exits 0. A file not listed gets the `error`. Clearing the warnings
+rule in per-rule `overrides` blocks, so `check:lint` prints warnings and
+exits 0. A file not listed gets the `error`. Clearing the warnings
 and shrinking those lists is tracked in rcrsr/rill-ext#138; drop a path from
 its block once the file is clean.
 
@@ -230,7 +230,7 @@ Each host function is a `RillFunction` with `params` (built with `p.*` helpers f
 - **Clean disposal.** `dispose()` is idempotent and releases every vendor resource, aborting in-flight requests. Streaming results carry their own `dispose` that aborts the underlying stream.
 - **Passive provision.** Extensions register nothing at import or factory time; gate optional operations behind config capability flags that deny with `#FORBIDDEN`.
 - **Return type constants.** Build each `returnType` once as a module-level `FOO_RT` constant via `structureToTypeValue` with snake_case field keys, and reuse it across callables sharing the shape.
-- **Post-dispose calls.** After `dispose()`, halt calls with `#DISPOSED` and `raw.kind: 'extension_disposed'`, never `'disposed'`.
+- **Post-dispose calls.** After `dispose()`, every host function in every extension throws `#DISPOSED` with `raw.kind: 'extension_disposed'`, never `'disposed'`; returning the disposed value is non-compliant.
 - **Host events.** Emit host events through `emitExtensionEvent` as `<provider>:<verb>` or `<provider>:error` with `subsystem: 'extension:<provider>'`.
 - **Host-declared targets.** Scripts name a host-configured endpoint, command, or mount and never supply a raw URL, binary, shell string, or path; `exec` uses `execFile` with no shell.
 
@@ -241,8 +241,8 @@ Shared packages (`packages/shared/`) are private and **bundled into** the consum
 **Import direction.** Extensions import from shared packages and `@rcrsr/rill`, never from other extensions. Shared packages never import extensions or other shared packages.
 
 - **ext-llm-shared**: Validation (`validateApiKey`, `validateModel`, `validateTemperature`), error mapping (`mapProviderError`), JSON Schema building (`buildJsonSchema`), and tool loop orchestration (`executeToolLoop`). Every LLM extension depends on this.
-- **ext-vector-shared**: Error mapping, event emission, batch execution, disposal state, distance normalization, and function wrappers. Every vector DB extension depends on this.
-- **ext-kv-shared**: Contract type (`KvExtensionContract`) for compile-time verification of KV extension function signatures. Every KV extension depends on this.
+- **ext-vector-shared**: Error mapping, event emission, disposal state, validation, and parameter helpers. Every vector DB extension depends on this.
+- **ext-kv-shared**: Contract type (`KvExtensionContract`) for compile-time verification of KV extension function signatures, plus a behavioral contract suite (`describeKvContract` in `tests/contract-suite.ts`) that each KV extension runs from its own `tests/contract.test.ts` through a vitest `resolve.alias`. Every KV extension depends on this.
 - **ext-fs-shared**: Contract type (`FsExtensionContract`) for compile-time verification of FS extension function signatures. Every FS extension depends on this.
 - **ext-param-shared**: Parameter construction helpers (`p.*`) for building `RillParam` objects. All extensions that declare typed host function parameters depend on this.
 - **ext-search-shared**: Validation (`assertRequired`, `validateBaseUrl`), error mapping (`mapSearchError`, `mapProviderSearchError`), event emission, function wrapper (`createSearchFunctionWrapper`), disposal and in-flight request tracking. Every search extension depends on this.
@@ -302,7 +302,8 @@ Mock SDK clients at module level with `vi.mock()`, build contexts with `createRu
 - Group tests in nested `describe` blocks, start each `it` name with a verb, and mark a test `async` only when it awaits.
 - Place new tests where the package's existing tests live (`tests/` or co-located in `src/`); a new package uses `tests/`.
 - Test files are type-checked: every package `tsconfig.json` includes `src/**/*` and `tests/**/*` (`noEmit`), so `pnpm run check:types` and type-aware lint fail on a type error in a test. Never exclude test files or silence a real mismatch with `@ts-ignore`.
-- Integration suites for external services (kv-redis, fs-s3) skip gracefully when the service is unreachable. When `RILL_EXT_REQUIRE_SERVICES` is set (CI sets it to `1`), an unreachable service makes the suite throw instead of skipping.
+- Tests import only the package's own `src/`, `@rcrsr/rill`, the shared-package barrels it depends on, and a shared contract suite wired through a vitest `resolve.alias`; never another extension's or shared package's `src/` internals.
+- Integration suites for external services (kv-redis, fs-s3) skip gracefully when the service is unreachable. When `RILL_EXT_REQUIRE_SERVICES` is set (CI sets it to `1`), an unreachable service makes the suite throw instead of skipping. Probe the service once, call `assertServiceAvailable` (from the package's `tests/_setup.ts`), then gate the suite with `describe.skipIf(!available)`; a bare `skipIf` lets CI pass with the suite never run.
 
 ## Extension Authoring
 

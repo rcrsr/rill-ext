@@ -175,8 +175,9 @@ describe('AC-8: Type conversion', () => {
       expect(typeof parsed).toBe('object');
       expect(parsed).not.toBe(null);
       expect(parsed['type']).toBe('image');
-      expect(typeof parsed['data']).toBe('string');
-      expect(parsed['data']).not.toBe('');
+      expect(parsed['data']).toBe(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      );
       expect(parsed['mime']).toBe('image/png');
     });
 
@@ -361,15 +362,6 @@ describe('AC-8: Type conversion', () => {
   });
 
   describe('Error results', () => {
-    it('throws for isError=true results', async () => {
-      const result: McpToolResult = {
-        content: [{ type: 'text', text: 'Error message' }],
-        isError: true,
-      };
-
-      await expectRejectsInvalid(testParseToolResult(result));
-    });
-
     it('invalidates with error text from content', async () => {
       const result: McpToolResult = {
         content: [{ type: 'text', text: 'Custom error message' }],

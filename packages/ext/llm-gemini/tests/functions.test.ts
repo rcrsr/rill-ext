@@ -8,9 +8,6 @@ import { expectHalt, expectRejectedHalt } from './_halt-helpers.js';
 import {
   createRuntimeContext,
   callable,
-  isRillStream,
-  isInvalid,
-  getStatus,
   type ApplicationCallable,
   type RillStream,
   type RillValue,
@@ -161,28 +158,6 @@ describe('message() function', () => {
   });
 
   describe('success cases', () => {
-    // AC-2: message("prompt") returns RillStream that resolves to dict with required fields
-    it('returns RillStream', async () => {
-      mockGenerateContentStream.mockResolvedValue(
-        makeChunksIterable(['Hello', ' from', ' Google!'])
-      );
-
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = await getCallable(ext, 'message').fn(
-        { prompt: 'Hello' },
-        ctx
-      );
-
-      expect(isRillStream(stream)).toBe(true);
-    });
-
     // AC-3: Iterating message() stream yields string chunks
     it('iterating stream yields string text chunks', async () => {
       mockGenerateContentStream.mockResolvedValue(
@@ -313,34 +288,6 @@ describe('message() function', () => {
       });
     });
 
-    it('uses default max_tokens when not specified', async () => {
-      mockGenerateContentStream.mockResolvedValue(
-        makeChunksIterable(['Response'])
-      );
-
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = await getCallable(ext, 'message').fn(
-        { prompt: 'Test' },
-        ctx
-      );
-      await collectStream(stream, ctx);
-
-      expect(mockGenerateContentStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            maxOutputTokens: 8192,
-          }),
-        })
-      );
-    });
-
     it('includes user message and assistant reply in resolved messages', async () => {
       mockGenerateContentStream.mockResolvedValue(
         makeChunksIterable(['Response'])
@@ -365,11 +312,11 @@ describe('message() function', () => {
         role: string;
         parts: Array<{ type: string; text?: string }>;
       }>;
-      // system → user → assistant
-      expect(messages.length).toBeGreaterThanOrEqual(2);
-      const lastMsg = messages[messages.length - 1]!;
-      expect(lastMsg.role).toBe('assistant');
-      expect(lastMsg.parts[0]?.text).toBe('Response');
+      // system is sent via config, not in resolved messages: user → assistant
+      expect(messages.map((m) => [m.role, m.parts[0]?.text])).toEqual([
+        ['user', 'Test'],
+        ['assistant', 'Response'],
+      ]);
     });
 
     it('sends multi-turn messages when prompt is a list', async () => {
@@ -412,42 +359,6 @@ describe('message() function', () => {
   });
 
   describe('error cases', () => {
-    // EC-1: Empty prompt text — normalizePrompt returns invalid RillValue (not a reject)
-    it('returns invalid RillValue for empty prompt text', async () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn({ prompt: '' }, ctx);
-      expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).message).toContain(
-        'prompt string cannot be empty'
-      );
-    });
-
-    it('returns invalid RillValue for whitespace-only prompt text', async () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn(
-        { prompt: '   ' },
-        ctx
-      );
-      expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).message).toContain(
-        'prompt string cannot be empty'
-      );
-    });
-
     // EC-2: Provider API error during stream
     it('throws RuntimeError for 401 authentication error when iterating stream', async () => {
       mockGenerateContentStream.mockRejectedValue(
@@ -467,6 +378,8 @@ describe('message() function', () => {
         ctx
       );
       await expectRejectedHalt(collectStream(stream, ctx), {
+        code: 'AUTH',
+        provider: 'gemini',
         message: 'Gemini API error (HTTP 401): authentication failed (401)',
       });
     });
@@ -474,7 +387,7 @@ describe('message() function', () => {
     // EC-2: Provider API error during stream
     it('throws RuntimeError for 429 rate limit error when iterating stream', async () => {
       mockGenerateContentStream.mockRejectedValue(
-        new Error('rate limit exceeded')
+        new Error('rate limit exceeded (429)')
       );
 
       const config: GeminiExtensionConfig = {
@@ -490,13 +403,17 @@ describe('message() function', () => {
         ctx
       );
       await expectRejectedHalt(collectStream(stream, ctx), {
-        message: 'Gemini API error: rate limit exceeded',
+        code: 'RATE_LIMIT',
+        provider: 'gemini',
+        message: 'Gemini API error (HTTP 429): rate limit exceeded (429)',
       });
     });
 
     // EC-2: Network timeout error during stream
     it('throws RuntimeError for timeout error when iterating stream', async () => {
-      mockGenerateContentStream.mockRejectedValue(new Error('Request timeout'));
+      const timeoutError = new Error('Request timeout');
+      timeoutError.name = 'AbortError';
+      mockGenerateContentStream.mockRejectedValue(timeoutError);
 
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
@@ -511,7 +428,9 @@ describe('message() function', () => {
         ctx
       );
       await expectRejectedHalt(collectStream(stream, ctx), {
-        message: 'Gemini API error: Request timeout',
+        code: 'TIMEOUT',
+        provider: 'gemini',
+        message: 'Request timeout',
       });
     });
 
@@ -534,6 +453,8 @@ describe('message() function', () => {
         ctx
       );
       await expectRejectedHalt(collectStream(stream, ctx), {
+        code: 'UNAVAILABLE',
+        provider: 'gemini',
         message: 'Gemini API error (HTTP 500): Internal server error (500)',
       });
     });
@@ -612,7 +533,12 @@ describe('message() function', () => {
       await expectRejectedHalt(
         (
           stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
-        ).__rill_stream_resolve()
+        ).__rill_stream_resolve(),
+        {
+          code: 'UNAVAILABLE',
+          provider: 'gemini',
+          message: 'Gemini API error (HTTP 503): Service unavailable (503)',
+        }
       );
     });
   });
@@ -687,23 +613,6 @@ describe('embed() function', () => {
   });
 
   describe('error cases', () => {
-    // EC-15: Empty text
-    it('throws RuntimeError for empty text', async () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        embed_model: 'text-embedding-004',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'embed').fn({ text: '' }, ctx),
-        { message: 'embed text cannot be empty' }
-      );
-    });
-
     // EC-16: No embed_model configured
     it('throws RuntimeError when embed_model not configured', async () => {
       const config: GeminiExtensionConfig = {
@@ -811,46 +720,6 @@ describe('embed_batch() function', () => {
   });
 
   describe('error cases', () => {
-    // EC-18: Non-string element
-    it('throws RuntimeError for non-string element', async () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        embed_model: 'text-embedding-004',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn(
-          { texts: ['Hello', 123, 'World'] },
-          ctx
-        ),
-        { message: 'embed_batch requires list of strings' }
-      );
-    });
-
-    // EC-19: Empty string in list
-    it('throws RuntimeError for empty string at specific index', async () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        embed_model: 'text-embedding-004',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'embed_batch').fn(
-          { texts: ['Hello', '', 'World'] },
-          ctx
-        ),
-        { message: 'embed text cannot be empty at index 1' }
-      );
-    });
-
     // EC-20: No embed_model configured
     it('throws RuntimeError when embed_model not configured', async () => {
       const config: GeminiExtensionConfig = {
@@ -959,30 +828,6 @@ describe('tool_loop() function', () => {
   });
 
   describe('streaming (AC-7, AC-8, AC-9)', () => {
-    // AC-7: tool_loop() returns a RillStream value
-    it('returns a RillStream', async () => {
-      mockGenerateContentStream.mockResolvedValue(
-        makeToolLoopStream([{ text: 'Hello' }])
-      );
-
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const tools = { tool: makeTool(vi.fn(), { description: 'Tool' }) };
-
-      const result = await getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Hello', tools },
-        ctx
-      );
-
-      expect(isRillStream(result)).toBe(true);
-    });
-
     // AC-8: Iterating tool_loop stream yields text_delta chunks
     it('iterating stream yields text_delta dict chunks from final turn', async () => {
       // Single turn: LLM returns text directly (no tool calls)
@@ -1008,8 +853,7 @@ describe('tool_loop() function', () => {
 
       // text_delta chunks are yielded by executeToolLoop via yieldChunk
       const textDeltas = chunks.filter((c) => c['type'] === 'text_delta');
-      expect(textDeltas.length).toBeGreaterThan(0);
-      textDeltas.forEach((c) => expect(typeof c['text']).toBe('string'));
+      expect(textDeltas.map((c) => c['text'])).toEqual(['Hello ', 'world']);
     });
 
     // AC-8: tool_loop stream yields tool_call and tool_result events
@@ -1215,138 +1059,13 @@ describe('tool_loop() function', () => {
       await expectRejectedHalt(
         (
           stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
-        ).__rill_stream_resolve()
+        ).__rill_stream_resolve(),
+        { code: 'INVALID_INPUT' }
       );
     });
   });
 
   describe('error cases', () => {
-    // EC-22: Empty prompt — normalizePrompt returns invalid RillValue (synchronous return, not throw)
-    it('returns invalid RillValue for empty prompt', async () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const tools = { test: makeTool(vi.fn()) };
-
-      const result = await getCallable(ext, 'tool_loop').fn(
-        { prompt: '   ', tools },
-        ctx
-      );
-      expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).message).toContain(
-        'prompt string cannot be empty'
-      );
-    });
-
-    // EC-23: Missing tools argument — error surfaces via stream resolve
-    it('stream resolve rejects when tools argument is missing', async () => {
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'Hello' }, ctx);
-
-      await expectRejectedHalt(
-        (
-          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
-        ).__rill_stream_resolve(),
-        { message: 'tools parameter is required' }
-      );
-    });
-
-    // EC-24: Unknown tool called by LLM — error surfaces via stream resolve
-    // max_errors is now a factory config option only
-    it('stream resolve rejects for unknown tool after max_errors', async () => {
-      // Each call to generateContentStream returns a fresh generator (not the same instance)
-      mockGenerateContentStream.mockImplementation(() =>
-        Promise.resolve(
-          makeToolLoopStream([
-            {
-              text: '',
-              functionCalls: [{ name: 'unknown_tool', args: {}, id: 'call_1' }],
-            },
-          ])
-        )
-      );
-
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        max_errors: 3,
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const tools = {
-        get_weather: makeTool(vi.fn()),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools },
-        ctx
-      );
-
-      await expectRejectedHalt(
-        (
-          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
-        ).__rill_stream_resolve(),
-        { message: 'Tool execution failed: 3 consecutive errors' }
-      );
-    });
-
-    // EC-25: max_errors exceeded — error surfaces via stream resolve
-    // max_errors is now a factory config option only
-    it('stream resolve rejects after max_errors consecutive errors', async () => {
-      // Each call to generateContentStream returns a fresh generator
-      mockGenerateContentStream.mockImplementation(() =>
-        Promise.resolve(
-          makeToolLoopStream([
-            {
-              text: '',
-              functionCalls: [{ name: 'failing_tool', args: {}, id: 'call_1' }],
-            },
-          ])
-        )
-      );
-
-      const config: GeminiExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gemini-2.0-flash',
-        max_errors: 2,
-      };
-
-      const ext = createGeminiExtension(config);
-      const ctx = createRuntimeContext();
-
-      const tools = {
-        failing_tool: makeTool(
-          vi.fn().mockRejectedValue(new Error('Tool failed'))
-        ),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools },
-        ctx
-      );
-
-      await expectRejectedHalt(
-        (
-          stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
-        ).__rill_stream_resolve(),
-        { message: 'Tool execution failed: 2 consecutive errors' }
-      );
-    });
-
     // EC-4/EC-12: Provider streaming API failure surfaces via stream resolve
     it('stream resolve rejects on provider streaming API failure [EC-4]', async () => {
       mockGenerateContentStream.mockRejectedValue(
@@ -1484,30 +1203,35 @@ describe('tool_loop() function', () => {
 
   describe('concurrent independent calls', () => {
     // AC-27: Multiple concurrent tool_loop() calls operate independently
-    it('handles multiple concurrent tool_loop calls independently', async () => {
+    it('handles multiple concurrent tool_loop calls on one extension independently', async () => {
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
         model: 'gemini-2.0-flash',
       };
 
-      const ext1 = createGeminiExtension(config);
-      const ext2 = createGeminiExtension(config);
+      const ext = createGeminiExtension(config);
       const ctx1 = createRuntimeContext();
       const ctx2 = createRuntimeContext();
 
-      mockGenerateContentStream
-        .mockResolvedValueOnce(makeToolLoopStream([{ text: 'Response 1' }]))
-        .mockResolvedValueOnce(makeToolLoopStream([{ text: 'Response 2' }]));
+      // Respond according to the prompt sent, so call order cannot mask shared state
+      mockGenerateContentStream.mockImplementation(
+        (request: { contents: Array<{ parts: Array<{ text: string }> }> }) => {
+          const sentText = request.contents[0]?.parts[0]?.text;
+          return Promise.resolve(
+            makeToolLoopStream([{ text: `Echo of ${sentText}` }])
+          );
+        }
+      );
 
       const tools = {
         tool: makeTool(vi.fn(), { description: 'Tool' }),
       };
 
-      const stream1 = getCallable(ext1, 'tool_loop').fn(
+      const stream1 = getCallable(ext, 'tool_loop').fn(
         { prompt: 'Prompt 1', tools },
         ctx1
       );
-      const stream2 = getCallable(ext2, 'tool_loop').fn(
+      const stream2 = getCallable(ext, 'tool_loop').fn(
         { prompt: 'Prompt 2', tools },
         ctx2
       );
@@ -1517,9 +1241,8 @@ describe('tool_loop() function', () => {
         collectToolLoopStream(stream2, ctx2),
       ]);
 
-      expect(extractLastMessageText(r1.resolved)).toBe('Response 1');
-      expect(extractLastMessageText(r2.resolved)).toBe('Response 2');
-      // turns is no longer in the resolved dict
+      expect(extractLastMessageText(r1.resolved)).toBe('Echo of Prompt 1');
+      expect(extractLastMessageText(r2.resolved)).toBe('Echo of Prompt 2');
     });
   });
 });

@@ -351,11 +351,6 @@ describe('expandContentSugar', () => {
 // ============================================================
 
 describe('MESSAGES_RETURN_TYPE', () => {
-  it('IR-6: is a defined value (not undefined or null)', () => {
-    expect(MESSAGES_RETURN_TYPE).toBeDefined();
-    expect(MESSAGES_RETURN_TYPE).not.toBeNull();
-  });
-
   it('IR-6: has structure.kind = list with a Message element', () => {
     // structureToTypeValue wraps the TypeStructure in a RillTypeValue.
     // The underlying structure is accessible via the .structure property.

@@ -1,6 +1,6 @@
 /**
  * Tests for stream-parser module.
- * Covers line buffering, ANSI stripping, error handling, and memory efficiency.
+ * Covers line buffering, ANSI stripping, error handling, and high-volume input.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -228,6 +228,36 @@ describe('StreamParser - ANSI Stripping', () => {
     expect(messages).toHaveLength(1);
     expect(messages[0]).toEqual(systemMsg);
   });
+
+  it('handles split ANSI prefix, JSON split across chunks, and trailing reset', () => {
+    const parser = createStreamParser();
+    const messages: ClaudeMessage[] = [];
+
+    const systemMsg: SystemMessage = {
+      type: 'system',
+      subtype: 'init',
+      model: 'test',
+    };
+    const json = JSON.stringify(systemMsg);
+
+    const chunks = [
+      '\x1b[',
+      '31m',
+      json.slice(0, 10),
+      json.slice(10, 20),
+      json.slice(20),
+      '\x1b[0m\n',
+    ];
+
+    for (const chunk of chunks) {
+      parser.processChunk(chunk, (msg) => {
+        messages.push(msg);
+      });
+    }
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toEqual(systemMsg);
+  });
 });
 
 // ============================================================
@@ -278,18 +308,6 @@ describe('StreamParser - Non-JSON Handling', () => {
       messages.push(msg);
     });
     expect(messages).toHaveLength(1);
-  });
-
-  it('strips terminal artifacts before parsing', () => {
-    const parser = createStreamParser();
-    const messages: ClaudeMessage[] = [];
-
-    // Terminal artifact that should be stripped and skipped
-    parser.processChunk('[<u some artifact\n', (msg) => {
-      messages.push(msg);
-    });
-
-    expect(messages).toHaveLength(0);
   });
 });
 
@@ -395,24 +413,6 @@ describe('StreamParser - Input Types', () => {
     expect(messages[0]).toEqual(systemMsg);
   });
 
-  it('accepts string input', () => {
-    const parser = createStreamParser();
-    const messages: ClaudeMessage[] = [];
-
-    const systemMsg: SystemMessage = {
-      type: 'system',
-      subtype: 'init',
-      model: 'test',
-    };
-
-    parser.processChunk(JSON.stringify(systemMsg) + '\n', (msg) => {
-      messages.push(msg);
-    });
-
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toEqual(systemMsg);
-  });
-
   it('handles mixed Buffer and string chunks', () => {
     const parser = createStreamParser();
     const messages: ClaudeMessage[] = [];
@@ -440,11 +440,11 @@ describe('StreamParser - Input Types', () => {
 });
 
 // ============================================================
-// MEMORY EFFICIENCY (AC-14)
+// HIGH VOLUME
 // ============================================================
 
-describe('StreamParser - Memory Efficiency', () => {
-  it('parses 10K lines without memory growth', () => {
+describe('StreamParser - High Volume', () => {
+  it('emits one message per line for 10K single-line chunks', () => {
     const parser = createStreamParser();
     let messageCount = 0;
 
@@ -465,7 +465,7 @@ describe('StreamParser - Memory Efficiency', () => {
     expect(messageCount).toBe(10_000);
   });
 
-  it('large chunks process without buffer accumulation', () => {
+  it('emits one message per line for a single 1000-line chunk', () => {
     const parser = createStreamParser();
     const messages: ClaudeMessage[] = [];
 
@@ -484,52 +484,5 @@ describe('StreamParser - Memory Efficiency', () => {
     });
 
     expect(messages).toHaveLength(1000);
-  });
-});
-
-// ============================================================
-// INTEGRATION SCENARIOS
-// ============================================================
-
-describe('StreamParser - Integration Scenarios', () => {
-  it('skips non-JSON lines in Claude CLI output sequence', () => {
-    const parser = createStreamParser();
-    const messages: ClaudeMessage[] = [];
-
-    // Simulate Claude CLI stream with ANSI codes - silently skipped
-    parser.processChunk('\x1b[1mInitializing...\x1b[0m\n', (msg) => {
-      messages.push(msg);
-    });
-
-    expect(messages).toHaveLength(0);
-  });
-
-  it('handles rapid small chunks with partial ANSI sequences', () => {
-    const parser = createStreamParser();
-    const messages: ClaudeMessage[] = [];
-
-    const systemMsg: SystemMessage = {
-      type: 'system',
-      subtype: 'init',
-      model: 'test',
-    };
-
-    const chunks = [
-      '\x1b[',
-      '31m',
-      JSON.stringify(systemMsg).slice(0, 10),
-      JSON.stringify(systemMsg).slice(10, 20),
-      JSON.stringify(systemMsg).slice(20),
-      '\x1b[0m\n',
-    ];
-
-    for (const chunk of chunks) {
-      parser.processChunk(chunk, (msg) => {
-        messages.push(msg);
-      });
-    }
-
-    expect(messages).toHaveLength(1);
-    expect(messages[0]).toEqual(systemMsg);
   });
 });

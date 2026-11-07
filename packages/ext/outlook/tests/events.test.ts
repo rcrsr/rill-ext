@@ -11,7 +11,7 @@ import {
   getStatus,
   type RillValue,
 } from '@rcrsr/rill';
-import { makeFactoryCtx } from './_helpers.js';
+import { makeFactoryCtx, recordedRequest } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
 
 // ============================================================
@@ -117,10 +117,13 @@ describe('reply() host function', () => {
     vi.restoreAllMocks();
   });
 
-  // AC-8: reply returns SendConfirmationDict
-  it('returns SendConfirmationDict with sent=true [AC-8]', async () => {
+  // reply returns SendConfirmationDict
+  it('returns SendConfirmationDict with sent=true', async () => {
     // Graph returns 202 with no body; graphFetch returns null
-    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 202 });
+    const mockFetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue({ ok: true, status: 202 } as Response);
+    globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -129,14 +132,20 @@ describe('reply() host function', () => {
       ctx
     )) as Record<string, unknown>;
 
+    expect(recordedRequest(mockFetch)).toEqual({
+      url: 'https://graph.microsoft.com/v1.0/me/messages/msg-001/reply',
+      method: 'POST',
+      body: { comment: 'Thanks for your message.' },
+    });
+
     expect(result['sent']).toBe(true);
     expect(Array.isArray(result['to'])).toBe(true);
     expect(result['to']).toEqual([]);
     expect(result['subject']).toBe('');
   });
 
-  // AC-19: reply emits outlook:mail:send event
-  it('emits outlook:mail:send event on success [AC-19]', async () => {
+  // reply emits outlook:mail:send event
+  it('emits outlook:mail:send event on success', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 202 });
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -156,8 +165,8 @@ describe('reply() host function', () => {
     );
   });
 
-  // EC-6: empty message_id throws #INVALID_INPUT
-  it('throws #INVALID_INPUT for empty message_id [EC-6]', async () => {
+  // empty message_id throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty message_id', async () => {
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -170,8 +179,8 @@ describe('reply() host function', () => {
     expect(getStatus(caught).message).toContain('message_id is required');
   });
 
-  // EC-6: empty body throws #INVALID_INPUT
-  it('throws #INVALID_INPUT for empty body [EC-6]', async () => {
+  // empty body throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty body', async () => {
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -201,13 +210,14 @@ describe('flag() host function', () => {
     vi.restoreAllMocks();
   });
 
-  // AC-9: flag returns updated MailMessageDict with flagged=true
-  it('returns updated MailMessageDict with flagged=true [AC-9]', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
+  // flag returns updated MailMessageDict with flagged=true
+  it('returns updated MailMessageDict with flagged=true', async () => {
+    const mockFetch = vi.fn<typeof fetch>().mockResolvedValue({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue(GRAPH_MESSAGE_FLAGGED),
-    });
+    } as unknown as Response);
+    globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(FLAG_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -216,13 +226,19 @@ describe('flag() host function', () => {
       ctx
     )) as Record<string, unknown>;
 
+    expect(recordedRequest(mockFetch)).toEqual({
+      url: 'https://graph.microsoft.com/v1.0/me/messages/msg-001',
+      method: 'PATCH',
+      body: { flag: { flagStatus: 'flagged' } },
+    });
+
     expect(result['id']).toBe('msg-001');
     expect(result['flagged']).toBe(true);
     expect(result['subject']).toBe('Hello');
   });
 
-  // AC-19: flag emits outlook:mail:flag event
-  it('emits outlook:mail:flag event on success [AC-19]', async () => {
+  // flag emits outlook:mail:flag event
+  it('emits outlook:mail:flag event on success', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -243,8 +259,8 @@ describe('flag() host function', () => {
     );
   });
 
-  // EC-6: empty message_id throws #INVALID_INPUT
-  it('throws #INVALID_INPUT for empty message_id [EC-6]', async () => {
+  // empty message_id throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty message_id', async () => {
     const ext = createOutlookExtension(FLAG_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -274,13 +290,14 @@ describe('events() host function', () => {
     vi.restoreAllMocks();
   });
 
-  // AC-10: events returns CalendarEventDict list for date range
-  it('returns CalendarEventDict list for date range [AC-10]', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
+  // events returns CalendarEventDict list for date range
+  it('returns CalendarEventDict list for date range', async () => {
+    const mockFetch = vi.fn<typeof fetch>().mockResolvedValue({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue({ value: [GRAPH_EVENT] }),
-    });
+    } as unknown as Response);
+    globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -288,6 +305,12 @@ describe('events() host function', () => {
       { start: DAY_START_MS, end: DAY_END_MS },
       ctx
     )) as Record<string, unknown>;
+
+    expect(recordedRequest(mockFetch)).toEqual({
+      url: 'https://graph.microsoft.com/v1.0/me/calendar/calendarView?startDateTime=2025-01-15T00%3A00%3A00.000Z&endDateTime=2025-01-15T23%3A59%3A59.999Z',
+      method: 'GET',
+      body: undefined,
+    });
 
     expect(Array.isArray(result['events'])).toBe(true);
     const eventsArr = result['events'] as Record<string, unknown>[];
@@ -298,13 +321,14 @@ describe('events() host function', () => {
     expect(typeof result['range']).toBe('string');
   });
 
-  // AC-34: start=end returns empty list
-  it('returns empty events list when start equals end [AC-34]', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
+  // start=end is forwarded to Graph as an empty window
+  it('requests an empty window when start equals end', async () => {
+    const mockFetch = vi.fn<typeof fetch>().mockResolvedValue({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue({ value: [] }),
-    });
+    } as unknown as Response);
+    globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -313,11 +337,17 @@ describe('events() host function', () => {
       ctx
     )) as Record<string, unknown>;
 
+    expect(recordedRequest(mockFetch).url).toBe(
+      'https://graph.microsoft.com/v1.0/me/calendar/calendarView?startDateTime=2025-01-15T00%3A00%3A00.000Z&endDateTime=2025-01-15T00%3A00%3A00.000Z'
+    );
     expect(result['events']).toEqual([]);
+    expect(result['range']).toBe(
+      '2025-01-15T00:00:00.000Z/2025-01-15T00:00:00.000Z'
+    );
   });
 
-  // EC-8: start > end throws #INVALID_INPUT
-  it('throws #INVALID_INPUT when start is after end [EC-8]', async () => {
+  // start > end throws #INVALID_INPUT
+  it('throws #INVALID_INPUT when start is after end', async () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -330,8 +360,8 @@ describe('events() host function', () => {
     expect(getStatus(caught).message).toContain('start must be before end');
   });
 
-  // AC-19: events emits outlook:calendar:read event
-  it('emits outlook:calendar:read event on success [AC-19]', async () => {
+  // events emits outlook:calendar:read event
+  it('emits outlook:calendar:read event on success', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -372,13 +402,14 @@ describe('free_busy() host function', () => {
     vi.restoreAllMocks();
   });
 
-  // AC-12: free_busy returns FreeBusyScheduleDict list
-  it('returns FreeBusyScheduleDict list [AC-12]', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
+  // free_busy returns FreeBusyScheduleDict list
+  it('returns FreeBusyScheduleDict list', async () => {
+    const mockFetch = vi.fn<typeof fetch>().mockResolvedValue({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue({ value: [GRAPH_SCHEDULE] }),
-    });
+    } as unknown as Response);
+    globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -391,6 +422,16 @@ describe('free_busy() host function', () => {
       ctx
     )) as Record<string, unknown>;
 
+    expect(recordedRequest(mockFetch)).toEqual({
+      url: 'https://graph.microsoft.com/v1.0/me/calendar/getSchedule',
+      method: 'POST',
+      body: {
+        schedules: ['alice@example.com', 'bob@example.com'],
+        startTime: { dateTime: '2025-01-15T00:00:00.000Z', timeZone: 'UTC' },
+        endTime: { dateTime: '2025-01-15T23:59:59.999Z', timeZone: 'UTC' },
+      },
+    });
+
     expect(Array.isArray(result['schedules'])).toBe(true);
     const schedules = result['schedules'] as Record<string, unknown>[];
     expect(schedules).toHaveLength(1);
@@ -399,13 +440,14 @@ describe('free_busy() host function', () => {
     expect(typeof result['range']).toBe('string');
   });
 
-  // AC-35: single attendee returns single-element list
-  it('returns single-element schedules list for one attendee [AC-35]', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
+  // single attendee is sent as a single-element schedules list
+  it('sends a single-element schedules list for one attendee', async () => {
+    const mockFetch = vi.fn<typeof fetch>().mockResolvedValue({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue({ value: [GRAPH_SCHEDULE] }),
-    });
+    } as unknown as Response);
+    globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -418,12 +460,14 @@ describe('free_busy() host function', () => {
       ctx
     )) as Record<string, unknown>;
 
-    const schedules = result['schedules'] as unknown[];
-    expect(schedules).toHaveLength(1);
+    expect(recordedRequest(mockFetch).body).toMatchObject({
+      schedules: ['alice@example.com'],
+    });
+    expect(result['schedules']).toHaveLength(1);
   });
 
-  // EC-9: empty attendees throws #INVALID_INPUT
-  it('throws #INVALID_INPUT for empty attendees [EC-9]', async () => {
+  // empty attendees throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty attendees', async () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -436,8 +480,8 @@ describe('free_busy() host function', () => {
     expect(getStatus(caught).message).toContain('attendees is required');
   });
 
-  // EC-8: start > end throws #INVALID_INPUT
-  it('throws #INVALID_INPUT when start is after end [EC-8]', async () => {
+  // start > end throws #INVALID_INPUT
+  it('throws #INVALID_INPUT when start is after end', async () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -454,8 +498,8 @@ describe('free_busy() host function', () => {
     expect(getStatus(caught).message).toContain('start must be before end');
   });
 
-  // AC-19: free_busy emits outlook:calendar:read event
-  it('emits outlook:calendar:read event on success [AC-19]', async () => {
+  // free_busy emits outlook:calendar:read event
+  it('emits outlook:calendar:read event on success', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -500,8 +544,8 @@ describe('create_event() host function', () => {
     vi.restoreAllMocks();
   });
 
-  // AC-13: create_event returns CalendarEventDict from 201
-  it('returns CalendarEventDict from 201 response [AC-13]', async () => {
+  // create_event returns CalendarEventDict from 201
+  it('returns CalendarEventDict from 201 response', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 201,
@@ -525,8 +569,8 @@ describe('create_event() host function', () => {
     expect(typeof result['end']).toBe('number');
   });
 
-  // EC-10: empty title throws #INVALID_INPUT
-  it('throws #INVALID_INPUT for empty title [EC-10]', async () => {
+  // empty title throws #INVALID_INPUT
+  it('throws #INVALID_INPUT for empty title', async () => {
     const ext = createOutlookExtension(
       CALENDAR_CREATE_CONFIG,
       makeFactoryCtx()
@@ -542,8 +586,8 @@ describe('create_event() host function', () => {
     expect(getStatus(caught).message).toContain('title is required');
   });
 
-  // EC-10: start > end throws #INVALID_INPUT
-  it('throws #INVALID_INPUT when start is after end [EC-10]', async () => {
+  // start > end throws #INVALID_INPUT
+  it('throws #INVALID_INPUT when start is after end', async () => {
     const ext = createOutlookExtension(
       CALENDAR_CREATE_CONFIG,
       makeFactoryCtx()
@@ -559,21 +603,8 @@ describe('create_event() host function', () => {
     expect(getStatus(caught).message).toContain('start must be before end');
   });
 
-  // EC-10: calendar.create disabled emits #FORBIDDEN
-  it('emits #FORBIDDEN when calendar.create is disabled [EC-10]', async () => {
-    const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-    const caught = (await getCallable(ext, 'create_event').fn(
-      { title: 'Meeting', start: DAY_START_MS, end: DAY_END_MS },
-      ctx
-    )) as RillValue;
-    expect(isInvalid(caught)).toBe(true);
-    expect(getStatus(caught).code.name).toBe('FORBIDDEN');
-    expect(getStatus(caught).message).toContain('calendar.create');
-  });
-
-  // AC-19: create_event emits outlook:calendar:create event
-  it('emits outlook:calendar:create event on success [AC-19]', async () => {
+  // create_event emits outlook:calendar:create event
+  it('emits outlook:calendar:create event on success', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 201,

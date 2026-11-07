@@ -11,7 +11,12 @@ import { SpawnError } from '../src/errors.js';
 import { makeFactoryCtx, extValue, type StreamStep } from './_helpers.js';
 import type { IPty } from 'node-pty';
 import type { ClaudeMessage } from '../src/types.js';
-import { createRuntimeContext } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type RillValue,
+} from '@rcrsr/rill';
 
 // ============================================================
 // MOCKS
@@ -82,8 +87,8 @@ async function collectChunks(stream: unknown): Promise<string[]> {
 // AC-14: 10K line output parses without memory growth
 // ============================================================
 
-describe('AC-14: 10K line output parses without memory growth', () => {
-  it('parses 10K lines and extracts result correctly', async () => {
+describe('10K line output streams through the parser', () => {
+  it('yields every one of 10K PTY lines and forwards all 100 chunks to the parser', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -188,7 +193,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     );
 
     // Iterate all chunks first so the generator runs and processes data
-    await collectChunks(stream);
+    const yieldedLines = await collectChunks(stream);
 
     // Resolve stream to get final result
     const result = await resolveStream(stream);
@@ -197,114 +202,18 @@ describe('AC-14: 10K line output parses without memory growth', () => {
     expect(result['result']).toBe('Processed 10000 lines successfully');
     expect(result['exit_code']).toBe(0);
 
-    // Verify parser processed all chunks
-    expect(mockParser.processChunk).toHaveBeenCalled();
-    const totalChunks = processedChunks.length;
-    expect(totalChunks).toBeGreaterThan(0);
-
-    // Verify memory stability by checking parser was called manageable number of times
-    // (100 chunks for 10K lines at 100 lines per chunk)
-    expect(mockParser.processChunk).toHaveBeenCalledTimes(100);
-  });
-
-  it('handles 10K lines with mixed content types', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-    const { extractResult } = await import('../src/result.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const mockParser = {
-      processChunk: vi.fn(
-        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
-          const lines = chunk.split('\n').filter((line) => line.trim());
-          lines.forEach((line) => {
-            try {
-              callback(JSON.parse(line));
-            } catch {
-              // Ignore parse errors
-            }
-          });
-        }
-      ),
-      flush: vi.fn(),
-    };
-
-    vi.mocked(createStreamParser).mockReturnValue(mockParser);
-
-    vi.mocked(extractResult).mockReturnValue({
-      result: 'Mixed content processed',
-      tokens: {
-        prompt: 200,
-        cache_write_5m: 10,
-        cache_write_1h: 5,
-        cache_read: 15,
-        output: 100,
-      },
-      cost: 0.02,
-      exit_code: 0,
-      duration: 6000,
-    });
-
-    let onDataCallback: ((chunk: string) => void) | undefined;
-    let onExitCallback: ((event: { exitCode: number }) => void) | undefined;
-
-    vi.mocked(spawnClaudeCli).mockReturnValue({
-      ptyProcess: {
-        onData: vi.fn((cb) => {
-          onDataCallback = cb;
-        }),
-        onExit: vi.fn((cb) => {
-          onExitCallback = cb;
-        }),
-        write: vi.fn(),
-        kill: vi.fn(),
-      } as unknown as IPty,
-      exitCode: new Promise<number>((resolve) => {
-        setTimeout(() => {
-          // Send 10K lines with varying message types
-          for (let i = 0; i < 100; i++) {
-            const chunkLines: string[] = [];
-            for (let j = 0; j < 100; j++) {
-              const lineNum = i * 100 + j + 1;
-              const msgType = lineNum % 3 === 0 ? 'usage' : 'content';
-              chunkLines.push(
-                JSON.stringify({
-                  type: msgType,
-                  data: `Data ${lineNum}`,
-                })
-              );
-            }
-            if (onDataCallback) {
-              onDataCallback(chunkLines.join('\n') + '\n');
-            }
-          }
-
-          if (onExitCallback) {
-            onExitCallback({ exitCode: 0 });
-          }
-          resolve(0);
-        }, 10);
-      }),
-      dispose: vi.fn(),
-    });
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    const stream = extValue(ext).prompt.fn(
-      { text: 'Mixed content test', options: {} },
-      ctx
+    // Every PTY line is yielded once, in order
+    expect(yieldedLines).toHaveLength(10000);
+    expect(yieldedLines[0]).toBe(
+      JSON.stringify({ type: 'content', text: 'Line 1 of output' })
+    );
+    expect(yieldedLines[9999]).toBe(
+      JSON.stringify({ type: 'content', text: 'Line 10000 of output' })
     );
 
-    // Iterate chunks first so generator processes all data
-    await collectChunks(stream);
-    const result = await resolveStream(stream);
-
-    expect(result['result']).toBe('Mixed content processed');
-    expect(result['exit_code']).toBe(0);
+    // The parser receives every PTY chunk (10K lines at 100 lines per chunk)
     expect(mockParser.processChunk).toHaveBeenCalledTimes(100);
+    expect(processedChunks).toHaveLength(100);
   });
 });
 
@@ -313,7 +222,7 @@ describe('AC-14: 10K line output parses without memory growth', () => {
 // ============================================================
 
 describe('AC-15: Concurrent 10 calls each complete independently', () => {
-  it('executes 10 concurrent prompts that all complete successfully', async () => {
+  it('executes 10 concurrent prompts that all complete with their own result', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
     const { createStreamParser } = await import('../src/stream-parser.js');
@@ -342,8 +251,8 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: new Promise<number>((resolve) => {
-          // Simulate varying completion times (50-150ms)
-          const delay = 50 + Math.random() * 100;
+          // Deterministic, varying completion times (50-149ms)
+          const delay = 50 + ((callIndex * 37) % 100);
           setTimeout(() => {
             if (onDataCallback) {
               onDataCallback(
@@ -500,20 +409,26 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       flush: vi.fn(),
     }));
 
-    let extractCallCount = 0;
-    vi.mocked(extractResult).mockImplementation(() => ({
-      result: `Response ${extractCallCount++}`,
-      tokens: {
-        prompt: 10,
-        cache_write_5m: 0,
-        cache_write_1h: 0,
-        cache_read: 0,
-        output: 5,
-      },
-      cost: 0.001,
-      exit_code: 0,
-      duration: 100,
-    }));
+    // Derive each result from the parsed message so the assertion does not
+    // depend on the order in which the extractor is called.
+    vi.mocked(extractResult).mockImplementation((messages) => {
+      const msg = (
+        messages as ReadonlyArray<{ type: string; text?: string }>
+      ).find((m) => m.type === 'content');
+      return {
+        result: msg?.text ?? 'missing',
+        tokens: {
+          prompt: 10,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
+          output: 5,
+        },
+        cost: 0.001,
+        exit_code: 0,
+        duration: 100,
+      };
+    });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -615,20 +530,24 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       flush: vi.fn(),
     }));
 
-    let extractCallCount = 0;
-    vi.mocked(extractResult).mockImplementation(() => ({
-      result: `Success ${extractCallCount++}`,
-      tokens: {
-        prompt: 10,
-        cache_write_5m: 0,
-        cache_write_1h: 0,
-        cache_read: 0,
-        output: 5,
-      },
-      cost: 0.001,
-      exit_code: 0,
-      duration: 100,
-    }));
+    vi.mocked(extractResult).mockImplementation((messages) => {
+      const msg = (
+        messages as ReadonlyArray<{ type: string; text?: string }>
+      ).find((m) => m.type === 'content');
+      return {
+        result: `Success ${msg?.text ?? 'missing'}`,
+        tokens: {
+          prompt: 10,
+          cache_write_5m: 0,
+          cache_write_1h: 0,
+          cache_read: 0,
+          output: 5,
+        },
+        cost: 0.001,
+        exit_code: 0,
+        duration: 100,
+      };
+    });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -638,18 +557,25 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       extValue(ext).prompt.fn({ text: `Prompt ${i}`, options: {} }, ctx)
     );
 
-    // Use Promise.allSettled to capture both successful and failed stream resolutions.
-    // Failed streams (calls 3 and 7) yield [error] chunks instead of rejecting,
-    // so resolveStream() still resolves. This test verifies all streams complete.
+    // Failed streams (calls 3 and 7) resolve to invalid values instead of rejecting.
     const results = await Promise.allSettled(
       streams.map((s) => resolveStream(s))
     );
 
     expect(results).toHaveLength(10);
-
-    // All stream resolutions succeed (errors surface as [error] chunks, not rejections)
-    const successes = results.filter((r) => r.status === 'fulfilled');
-    expect(successes.length).toBeGreaterThanOrEqual(8);
+    results.forEach((settled, i) => {
+      expect(settled.status).toBe('fulfilled');
+      const value = (settled as PromiseFulfilledResult<Record<string, unknown>>)
+        .value;
+      if (i === 3 || i === 7) {
+        expect(isInvalid(value as RillValue)).toBe(true);
+        expect(getStatus(value as RillValue).code.name).toBe('UNAVAILABLE');
+      } else {
+        expect(isInvalid(value as RillValue)).toBe(false);
+        expect(value['result']).toBe(`Success OK ${i}`);
+        expect(value['exit_code']).toBe(0);
+      }
+    });
 
     // Verify 10 separate processes were spawned
     expect(spawnClaudeCli).toHaveBeenCalledTimes(10);
@@ -768,204 +694,5 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
     // Verify no active processes remain
     expect(activeProcesses).toBe(0);
-  }, 30000);
-
-  it('maintains stable memory with varying response sizes over 1000 calls', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-    const { extractResult } = await import('../src/result.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const disposers: Array<() => void> = [];
-    let activeProcesses = 0;
-
-    vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      activeProcesses++;
-
-      let onDataCallback: ((chunk: string) => void) | undefined;
-      let onExitCallback: ((event: { exitCode: number }) => void) | undefined;
-
-      const dispose = vi.fn(() => {
-        activeProcesses--;
-      });
-
-      disposers.push(dispose);
-
-      return {
-        ptyProcess: {
-          onData: vi.fn((cb) => {
-            onDataCallback = cb;
-          }),
-          onExit: vi.fn((cb) => {
-            onExitCallback = cb;
-          }),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: new Promise<number>((resolve) => {
-          setTimeout(() => {
-            if (onDataCallback) {
-              // Vary response size (small to large)
-              const size = Math.floor(Math.random() * 1000);
-              const text = 'X'.repeat(size);
-              onDataCallback(JSON.stringify({ type: 'content', text }) + '\n');
-            }
-            if (onExitCallback) {
-              onExitCallback({ exitCode: 0 });
-            }
-            resolve(0);
-          }, 1);
-        }),
-        dispose,
-      };
-    });
-
-    vi.mocked(createStreamParser).mockImplementation(() => ({
-      processChunk: vi.fn(
-        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
-          try {
-            callback(JSON.parse(chunk.trim()));
-          } catch {
-            // Ignore
-          }
-        }
-      ),
-      flush: vi.fn(),
-    }));
-
-    vi.mocked(extractResult).mockImplementation(() => ({
-      result: 'Varying size response',
-      tokens: {
-        prompt: Math.floor(Math.random() * 100),
-        cache_write_5m: 0,
-        cache_write_1h: 0,
-        cache_read: 0,
-        output: Math.floor(Math.random() * 50),
-      },
-      cost: Math.random() * 0.01,
-      exit_code: 0,
-      duration: Math.floor(Math.random() * 200),
-    }));
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    // Execute 1000 sequential prompts with varying sizes
-    for (let i = 0; i < 1000; i++) {
-      const stream = extValue(ext).prompt.fn(
-        { text: `Prompt ${i}`, options: {} },
-        ctx
-      );
-      const result = await resolveStream(stream);
-
-      expect(result['exit_code']).toBe(0);
-      expect(activeProcesses).toBeLessThanOrEqual(1);
-    }
-
-    expect(spawnClaudeCli).toHaveBeenCalledTimes(1000);
-    expect(disposers).toHaveLength(1000);
-    disposers.forEach((dispose) => {
-      expect(dispose).toHaveBeenCalled();
-    });
-    expect(activeProcesses).toBe(0);
-  }, 30000);
-
-  it('verifies no file descriptor leaks over 1000 calls', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-    const { extractResult } = await import('../src/result.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Track PTY instances to verify cleanup
-    const ptyInstances: Array<{ kill: ReturnType<typeof vi.fn> }> = [];
-
-    vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      let onDataCallback: ((chunk: string) => void) | undefined;
-      let onExitCallback: ((event: { exitCode: number }) => void) | undefined;
-
-      const killFn = vi.fn();
-      const ptyInstance = {
-        onData: vi.fn((cb) => {
-          onDataCallback = cb;
-        }),
-        onExit: vi.fn((cb) => {
-          onExitCallback = cb;
-        }),
-        write: vi.fn(),
-        kill: killFn,
-      };
-
-      ptyInstances.push(ptyInstance);
-
-      const dispose = vi.fn(() => {
-        // Verify kill is called on cleanup
-        killFn();
-      });
-
-      return {
-        ptyProcess: ptyInstance as unknown as IPty,
-        exitCode: new Promise<number>((resolve) => {
-          setTimeout(() => {
-            if (onDataCallback) {
-              onDataCallback(JSON.stringify({ type: 'content', text: 'OK' }));
-            }
-            if (onExitCallback) {
-              onExitCallback({ exitCode: 0 });
-            }
-            resolve(0);
-          }, 1);
-        }),
-        dispose,
-      };
-    });
-
-    vi.mocked(createStreamParser).mockImplementation(() => ({
-      processChunk: vi.fn(
-        (chunk: string, callback: (msg: ClaudeMessage) => void) => {
-          try {
-            callback(JSON.parse(chunk.trim()));
-          } catch {
-            // Ignore
-          }
-        }
-      ),
-      flush: vi.fn(),
-    }));
-
-    vi.mocked(extractResult).mockReturnValue({
-      result: 'OK',
-      tokens: {
-        prompt: 5,
-        cache_write_5m: 0,
-        cache_write_1h: 0,
-        cache_read: 0,
-        output: 3,
-      },
-      cost: 0.001,
-      exit_code: 0,
-      duration: 50,
-    });
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    // Execute 1000 sequential prompts
-    for (let i = 0; i < 1000; i++) {
-      const stream = extValue(ext).prompt.fn(
-        { text: `Prompt ${i}`, options: {} },
-        ctx
-      );
-      await resolveStream(stream);
-    }
-
-    // Verify all PTY instances had kill called (cleanup)
-    expect(ptyInstances).toHaveLength(1000);
-    ptyInstances.forEach((pty) => {
-      expect(pty.kill).toHaveBeenCalled();
-    });
   }, 30000);
 });

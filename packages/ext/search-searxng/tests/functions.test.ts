@@ -469,23 +469,7 @@ describe('SearXNG extension host functions', () => {
   // ============================================================
 
   describe('config()', () => {
-    it('returns config dict with categories, engines, plugins, locales [AC-9]', async () => {
-      const ext = await createTestExtension();
-      globalThis.fetch = mockFetchJson(200, CONFIG_RESPONSE);
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'config').fn({}, ctx)) as Record<
-        string,
-        unknown
-      >;
-
-      expect(result['categories']).toBeDefined();
-      expect(result['engines']).toBeDefined();
-      expect(result['plugins']).toBeDefined();
-      expect(result['locales']).toBeDefined();
-    });
-
-    it('returns categories as an array [AC-9]', async () => {
+    it('returns config dict with categories array, engines, plugins, locales', async () => {
       const ext = await createTestExtension();
       globalThis.fetch = mockFetchJson(200, CONFIG_RESPONSE);
       const ctx = createRuntimeContext();
@@ -496,6 +480,7 @@ describe('SearXNG extension host functions', () => {
       >;
 
       expect(Array.isArray(result['categories'])).toBe(true);
+      expect(result).toEqual(CONFIG_RESPONSE);
     });
 
     it('sends GET to /config with no body', async () => {

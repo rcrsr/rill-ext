@@ -19,88 +19,38 @@ import { buildJsonSchemaFromStructuralType } from '../src/schema.js';
 
 describe('buildJsonSchemaFromStructuralType', () => {
   describe('closure TypeStructure', () => {
-    // AC-10: output identical to equivalent legacy schema for same param structure
-    it('AC-10: string param produces same output as buildJsonSchema string type', () => {
-      const params: RillParam[] = [
-        {
-          name: 'name',
-          type: { kind: 'string' },
-          defaultValue: undefined,
-          annotations: {},
-        },
-      ];
-      const result = buildJsonSchemaFromStructuralType(
-        {
-          kind: 'closure',
-          params: [{ name: 'name', type: { kind: 'string' } }],
-        },
-        params
-      );
-      expect(result.properties['name']?.type).toBe('string');
-      expect(result.required).toContain('name');
-      expect(result.type).toBe('object');
-      expect(result.additionalProperties).toBe(false);
-    });
-
-    it('AC-10: number param produces same output as buildJsonSchema number type', () => {
-      const params: RillParam[] = [
-        {
-          name: 'count',
-          type: { kind: 'number' },
-          defaultValue: undefined,
-          annotations: {},
-        },
-      ];
-      const result = buildJsonSchemaFromStructuralType(
-        {
-          kind: 'closure',
-          params: [{ name: 'count', type: { kind: 'number' } }],
-        },
-        params
-      );
-      expect(result.properties['count']?.type).toBe('number');
-      expect(result.required).toContain('count');
-    });
-
-    it('AC-10: bool param produces type "boolean" matching buildJsonSchema', () => {
-      const params: RillParam[] = [
-        {
-          name: 'active',
-          type: { kind: 'bool' },
-          defaultValue: undefined,
-          annotations: {},
-        },
-      ];
-      const result = buildJsonSchemaFromStructuralType(
-        {
-          kind: 'closure',
-          params: [{ name: 'active', type: { kind: 'bool' } }],
-        },
-        params
-      );
-      expect(result.properties['active']?.type).toBe('boolean');
-    });
-
-    it('AC-10: dict param produces type "object"', () => {
-      const params: RillParam[] = [
-        {
-          name: 'meta',
-          type: { kind: 'dict' },
-          defaultValue: undefined,
-          annotations: {},
-        },
-      ];
-      const result = buildJsonSchemaFromStructuralType(
-        {
-          kind: 'closure',
-          params: [{ name: 'meta', type: { kind: 'dict' } }],
-        },
-        params
-      );
-      expect(result.properties['meta']?.type).toBe('object');
-      expect(result.properties['meta']?.additionalProperties).toBe(false);
-      expect(result.required).toContain('meta');
-    });
+    it.each([
+      { kind: 'string', jsonType: 'string', additionalProperties: undefined },
+      { kind: 'number', jsonType: 'number', additionalProperties: undefined },
+      { kind: 'bool', jsonType: 'boolean', additionalProperties: undefined },
+      { kind: 'dict', jsonType: 'object', additionalProperties: false },
+    ] as const)(
+      '$kind param maps to JSON Schema type "$jsonType"',
+      ({ kind, jsonType, additionalProperties }) => {
+        const params: RillParam[] = [
+          {
+            name: 'value',
+            type: { kind },
+            defaultValue: undefined,
+            annotations: {},
+          },
+        ];
+        const result = buildJsonSchemaFromStructuralType(
+          {
+            kind: 'closure',
+            params: [{ name: 'value', type: { kind } }],
+          },
+          params
+        );
+        expect(result.type).toBe('object');
+        expect(result.additionalProperties).toBe(false);
+        expect(result.properties['value']?.type).toBe(jsonType);
+        expect(result.properties['value']?.additionalProperties).toBe(
+          additionalProperties
+        );
+        expect(result.required).toContain('value');
+      }
+    );
 
     it('strict mode: vector param produces type "object" with additionalProperties: false', () => {
       const result = buildJsonSchemaFromStructuralType({
@@ -378,19 +328,11 @@ describe('buildJsonSchemaFromStructuralType', () => {
       expect(result.required).toEqual(['name']);
     });
 
-    it('returns empty properties for dict without fields', () => {
-      const result = buildJsonSchemaFromStructuralType({ kind: 'dict' });
-      expect(result.type).toBe('object');
-      expect(result.properties).toEqual({});
-      expect(result.required).toEqual([]);
-      expect(result.additionalProperties).toBe(false);
-    });
-
-    it('returns empty properties for dict with empty fields', () => {
-      const result = buildJsonSchemaFromStructuralType({
-        kind: 'dict',
-        fields: {},
-      });
+    it.each([
+      { shape: 'without fields', structure: { kind: 'dict' } },
+      { shape: 'with empty fields', structure: { kind: 'dict', fields: {} } },
+    ] as const)('returns empty properties for dict $shape', ({ structure }) => {
+      const result = buildJsonSchemaFromStructuralType(structure);
       expect(result.type).toBe('object');
       expect(result.properties).toEqual({});
       expect(result.required).toEqual([]);

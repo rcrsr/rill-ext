@@ -13,7 +13,7 @@ import {
   getStatus,
   type RillValue,
 } from '@rcrsr/rill';
-import { makeFactoryCtx } from './_helpers.js';
+import { makeFactoryCtx, expectCombinedFetchSignal } from './_helpers.js';
 import { createGoogleWorkspaceExtension } from '../src/factory.js';
 
 // ============================================================
@@ -227,6 +227,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 // ============================================================
@@ -757,6 +758,7 @@ describe('success cases', () => {
       const [emittedCtx, emittedPayload] = mockEmitEvent.mock.calls[0]!;
       expect(emittedCtx).toBe(ctx);
       expect(emittedPayload['event']).toBe('google:calendar:events');
+      expect(emittedPayload['subsystem']).toBe('extension:google-workspace');
       expect(typeof emittedPayload['duration']).toBe('number');
     });
 
@@ -831,10 +833,13 @@ describe('success cases', () => {
       expect(mockEmitEvent).toHaveBeenCalledOnce();
       const [, payload] = mockEmitEvent.mock.calls[0]!;
       expect(payload['event']).toBe('google:calendar:today');
+      expect(payload['subsystem']).toBe('extension:google-workspace');
       expect(typeof payload['duration']).toBe('number');
     });
 
-    it('makes GET request for today primary calendar', async () => {
+    it('requests the primary calendar for the current UTC day window', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-04-15T13:45:00Z'));
       const mockFetch = makeFetchOk({ items: [] });
       vi.stubGlobal('fetch', mockFetch);
 
@@ -849,6 +854,12 @@ describe('success cases', () => {
       const [url] = mockFetch.mock.calls[0] as [string];
       expect(url).toContain('/calendars/primary/events');
       expect(url).toContain('singleEvents=true');
+      expect(url).toContain(
+        `timeMin=${encodeURIComponent('2026-04-15T00:00:00Z')}`
+      );
+      expect(url).toContain(
+        `timeMax=${encodeURIComponent('2026-04-15T23:59:59Z')}`
+      );
     });
   });
 
@@ -888,6 +899,7 @@ describe('success cases', () => {
       expect(mockEmitEvent).toHaveBeenCalledOnce();
       const [, payload] = mockEmitEvent.mock.calls[0]!;
       expect(payload['event']).toBe('google:calendar:create_event');
+      expect(payload['subsystem']).toBe('extension:google-workspace');
       expect(typeof payload['duration']).toBe('number');
     });
 
@@ -1002,6 +1014,7 @@ describe('success cases', () => {
       expect(mockEmitEvent).toHaveBeenCalledOnce();
       const [, payload] = mockEmitEvent.mock.calls[0]!;
       expect(payload['event']).toBe('google:calendar:free_busy');
+      expect(payload['subsystem']).toBe('extension:google-workspace');
       expect(typeof payload['duration']).toBe('number');
     });
 
@@ -1078,147 +1091,36 @@ describe('success cases', () => {
 });
 
 // ============================================================
-// Integration depth: AC-13 subsystem field verification
-// ============================================================
-
-describe('AC-13: calendar events include subsystem field', () => {
-  it('calendar_events emits subsystem extension:google-workspace', async () => {
-    vi.stubGlobal('fetch', makeFetchOk({ items: [] }));
-
-    const ext = createGoogleWorkspaceExtension(
-      ALL_CAPS_CONFIG,
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-
-    await getCallable(ext, 'calendar_events').fn(
-      { start_date: '2026-04-01', end_date: '2026-04-30' },
-      ctx
-    );
-
-    // mockEmitEvent is the vi.mocked(emitExtensionEvent) from the module mock
-    expect(mockEmitEvent).toHaveBeenCalledOnce();
-    const [, payload] = mockEmitEvent.mock.calls[0]!;
-    expect(payload['subsystem']).toBe('extension:google-workspace');
-    expect(payload['event']).toBe('google:calendar:events');
-  });
-
-  it('calendar_create_event emits subsystem extension:google-workspace', async () => {
-    vi.stubGlobal('fetch', makeFetchOk({ id: 'evt-1' }));
-
-    const ext = createGoogleWorkspaceExtension(
-      ALL_CAPS_CONFIG,
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-
-    await getCallable(ext, 'calendar_create_event').fn(
-      { title: 'Meeting', start_time: START_Z, end_time: END_Z },
-      ctx
-    );
-
-    const [, payload] = mockEmitEvent.mock.calls[0]!;
-    expect(payload['subsystem']).toBe('extension:google-workspace');
-  });
-
-  it('calendar_free_busy emits subsystem extension:google-workspace', async () => {
-    vi.stubGlobal(
-      'fetch',
-      makeFetchOk({ calendars: { 'a@x.com': { busy: [] } } })
-    );
-
-    const ext = createGoogleWorkspaceExtension(
-      ALL_CAPS_CONFIG,
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-
-    await getCallable(ext, 'calendar_free_busy').fn(
-      { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
-      ctx
-    );
-
-    const [, payload] = mockEmitEvent.mock.calls[0]!;
-    expect(payload['subsystem']).toBe('extension:google-workspace');
-  });
-
-  it('calendar_today emits subsystem extension:google-workspace', async () => {
-    vi.stubGlobal('fetch', makeFetchOk({ items: [] }));
-
-    const ext = createGoogleWorkspaceExtension(
-      ALL_CAPS_CONFIG,
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-
-    await getCallable(ext, 'calendar_today').fn({}, ctx);
-
-    const [, payload] = mockEmitEvent.mock.calls[0]!;
-    expect(payload['subsystem']).toBe('extension:google-workspace');
-  });
-});
-
-// ============================================================
 // Integration depth: AC-11 AbortSignal verification
 // ============================================================
 
-describe('AC-11: calendar callables pass AbortSignal to fetch', () => {
-  it('calendar_today passes a combined AbortSignal instance [AC-11]', async () => {
-    let capturedSignal: AbortSignal | undefined;
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((_url: unknown, init: RequestInit) => {
-        capturedSignal = init.signal as AbortSignal;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ items: [] }),
-        });
-      })
-    );
-
+describe('AC-11: calendar callables pass a combined signal to fetch', () => {
+  it('calendar_today passes fetch a signal combining dispose abort and a 30s timeout', async () => {
     const ext = createGoogleWorkspaceExtension(
       ALL_CAPS_CONFIG,
       makeFactoryCtx()
     );
-    const ctx = createRuntimeContext();
 
-    await getCallable(ext, 'calendar_today').fn({}, ctx);
-
-    // AC-11: signal must be an AbortSignal instance (combined controller + 30s timeout)
-    expect(capturedSignal).toBeInstanceOf(AbortSignal);
-    expect(capturedSignal!.aborted).toBe(false);
+    await expectCombinedFetchSignal(
+      ext,
+      getCallable(ext, 'calendar_today'),
+      {},
+      { ok: true, status: 200, json: () => Promise.resolve({ items: [] }) }
+    );
   });
 
-  it('calendar_free_busy passes a combined AbortSignal instance [AC-11]', async () => {
-    let capturedSignal: AbortSignal | undefined;
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((_url: unknown, init: RequestInit) => {
-        capturedSignal = init.signal as AbortSignal;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ calendars: {} }),
-        });
-      })
-    );
-
+  it('calendar_free_busy passes fetch a signal combining dispose abort and a 30s timeout', async () => {
     const ext = createGoogleWorkspaceExtension(
       ALL_CAPS_CONFIG,
       makeFactoryCtx()
     );
-    const ctx = createRuntimeContext();
 
-    await getCallable(ext, 'calendar_free_busy').fn(
+    await expectCombinedFetchSignal(
+      ext,
+      getCallable(ext, 'calendar_free_busy'),
       { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
-      ctx
+      { ok: true, status: 200, json: () => Promise.resolve({ calendars: {} }) }
     );
-
-    expect(capturedSignal).toBeInstanceOf(AbortSignal);
-    expect(capturedSignal!.aborted).toBe(false);
   });
 });
 

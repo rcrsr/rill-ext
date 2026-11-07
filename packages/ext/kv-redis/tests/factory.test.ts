@@ -2,14 +2,16 @@
  * Tests for Redis kv extension factory.
  *
  * Coverage:
- * - IC-7: Factory creates extension with valid config
- * - AC-10: Configuration validation failure
+ * - Factory creates extension with valid config
+ * - Configuration validation failure
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { createRedisKvExtension } from '../src/factory.js';
 import type { RedisKvExtensionConfig } from '../src/factory.js';
 import { makeFactoryCtx } from './_setup.js';
+
+const validMounts = { test: { mode: 'read-write', prefix: 'test:' } } as const;
 
 describe('createRedisKvExtension', () => {
   // Track created extensions for cleanup
@@ -25,96 +27,7 @@ describe('createRedisKvExtension', () => {
     extensions.length = 0;
   });
 
-  describe('IC-7: Factory creates extension with valid config', () => {
-    it('exports factory function', () => {
-      expect(typeof createRedisKvExtension).toBe('function');
-    });
-
-    it('returns ExtensionResult structure with valid config', () => {
-      const config: RedisKvExtensionConfig = {
-        url: 'redis://localhost:6379',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            prefix: 'test:',
-          },
-        },
-      };
-
-      const result = createRedisKvExtension(config, makeFactoryCtx());
-      extensions.push(result);
-
-      expect(typeof result).toBe('object');
-      expect(result).not.toBeNull();
-      expect(Array.isArray(result)).toBe(false);
-    });
-
-    it('exports all 11 kv functions with correct structure', () => {
-      const config: RedisKvExtensionConfig = {
-        url: 'redis://localhost:6379',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            prefix: 'test:',
-          },
-        },
-      };
-
-      const result = createRedisKvExtension(config, makeFactoryCtx());
-      extensions.push(result);
-
-      // Check all 11 functions are present (IR-1 through IR-11)
-      const expectedFunctions = [
-        'get', // IR-1
-        'get_or', // IR-2
-        'set', // IR-3
-        'merge', // IR-4
-        'delete', // IR-5
-        'keys', // IR-6
-        'has', // IR-7
-        'clear', // IR-8
-        'getAll', // IR-9
-        'schema', // IR-10
-        'mounts', // IR-11
-      ];
-
-      const value = result.value as Record<
-        string,
-        {
-          fn: unknown;
-          params: unknown[];
-          annotations?: Record<string, unknown>;
-          returnType: unknown;
-        }
-      >;
-      for (const fnName of expectedFunctions) {
-        expect(value[fnName]).toBeDefined();
-        expect(typeof value[fnName]?.fn).toBe('function');
-        expect(Array.isArray(value[fnName]?.params)).toBe(true);
-        expect(typeof value[fnName]?.annotations?.['description']).toBe(
-          'string'
-        );
-        expect(typeof value[fnName]?.returnType).toBe('object');
-      }
-    });
-
-    it('returns ExtensionResult with dispose method', () => {
-      const config: RedisKvExtensionConfig = {
-        url: 'redis://localhost:6379',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            prefix: 'test:',
-          },
-        },
-      };
-
-      const result = createRedisKvExtension(config, makeFactoryCtx());
-      extensions.push(result);
-
-      expect(typeof result.dispose).toBe('function');
-    });
-
+  describe('Factory creates extension with valid config', () => {
     it('accepts TLS connection URL with rediss://', () => {
       const config: RedisKvExtensionConfig = {
         url: 'rediss://localhost:6380',
@@ -175,139 +88,76 @@ describe('createRedisKvExtension', () => {
     });
   });
 
-  describe('AC-10: Configuration validation failure', () => {
-    it('throws for missing mounts configuration', () => {
-      const config = {
-        url: 'redis://localhost:6379',
-        mounts: {},
-      } as RedisKvExtensionConfig;
-
-      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
+  describe('Configuration validation failure', () => {
+    it.each([
+      {
+        label: 'empty mounts',
+        config: { url: 'redis://localhost:6379', mounts: {} },
+      },
+      { label: 'undefined mounts', config: { url: 'redis://localhost:6379' } },
+    ])('throws for $label', ({ config }) => {
+      expect(() =>
+        createRedisKvExtension(
+          config as RedisKvExtensionConfig,
+          makeFactoryCtx()
+        )
+      ).toThrow(
         'Redis kv extension requires at least one mount in configuration'
       );
     });
 
-    it('throws for undefined mounts', () => {
-      const config = {
-        url: 'redis://localhost:6379',
-      } as unknown as RedisKvExtensionConfig;
-
-      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
-        'Redis kv extension requires at least one mount in configuration'
-      );
+    it.each([
+      { label: 'empty string', url: '' },
+      { label: 'null', url: null },
+    ])('throws for missing connection URL ($label)', ({ url }) => {
+      expect(() =>
+        createRedisKvExtension(
+          { url, mounts: validMounts } as unknown as RedisKvExtensionConfig,
+          makeFactoryCtx()
+        )
+      ).toThrow('Redis kv extension requires a valid connection URL');
     });
 
-    it('throws for missing connection URL', () => {
-      const config = {
-        url: '',
-        mounts: {
-          test: { mode: 'read-write', prefix: 'test:' },
-        },
-      } as RedisKvExtensionConfig;
-
-      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
-        'Redis kv extension requires a valid connection URL'
-      );
-    });
-
-    it('throws for invalid URL type', () => {
-      const config = {
-        url: null,
-        mounts: {
-          test: { mode: 'read-write', prefix: 'test:' },
-        },
-      } as unknown as RedisKvExtensionConfig;
-
-      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
-        'Redis kv extension requires a valid connection URL'
-      );
-    });
-
-    it('throws for invalid URL scheme (http)', () => {
-      const config: RedisKvExtensionConfig = {
-        url: 'http://localhost:6379',
-        mounts: {
-          test: { mode: 'read-write', prefix: 'test:' },
-        },
-      };
-
-      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
+    it.each([
+      { label: 'http', url: 'http://localhost:6379' },
+      { label: 'localhost without protocol', url: 'localhost:6379' },
+    ])('throws for invalid URL scheme ($label)', ({ url }) => {
+      expect(() =>
+        createRedisKvExtension({ url, mounts: validMounts }, makeFactoryCtx())
+      ).toThrow(
         'Invalid Redis connection URL: must start with redis:// or rediss://'
       );
     });
 
-    it('throws for invalid URL scheme (localhost without protocol)', () => {
-      const config: RedisKvExtensionConfig = {
-        url: 'localhost:6379',
+    it.each([
+      {
+        label: 'exact match',
         mounts: {
-          test: { mode: 'read-write', prefix: 'test:' },
+          user1: { mode: 'read-write', prefix: 'app:user:' },
+          user2: { mode: 'read-write', prefix: 'app:user:' },
         },
-      };
-
-      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
-        'Invalid Redis connection URL: must start with redis:// or rediss://'
-      );
-    });
-
-    it('throws for overlapping mount prefixes (exact match)', () => {
-      const config: RedisKvExtensionConfig = {
-        url: 'redis://localhost:6379',
+      },
+      {
+        label: 'one prefix starts with another',
         mounts: {
-          user1: {
-            mode: 'read-write',
-            prefix: 'app:user:',
-          },
-          user2: {
-            mode: 'read-write',
-            prefix: 'app:user:',
-          },
+          app: { mode: 'read-write', prefix: 'app:' },
+          user: { mode: 'read-write', prefix: 'app:user:' },
         },
-      };
-
-      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
-        'Mount prefix overlap detected'
-      );
-    });
-
-    it('throws for overlapping mount prefixes (one prefix starts with another)', () => {
-      const config: RedisKvExtensionConfig = {
-        url: 'redis://localhost:6379',
-        mounts: {
-          app: {
-            mode: 'read-write',
-            prefix: 'app:',
-          },
-          user: {
-            mode: 'read-write',
-            prefix: 'app:user:',
-          },
-        },
-      };
-
-      expect(() => createRedisKvExtension(config, makeFactoryCtx())).toThrow(
-        'Mount prefix overlap detected'
-      );
-    });
+      },
+    ] as const)(
+      'throws for overlapping mount prefixes ($label)',
+      ({ mounts }) => {
+        expect(() =>
+          createRedisKvExtension(
+            { url: 'redis://localhost:6379', mounts },
+            makeFactoryCtx()
+          )
+        ).toThrow('Mount prefix overlap detected');
+      }
+    );
   });
 
-  describe('IC-7: Dispose disconnects Redis client', () => {
-    it('dispose method returns without error', async () => {
-      const config: RedisKvExtensionConfig = {
-        url: 'redis://localhost:6379',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            prefix: 'test:',
-          },
-        },
-      };
-
-      const result = createRedisKvExtension(config, makeFactoryCtx());
-
-      // Should not throw
-      await expect(result.dispose?.()).resolves.toBeUndefined();
-    });
-
+  describe('Dispose disconnects Redis client', () => {
     it('dispose can be called multiple times', async () => {
       const config: RedisKvExtensionConfig = {
         url: 'redis://localhost:6379',

@@ -5,6 +5,8 @@
  * happy path dispatch for all supported types, with and without defaults
  * malformed entry (no `:` separator) → RuntimeError RILL-R001
  * unrecognized type → RuntimeError RILL-R001
+ * Rejections of dynamic, union, mixed-arg and non-renderable types are
+ * asserted in typeRefToStructure.test.ts (parseParamGrammar delegates there).
  *
  * Both `num` and `callable` are hard-rejected (not valid rill type names).
  * Non-renderable types (closure, iterator, stream, vector, type) are also
@@ -18,51 +20,35 @@ import { describe, it, expect } from 'vitest';
 import { RuntimeError } from '@rcrsr/rill';
 import { parseParamGrammar } from './grammar.js';
 
+function expectR001(fn: () => unknown, message: string): void {
+  let thrown: unknown;
+  try {
+    fn();
+  } catch (err) {
+    thrown = err;
+  }
+  expect(thrown).toBeInstanceOf(RuntimeError);
+  expect((thrown as RuntimeError).errorId).toBe('RILL-R001');
+  expect((thrown as RuntimeError).message).toContain(message);
+}
+
 // ============================================================
 // HAPPY PATH — NO DEFAULT
 // ============================================================
 
 describe('parseParamGrammar', () => {
   describe('happy path — no default', () => {
-    it('parses string param', () => {
-      const result = parseParamGrammar('question: string');
-      expect(result.name).toBe('question');
-      expect(result.type).toEqual({ kind: 'string' });
-      expect(result.defaultValue).toBeUndefined();
-    });
-
-    it('parses number param', () => {
-      const result = parseParamGrammar('count: number');
-      expect(result.name).toBe('count');
-      expect(result.type).toEqual({ kind: 'number' });
-      expect(result.defaultValue).toBeUndefined();
-    });
-
-    it('parses bool param', () => {
-      const result = parseParamGrammar('verbose: bool');
-      expect(result.name).toBe('verbose');
-      expect(result.type).toEqual({ kind: 'bool' });
-      expect(result.defaultValue).toBeUndefined();
-    });
-
-    it('parses dict param', () => {
-      const result = parseParamGrammar('options: dict');
-      expect(result.name).toBe('options');
-      expect(result.type).toEqual({ kind: 'dict' });
-      expect(result.defaultValue).toBeUndefined();
-    });
-
-    it('parses list param', () => {
-      const result = parseParamGrammar('items: list');
-      expect(result.name).toBe('items');
-      expect(result.type).toEqual({ kind: 'list' });
-      expect(result.defaultValue).toBeUndefined();
-    });
-
-    it('parses any param', () => {
-      const result = parseParamGrammar('value: any');
-      expect(result.name).toBe('value');
-      expect(result.type).toEqual({ kind: 'any' });
+    it.each([
+      { entry: 'question: string', name: 'question', kind: 'string' },
+      { entry: 'count: number', name: 'count', kind: 'number' },
+      { entry: 'verbose: bool', name: 'verbose', kind: 'bool' },
+      { entry: 'options: dict', name: 'options', kind: 'dict' },
+      { entry: 'items: list', name: 'items', kind: 'list' },
+      { entry: 'value: any', name: 'value', kind: 'any' },
+    ])('parses $kind param "$entry" without a default', (row) => {
+      const result = parseParamGrammar(row.entry);
+      expect(result.name).toBe(row.name);
+      expect(result.type).toEqual({ kind: row.kind });
       expect(result.defaultValue).toBeUndefined();
     });
   });
@@ -204,175 +190,70 @@ describe('parseParamGrammar', () => {
   });
 
   // ============================================================
-  // MISSING COLON SEPARATOR
+  // REJECTIONS
   // ============================================================
 
   describe('missing colon separator', () => {
-    it('throws RuntimeError for entry without colon', () => {
-      expect(() => parseParamGrammar('tone = neutral')).toThrow(RuntimeError);
-    });
-
-    it('throws with error code RILL-R001', () => {
-      try {
-        parseParamGrammar('tone = neutral');
-        expect.fail('should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(RuntimeError);
-        expect((err as RuntimeError).errorId).toBe('RILL-R001');
-      }
-    });
-
-    it('throws for plain name with no separator', () => {
-      expect(() => parseParamGrammar('justname')).toThrow(RuntimeError);
-    });
-
-    it('throws for empty entry', () => {
-      expect(() => parseParamGrammar('')).toThrow(RuntimeError);
+    it.each([
+      { entry: 'tone = neutral' },
+      { entry: 'justname' },
+      { entry: '' },
+    ])('throws RILL-R001 malformed entry for "$entry"', (row) => {
+      expectR001(() => parseParamGrammar(row.entry), 'malformed param entry');
     });
   });
-
-  // ============================================================
-  // UNRECOGNIZED / REJECTED TYPE
-  // ============================================================
 
   describe('unrecognized type', () => {
-    it('throws RuntimeError for unknown type', () => {
-      expect(() => parseParamGrammar('x: widget')).toThrow(RuntimeError);
+    it.each([
+      { entry: 'x: widget', typeName: 'widget' },
+      { entry: 'x: String', typeName: 'String' },
+      { entry: 'x: NUMBER', typeName: 'NUMBER' },
+      { entry: 'count: num', typeName: 'num' },
+      { entry: 'fn: callable', typeName: 'callable' },
+    ])('throws RILL-R001 for type "$typeName"', (row) => {
+      expectR001(
+        () => parseParamGrammar(row.entry),
+        `failed to parse param type "${row.typeName}"`
+      );
     });
 
-    it('throws with error code RILL-R001 for unknown type', () => {
-      try {
-        parseParamGrammar('x: widget');
-        expect.fail('should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(RuntimeError);
-        expect((err as RuntimeError).errorId).toBe('RILL-R001');
-      }
+    it('throws RILL-R001 for empty type', () => {
+      expectR001(
+        () => parseParamGrammar('x: '),
+        'failed to parse param type ""'
+      );
     });
-
-    it('throws for type with wrong casing (e.g. String)', () => {
-      expect(() => parseParamGrammar('x: String')).toThrow(RuntimeError);
-    });
-
-    it('throws for type with wrong casing (e.g. NUMBER)', () => {
-      expect(() => parseParamGrammar('x: NUMBER')).toThrow(RuntimeError);
-    });
-
-    it('throws for empty type', () => {
-      expect(() => parseParamGrammar('x: ')).toThrow(RuntimeError);
-    });
-
-    // Hard reject legacy aliases — no backward compat
-    it('rejects num (use number)', () => {
-      try {
-        parseParamGrammar('count: num');
-        expect.fail('should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(RuntimeError);
-        expect((err as RuntimeError).errorId).toBe('RILL-R001');
-      }
-    });
-
-    it('rejects callable — no function-typed params supported in prompt-md', () => {
-      try {
-        parseParamGrammar('fn: callable');
-        expect.fail('should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(RuntimeError);
-        expect((err as RuntimeError).errorId).toBe('RILL-R001');
-      }
-    });
-
-    it('rejects dynamic ref $T', () => {
-      try {
-        parseParamGrammar('x: $T');
-        expect.fail('should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(RuntimeError);
-        expect((err as RuntimeError).errorId).toBe('RILL-R001');
-      }
-    });
-
-    it('rejects union type string | number', () => {
-      try {
-        parseParamGrammar('x: string | number');
-        expect.fail('should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(RuntimeError);
-        expect((err as RuntimeError).errorId).toBe('RILL-R001');
-      }
-    });
-
-    it('rejects dict with mixed named and positional args', () => {
-      try {
-        parseParamGrammar('x: dict(string, b: number)');
-        expect.fail('should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(RuntimeError);
-        expect((err as RuntimeError).errorId).toBe('RILL-R001');
-      }
-    });
-
-    // Non-renderable types — produce placeholder strings, not prompt text
-    const nonRenderableTypes = [
-      'closure',
-      'iterator',
-      'stream',
-      'vector',
-      'type',
-    ] as const;
-    for (const typeName of nonRenderableTypes) {
-      it(`rejects ${typeName} with RILL-R001`, () => {
-        try {
-          parseParamGrammar(`x: ${typeName}`);
-          expect.fail('should have thrown');
-        } catch (err) {
-          expect(err).toBeInstanceOf(RuntimeError);
-          expect((err as RuntimeError).errorId).toBe('RILL-R001');
-        }
-      });
-    }
   });
-
-  // ============================================================
-  // UNSUPPORTED DEFAULTS (v0 constraint)
-  // ============================================================
 
   describe('unsupported defaults (v0 constraint)', () => {
-    it('throws RuntimeError when dict has a default', () => {
-      expect(() => parseParamGrammar('opts: dict = {}')).toThrow(RuntimeError);
-    });
-
-    it('throws RuntimeError when list has a default', () => {
-      expect(() => parseParamGrammar('tags: list = []')).toThrow(RuntimeError);
-    });
-
-    it('throws RuntimeError when any has a default', () => {
-      expect(() => parseParamGrammar('val: any = something')).toThrow(
-        RuntimeError
+    it.each([
+      { entry: 'opts: dict = {}', kind: 'dict' },
+      { entry: 'tags: list = []', kind: 'list' },
+      { entry: 'val: any = something', kind: 'any' },
+    ])('throws RILL-R001 when $kind has a default', (row) => {
+      expectR001(
+        () => parseParamGrammar(row.entry),
+        `defaults for param type "${row.kind}" are not supported in v0`
       );
     });
   });
 
-  // ============================================================
-  // INVALID DEFAULT VALUES
-  // ============================================================
-
   describe('invalid default values', () => {
-    it('throws RuntimeError for non-numeric default on number type', () => {
-      expect(() => parseParamGrammar('count: number = abc')).toThrow(
-        RuntimeError
+    it('throws RILL-R001 for non-numeric default on number type', () => {
+      expectR001(
+        () => parseParamGrammar('count: number = abc'),
+        'default value for number param "count" is not a valid number: "abc"'
       );
     });
 
-    it('throws RuntimeError for mixed-case bool default', () => {
-      expect(() => parseParamGrammar('flag: bool = True')).toThrow(
-        RuntimeError
+    it.each([
+      { entry: 'flag: bool = True', raw: 'True' },
+      { entry: 'flag: bool = yes', raw: 'yes' },
+    ])('throws RILL-R001 for bool default "$raw"', (row) => {
+      expectR001(
+        () => parseParamGrammar(row.entry),
+        `default value for bool param "flag" must be "true" or "false", got: "${row.raw}"`
       );
-    });
-
-    it('throws RuntimeError for bool default that is not true or false', () => {
-      expect(() => parseParamGrammar('flag: bool = yes')).toThrow(RuntimeError);
     });
   });
 });

@@ -235,7 +235,6 @@
         "packages/ext/mcp/src/introspection.ts",
         "packages/ext/mcp/tests/integration/stdio-mock-server.test.ts",
         "packages/ext/mcp/tests/unit/dispose.test.ts",
-        "packages/ext/mcp/tests/unit/introspection-integration.test.ts",
         "packages/ext/mcp/tests/unit/lifecycle-events.test.ts",
         "packages/ext/mcp/tests/unit/prompts.test.ts",
         "packages/ext/mcp/tests/unit/resources.test.ts",
@@ -303,8 +302,7 @@
         "packages/shared/ext-search/src/errors.test.ts",
         "packages/shared/ext-search/src/errors.ts",
         "packages/shared/ext-vector/tests/disposal.test.ts",
-        "packages/shared/ext-vector/tests/events.test.ts",
-        "packages/shared/ext-vector/tests/wrapper.test.ts"
+        "packages/shared/ext-vector/tests/events.test.ts"
       ],
       "rules": { "typescript/no-unnecessary-type-assertion": "warn" }
     },
@@ -334,7 +332,6 @@
         "packages/ext/kv-file/tests/functions.test.ts",
         "packages/ext/llm-anthropic/tests/functions.test.ts",
         "packages/ext/llm-anthropic/tests/tool-loop.test.ts",
-        "packages/ext/llm-gemini/src/index.test.ts",
         "packages/ext/llm-openai/tests/functions.test.ts",
         "packages/ext/mcp/tests/unit/type-conversion.test.ts",
         "packages/ext/prompt-md/tests/factory.test.ts",
@@ -385,7 +382,6 @@
         "packages/ext/prompt-md/tests/integration-llm.test.ts",
         "packages/ext/prompt-md/tests/role-allowlist.test.ts",
         "packages/ext/vectordb-chroma/tests/placeholder.test.ts",
-        "packages/ext/vectordb-pinecone/tests/types.test.ts",
         "packages/ext/vectordb-qdrant/tests/index.test.ts"
       ],
       "rules": { "typescript/no-unsafe-call": "warn" }
@@ -451,12 +447,10 @@
         "packages/ext/text/tests/factory.test.ts",
         "packages/ext/vectordb-chroma/tests/placeholder.test.ts",
         "packages/ext/vectordb-pinecone/tests/pinecone.test.ts",
-        "packages/ext/vectordb-pinecone/tests/types.test.ts",
         "packages/ext/vectordb-qdrant/tests/index.test.ts",
         "packages/ext/vectordb-qdrant/tests/qdrant.test.ts",
         "packages/shared/ext-llm/src/tool-loop.test.ts",
-        "packages/shared/ext-search/src/wrapper.test.ts",
-        "packages/shared/ext-vector/tests/wrapper.test.ts"
+        "packages/shared/ext-search/src/wrapper.test.ts"
       ],
       "rules": { "typescript/no-unsafe-assignment": "warn" }
     },
@@ -514,8 +508,7 @@
         "packages/ext/vectordb-qdrant/tests/qdrant.test.ts",
         "packages/shared/ext-llm/src/tool-loop.test.ts",
         "packages/shared/ext-search/src/wrapper.test.ts",
-        "packages/shared/ext-vector/tests/events.test.ts",
-        "packages/shared/ext-vector/tests/wrapper.test.ts"
+        "packages/shared/ext-vector/tests/events.test.ts"
       ],
       "rules": { "typescript/strict-void-return": "warn" }
     },
@@ -560,11 +553,9 @@
         "packages/ext/llm-openai/tests/boundary.test.ts",
         "packages/ext/llm-openai/tests/functions.test.ts",
         "packages/ext/llm-openai/tests/integration-events.test.ts",
-        "packages/ext/mcp/src/index.test.ts",
         "packages/ext/mcp/tests/integration-dispose.test.ts",
         "packages/ext/mcp/tests/integration/mock-mcp-server.mjs",
         "packages/ext/mcp/tests/unit/dispose.test.ts",
-        "packages/ext/mcp/tests/unit/introspection-integration.test.ts",
         "packages/ext/mcp/tests/unit/introspection.test.ts",
         "packages/ext/mcp/tests/unit/resources.test.ts",
         "packages/ext/mcp/tests/unit/transport.test.ts",
@@ -585,10 +576,8 @@
         "packages/shared/ext-llm/src/tool-loop.test.ts",
         "packages/shared/ext-search/src/disposal.test.ts",
         "packages/shared/ext-search/src/wrapper.test.ts",
-        "packages/shared/ext-vector/tests/batch.test.ts",
         "packages/shared/ext-vector/tests/disposal.test.ts",
-        "packages/shared/ext-vector/tests/events.test.ts",
-        "packages/shared/ext-vector/tests/wrapper.test.ts"
+        "packages/shared/ext-vector/tests/events.test.ts"
       ],
       "rules": { "require-await": "warn" }
     },
@@ -810,8 +799,7 @@
         "packages/ext/llm-gemini/tests/_halt-helpers.ts",
         "packages/ext/llm-openai/tests/_halt-helpers.ts",
         "packages/ext/mcp/src/prompts.ts",
-        "packages/shared/ext-llm/src/types.ts",
-        "packages/shared/ext-vector/src/distance.ts"
+        "packages/shared/ext-llm/src/types.ts"
       ],
       "rules": { "typescript/no-redundant-type-constituents": "warn" }
     },

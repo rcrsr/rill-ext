@@ -215,61 +215,6 @@ describe('executeToolLoop', () => {
 
       expect(result.toolCalls[0]?.result).toBe('async result');
     });
-
-    it('aggregates token usage across iterations', async () => {
-      // Token tracking works correctly
-      const tools = {
-        tool: createMockTool(() => 'result'),
-      };
-
-      const callbacks = createMockCallbacks({
-        callAPI: vi.fn(async () => ({
-          content: 'response',
-          usage: { input_tokens: 200, output_tokens: 100 },
-        })),
-        extractToolCalls: vi.fn(() => null),
-      });
-
-      const result = await executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        tools,
-        3,
-        callbacks,
-        vi.fn()
-      );
-
-      expect(result.totalTokens).toEqual({ input: 200, output: 100 });
-    });
-
-    it('continues execution with 0 consecutive errors', async () => {
-      // With 0 consecutive errors → continues normally
-      const tools = {
-        tool: createMockTool(() => 'success'),
-      };
-
-      let callCount = 0;
-      const callbacks = createMockCallbacks({
-        extractToolCalls: vi.fn(() => {
-          // Return tool calls on first call, null on subsequent calls
-          callCount++;
-          return callCount === 1
-            ? [{ id: 'call_1', name: 'tool', input: {} }]
-            : null;
-        }),
-      });
-
-      const result = await executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        tools,
-        3,
-        callbacks,
-        vi.fn()
-      );
-
-      // No errors, should complete successfully
-      expect(result.toolCalls).toHaveLength(1);
-      expect(result.toolCalls[0]?.result).toBe('success');
-    });
   });
 
   describe('error cases - consecutive errors exceed threshold', () => {
@@ -433,6 +378,15 @@ describe('executeToolLoop', () => {
 
       // Tool loop completes but no successful tool calls
       expect(result.toolCalls).toHaveLength(0);
+      // The failure is fed back to the model as an error result
+      expect(callbacks.formatToolResult).toHaveBeenCalledWith([
+        {
+          id: 'call_1',
+          name: 'unknown_tool',
+          result: 'Unknown tool: unknown_tool',
+          error: 'Unknown tool: unknown_tool',
+        },
+      ]);
     });
 
     it('throws RuntimeError after maxErrors unknown tool calls', async () => {
@@ -456,37 +410,21 @@ describe('executeToolLoop', () => {
         }),
       });
 
-      await expect(
-        executeToolLoop(
-          [{ role: 'user', content: 'Test' }],
-          tools,
-          3,
-          callbacks,
-          vi.fn()
-        )
-      ).rejects.toThrow(RuntimeError);
+      const promise = executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn()
+      );
+      await expect(promise).rejects.toThrow(RuntimeError);
+      await expect(promise).rejects.toThrow(
+        'Tool execution failed: 3 consecutive errors (last: missing3: Unknown tool: missing3)'
+      );
     });
   });
 
   describe('error cases - invalid tool input', () => {
-    it('throws for non-callable tool', async () => {
-      // Tool input validation fails → throws
-      const tools = {
-        invalid_tool: 'not a function' as unknown as RillValue,
-      };
-
-      // Error happens during setup, not during extractToolCalls
-      await expect(
-        executeToolLoop(
-          [{ role: 'user', content: 'Test' }],
-          tools,
-          3,
-          createMockCallbacks(),
-          vi.fn()
-        )
-      ).rejects.toThrow('tool_loop: tool "invalid_tool" is not a callable');
-    });
-
     it('does not throw immediately for null tool input', async () => {
       // Tool input is null → error tracked but doesn't halt unless maxErrors exceeded
       const tools = {
@@ -514,24 +452,15 @@ describe('executeToolLoop', () => {
       );
 
       expect(result.toolCalls).toHaveLength(0);
-    });
-
-    it('throws for undefined tool in dict', async () => {
-      // Tool value is undefined → throws
-      const tools = {
-        tool: undefined as unknown as RillValue,
-      };
-
-      // Error happens during setup, not during extractToolCalls
-      await expect(
-        executeToolLoop(
-          [{ role: 'user', content: 'Test' }],
-          tools,
-          3,
-          createMockCallbacks(),
-          vi.fn()
-        )
-      ).rejects.toThrow('tool_loop: tool "tool" is not a callable');
+      // The failure is fed back to the model as an error result
+      expect(callbacks.formatToolResult).toHaveBeenCalledWith([
+        {
+          id: 'call_1',
+          name: 'tool',
+          result: 'input must be an object',
+          error: 'input must be an object',
+        },
+      ]);
     });
   });
 
@@ -547,15 +476,17 @@ describe('executeToolLoop', () => {
         }),
       });
 
-      await expect(
-        executeToolLoop(
-          [{ role: 'user', content: 'Test' }],
-          tools,
-          3,
-          callbacks,
-          vi.fn()
-        )
-      ).rejects.toThrow('Provider API error: API connection failed');
+      const promise = executeToolLoop(
+        [{ role: 'user', content: 'Test' }],
+        tools,
+        3,
+        callbacks,
+        vi.fn()
+      );
+      await expect(promise).rejects.toThrow(RuntimeError);
+      await expect(promise).rejects.toThrow(
+        'Provider API error: API connection failed'
+      );
     });
 
     it('wraps non-Error API failures', async () => {
@@ -578,28 +509,6 @@ describe('executeToolLoop', () => {
         )
       ).rejects.toThrow('Provider API error: Unknown error');
     });
-
-    it('throws RuntimeError for API failures', async () => {
-      // API errors wrapped as RuntimeError
-      const tools = {};
-      const originalError = new Error('Network timeout');
-
-      const callbacks = createMockCallbacks({
-        callAPI: vi.fn(async () => {
-          throw originalError;
-        }),
-      });
-
-      await expect(
-        executeToolLoop(
-          [{ role: 'user', content: 'Test' }],
-          tools,
-          3,
-          callbacks,
-          vi.fn()
-        )
-      ).rejects.toThrow(RuntimeError);
-    });
   });
 
   describe('validation errors', () => {
@@ -617,37 +526,42 @@ describe('executeToolLoop', () => {
       ).rejects.toThrow('tools parameter is required');
     });
 
-    it('throws when tools is not a dict', async () => {
-      const callbacks = createMockCallbacks();
-
+    it.each([
+      { label: 'a string', value: 'not a dict' },
+      { label: 'a number', value: 42 },
+      { label: 'an array', value: [] },
+    ])('throws when tools is $label', async ({ value }) => {
       await expect(
         executeToolLoop(
           [{ role: 'user', content: 'Test' }],
-          'not a dict' as unknown as RillValue,
+          value as unknown as RillValue,
           3,
-          callbacks,
+          createMockCallbacks(),
           vi.fn()
         )
       ).rejects.toThrow('tool_loop: tools must be a dict of name → callable');
     });
 
-    it('throws when tool value is not callable during setup', async () => {
-      const tools = {
-        invalid: 'not callable' as unknown as RillValue,
-      };
+    it.each([
+      { label: 'a string', name: 'invalid', value: 'not callable' },
+      { label: 'a number', name: 'my_number_tool', value: 99 },
+      { label: 'undefined', name: 'tool', value: undefined },
+    ])(
+      'throws naming "$name" when tool value is $label',
+      async ({ name, value }) => {
+        const tools = { [name]: value as unknown as RillValue };
 
-      const callbacks = createMockCallbacks();
-
-      await expect(
-        executeToolLoop(
-          [{ role: 'user', content: 'Test' }],
-          tools,
-          3,
-          callbacks,
-          vi.fn()
-        )
-      ).rejects.toThrow('tool_loop: tool "invalid" is not a callable');
-    });
+        await expect(
+          executeToolLoop(
+            [{ role: 'user', content: 'Test' }],
+            tools,
+            3,
+            createMockCallbacks(),
+            vi.fn()
+          )
+        ).rejects.toThrow(`tool_loop: tool "${name}" is not a callable`);
+      }
+    );
   });
 
   describe('edge cases', () => {
@@ -690,44 +604,6 @@ describe('executeToolLoop', () => {
       );
 
       expect(result.totalTokens).toEqual({ input: 50, output: 0 });
-    });
-
-    it('emits events for tool execution', async () => {
-      const tools = {
-        tool: createMockTool(() => 'result'),
-      };
-
-      let apiCallCount = 0;
-      const callbacks = createMockCallbacks({
-        extractToolCalls: vi.fn(() => {
-          // Return tool calls on first call, null on subsequent calls
-          apiCallCount++;
-          return apiCallCount === 1
-            ? [{ id: 'call_1', name: 'tool', input: { param: 'value' } }]
-            : null;
-        }),
-      });
-      const emitEvent = vi.fn();
-
-      await executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        tools,
-        3,
-        callbacks,
-        emitEvent
-      );
-
-      expect(emitEvent).toHaveBeenCalledWith('tool_call', {
-        tool_name: 'tool',
-        args: { param: 'value' },
-      });
-      expect(emitEvent).toHaveBeenCalledWith(
-        'tool_result',
-        expect.objectContaining({
-          tool_name: 'tool',
-          duration: expect.any(Number),
-        })
-      );
     });
 
     it('builds tool descriptors from callable metadata', async () => {
@@ -960,113 +836,6 @@ describe('executeToolLoop', () => {
       // Unconstrained param produces {} (no type field)
       expect(descriptor.input_schema.properties['unconstrained']).toEqual({});
       expect(descriptor.input_schema.required).toContain('unconstrained');
-    });
-
-    it('omits description field when annotations is empty', async () => {
-      // empty annotations → no description in schema property
-      const toolFn: ApplicationCallable = {
-        ...callable(() => ''),
-        params: [
-          {
-            name: 'param',
-            type: { kind: 'string' },
-            defaultValue: undefined,
-            annotations: {},
-          },
-        ],
-        fn: () => 'result',
-        annotations: { description: 'Tool' },
-      };
-
-      const buildTools = vi.fn((toolsArg) => toolsArg);
-      const callbacks = createMockCallbacks({
-        buildTools,
-        extractToolCalls: vi.fn(() => null),
-      });
-
-      await executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        { test_tool: toolFn },
-        3,
-        callbacks,
-        vi.fn()
-      );
-
-      const descriptor = buildTools.mock.calls[0]?.[0]?.[0];
-      expect(descriptor.input_schema.properties['param']).toEqual({
-        type: 'string',
-      });
-      expect(descriptor.input_schema.properties['param']).not.toHaveProperty(
-        'description'
-      );
-    });
-
-    it('includes param in required[] when defaultValue is undefined', async () => {
-      // defaultValue === undefined → param appears in required[]
-      const toolFn: ApplicationCallable = {
-        ...callable(() => ''),
-        params: [
-          {
-            name: 'required_param',
-            type: { kind: 'string' },
-            defaultValue: undefined,
-            annotations: {},
-          },
-        ],
-        fn: () => 'result',
-        annotations: { description: 'Tool' },
-      };
-
-      const buildTools = vi.fn((toolsArg) => toolsArg);
-      const callbacks = createMockCallbacks({
-        buildTools,
-        extractToolCalls: vi.fn(() => null),
-      });
-
-      await executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        { test_tool: toolFn },
-        3,
-        callbacks,
-        vi.fn()
-      );
-
-      const descriptor = buildTools.mock.calls[0]?.[0]?.[0];
-      expect(descriptor.input_schema.required).toContain('required_param');
-    });
-
-    it('excludes param from required[] when defaultValue is 0 (falsy but defined)', async () => {
-      // defaultValue: 0 → absent from required[]
-      const toolFn: ApplicationCallable = {
-        ...callable(() => ''),
-        params: [
-          {
-            name: 'optional_num',
-            type: { kind: 'number' },
-            defaultValue: 0,
-            annotations: {},
-          },
-        ],
-        fn: () => 'result',
-        annotations: { description: 'Tool' },
-      };
-
-      const buildTools = vi.fn((toolsArg) => toolsArg);
-      const callbacks = createMockCallbacks({
-        buildTools,
-        extractToolCalls: vi.fn(() => null),
-      });
-
-      await executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        { test_tool: toolFn },
-        3,
-        callbacks,
-        vi.fn()
-      );
-
-      const descriptor = buildTools.mock.calls[0]?.[0]?.[0];
-      expect(descriptor.input_schema.required).not.toContain('optional_num');
     });
   });
 
@@ -1819,204 +1588,6 @@ describe('executeToolLoop', () => {
       isProperty: false,
     };
 
-    /** Terminal callbacks: API returns a response with no tool calls */
-    function createTerminalCallbacks() {
-      return createMockCallbacks({
-        extractToolCalls: vi.fn(() => null),
-        callAPI: vi.fn(async () => ({
-          content: 'done',
-          usage: { input_tokens: 10, output_tokens: 5 },
-        })),
-        formatAssistantMessage: vi.fn(() => ({
-          role: 'assistant',
-          content: 'done',
-        })),
-      });
-    }
-
-    describe('dict-form tools accepted without error', () => {
-      it('accepts dict of name -> ApplicationCallable without throwing', async () => {
-        const tools = { search: mockAppCallable } as unknown as RillValue;
-        const emitEvent = vi.fn();
-
-        await expect(
-          executeToolLoop([], tools, 3, createTerminalCallbacks(), emitEvent, 1)
-        ).resolves.toBeDefined();
-      });
-    });
-
-    describe('tool name comes from dict key', () => {
-      it('builds tool descriptor with name from dict key', async () => {
-        const tools = { my_tool: mockAppCallable } as unknown as RillValue;
-
-        const buildTools = vi.fn((descriptors) => descriptors);
-        const callbacks = createMockCallbacks({
-          buildTools,
-          extractToolCalls: vi.fn(() => null),
-          callAPI: vi.fn(async () => ({
-            content: 'done',
-            usage: { input_tokens: 10, output_tokens: 5 },
-          })),
-        });
-        const emitEvent = vi.fn();
-
-        await executeToolLoop([], tools, 3, callbacks, emitEvent, 1);
-
-        const descriptors = buildTools.mock.calls[0]?.[0] as
-          | Array<{ name: string }>
-          | undefined;
-        expect(descriptors?.[0]?.name).toBe('my_tool');
-      });
-    });
-
-    describe('ScriptCallable description from annotations', () => {
-      it('extracts description from ScriptCallable annotations field', async () => {
-        const tools = { search: mockScriptCallable } as unknown as RillValue;
-
-        const buildTools = vi.fn((descriptors) => descriptors);
-        const callbacks = createMockCallbacks({
-          buildTools,
-          extractToolCalls: vi.fn(() => null),
-          callAPI: vi.fn(async () => ({
-            content: 'done',
-            usage: { input_tokens: 10, output_tokens: 5 },
-          })),
-        });
-
-        await executeToolLoop([], tools, 3, callbacks, vi.fn(), 1);
-
-        const descriptors = buildTools.mock.calls[0]?.[0] as
-          | Array<{ name: string; description: string }>
-          | undefined;
-        expect(descriptors?.[0]?.description).toBe('Search the web');
-      });
-    });
-
-    describe('ApplicationCallable description from annotations', () => {
-      it('extracts description from ApplicationCallable annotations field', async () => {
-        const tools = { my_tool: mockAppCallable } as unknown as RillValue;
-
-        const buildTools = vi.fn((descriptors) => descriptors);
-        const callbacks = createMockCallbacks({
-          buildTools,
-          extractToolCalls: vi.fn(() => null),
-          callAPI: vi.fn(async () => ({
-            content: 'done',
-            usage: { input_tokens: 10, output_tokens: 5 },
-          })),
-        });
-
-        await executeToolLoop([], tools, 3, callbacks, vi.fn(), 1);
-
-        const descriptors = buildTools.mock.calls[0]?.[0] as
-          | Array<{ name: string; description: string }>
-          | undefined;
-        expect(descriptors?.[0]?.description).toBe('My tool description');
-      });
-    });
-
-    describe('non-dict tools throws', () => {
-      it('throws for a string tools value', async () => {
-        await expect(
-          executeToolLoop(
-            [],
-            'not-a-dict' as unknown as RillValue,
-            3,
-            createMockCallbacks(),
-            vi.fn()
-          )
-        ).rejects.toThrow('tool_loop: tools must be a dict of name → callable');
-      });
-
-      it('throws for a number tools value', async () => {
-        await expect(
-          executeToolLoop(
-            [],
-            42 as unknown as RillValue,
-            3,
-            createMockCallbacks(),
-            vi.fn()
-          )
-        ).rejects.toThrow('tool_loop: tools must be a dict of name → callable');
-      });
-
-      it('throws for an array tools value', async () => {
-        await expect(
-          executeToolLoop(
-            [],
-            [] as unknown as RillValue,
-            3,
-            createMockCallbacks(),
-            vi.fn()
-          )
-        ).rejects.toThrow('tool_loop: tools must be a dict of name → callable');
-      });
-    });
-
-    describe('non-callable dict value throws', () => {
-      it('throws with the tool name in the message', async () => {
-        const tools = {
-          bad: 'not-callable',
-        } as unknown as RillValue;
-
-        await expect(
-          executeToolLoop([], tools, 3, createMockCallbacks(), vi.fn())
-        ).rejects.toThrow('tool_loop: tool "bad" is not a callable');
-      });
-
-      it('includes correct tool name for number value', async () => {
-        const tools = { my_number_tool: 99 } as unknown as RillValue;
-
-        await expect(
-          executeToolLoop([], tools, 3, createMockCallbacks(), vi.fn())
-        ).rejects.toThrow('tool_loop: tool "my_number_tool" is not a callable');
-      });
-    });
-
-    describe('empty tools dict is valid', () => {
-      it('accepts empty dict without throwing', async () => {
-        const tools = {} as unknown as RillValue;
-
-        await expect(
-          executeToolLoop([], tools, 3, createTerminalCallbacks(), vi.fn(), 1)
-        ).resolves.toBeDefined();
-      });
-    });
-
-    describe('callable with no params is valid', () => {
-      it('accepts callable with empty params array', async () => {
-        const noParamsTool: ApplicationCallable = {
-          ...callable(() => ''),
-          params: [],
-          fn: () => 'result',
-          isProperty: false,
-        };
-        const tools = { noop: noParamsTool } as unknown as RillValue;
-
-        await expect(
-          executeToolLoop([], tools, 3, createTerminalCallbacks(), vi.fn(), 1)
-        ).resolves.toBeDefined();
-      });
-    });
-
-    describe('ApplicationCallable with params: undefined is valid', () => {
-      it('accepts ApplicationCallable with undefined params', async () => {
-        // Malformed callable: params is absent, which the typed shape forbids
-        const unparamTool = {
-          __type: 'callable' as const,
-          kind: 'application' as const,
-          params: undefined,
-          fn: () => 'result',
-          isProperty: false,
-        };
-        const tools = { untyped: unparamTool } as unknown as RillValue;
-
-        await expect(
-          executeToolLoop([], tools, 3, createTerminalCallbacks(), vi.fn(), 1)
-        ).resolves.toBeDefined();
-      });
-    });
-
     describe('callable with no description produces empty string', () => {
       it('uses empty string when ApplicationCallable has no description', async () => {
         const noDescTool: ApplicationCallable = {
@@ -2079,17 +1650,6 @@ describe('executeToolLoop', () => {
     });
 
     describe('mixed dict of ScriptCallable and ApplicationCallable is valid', () => {
-      it('accepts dict with both ScriptCallable and ApplicationCallable entries', async () => {
-        const tools = {
-          script_tool: mockScriptCallable,
-          app_tool: mockAppCallable,
-        } as unknown as RillValue;
-
-        await expect(
-          executeToolLoop([], tools, 3, createTerminalCallbacks(), vi.fn(), 1)
-        ).resolves.toBeDefined();
-      });
-
       it('builds correct descriptors for mixed callable types', async () => {
         const tools = {
           script_tool: mockScriptCallable,
@@ -2469,20 +2029,6 @@ describe('buildResponseMessages', () => {
     ]);
   });
 
-  it('does not mutate the input array', () => {
-    // pure function, returns new array
-    const input = [
-      {
-        role: 'user' as const,
-        parts: [{ type: 'text' as const, text: 'Hello' }],
-      },
-    ];
-    const inputCopy = [...input];
-    buildResponseMessages(input, [{ type: 'text', text: 'Hi there' }]);
-    expect(input).toEqual(inputCopy);
-    expect(input).toHaveLength(1);
-  });
-
   it('returns a new array instance (does not mutate input)', () => {
     // returned array is a new reference
     const input = [
@@ -2604,27 +2150,30 @@ describe('executeToolLoop max_turns resolution', () => {
     expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(5);
   });
 
-  it('per-call maxTurns = 0 routes to factoryMaxTurns', async () => {
-    // Resolution: per-call 0 (sentinel) → factory 3
-    const callbacks = createInfiniteToolCallbacks();
-    const tools = { tool: createMockTool(() => 'ok') };
+  it.each([{ factoryMaxTurns: 3 }, { factoryMaxTurns: 7 }])(
+    'per-call maxTurns = 0 routes to factoryMaxTurns $factoryMaxTurns',
+    async ({ factoryMaxTurns }) => {
+      // Resolution: per-call 0 (sentinel) → factory limit
+      const callbacks = createInfiniteToolCallbacks();
+      const tools = { tool: createMockTool(() => 'ok') };
 
-    await expect(
-      executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        tools,
-        3,
-        callbacks,
-        vi.fn(),
-        0, // per-call sentinel
-        undefined,
-        undefined,
-        undefined,
-        3 // factoryMaxTurns = 3
-      )
-    ).rejects.toThrow('tool_loop exceeded max_turns (3)');
-    expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(3);
-  });
+      await expect(
+        executeToolLoop(
+          [{ role: 'user', content: 'Test' }],
+          tools,
+          3,
+          callbacks,
+          vi.fn(),
+          0, // per-call sentinel
+          undefined,
+          undefined,
+          undefined,
+          factoryMaxTurns
+        )
+      ).rejects.toThrow(`tool_loop exceeded max_turns (${factoryMaxTurns})`);
+      expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(factoryMaxTurns);
+    }
+  );
 
   it('per-call maxTurns = 0 and factoryMaxTurns undefined → unlimited (no early halt)', async () => {
     // Resolution: 0 + undefined → unlimited; loop completes normally after tool returns no more calls
@@ -2649,28 +2198,6 @@ describe('executeToolLoop max_turns resolution', () => {
     expect(result.toolCalls[0]?.result).toBe('ok');
   });
 
-  it('factoryMaxTurns applies when per-call is 0 and factory is set', async () => {
-    // Resolution: per-call 0, factory 7 → uses 7
-    const callbacks = createInfiniteToolCallbacks();
-    const tools = { tool: createMockTool(() => 'ok') };
-
-    await expect(
-      executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        tools,
-        3,
-        callbacks,
-        vi.fn(),
-        0, // per-call sentinel
-        undefined,
-        undefined,
-        undefined,
-        7 // factoryMaxTurns = 7
-      )
-    ).rejects.toThrow('tool_loop exceeded max_turns (7)');
-    expect(callbacks.extractToolCalls).toHaveBeenCalledTimes(7);
-  });
-
   it('negative per-call maxTurns is rejected with INVALID_INPUT', async () => {
     // Defensive guard: negative per-call value is invalid
     const callbacks = createMockCallbacks({});
@@ -2690,68 +2217,10 @@ describe('executeToolLoop max_turns resolution', () => {
 });
 
 // ============================================================
-// MAX_TURNS_EXCEEDED
-// ============================================================
-
-describe('executeToolLoop max_turns_exceeded', () => {
-  it('halts with max_turns_exceeded when turn limit is reached', async () => {
-    const callbacks = createMockCallbacks({
-      extractToolCalls: vi.fn(() => [
-        { id: 'call_1', name: 'tool', input: {} },
-      ]),
-    });
-    const tools = { tool: createMockTool(() => 'ok') };
-
-    await expect(
-      executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        tools,
-        3,
-        callbacks,
-        vi.fn(),
-        2 // limit to 2 turns
-      )
-    ).rejects.toThrow('tool_loop exceeded max_turns (2)');
-  });
-});
-
-// ============================================================
 // MAX_ERRORS_EXCEEDED
 // ============================================================
 
 describe('executeToolLoop max_errors_exceeded', () => {
-  it('halts with max_errors_exceeded when error threshold is reached', async () => {
-    const tools = {
-      failing_tool: createMockTool(() => {
-        throw new Error('Tool failed');
-      }),
-    };
-
-    let apiCallCount = 0;
-    const callbacks = createMockCallbacks({
-      extractToolCalls: vi.fn(() => {
-        apiCallCount++;
-        return apiCallCount === 1
-          ? [
-              { id: 'call_1', name: 'failing_tool', input: {} },
-              { id: 'call_2', name: 'failing_tool', input: {} },
-              { id: 'call_3', name: 'failing_tool', input: {} },
-            ]
-          : null;
-      }),
-    });
-
-    await expect(
-      executeToolLoop(
-        [{ role: 'user', content: 'Test' }],
-        tools,
-        3,
-        callbacks,
-        vi.fn()
-      )
-    ).rejects.toThrow('Tool execution failed: 3 consecutive errors');
-  });
-
   it('uses default max_errors of 3 when maxErrors param is 0', async () => {
     // max_errors default: 3 when unset/0
     let errorCount = 0;

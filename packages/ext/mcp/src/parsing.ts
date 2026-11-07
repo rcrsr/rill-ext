@@ -125,38 +125,6 @@ export function mapJsonSchemaTypeToRillType(
 }
 
 /**
- * Returns type-appropriate default value for optional parameters.
- *
- * Default values by rill type:
- * - `string` → `""` (empty string)
- * - `number` → `0`
- * - `bool` → `false`
- * - `list` → `[]` (empty array)
- * - `dict` → `{}` (empty object)
- * - `vector` → `[]` (empty array)
- * - `any` → `{}` (empty object)
- *
- * @param type - Rill type
- * @returns Default value for the type
- */
-export function getDefaultValueForType(type: RillTypeName): RillValue {
-  switch (type) {
-    case 'string':
-      return '';
-    case 'number':
-      return 0;
-    case 'bool':
-      return false;
-    case 'list':
-    case 'vector':
-      return [];
-    case 'dict':
-    case 'any':
-      return {};
-  }
-}
-
-/**
  * Sanitizes parameter name to valid rill identifier.
  *
  * Rules:

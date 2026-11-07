@@ -123,13 +123,6 @@ const SCORE_SCHEMA = typeVal({
   },
 });
 
-const NAME_SCHEMA = typeVal({
-  kind: 'dict',
-  fields: {
-    name: { type: { kind: 'string' } },
-  },
-});
-
 // ============================================================
 // GENERATE() TESTS
 // ============================================================
@@ -140,11 +133,9 @@ describe('generate() function', () => {
   });
 
   describe('success cases', () => {
-    // AC-6: data field contains schema-matching keys
-    it('returns data dict with keys matching the schema', async () => {
-      mockCreate.mockResolvedValue(
-        createGenerateMockResponse('{"name":"Alice","age":30}')
-      );
+    it('returns parsed data, model, usage, raw JSON and stop_reason', async () => {
+      const jsonContent = '{"name":"Alice","age":30}';
+      mockCreate.mockResolvedValue(createGenerateMockResponse(jsonContent));
 
       const ext = await createFoundryExtension(baseConfig);
       const ctx = createRuntimeContext();
@@ -158,80 +149,11 @@ describe('generate() function', () => {
         ctx
       )) as Record<string, unknown>;
 
-      const data = result['data'] as Record<string, unknown>;
-      expect(data).toBeDefined();
-      expect(data['name']).toBe('Alice');
-      expect(data['age']).toBe(30);
-    });
-
-    // AC-6: data is the parsed object, not the raw JSON string
-    it('returns data as parsed object, not raw string', async () => {
-      mockCreate.mockResolvedValue(createGenerateMockResponse('{"score":99}'));
-
-      const ext = await createFoundryExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'rate something', schema: SCORE_SCHEMA, options: {} },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(typeof result['data']).toBe('object');
-      expect(result['data']).not.toBe('{"score":99}');
-      expect((result['data'] as Record<string, unknown>)['score']).toBe(99);
-    });
-
-    // AC-6: result contains model field
-    it('result dict contains model field', async () => {
-      mockCreate.mockResolvedValue(
-        createGenerateMockResponse('{"name":"Bob"}')
-      );
-
-      const ext = await createFoundryExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'give a name', schema: NAME_SCHEMA, options: {} },
-        ctx
-      )) as Record<string, unknown>;
-
+      expect(result['data']).toEqual({ name: 'Alice', age: 30 });
       expect(result['model']).toBe('gpt-4o');
-    });
-
-    // AC-6: result contains usage field with input and output tokens
-    it('result dict contains usage with input and output tokens', async () => {
-      mockCreate.mockResolvedValue(
-        createGenerateMockResponse('{"name":"Carol"}')
-      );
-
-      const ext = await createFoundryExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'give a name', schema: NAME_SCHEMA, options: {} },
-        ctx
-      )) as Record<string, unknown>;
-
-      const usage = result['usage'] as Record<string, unknown>;
-      expect(usage).toBeDefined();
-      expect(usage['input']).toBe(50);
-      expect(usage['output']).toBe(20);
-    });
-
-    // AC-6: result contains raw JSON string
-    it('result dict contains raw JSON string', async () => {
-      const jsonContent = '{"name":"Dave"}';
-      mockCreate.mockResolvedValue(createGenerateMockResponse(jsonContent));
-
-      const ext = await createFoundryExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'give a name', schema: NAME_SCHEMA, options: {} },
-        ctx
-      )) as Record<string, unknown>;
-
+      expect(result['usage']).toMatchObject({ input: 50, output: 20 });
       expect(result['raw']).toBe(jsonContent);
+      expect(result['stop_reason']).toBe('stop');
     });
 
     // AC-6: sends json_schema response_format to the API
@@ -253,23 +175,6 @@ describe('generate() function', () => {
           }),
         })
       );
-    });
-
-    // AC-6: stop_reason field is present in result
-    it('result dict contains stop_reason field', async () => {
-      mockCreate.mockResolvedValue(
-        createGenerateMockResponse('{"name":"Eve"}')
-      );
-
-      const ext = await createFoundryExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'give a name', schema: NAME_SCHEMA, options: {} },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(result['stop_reason']).toBe('stop');
     });
   });
 

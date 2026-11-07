@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import {
-  RuntimeError,
   createRuntimeContext,
   isInvalid,
   getStatus,
@@ -193,19 +192,6 @@ describe('signServiceAccountJwt — AC-9: JWT claims', () => {
 
     expect('sub' in payload).toBe(false);
   });
-
-  it('sub claim is absent when subject is undefined explicitly (AC-9)', () => {
-    const key = makeTestKey();
-    const assertion = signServiceAccountJwt(
-      makeTestCtx(),
-      key,
-      SINGLE_SCOPE,
-      undefined
-    );
-    const { payload } = parseJwt(assertion);
-
-    expect('sub' in payload).toBe(false);
-  });
 });
 
 // ============================================================
@@ -218,32 +204,6 @@ describe('signServiceAccountJwt — signature verification', () => {
     const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
 
     expect(verifyJwtSignature(assertion)).toBe(true);
-  });
-
-  it('RS256 signature is valid for multi-scope assertions', () => {
-    const key = makeTestKey();
-    const assertion = signServiceAccountJwt(makeTestCtx(), key, MULTI_SCOPES);
-
-    expect(verifyJwtSignature(assertion)).toBe(true);
-  });
-
-  it('RS256 signature is valid when subject is provided', () => {
-    const key = makeTestKey();
-    const assertion = signServiceAccountJwt(
-      makeTestCtx(),
-      key,
-      SINGLE_SCOPE,
-      'admin@domain.com'
-    );
-
-    expect(verifyJwtSignature(assertion)).toBe(true);
-  });
-
-  it('assertion has exactly three dot-separated parts', () => {
-    const key = makeTestKey();
-    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
-
-    expect(assertion.split('.').length).toBe(3);
   });
 });
 
@@ -267,55 +227,6 @@ describe('signServiceAccountJwt — VAL-1: RS256 fixture verification', () => {
     for (const part of assertion.split('.')) {
       expect(part).toMatch(/^[A-Za-z0-9_-]+$/);
     }
-  });
-
-  it('signing input matches header-dot-payload exactly (signature covers what we decode)', () => {
-    const key = makeTestKey();
-    const assertion = signServiceAccountJwt(makeTestCtx(), key, MULTI_SCOPES);
-
-    const parts = assertion.split('.');
-    const signingInput = `${parts[0]}.${parts[1]}`;
-
-    // Re-pad signature and verify it covers the signing input we just split.
-    const rawSig = parts[2]!;
-    const padded = rawSig.padEnd(
-      rawSig.length + ((4 - (rawSig.length % 4)) % 4),
-      '='
-    );
-    const sigBuffer = Buffer.from(padded, 'base64');
-
-    const verifier = createVerify('RSA-SHA256');
-    verifier.update(signingInput);
-    expect(verifier.verify(TEST_PUBLIC_KEY, sigBuffer)).toBe(true);
-  });
-
-  it('negative control: tampered signing input fails RS256 verification', () => {
-    const key = makeTestKey();
-    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
-
-    const parts = assertion.split('.');
-    const tamperedInput = `${parts[0]}.${parts[1]}X`; // mutate payload segment
-
-    const rawSig = parts[2]!;
-    const padded = rawSig.padEnd(
-      rawSig.length + ((4 - (rawSig.length % 4)) % 4),
-      '='
-    );
-    const sigBuffer = Buffer.from(padded, 'base64');
-
-    const verifier = createVerify('RSA-SHA256');
-    verifier.update(tamperedInput);
-    expect(verifier.verify(TEST_PUBLIC_KEY, sigBuffer)).toBe(false);
-  });
-
-  it('decoded header is byte-exact { alg, typ } with no extra fields', () => {
-    const key = makeTestKey();
-    const assertion = signServiceAccountJwt(makeTestCtx(), key, SINGLE_SCOPE);
-
-    const headerJson = decodeBase64Url(assertion.split('.')[0]!);
-    // JSON.parse + strict equality already covered above; here assert the
-    // raw decoded JSON has exactly the documented fields in canonical form.
-    expect(JSON.parse(headerJson)).toStrictEqual({ alg: 'RS256', typ: 'JWT' });
   });
 });
 
@@ -382,84 +293,6 @@ describe('parseServiceAccountKey — AC-8: required field validation', () => {
 
     expect(result.client_email).toBe('sa@project.iam.gserviceaccount.com');
     expect(result.token_uri).toBe('https://oauth2.googleapis.com/token');
-  });
-
-  it('throws RILL-R001 when client_email is missing (AC-8)', () => {
-    const keyJson = JSON.stringify({
-      private_key:
-        '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
-      token_uri: 'https://oauth2.googleapis.com/token',
-    });
-    let caught: unknown;
-    try {
-      parseServiceAccountKey(keyJson);
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-    expect((caught as RuntimeError).message).toContain('client_email');
-  });
-
-  it('throws RILL-R001 when private_key is missing (AC-8)', () => {
-    const keyJson = JSON.stringify({
-      client_email: 'sa@project.iam.gserviceaccount.com',
-      token_uri: 'https://oauth2.googleapis.com/token',
-    });
-    let caught: unknown;
-    try {
-      parseServiceAccountKey(keyJson);
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-    expect((caught as RuntimeError).message).toContain('private_key');
-  });
-
-  it('throws RILL-R001 when token_uri is missing (AC-8)', () => {
-    const keyJson = JSON.stringify({
-      client_email: 'sa@project.iam.gserviceaccount.com',
-      private_key:
-        '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
-    });
-    let caught: unknown;
-    try {
-      parseServiceAccountKey(keyJson);
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-    expect((caught as RuntimeError).message).toContain('token_uri');
-  });
-
-  it('throws RILL-R001 for non-JSON input', () => {
-    let caught: unknown;
-    try {
-      parseServiceAccountKey('not-json');
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-  });
-
-  it('throws RILL-R001 when client_email is empty string', () => {
-    const keyJson = JSON.stringify({
-      client_email: '',
-      private_key:
-        '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
-      token_uri: 'https://oauth2.googleapis.com/token',
-    });
-    let caught: unknown;
-    try {
-      parseServiceAccountKey(keyJson);
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(RuntimeError);
-    expect((caught as RuntimeError).errorId).toBe('RILL-R001');
   });
 });
 

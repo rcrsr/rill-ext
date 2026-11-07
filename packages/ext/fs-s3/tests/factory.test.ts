@@ -4,509 +4,361 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { structureToTypeValue } from '@rcrsr/rill';
+import {
+  getStatus,
+  isInvalid,
+  RuntimeError,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createS3FsExtension } from '../src/index.js';
 import type { S3FsConfig } from '../src/types.js';
-import { makeFactoryCtx } from './_setup.js';
+import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
-type FnDefView = {
-  params: unknown[];
-  fn: unknown;
-  annotations?: Record<string, unknown>;
-  returnType: unknown;
+const BASE_MOUNT = {
+  mode: 'read-write',
+  bucket: 'test-bucket',
+  prefix: '',
+} as const;
+
+const TEST_CREDENTIALS = {
+  accessKeyId: 'test-key',
+  secretAccessKey: 'test-secret',
 };
 
-function getDef(view: Record<string, FnDefView>, name: string): FnDefView {
-  const def = view[name];
-  if (def === undefined) {
-    throw new Error(`function ${name} missing from extension value`);
+function expectConfigError(config: S3FsConfig, message: string): void {
+  let caught: unknown;
+  try {
+    createS3FsExtension(config, makeFactoryCtx());
+  } catch (error) {
+    caught = error;
   }
-  return def;
+  expect(caught).toBeInstanceOf(RuntimeError);
+  expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+  expect((caught as RuntimeError).message).toContain(message);
 }
 
 describe('createS3FsExtension', () => {
   describe('configuration validation', () => {
-    it('throws for missing region', () => {
-      const config: Omit<S3FsConfig, 'region'> = {
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
+    const REGION_MESSAGE = 'S3 configuration requires non-empty region';
+    const MOUNTS_MESSAGE = 'S3 configuration requires at least one mount';
+    const ENDPOINT_EMPTY_MESSAGE = 'S3 endpoint must be a non-empty string';
+
+    it.each([
+      {
+        label: 'missing region',
+        config: { mounts: { test: BASE_MOUNT } } as unknown as S3FsConfig,
+        message: REGION_MESSAGE,
+      },
+      {
+        label: 'empty region',
+        config: { region: '', mounts: { test: BASE_MOUNT } },
+        message: REGION_MESSAGE,
+      },
+      {
+        label: 'whitespace-only region',
+        config: { region: '   ', mounts: { test: BASE_MOUNT } },
+        message: REGION_MESSAGE,
+      },
+      {
+        label: 'missing mounts',
+        config: { region: 'us-west-2' } as unknown as S3FsConfig,
+        message: MOUNTS_MESSAGE,
+      },
+      {
+        label: 'empty mounts object',
+        config: { region: 'us-west-2', mounts: {} },
+        message: MOUNTS_MESSAGE,
+      },
+      {
+        label: 'empty endpoint',
+        config: {
+          region: 'us-west-2',
+          endpoint: '',
+          mounts: { test: BASE_MOUNT },
         },
-      };
-
-      expect(() =>
-        createS3FsExtension(config as S3FsConfig, makeFactoryCtx())
-      ).toThrow('region');
-    });
-
-    it('throws for empty region', () => {
-      const config: S3FsConfig = {
-        region: '',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
+        message: ENDPOINT_EMPTY_MESSAGE,
+      },
+      {
+        label: 'whitespace-only endpoint',
+        config: {
+          region: 'us-west-2',
+          endpoint: '   ',
+          mounts: { test: BASE_MOUNT },
         },
-      };
-
-      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
-        'region'
-      );
-    });
-
-    it('throws for whitespace-only region', () => {
-      const config: S3FsConfig = {
-        region: '   ',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
+        message: ENDPOINT_EMPTY_MESSAGE,
+      },
+      {
+        label: 'malformed endpoint URL',
+        config: {
+          region: 'us-west-2',
+          endpoint: 'not-a-url',
+          mounts: { test: BASE_MOUNT },
         },
-      };
-
-      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
-        'region'
-      );
-    });
-
-    it('throws for missing mounts', () => {
-      const config = {
-        region: 'us-west-2',
-      } as S3FsConfig;
-
-      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
-        'at least one mount'
-      );
-    });
-
-    it('throws for empty mounts object', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        mounts: {},
-      };
-
-      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
-        'at least one mount'
-      );
-    });
-
-    it('throws for invalid endpoint (empty string)', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        endpoint: '',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
-        },
-      };
-
-      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
-        'non-empty string'
-      );
-    });
-
-    it('throws for invalid endpoint (whitespace only)', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        endpoint: '   ',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
-        },
-      };
-
-      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
-        'non-empty string'
-      );
-    });
-
-    it('throws for invalid endpoint (malformed URL)', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        endpoint: 'not-a-url',
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
-        },
-      };
-
-      expect(() => createS3FsExtension(config, makeFactoryCtx())).toThrow(
-        'valid URL'
-      );
+        message: 'S3 endpoint must be a valid URL: not-a-url',
+      },
+    ])('throws RILL-R001 for $label', ({ config, message }) => {
+      expectConfigError(config, message);
     });
   });
 
   describe('valid configuration acceptance', () => {
-    it('accepts minimal AWS S3 configuration', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-        },
-        mounts: {
-          uploads: {
+    it.each([
+      {
+        label: 'minimal AWS S3',
+        config: {
+          region: 'us-west-2',
+          credentials: TEST_CREDENTIALS,
+          mounts: {
+            uploads: {
+              mode: 'read-write',
+              bucket: 'my-bucket',
+              prefix: 'uploads/',
+            },
+          },
+        } satisfies S3FsConfig,
+        expected: [
+          {
+            name: 'uploads',
             mode: 'read-write',
+            glob: '',
             bucket: 'my-bucket',
             prefix: 'uploads/',
           },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      expect(ext).toBeDefined();
-      expect(
-        (ext.value as unknown as Record<string, unknown>)['read']
-      ).toBeDefined();
-      ext.dispose?.();
-    });
-
-    it('accepts S3-compatible service configuration (MinIO)', () => {
-      const config: S3FsConfig = {
-        region: 'us-east-1',
-        credentials: {
-          accessKeyId: 'minioadmin',
-          secretAccessKey: 'minioadmin',
-        },
-        endpoint: 'http://localhost:9000',
-        forcePathStyle: true,
-        mounts: {
-          local: {
+        ],
+      },
+      {
+        label: 'S3-compatible MinIO',
+        config: {
+          region: 'us-east-1',
+          credentials: {
+            accessKeyId: 'minioadmin',
+            secretAccessKey: 'minioadmin',
+          },
+          endpoint: 'http://localhost:9000',
+          forcePathStyle: true,
+          mounts: { local: BASE_MOUNT },
+        } satisfies S3FsConfig,
+        expected: [
+          {
+            name: 'local',
             mode: 'read-write',
+            glob: '',
             bucket: 'test-bucket',
             prefix: '',
           },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      expect(ext).toBeDefined();
-      expect(
-        (ext.value as unknown as Record<string, unknown>)['read']
-      ).toBeDefined();
-      ext.dispose?.();
-    });
-
-    it('accepts Cloudflare R2 configuration', () => {
-      const config: S3FsConfig = {
-        region: 'auto',
-        credentials: {
-          accessKeyId: 'r2-key',
-          secretAccessKey: 'r2-secret',
-        },
-        endpoint: 'https://account123.r2.cloudflarestorage.com',
-        mounts: {
-          storage: {
+        ],
+      },
+      {
+        label: 'Cloudflare R2',
+        config: {
+          region: 'auto',
+          credentials: {
+            accessKeyId: 'r2-key',
+            secretAccessKey: 'r2-secret',
+          },
+          endpoint: 'https://account123.r2.cloudflarestorage.com',
+          mounts: {
+            storage: {
+              mode: 'read-write',
+              bucket: 'my-r2-bucket',
+              prefix: 'app-data/',
+            },
+          },
+        } satisfies S3FsConfig,
+        expected: [
+          {
+            name: 'storage',
             mode: 'read-write',
+            glob: '',
             bucket: 'my-r2-bucket',
             prefix: 'app-data/',
           },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      expect(ext).toBeDefined();
-      expect(
-        (ext.value as unknown as Record<string, unknown>)['read']
-      ).toBeDefined();
-      ext.dispose?.();
-    });
-
-    it('accepts configuration without credentials (uses default provider chain)', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        mounts: {
-          uploads: {
+        ],
+      },
+      {
+        label: 'default credential provider chain',
+        config: {
+          region: 'us-west-2',
+          mounts: {
+            uploads: {
+              mode: 'read-write',
+              bucket: 'my-bucket',
+              prefix: 'uploads/',
+            },
+          },
+        } satisfies S3FsConfig,
+        expected: [
+          {
+            name: 'uploads',
             mode: 'read-write',
+            glob: '',
             bucket: 'my-bucket',
             prefix: 'uploads/',
           },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      expect(ext).toBeDefined();
-      expect(
-        (ext.value as unknown as Record<string, unknown>)['read']
-      ).toBeDefined();
-      ext.dispose?.();
-    });
-
-    it('accepts multiple mounts', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-        },
-        mounts: {
-          uploads: {
+        ],
+      },
+      {
+        label: 'multiple mounts',
+        config: {
+          region: 'us-west-2',
+          credentials: TEST_CREDENTIALS,
+          mounts: {
+            uploads: {
+              mode: 'read-write',
+              bucket: 'uploads-bucket',
+              prefix: 'user-files/',
+            },
+            backups: {
+              mode: 'read',
+              bucket: 'backups-bucket',
+              prefix: 'database/',
+            },
+            logs: {
+              mode: 'write',
+              bucket: 'logs-bucket',
+              prefix: 'app-logs/',
+            },
+          },
+        } satisfies S3FsConfig,
+        expected: [
+          {
+            name: 'uploads',
             mode: 'read-write',
+            glob: '',
             bucket: 'uploads-bucket',
             prefix: 'user-files/',
           },
-          backups: {
+          {
+            name: 'backups',
             mode: 'read',
+            glob: '',
             bucket: 'backups-bucket',
             prefix: 'database/',
           },
-          logs: {
+          {
+            name: 'logs',
             mode: 'write',
+            glob: '',
             bucket: 'logs-bucket',
             prefix: 'app-logs/',
           },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      expect(ext).toBeDefined();
-      expect(
-        (ext.value as unknown as Record<string, unknown>)['read']
-      ).toBeDefined();
-      ext.dispose?.();
-    });
-
-    it('accepts mount with glob pattern', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-        },
-        mounts: {
-          images: {
-            mode: 'read-write',
-            bucket: 'assets-bucket',
-            prefix: 'images/',
-            glob: '*.{jpg,png,gif}',
-          },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      expect(ext).toBeDefined();
-      expect(
-        (ext.value as unknown as Record<string, unknown>)['read']
-      ).toBeDefined();
-      ext.dispose?.();
-    });
-
-    it('accepts mount with custom maxFileSize', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-        },
-        mounts: {
-          uploads: {
-            mode: 'read-write',
-            bucket: 'uploads-bucket',
-            prefix: 'files/',
-            maxFileSize: 5242880, // 5 MB
-          },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      expect(ext).toBeDefined();
-      expect(
-        (ext.value as unknown as Record<string, unknown>)['read']
-      ).toBeDefined();
-      ext.dispose?.();
-    });
-  });
-
-  describe('function exports', () => {
-    it('exports all 12 filesystem functions', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-        },
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      const v = ext.value as unknown as Record<string, FnDefView>;
-
-      // Verify all 12 functions exist
-      expect(v['read']).toBeDefined();
-      expect(v['write']).toBeDefined();
-      expect(v['append']).toBeDefined();
-      expect(v['list']).toBeDefined();
-      expect(v['find']).toBeDefined();
-      expect(v['exists']).toBeDefined();
-      expect(v['remove']).toBeDefined();
-      expect(v['stat']).toBeDefined();
-      expect(v['mkdir']).toBeDefined();
-      expect(v['copy']).toBeDefined();
-      expect(v['move']).toBeDefined();
-      expect(v['mounts']).toBeDefined();
-
-      ext.dispose?.();
-    });
-
-    it('all functions have correct HostFunctionDefinition structure', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-        },
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
-      const v = ext.value as unknown as Record<string, FnDefView>;
-
-      // Verify structure for read function (all follow same pattern)
-      expect(getDef(v, 'read').params).toBeDefined();
-      expect(Array.isArray(getDef(v, 'read').params)).toBe(true);
-      expect(getDef(v, 'read').params.length).toBeGreaterThan(0);
-      expect(getDef(v, 'read').fn).toBeTypeOf('function');
-      expect(getDef(v, 'read').annotations?.['description']).toBeTypeOf(
-        'string'
-      );
-      expect(getDef(v, 'read').returnType).toEqual(
-        structureToTypeValue({ kind: 'string' })
-      );
-
-      // Verify structure for write function
-      expect(getDef(v, 'write').params).toBeDefined();
-      expect(Array.isArray(getDef(v, 'write').params)).toBe(true);
-      expect(getDef(v, 'write').fn).toBeTypeOf('function');
-      expect(getDef(v, 'write').annotations?.['description']).toBeTypeOf(
-        'string'
-      );
-      expect(getDef(v, 'write').returnType).toEqual(
-        structureToTypeValue({ kind: 'string' })
-      );
-
-      // Verify structure for mounts function (no params)
-      expect(getDef(v, 'mounts').params).toBeDefined();
-      expect(Array.isArray(getDef(v, 'mounts').params)).toBe(true);
-      expect(getDef(v, 'mounts').params.length).toBe(0);
-      expect(getDef(v, 'mounts').fn).toBeTypeOf('function');
-      expect(getDef(v, 'mounts').annotations?.['description']).toBeTypeOf(
-        'string'
-      );
-      expect(getDef(v, 'mounts').returnType).toEqual(
-        structureToTypeValue({
-          kind: 'list',
-          element: {
-            kind: 'dict',
-            fields: {
-              name: { type: { kind: 'string' } },
-              mode: { type: { kind: 'string' } },
-              glob: { type: { kind: 'string' } },
-              bucket: { type: { kind: 'string' } },
-              prefix: { type: { kind: 'string' } },
+        ],
+      },
+      {
+        label: 'mount with glob pattern',
+        config: {
+          region: 'us-west-2',
+          credentials: TEST_CREDENTIALS,
+          mounts: {
+            images: {
+              mode: 'read-write',
+              bucket: 'assets-bucket',
+              prefix: 'images/',
+              glob: '*.{jpg,png,gif}',
             },
           },
-        })
-      );
-
-      ext.dispose?.();
-    });
-
-    it('exports dispose function', () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-        },
-        mounts: {
-          test: {
+        } satisfies S3FsConfig,
+        expected: [
+          {
+            name: 'images',
             mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
+            glob: '*.{jpg,png,gif}',
+            bucket: 'assets-bucket',
+            prefix: 'images/',
           },
-        },
-      };
+        ],
+      },
+      {
+        label: 'mount with custom maxFileSize',
+        config: {
+          region: 'us-west-2',
+          credentials: TEST_CREDENTIALS,
+          mounts: {
+            uploads: {
+              mode: 'read-write',
+              bucket: 'uploads-bucket',
+              prefix: 'files/',
+              maxFileSize: 5242880,
+            },
+          },
+        } satisfies S3FsConfig,
+        expected: [
+          {
+            name: 'uploads',
+            mode: 'read-write',
+            glob: '',
+            bucket: 'uploads-bucket',
+            prefix: 'files/',
+          },
+        ],
+      },
+    ])(
+      'lists the configured mounts for $label',
+      async ({ config, expected }) => {
+        const ext = createS3FsExtension(config, makeFactoryCtx());
+        const v = ext.value as unknown as Record<
+          string,
+          {
+            fn: (
+              args: Record<string, unknown>,
+              ctx: unknown
+            ) => Promise<unknown>;
+          }
+        >;
 
-      const ext = createS3FsExtension(config, makeFactoryCtx());
+        const result = await v['mounts']!.fn({}, makeRuntimeCtx());
 
-      expect(ext.dispose).toBeDefined();
-      expect(ext.dispose).toBeTypeOf('function');
-
-      ext.dispose?.();
-    });
+        expect(result).toEqual(expected);
+        await ext.dispose?.();
+      }
+    );
   });
 
   describe('dispose lifecycle', () => {
-    it('handles dispose without error', async () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
+    function createTestExtension(): ReturnType<typeof createS3FsExtension> {
+      return createS3FsExtension(
+        {
+          region: 'us-west-2',
+          credentials: TEST_CREDENTIALS,
+          mounts: { test: BASE_MOUNT },
         },
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
-        },
-      };
+        makeFactoryCtx()
+      );
+    }
 
-      const ext = createS3FsExtension(config, makeFactoryCtx());
+    function callRead(
+      ext: ReturnType<typeof createS3FsExtension>
+    ): Promise<unknown> {
+      const v = ext.value as unknown as Record<
+        string,
+        {
+          fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+        }
+      >;
+      return v['read']!.fn({ path: 'test/file.txt' }, makeRuntimeCtx());
+    }
+
+    it('halts later calls with #DISPOSED and raw.kind extension_disposed', async () => {
+      const ext = createTestExtension();
 
       await expect(ext.dispose?.()).resolves.toBeUndefined();
+      const result = await callRead(ext);
+
+      expect(isInvalid(result as RillValue)).toBe(true);
+      const status = getStatus(result as RillValue);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
     });
 
-    it('is idempotent (can call dispose multiple times)', async () => {
-      const config: S3FsConfig = {
-        region: 'us-west-2',
-        credentials: {
-          accessKeyId: 'test-key',
-          secretAccessKey: 'test-secret',
-        },
-        mounts: {
-          test: {
-            mode: 'read-write',
-            bucket: 'test-bucket',
-            prefix: '',
-          },
-        },
-      };
-
-      const ext = createS3FsExtension(config, makeFactoryCtx());
+    it('resolves on repeated dispose and keeps halting calls', async () => {
+      const ext = createTestExtension();
 
       await expect(ext.dispose?.()).resolves.toBeUndefined();
       await expect(ext.dispose?.()).resolves.toBeUndefined();
       await expect(ext.dispose?.()).resolves.toBeUndefined();
+      const result = await callRead(ext);
+
+      expect(getStatus(result as RillValue).code.name).toBe('DISPOSED');
     });
   });
 });

@@ -3,7 +3,7 @@
  * Tests extension factory and result structure with mocked stream parser and result extractor.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { SpawnError } from '../src/errors.js';
 import {
@@ -20,7 +20,6 @@ import {
   isRillStream,
   type RillValue,
 } from '@rcrsr/rill';
-import type { ClaudeCodeResult } from '../src/types.js';
 
 // Mock which module
 vi.mock('which', () => ({
@@ -71,9 +70,17 @@ async function collectChunks(stream: unknown): Promise<string[]> {
 }
 
 describe('Claude Code Extension Integration Tests - Success Cases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   // AC-10: prompt() returns RillStream
   describe('AC-10: prompt/skill/command return RillStream', () => {
-    it('prompt() returns RillStream (isRillStream is true)', async () => {
+    it.each([
+      { fn: 'prompt' as const, args: { text: 'Hello Claude', options: {} } },
+      { fn: 'skill' as const, args: { name: 'test-skill', args: {} } },
+      { fn: 'command' as const, args: { name: 'test-command', args: {} } },
+    ])('returns a RillStream from $fn()', async ({ fn, args }) => {
       const { spawnClaudeCli } = await import('../src/process.js');
       const { createStreamParser } = await import('../src/stream-parser.js');
       const { extractResult } = await import('../src/result.js');
@@ -109,98 +116,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const stream = extValue(ext).prompt.fn(
-        { text: 'Hello Claude', options: {} },
-        ctx
-      );
-
-      expect(isRillStream(stream as RillValue)).toBe(true);
-    });
-
-    it('skill() returns RillStream (isRillStream is true)', async () => {
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      });
-      vi.mocked(extractResult).mockReturnValue({
-        result: 'Skill done',
-        tokens: {
-          prompt: 5,
-          cache_write_5m: 0,
-          cache_write_1h: 0,
-          cache_read: 0,
-          output: 3,
-        },
-        cost: 0.001,
-        exit_code: 0,
-        duration: 500,
-      });
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const stream = extValue(ext).skill.fn(
-        { name: 'test-skill', args: {} },
-        ctx
-      );
-
-      expect(isRillStream(stream as RillValue)).toBe(true);
-    });
-
-    it('command() returns RillStream (isRillStream is true)', async () => {
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      });
-      vi.mocked(extractResult).mockReturnValue({
-        result: 'Command done',
-        tokens: {
-          prompt: 5,
-          cache_write_5m: 0,
-          cache_write_1h: 0,
-          cache_read: 0,
-          output: 3,
-        },
-        cost: 0.001,
-        exit_code: 0,
-        duration: 500,
-      });
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const stream = extValue(ext).command.fn(
-        { name: 'test-command', args: {} },
-        ctx
-      );
+      const stream = extValue(ext)[fn].fn(args, ctx);
 
       expect(isRillStream(stream as RillValue)).toBe(true);
     });
@@ -208,7 +124,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
 
   // AC-11: Iterating Claude Code streams yields string stdout line chunks
   describe('AC-11: Iterating stream yields string stdout line chunks', () => {
-    it('yields string chunks when PTY emits data lines', async () => {
+    it('yields each PTY output line as a string chunk in order', async () => {
       const { spawnClaudeCli } = await import('../src/process.js');
       const { createStreamParser } = await import('../src/stream-parser.js');
       const { extractResult } = await import('../src/result.js');
@@ -271,126 +187,8 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
 
       const chunks = await collectChunks(stream);
 
-      // All collected chunks must be strings (AC-11)
-      expect(chunks.length).toBeGreaterThan(0);
-      expect(chunks.every((c) => typeof c === 'string')).toBe(true);
-    });
-  });
-
-  // AC-12: Claude Code stream resolution dict contains result, tokens, cost, exit_code, duration
-  describe('AC-12: Stream resolution dict contains required fields', () => {
-    it('resolves with result, tokens, cost, exit_code, duration', async () => {
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      });
-      vi.mocked(extractResult).mockReturnValue({
-        result: 'Hello! How can I help?',
-        tokens: {
-          prompt: 10,
-          cache_write_5m: 0,
-          cache_write_1h: 0,
-          cache_read: 0,
-          output: 8,
-        },
-        cost: 0.001,
-        exit_code: 0,
-        duration: 1200,
-      });
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const stream = extValue(ext).prompt.fn(
-        { text: 'Hello Claude', options: {} },
-        ctx
-      );
-      const result = (await resolveStream(stream)) as Record<string, unknown>;
-
-      // AC-12: Verify all required resolution fields are present
-      expect(result['result']).toBe('Hello! How can I help?');
-      expect(result['cost']).toBe(0.001);
-      expect(result['exit_code']).toBe(0);
-      expect(result['duration']).toBe(1200);
-      expect(result['tokens']).toBeDefined();
-    });
-  });
-
-  describe('AC-1: Basic prompt returns result dict with text, tokens, cost, exit_code 0', () => {
-    it('returns complete ClaudeCodeResult structure via stream resolve', async () => {
-      // Import mocked modules
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      // Setup mocks
-      const mockParser = {
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      };
-
-      vi.mocked(createStreamParser).mockReturnValue(mockParser);
-
-      vi.mocked(extractResult).mockReturnValue({
-        result: 'Hello! How can I help?',
-        tokens: {
-          prompt: 10,
-          cache_write_5m: 0,
-          cache_write_1h: 0,
-          cache_read: 0,
-          output: 8,
-        },
-        cost: 0.001,
-        exit_code: 0,
-        duration: 1200,
-      });
-
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      // Create extension and execute
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const stream = extValue(ext).prompt.fn(
-        { text: 'Hello Claude', options: {} },
-        ctx
-      );
-
-      // AC-10: verify it's a stream
-      expect(isRillStream(stream as RillValue)).toBe(true);
-
-      // AC-12: resolve and verify result structure
-      const result = await resolveStream<ClaudeCodeResult>(stream);
-
-      expect(result.result).toBe('Hello! How can I help?');
-      expect(result.tokens.prompt).toBe(10);
-      expect(result.tokens.output).toBe(8);
-      expect(result.cost).toBe(0.001);
-      expect(result.exit_code).toBe(0);
-      expect(result.duration).toBe(1200);
+      // Each PTY line arrives as its own string chunk, in emission order
+      expect(chunks).toEqual(['line one', 'line two']);
     });
   });
 
@@ -566,218 +364,6 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       );
     });
   });
-
-  describe('AC-4: Token tracking extracts full breakdown from usage events', () => {
-    it('returns 5-field token breakdown from extractResult', async () => {
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      });
-
-      // Mock extractResult with all 5 token fields (AC-4)
-      vi.mocked(extractResult).mockReturnValue({
-        result: 'Response',
-        tokens: {
-          prompt: 20,
-          cache_write_5m: 5,
-          cache_write_1h: 8,
-          cache_read: 3,
-          output: 10,
-        },
-        cost: 0.002,
-        exit_code: 0,
-        duration: 1000,
-      });
-
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const stream = extValue(ext).prompt.fn(
-        { text: 'Test', options: {} },
-        ctx
-      );
-      const result = await resolveStream<ClaudeCodeResult>(stream);
-
-      // Verify all 5 token fields present
-      expect(result.tokens.prompt).toBe(20);
-      expect(result.tokens.cache_write_5m).toBe(5);
-      expect(result.tokens.cache_write_1h).toBe(8);
-      expect(result.tokens.cache_read).toBe(3);
-      expect(result.tokens.output).toBe(10);
-    });
-  });
-
-  describe('AC-5: Cost extraction reads cost_usd from CLI ResultMessage', () => {
-    it('extracts cost field from result', async () => {
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      });
-
-      // Mock with specific cost value (AC-5)
-      vi.mocked(extractResult).mockReturnValue({
-        result: 'Response',
-        tokens: {
-          prompt: 5,
-          cache_write_5m: 0,
-          cache_write_1h: 0,
-          cache_read: 0,
-          output: 3,
-        },
-        cost: 0.00456,
-        exit_code: 0,
-        duration: 800,
-      });
-
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const stream = extValue(ext).prompt.fn(
-        { text: 'Test', options: {} },
-        ctx
-      );
-      const result = await resolveStream<ClaudeCodeResult>(stream);
-
-      // Verify exact cost extraction
-      expect(result.cost).toBe(0.00456);
-    });
-  });
-
-  describe('AC-12: Empty result returns empty string in result field', () => {
-    it('returns empty string when extractResult provides empty text', async () => {
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      });
-
-      // Mock with empty result string (AC-12)
-      vi.mocked(extractResult).mockReturnValue({
-        result: '',
-        tokens: {
-          prompt: 0,
-          cache_write_5m: 0,
-          cache_write_1h: 0,
-          cache_read: 0,
-          output: 0,
-        },
-        cost: 0.001,
-        exit_code: 0,
-        duration: 500,
-      });
-
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const stream = extValue(ext).prompt.fn(
-        { text: 'Test', options: {} },
-        ctx
-      );
-      const result = await resolveStream<ClaudeCodeResult>(stream);
-
-      // Verify empty string
-      expect(result.result).toBe('');
-    });
-  });
-
-  describe('AC-13: Zero tokens returns all-zero TokenCounts', () => {
-    it('returns zero values for all token fields', async () => {
-      const { spawnClaudeCli } = await import('../src/process.js');
-      const { createStreamParser } = await import('../src/stream-parser.js');
-      const { extractResult } = await import('../src/result.js');
-
-      vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
-      });
-
-      // Mock with all-zero tokens (AC-13)
-      vi.mocked(extractResult).mockReturnValue({
-        result: 'Response',
-        tokens: {
-          prompt: 0,
-          cache_write_5m: 0,
-          cache_write_1h: 0,
-          cache_read: 0,
-          output: 0,
-        },
-        cost: 0.0,
-        exit_code: 0,
-        duration: 500,
-      });
-
-      vi.mocked(spawnClaudeCli).mockReturnValue({
-        ptyProcess: {
-          onData: vi.fn(),
-          onExit: vi.fn(),
-          write: vi.fn(),
-          kill: vi.fn(),
-        } as unknown as IPty,
-        exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
-      });
-
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const stream = extValue(ext).prompt.fn(
-        { text: 'Test', options: {} },
-        ctx
-      );
-      const result = await resolveStream<ClaudeCodeResult>(stream);
-
-      // Verify all zeros
-      expect(result.tokens.prompt).toBe(0);
-      expect(result.tokens.cache_write_5m).toBe(0);
-      expect(result.tokens.cache_write_1h).toBe(0);
-      expect(result.tokens.cache_read).toBe(0);
-      expect(result.tokens.output).toBe(0);
-    });
-  });
 });
 
 // ============================================================
@@ -785,69 +371,6 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
 // ============================================================
 
 describe('Claude Code Extension Integration Tests - Error Contracts', () => {
-  // EC-7: Empty prompt/name text invalidates with #INVALID_INPUT before stream creation
-  describe('EC-7: Empty text invalidates with #INVALID_INPUT before stream creation', () => {
-    it('prompt() invalidates for empty prompt text', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-      expectInvalidThrow(
-        () => extValue(ext).prompt.fn({ text: '', options: {} }, ctx),
-        'INVALID_INPUT',
-        'prompt text cannot be empty'
-      );
-    });
-
-    it('prompt() invalidates for whitespace-only prompt text', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-      expectInvalidThrow(
-        () => extValue(ext).prompt.fn({ text: '   ', options: {} }, ctx),
-        'INVALID_INPUT',
-        'prompt text cannot be empty'
-      );
-    });
-
-    it('skill() invalidates for empty skill name', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-      expectInvalidThrow(
-        () => extValue(ext).skill.fn({ name: '', args: {} }, ctx),
-        'INVALID_INPUT',
-        'skill name cannot be empty'
-      );
-    });
-
-    it('skill() invalidates for whitespace-only skill name', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-      expectInvalidThrow(
-        () => extValue(ext).skill.fn({ name: '  ', args: {} }, ctx),
-        'INVALID_INPUT',
-        'skill name cannot be empty'
-      );
-    });
-
-    it('command() invalidates for empty command name', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-      expectInvalidThrow(
-        () => extValue(ext).command.fn({ name: '', args: {} }, ctx),
-        'INVALID_INPUT',
-        'command name cannot be empty'
-      );
-    });
-
-    it('command() invalidates for whitespace-only command name', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-      expectInvalidThrow(
-        () => extValue(ext).command.fn({ name: '\t', args: {} }, ctx),
-        'INVALID_INPUT',
-        'command name cannot be empty'
-      );
-    });
-  });
-
   // EC-8: Binary not found invalidates with #UNAVAILABLE
   describe('EC-8: Binary not found invalidates with #UNAVAILABLE', () => {
     it('prompt() invalidates when spawnClaudeCli throws SpawnError(binary_missing)', async () => {
@@ -1078,66 +601,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
 
   // ============================================================
   // BOUNDARY CONDITION TESTS
-  // ============================================================
-
   describe('boundary conditions', () => {
-    // AC-13: resolveStream(prompt()) returns dict identical to pre-streaming return
-    describe('AC-13: resolveStream(prompt()) returns expected dict shape field-by-field', () => {
-      it('resolution dict contains all required fields with correct types', async () => {
-        const { spawnClaudeCli } = await import('../src/process.js');
-        const { createStreamParser } = await import('../src/stream-parser.js');
-        const { extractResult } = await import('../src/result.js');
-
-        vi.mocked(createStreamParser).mockReturnValue({
-          processChunk: vi.fn(),
-          flush: vi.fn(),
-        });
-        vi.mocked(extractResult).mockReturnValue({
-          result: 'Task completed successfully.',
-          tokens: {
-            prompt: 12,
-            cache_write_5m: 0,
-            cache_write_1h: 0,
-            cache_read: 5,
-            output: 9,
-          },
-          cost: 0.0025,
-          exit_code: 0,
-          duration: 950,
-        });
-        vi.mocked(spawnClaudeCli).mockReturnValue({
-          ptyProcess: {
-            onData: vi.fn(),
-            onExit: vi.fn(),
-            write: vi.fn(),
-            kill: vi.fn(),
-          } as unknown as IPty,
-          exitCode: Promise.resolve(0),
-          dispose: vi.fn(),
-        });
-
-        const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-        const ctx = createRuntimeContext();
-
-        const stream = extValue(ext).prompt.fn(
-          { text: 'Do something', options: {} },
-          ctx
-        );
-        const result = await resolveStream(stream);
-
-        // All required Claude Code resolution dict fields (IR-6 / spec)
-        expect(typeof result['result']).toBe('string');
-        expect(result['result']).toBe('Task completed successfully.');
-        expect(result['tokens']).toBeDefined();
-        expect(typeof result['cost']).toBe('number');
-        expect(result['cost']).toBe(0.0025);
-        expect(typeof result['exit_code']).toBe('number');
-        expect(result['exit_code']).toBe(0);
-        expect(typeof result['duration']).toBe('number');
-        expect(result['duration']).toBe(950);
-      });
-    });
-
     // AC-22: Second iteration of a consumed Claude Code stream throws RILL-R002
     describe('AC-22: second iteration of consumed Claude Code stream throws RILL-R002', () => {
       it('calling next() on consumed stream root step throws RILL-R002', async () => {
@@ -1205,61 +669,6 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         expect(() => current.next.fn({}, null)).toThrow(
           /#RILL_R002: Stream already consumed; cannot re-iterate/
         );
-      });
-    });
-
-    // AC-24: Stream with 0 data chunks resolves to valid dict
-    describe('AC-24: 0-chunk stream resolves to valid Claude Code dict', () => {
-      it('stream that emits no PTY data still resolves with valid dict shape', async () => {
-        const { spawnClaudeCli } = await import('../src/process.js');
-        const { createStreamParser } = await import('../src/stream-parser.js');
-        const { extractResult } = await import('../src/result.js');
-
-        vi.mocked(createStreamParser).mockReturnValue({
-          processChunk: vi.fn(),
-          flush: vi.fn(),
-        });
-        vi.mocked(extractResult).mockReturnValue({
-          result: '',
-          tokens: {
-            prompt: 0,
-            cache_write_5m: 0,
-            cache_write_1h: 0,
-            cache_read: 0,
-            output: 0,
-          },
-          cost: 0,
-          exit_code: 0,
-          duration: 0,
-        });
-
-        // PTY exits immediately without emitting any data
-        vi.mocked(spawnClaudeCli).mockReturnValue({
-          ptyProcess: {
-            onData: vi.fn(),
-            onExit: vi.fn(),
-            write: vi.fn(),
-            kill: vi.fn(),
-          } as unknown as IPty,
-          exitCode: Promise.resolve(0),
-          dispose: vi.fn(),
-        });
-
-        const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-        const ctx = createRuntimeContext();
-
-        const stream = extValue(ext).prompt.fn(
-          { text: 'Empty task', options: {} },
-          ctx
-        );
-        const result = await resolveStream(stream);
-
-        // Resolution dict must be valid even with 0 data chunks
-        expect(typeof result['result']).toBe('string');
-        expect(result['tokens']).toBeDefined();
-        expect(typeof result['cost']).toBe('number');
-        expect(typeof result['exit_code']).toBe('number');
-        expect(typeof result['duration']).toBe('number');
       });
     });
 

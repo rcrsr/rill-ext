@@ -67,16 +67,6 @@ describe('typeRefToStructure', () => {
       expect(result).toEqual({ kind: 'list', element: { kind: 'string' } });
     });
 
-    it('converts list(number)', () => {
-      const ref: TypeRef = {
-        kind: 'static',
-        typeName: 'list',
-        args: [{ value: { kind: 'static', typeName: 'number' } }],
-      };
-      const result = typeRefToStructure(ref);
-      expect(result).toEqual({ kind: 'list', element: { kind: 'number' } });
-    });
-
     it('rejects list with named arg', () => {
       const ref: TypeRef = {
         kind: 'static',
@@ -143,25 +133,6 @@ describe('typeRefToStructure', () => {
         fields: {
           a: { type: { kind: 'string' } },
           b: { type: { kind: 'number' } },
-        },
-      });
-    });
-
-    it('converts dict(title: string, body: string)', () => {
-      const ref: TypeRef = {
-        kind: 'static',
-        typeName: 'dict',
-        args: [
-          { name: 'title', value: { kind: 'static', typeName: 'string' } },
-          { name: 'body', value: { kind: 'static', typeName: 'string' } },
-        ],
-      };
-      const result = typeRefToStructure(ref);
-      expect(result).toEqual({
-        kind: 'dict',
-        fields: {
-          title: { type: { kind: 'string' } },
-          body: { type: { kind: 'string' } },
         },
       });
     });

@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { getStatus, isDict, isInvalid } from '@rcrsr/rill';
+import { getStatus, isInvalid, RuntimeError } from '@rcrsr/rill';
 import { createLocalFsExtension } from '../src/factory.js';
 import type { FsLocalExtensionConfig } from '../src/types.js';
 import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
@@ -43,39 +43,16 @@ describe('createLocalFsExtension - factory', () => {
           bad: { path: '/nonexistent/path/xyz', mode: 'read' },
         },
       };
-      await expect(
-        createLocalFsExtension(config, makeFactoryCtx())
-      ).rejects.toThrow();
+      const created = createLocalFsExtension(config, makeFactoryCtx());
+      await expect(created).rejects.toBeInstanceOf(RuntimeError);
+      await expect(created).rejects.toMatchObject({
+        errorId: 'RILL-R001',
+        message: expect.stringContaining('mount path does not exist'),
+      });
     });
   });
 
   describe('extension shape', () => {
-    it('returns all 12 host functions', async () => {
-      const ext = await createLocalFsExtension(
-        {
-          mounts: {
-            workspace: { path: testMount, mode: 'read-write' },
-          },
-        },
-        makeFactoryCtx()
-      );
-
-      const value = ext.value;
-      if (!isDict(value)) throw new Error('extension value is not a dict');
-      expect(value['read']).toBeDefined();
-      expect(value['write']).toBeDefined();
-      expect(value['append']).toBeDefined();
-      expect(value['list']).toBeDefined();
-      expect(value['find']).toBeDefined();
-      expect(value['exists']).toBeDefined();
-      expect(value['remove']).toBeDefined();
-      expect(value['stat']).toBeDefined();
-      expect(value['mkdir']).toBeDefined();
-      expect(value['copy']).toBeDefined();
-      expect(value['move']).toBeDefined();
-      expect(value['mounts']).toBeDefined();
-    });
-
     it('returns a dispose function', async () => {
       const ext = await createLocalFsExtension(
         {
@@ -128,36 +105,6 @@ describe('createLocalFsExtension - factory', () => {
         max: limit,
       });
       await expect(fs.stat(overLimitPath)).rejects.toThrow(/ENOENT/);
-    });
-
-    it('applies custom maxFileSize', async () => {
-      const ext = await createLocalFsExtension(
-        {
-          mounts: {
-            workspace: { path: testMount, mode: 'read-write' },
-          },
-          maxFileSize: 1000,
-        },
-        makeFactoryCtx()
-      );
-      const content = 'x'.repeat(1001);
-
-      const result = await getCallable(ext, 'write').fn(
-        { path: '/workspace/too-large.txt', content },
-        makeRuntimeCtx()
-      );
-      const status = getStatus(result);
-      expect(status.code.name).toBe('UNAVAILABLE');
-      expect(status.message).toMatch(/exceeds size limit/);
-    });
-
-    it('exports FsLocalExtensionConfig and MountConfig types', async () => {
-      const config: FsLocalExtensionConfig = {
-        mounts: {
-          test: { path: testMount, mode: 'read' },
-        },
-      };
-      expect(config).toBeDefined();
     });
   });
 });

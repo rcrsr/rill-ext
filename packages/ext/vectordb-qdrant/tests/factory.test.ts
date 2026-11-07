@@ -14,7 +14,7 @@ function getCallable(
 
 describe('createQdrantExtension', () => {
   describe('configuration validation', () => {
-    it('throws Error for missing url (AC-10)', () => {
+    it('throws Error for missing url', () => {
       expect(() =>
         createQdrantExtension({
           url: undefined as unknown as string,
@@ -23,7 +23,7 @@ describe('createQdrantExtension', () => {
       ).toThrow('url is required');
     });
 
-    it('throws Error for empty url (AC-10)', () => {
+    it('throws Error for empty url', () => {
       expect(() =>
         createQdrantExtension({
           url: '',
@@ -32,7 +32,7 @@ describe('createQdrantExtension', () => {
       ).toThrow('url is required');
     });
 
-    it('throws Error for missing collection (AC-10)', () => {
+    it('throws Error for missing collection', () => {
       expect(() =>
         createQdrantExtension({
           url: 'http://localhost:6333',
@@ -41,7 +41,7 @@ describe('createQdrantExtension', () => {
       ).toThrow('collection is required');
     });
 
-    it('throws Error for empty collection (AC-10)', () => {
+    it('throws Error for empty collection', () => {
       expect(() =>
         createQdrantExtension({
           url: 'http://localhost:6333',
@@ -52,30 +52,6 @@ describe('createQdrantExtension', () => {
   });
 
   describe('factory return value', () => {
-    it('returns ExtensionResult with all 11 functions', () => {
-      const ext = createQdrantExtension({
-        url: 'http://localhost:6333',
-        collection: 'test_collection',
-      });
-
-      // Verify all 11 functions are present
-      expect(getCallable(ext, 'upsert')).toBeDefined();
-      expect(getCallable(ext, 'upsert_batch')).toBeDefined();
-      expect(getCallable(ext, 'search')).toBeDefined();
-      expect(getCallable(ext, 'get')).toBeDefined();
-      expect(getCallable(ext, 'delete')).toBeDefined();
-      expect(getCallable(ext, 'delete_batch')).toBeDefined();
-      expect(getCallable(ext, 'count')).toBeDefined();
-      expect(getCallable(ext, 'create_collection')).toBeDefined();
-      expect(getCallable(ext, 'delete_collection')).toBeDefined();
-      expect(getCallable(ext, 'list_collections')).toBeDefined();
-      expect(getCallable(ext, 'describe')).toBeDefined();
-
-      // Verify dispose is present
-      expect(ext.dispose).toBeDefined();
-      expect(typeof ext.dispose).toBe('function');
-    });
-
     it('creates functions with correct signatures (IR-1)', () => {
       const ext = createQdrantExtension({
         url: 'http://localhost:6333',
@@ -161,20 +137,16 @@ describe('createQdrantExtension', () => {
     });
   });
 
-  describe('dispose lifecycle (AC-31, AC-32)', () => {
-    it('dispose is idempotent', async () => {
+  describe('dispose lifecycle', () => {
+    it('resolves on repeated dispose calls', async () => {
       const ext = createQdrantExtension({
         url: 'http://localhost:6333',
         collection: 'test_collection',
       });
 
-      // AC-32: Multiple calls to dispose should not throw
       await ext.dispose!();
-      await ext.dispose!();
-      await ext.dispose!();
-
-      // No error expected
-      expect(true).toBe(true);
+      await expect(ext.dispose!()).resolves.toBeUndefined();
+      await expect(ext.dispose!()).resolves.toBeUndefined();
     });
   });
 });

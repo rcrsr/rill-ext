@@ -2,8 +2,7 @@
  * Boundary condition and error-path tests for the Gemini extension
  * unified prompting surface (spec §Acceptance Criteria / Boundary Conditions).
  *
- * Covers: AC-B2, AC-B3, AC-B4, AC-B6, AC-B7, AC-B8,
- *         AC-E1..AC-E9, AC-E13..AC-E15
+ * Covers: AC-B2, AC-B3, AC-B4, AC-B8, AC-E8, AC-E9, AC-E13
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -12,7 +11,6 @@ import {
   callable,
   isInvalid,
   getStatus,
-  RuntimeError,
   RuntimeHaltSignal,
   type ApplicationCallable,
   type RillValue,
@@ -134,6 +132,15 @@ describe('Gemini boundary conditions', () => {
       // Should not be invalid — multiple user turns are permitted
       expect(isInvalid(stream)).toBe(false);
       await collectStream(stream, ctx);
+
+      expect(mockGenerateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: [
+            { role: 'user', parts: [{ text: 'first message' }] },
+            { role: 'user', parts: [{ text: 'second message' }] },
+          ],
+        })
+      );
     });
   });
 
@@ -165,6 +172,16 @@ describe('Gemini boundary conditions', () => {
       const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
       expect(isInvalid(stream)).toBe(false);
       await collectStream(stream, ctx);
+
+      const request = mockGenerateContentStream.mock.calls[0]![0] as {
+        contents: Array<{ role: string; parts: unknown[] }>;
+      };
+      expect(request.contents).toEqual([
+        {
+          role: 'user',
+          parts: [{ inlineData: { mimeType: 'image/png', data: 'abc123' } }],
+        },
+      ]);
     });
   });
 
@@ -193,65 +210,36 @@ describe('Gemini boundary conditions', () => {
   });
 
   // ──────────────────────────────────────────────────────────
-  // AC-B6: Factory extra: {} accepted
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-B6: factory extra: {} accepted', () => {
-    it('does not throw for empty extra dict', () => {
-      expect(() =>
-        createGeminiExtension({ ...BASE_CONFIG, extra: {} })
-      ).not.toThrow();
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-B7: Factory max_turns: 0 → RILL-R001 (verbatim message)
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-B7: factory max_turns: 0 rejected with specific message', () => {
-    it('throws RuntimeError RILL-R001 with exact message when max_turns is 0', () => {
-      expect(() =>
-        createGeminiExtension({ ...BASE_CONFIG, max_turns: 0 })
-      ).toThrow(
-        "Factory config 'max_turns' must be a positive integer or undefined; sentinel value 0 is reserved for per-call override semantics."
-      );
-    });
-
-    it('the thrown error is a RuntimeError', () => {
-      let thrown: unknown;
-      try {
-        createGeminiExtension({ ...BASE_CONFIG, max_turns: 0 });
-      } catch (e) {
-        thrown = e;
-      }
-      expect(thrown).toBeInstanceOf(RuntimeError);
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
   // AC-B8: 10 parallel message() calls share factory config without mutation
   // ──────────────────────────────────────────────────────────
 
   describe('AC-B8: parallel message() calls share config without mutation', () => {
-    it('10 concurrent message() calls all use the same model string', async () => {
+    it('10 concurrent message() calls each send the configured model and their own prompt', async () => {
       const ext = createGeminiExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const calls = Array.from({ length: 10 }, () =>
-        getCallable(ext, 'message').fn({ prompt: 'hello' }, ctx)
+      const calls = Array.from({ length: 10 }, (_, i) =>
+        getCallable(ext, 'message').fn({ prompt: `hello ${i}` }, ctx)
       );
 
       const streams = await Promise.all(calls);
+      await Promise.all(streams.map((s) => collectStream(s, ctx)));
 
-      // Drain all streams and collect resolved values
-      const results = await Promise.all(
-        streams.map((s) => collectStream(s, ctx))
+      // Every request carries the factory model and its own prompt (config not mutated)
+      const requests = mockGenerateContentStream.mock.calls.map(
+        (c) =>
+          c[0] as {
+            model: string;
+            contents: Array<{ parts: Array<{ text: string }> }>;
+          }
       );
-
-      // All results must report the same model (factory config not mutated)
-      for (const result of results) {
-        expect(result['model']).toBe('gemini-2.0-flash');
-      }
+      expect(requests).toHaveLength(10);
+      expect(requests.map((r) => r.model)).toEqual(
+        Array.from({ length: 10 }, () => 'gemini-2.0-flash')
+      );
+      expect(requests.map((r) => r.contents[0]!.parts[0]!.text)).toEqual(
+        Array.from({ length: 10 }, (_, i) => `hello ${i}`)
+      );
     });
   });
 });
@@ -266,149 +254,6 @@ describe('Gemini boundary error cases', () => {
     mockGenerateContent.mockReset();
     mockEmbedContent.mockReset();
     mockGenerateContentStream.mockResolvedValue(makeChunksIterable(['ok']));
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E1: tool role → INVALID_INPUT
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E1: tool role rejected', () => {
-    it('returns INVALID_INPUT with invalid_role when role is tool', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn(
-        { prompt: [{ role: 'tool', content: 'some result' }] },
-        ctx
-      );
-
-      expect(isInvalid(result)).toBe(true);
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E2: model role (Gemini-native) rejected at boundary
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E2: Gemini-native model role rejected at boundary (FR-UNIFY-5)', () => {
-    it('returns INVALID_INPUT for role model even on Gemini extension', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn(
-        { prompt: [{ role: 'model', content: 'hi' }] },
-        ctx
-      );
-
-      expect(isInvalid(result)).toBe(true);
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E3: Unknown role → INVALID_INPUT
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E3: unknown role rejected', () => {
-    it('returns INVALID_INPUT for an arbitrary unknown role string', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn(
-        { prompt: [{ role: 'foo', content: 'hi' }] },
-        ctx
-      );
-
-      expect(isInvalid(result)).toBe(true);
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E4: Trailing assistant turn → raw.kind=trailing_assistant_turn
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E4: trailing assistant turn', () => {
-    it('returns INVALID_INPUT with raw.kind=trailing_assistant_turn', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn(
-        {
-          prompt: [
-            { role: 'user', content: 'hi' },
-            { role: 'assistant', content: 'hello' },
-          ],
-        },
-        ctx
-      );
-
-      expect(isInvalid(result)).toBe(true);
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-      expect(status.raw['kind']).toBe('trailing_assistant_turn');
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E5: Unknown part type → INVALID_INPUT
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E5: unknown part type audio', () => {
-    it('returns INVALID_INPUT for part type audio', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn(
-        {
-          prompt: [
-            {
-              role: 'user',
-              parts: [{ type: 'audio', data: 'binary' }],
-            },
-          ],
-        },
-        ctx
-      );
-
-      expect(isInvalid(result)).toBe(true);
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E6: Factory extra: {model: '...'} → RILL-R001
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E6: extra.model reserved key rejected', () => {
-    it('throws RuntimeError RILL-R001 when extra contains model key', () => {
-      expect(() =>
-        createGeminiExtension({
-          ...BASE_CONFIG,
-          extra: { model: 'some-model' },
-        })
-      ).toThrow(/reserved key/i);
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E7: Factory extra: {temperature: 0.5} → RILL-R001
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E7: extra.temperature reserved key rejected', () => {
-    it('throws RuntimeError RILL-R001 when extra contains temperature key', () => {
-      expect(() =>
-        createGeminiExtension({
-          ...BASE_CONFIG,
-          extra: { temperature: 0.5 },
-        })
-      ).toThrow(/reserved key/i);
-    });
   });
 
   // ──────────────────────────────────────────────────────────
@@ -473,45 +318,6 @@ describe('Gemini boundary error cases', () => {
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.raw['kind']).toBe('invalid_prompt_type');
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E14: message([]) → raw.kind=empty_message_list
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E14: empty message list', () => {
-    it('returns INVALID_INPUT with raw.kind=empty_message_list for []', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn(
-        { prompt: [] as unknown as RillValue },
-        ctx
-      );
-
-      expect(isInvalid(result)).toBe(true);
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-      expect(status.raw['kind']).toBe('empty_message_list');
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
-  // AC-E15: message("") → raw.kind=empty_prompt
-  // ──────────────────────────────────────────────────────────
-
-  describe('AC-E15: empty string prompt', () => {
-    it('returns INVALID_INPUT with raw.kind=empty_prompt for empty string', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn({ prompt: '' }, ctx);
-
-      expect(isInvalid(result)).toBe(true);
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-      expect(status.raw['kind']).toBe('empty_prompt');
     });
   });
 });

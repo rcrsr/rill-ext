@@ -3,7 +3,7 @@
  * Covers: IR-27, AC-11, EC-14..EC-20 (HTTPS check, error mapping, signal combination).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createRuntimeContext,
   isInvalid,
@@ -37,6 +37,10 @@ const PATH = '/gmail/v1/users/me/messages';
 beforeEach(() => {
   vi.resetAllMocks();
   mockResolveToken.mockResolvedValue('resolved-token');
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 // ============================================================
@@ -73,7 +77,7 @@ describe('HTTPS enforcement', () => {
     expect(mockResolveToken).not.toHaveBeenCalled();
   });
 
-  it('does not throw for a valid https:// baseUrl', async () => {
+  it('returns the parsed response for a valid https:// baseUrl', async () => {
     const ctx = createRuntimeContext();
     const controller = new AbortController();
 
@@ -85,22 +89,21 @@ describe('HTTPS enforcement', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    await expect(
-      googleFetch(
-        'GET',
-        BASE_URL,
-        PATH,
-        'gmail',
-        'read',
-        BEARER_AUTH,
-        ctx,
-        controller,
-        makeCache(),
-        SCOPES
-      )
-    ).resolves.not.toThrow();
+    const result = await googleFetch(
+      'GET',
+      BASE_URL,
+      PATH,
+      'gmail',
+      'read',
+      BEARER_AUTH,
+      ctx,
+      controller,
+      makeCache(),
+      SCOPES
+    );
 
-    vi.unstubAllGlobals();
+    expect(result).toEqual({ id: '1' });
+    expect(mockFetch).toHaveBeenCalledOnce();
   });
 });
 
@@ -142,8 +145,6 @@ describe('token resolution', () => {
     expect(calledCache).toBe(cache);
     expect(calledScopes).toBe(SCOPES);
     expect(calledSignal).toBeInstanceOf(AbortSignal);
-
-    vi.unstubAllGlobals();
   });
 
   it('sets Authorization: Bearer <token> in request headers', async () => {
@@ -175,8 +176,6 @@ describe('token resolution', () => {
       'Authorization'
     ];
     expect(authHeader).toBe('Bearer resolved-token');
-
-    vi.unstubAllGlobals();
   });
 });
 
@@ -211,8 +210,6 @@ describe('request construction', () => {
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`${BASE_URL}${PATH}`);
-
-    vi.unstubAllGlobals();
   });
 
   it('sets Content-Type: application/json when body is present', async () => {
@@ -245,8 +242,6 @@ describe('request construction', () => {
       'application/json'
     );
     expect(init.body).toBe(JSON.stringify({ subject: 'hello' }));
-
-    vi.unstubAllGlobals();
   });
 
   it('does not set Content-Type when body is absent', async () => {
@@ -278,8 +273,6 @@ describe('request construction', () => {
       (init.headers as Record<string, string>)['Content-Type']
     ).toBeUndefined();
     expect(init.body).toBeUndefined();
-
-    vi.unstubAllGlobals();
   });
 
   it('merges extra headers without overwriting Authorization', async () => {
@@ -312,8 +305,6 @@ describe('request construction', () => {
     const hdrs = init.headers as Record<string, string>;
     expect(hdrs['X-Goog-FieldMask']).toBe('id,name');
     expect(hdrs['Authorization']).toBe('Bearer resolved-token');
-
-    vi.unstubAllGlobals();
   });
 });
 
@@ -346,8 +337,6 @@ describe('response handling', () => {
       SCOPES
     );
     expect(result).toEqual({ messages: [] });
-
-    vi.unstubAllGlobals();
   });
 
   it('returns null for 204 No Content', async () => {
@@ -370,8 +359,6 @@ describe('response handling', () => {
       SCOPES
     );
     expect(result).toBeNull();
-
-    vi.unstubAllGlobals();
   });
 
   it('returns null for 202 Accepted', async () => {
@@ -395,8 +382,6 @@ describe('response handling', () => {
       {}
     );
     expect(result).toBeNull();
-
-    vi.unstubAllGlobals();
   });
 });
 
@@ -437,8 +422,6 @@ describe('HTTP error mapping', () => {
     expect(getStatus(caught as RillValue).message).toBe(
       'google: invalid Gmail token'
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('maps 403 to #FORBIDDEN insufficient scopes [EC-15]', async () => {
@@ -471,8 +454,6 @@ describe('HTTP error mapping', () => {
     expect(getStatus(caught as RillValue).message).toBe(
       'google: insufficient Gmail scopes for send'
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('maps 404 with resourceId to "not found" message [EC-16]', async () => {
@@ -508,8 +489,6 @@ describe('HTTP error mapping', () => {
     expect(getStatus(caught as RillValue).message).toBe(
       "google: Gmail resource 'msg-abc' not found"
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('maps 429 to rate limit error [EC-17]', async () => {
@@ -542,8 +521,6 @@ describe('HTTP error mapping', () => {
     expect(getStatus(caught as RillValue).message).toBe(
       'google: rate limit exceeded; retry after delay'
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('maps 500 to server error [EC-18]', async () => {
@@ -576,8 +553,6 @@ describe('HTTP error mapping', () => {
     expect(getStatus(caught as RillValue).message).toBe(
       'google: Gmail server error (500); temporarily unavailable'
     );
-
-    vi.unstubAllGlobals();
   });
 });
 
@@ -617,8 +592,6 @@ describe('network and abort error mapping', () => {
     expect(getStatus(caught as RillValue).message).toBe(
       'google: request timeout'
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('maps TypeError (network failure) to connection failed', async () => {
@@ -651,7 +624,5 @@ describe('network and abort error mapping', () => {
     expect(getStatus(caught as RillValue).message).toBe(
       'google: gmail connection failed'
     );
-
-    vi.unstubAllGlobals();
   });
 });

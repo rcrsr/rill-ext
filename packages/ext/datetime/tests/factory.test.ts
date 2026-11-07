@@ -4,7 +4,7 @@
  * Covers factory creation, callable structure, config variants, and disposal.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getStatus } from '@rcrsr/rill';
 import { createDatetimeExtension } from '../src/factory.js';
 import type { DatetimeExtensionConfig } from '../src/types.js';
@@ -20,14 +20,6 @@ describe('datetime extension factory', () => {
   // ============================================================
 
   describe('factory creation', () => {
-    it('returns ExtensionFactoryResult with value and dispose', () => {
-      const ext = mk();
-
-      expect(ext).toHaveProperty('value');
-      expect(ext).toHaveProperty('dispose');
-      expect(typeof ext.dispose).toBe('function');
-    });
-
     it('returns all 7 function keys on value dict', () => {
       const ext = mk();
 
@@ -38,23 +30,6 @@ describe('datetime extension factory', () => {
       expect(ext.value).toHaveProperty('zones');
       expect(ext.value).toHaveProperty('format');
       expect(ext.value).toHaveProperty('parse');
-    });
-
-    it('wraps each function as callable with params, fn, annotations, returnType', () => {
-      const ext = mk();
-
-      expect(fnOf(ext, 'iso')).toMatchObject({
-        __type: 'callable',
-        kind: 'application',
-        params: expect.any(Array),
-        fn: expect.any(Function),
-        annotations: expect.objectContaining({
-          description: expect.any(String),
-        }),
-        returnType: expect.objectContaining({
-          __rill_type: true,
-        }),
-      });
     });
 
     it('wraps all 7 functions as callables', () => {
@@ -89,31 +64,12 @@ describe('datetime extension factory', () => {
   // ============================================================
 
   describe('no side effects', () => {
-    it('creates two independent instances without interference', () => {
-      const extA = mk();
-      const extB = mk();
+    it('does not register error codes at factory time', () => {
+      const registerErrorCode = vi.fn<() => void>();
 
-      expect(extA.value).not.toBe(extB.value);
-      expect(extA.dispose).not.toBe(extB.dispose);
-    });
-  });
+      createDatetimeExtension({}, { ...makeFactoryCtx(), registerErrorCode });
 
-  // ============================================================
-  // IR-8: Factory accepts empty config and undefined config
-  // ============================================================
-
-  describe('config variants', () => {
-    it('accepts undefined config', () => {
-      const ext = mk(undefined);
-      expect(ext).toBeDefined();
-      expect(ext.value).toHaveProperty('iso');
-    });
-
-    it('accepts empty config object', () => {
-      const config: DatetimeExtensionConfig = {};
-      const ext = mk(config);
-      expect(ext).toBeDefined();
-      expect(ext.value).toHaveProperty('iso');
+      expect(registerErrorCode).not.toHaveBeenCalled();
     });
   });
 
@@ -122,11 +78,6 @@ describe('datetime extension factory', () => {
   // ============================================================
 
   describe('dispose()', () => {
-    it('resolves without throw on first call', async () => {
-      const ext = mk();
-      await expect(ext.dispose!()).resolves.toBeUndefined();
-    });
-
     it('is idempotent: second call does not throw', async () => {
       const ext = mk();
       await ext.dispose!();
@@ -139,40 +90,21 @@ describe('datetime extension factory', () => {
   // ============================================================
 
   describe('post-dispose function calls', () => {
-    it('returns invalid value when iso is called after dispose', async () => {
-      const ext = mk();
-      await ext.dispose!();
+    it.each([
+      { name: 'iso', args: { dt: 0, zone: 'UTC' } },
+      { name: 'zones', args: {} },
+      { name: 'format', args: { dt: 0, pattern: 'YYYY-MM-DD' } },
+    ])(
+      'returns invalid value with message "datetime: operation cancelled" when $name is called after dispose',
+      async ({ name, args }) => {
+        const ext = mk();
+        await ext.dispose!();
 
-      const result = await fnOf(ext, 'iso').fn(
-        { dt: Date.now(), zone: 'UTC' },
-        makeRuntimeCtx()
-      );
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-      expect(status.message).toMatch(/datetime: operation cancelled/);
-    });
-
-    it('returns invalid value when zones is called after dispose', async () => {
-      const ext = mk();
-      await ext.dispose!();
-
-      const result = await fnOf(ext, 'zones').fn({}, makeRuntimeCtx());
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-      expect(status.message).toMatch(/datetime: operation cancelled/);
-    });
-
-    it('returns invalid value with message "datetime: operation cancelled"', async () => {
-      const ext = mk();
-      await ext.dispose!();
-
-      const result = await fnOf(ext, 'format').fn(
-        { dt: Date.now(), pattern: 'YYYY-MM-DD' },
-        makeRuntimeCtx()
-      );
-      const status = getStatus(result);
-      expect(status.code.name).toBe('INVALID_INPUT');
-      expect(status.message).toMatch(/datetime: operation cancelled/);
-    });
+        const result = await fnOf(ext, name).fn(args, makeRuntimeCtx());
+        const status = getStatus(result);
+        expect(status.code.name).toBe('INVALID_INPUT');
+        expect(status.message).toMatch(/datetime: operation cancelled/);
+      }
+    );
   });
 });

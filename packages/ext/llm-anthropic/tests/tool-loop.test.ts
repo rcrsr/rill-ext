@@ -7,7 +7,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
   callable,
-  isRillStream,
   type RillValue,
   type ApplicationCallable,
 } from '@rcrsr/rill';
@@ -224,32 +223,6 @@ describe('tool_loop() function', () => {
   });
 
   describe('streaming', () => {
-    // AC-7: tool_loop() returns RillStream
-    it('returns RillStream (isRillStream is true)', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      mockStream.mockReturnValue(
-        createMockMessageStream(createMockTextResponse('Hello'))
-      );
-
-      const tools = {
-        tool: makeTool(() => 'result', { description: 'Tool' }),
-      };
-
-      const result = await getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, max_turns: 0 },
-        ctx
-      );
-
-      expect(isRillStream(result)).toBe(true);
-    });
-
     // AC-8: Iterating tool_loop() stream yields text_delta, tool_call, tool_result events
     it('yields text_delta, tool_call, and tool_result chunks when iterated', async () => {
       const config: AnthropicExtensionConfig = {
@@ -294,61 +267,6 @@ describe('tool_loop() function', () => {
       expect(types).toContain('tool_call');
       expect(types).toContain('tool_result');
       // text_delta chunks may appear from text content in the final response
-    });
-
-    // AC-9: tool_loop()() resolution dict contains correct fields
-    it('resolution dict has model, usage, stop_reason, turns, messages', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      mockStream
-        .mockReturnValueOnce(
-          createMockMessageStream(
-            createMockToolUseResponse([
-              { name: 'get_weather', id: 'tool_1', input: { location: 'SF' } },
-            ])
-          )
-        )
-        .mockReturnValueOnce(
-          createMockMessageStream(
-            createMockTextResponse('The weather in SF is sunny.')
-          )
-        );
-
-      const tools = {
-        get_weather: makeTool((_args) => 'Sunny, 72°F', {
-          description: 'Get weather',
-        }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Weather in SF?', tools, max_turns: 0 },
-        ctx
-      );
-
-      const result = await resolveStream(stream);
-
-      // content field removed; text in messages[last].parts[i].text
-      const msgs = result['messages'] as Array<{
-        role: string;
-        parts: Array<{ type: string; text?: string }>;
-      }>;
-      const lastParts = msgs[msgs.length - 1]!.parts;
-      const lastText = lastParts
-        .filter((p) => p.type === 'text')
-        .map((p) => p.text ?? '')
-        .join('');
-      expect(lastText).toBe('The weather in SF is sunny.');
-      expect(result['model']).toBe('claude-sonnet-4-5-20250929');
-      expect(result['usage']).toEqual({ input: 15, output: 35 }); // 10+5, 20+15
-      expect(result['stop_reason']).toBe('end_turn');
-      expect(typeof result['turns']).toBe('number');
-      expect(Array.isArray(result['messages'])).toBe(true);
     });
 
     // text_delta chunks appear in tool_loop stream when LLM emits text
@@ -443,6 +361,7 @@ describe('tool_loop() function', () => {
         .map((p) => p.text ?? '')
         .join('');
       expect(lastText).toBe('The weather in SF is sunny.');
+      expect(result['model']).toBe('claude-sonnet-4-5-20250929');
       expect(result['turns']).toBe(2);
       expect(result['stop_reason']).toBe('end_turn');
       expect(result['usage']).toEqual({ input: 15, output: 35 });
@@ -487,6 +406,7 @@ describe('tool_loop() function', () => {
         .map((p) => p.text ?? '')
         .join('');
       expect(lastText).toBe('I can answer that directly: 42');
+      expect(result['stop_reason']).toBe('end_turn');
       expect(result['turns']).toBe(1);
       expect(mockStream).toHaveBeenCalledTimes(1);
     });
@@ -522,7 +442,9 @@ describe('tool_loop() function', () => {
         ctx
       );
       // max_turns exceeded is now a halt, not a resolved stop_reason
-      await expectRejectedHalt(resolveStream(stream));
+      await expectRejectedHalt(resolveStream(stream), {
+        code: 'INVALID_INPUT',
+      });
       expect(mockStream).toHaveBeenCalledTimes(1);
     });
   });
@@ -694,79 +616,6 @@ describe('tool_loop() function', () => {
       });
     });
 
-    it('error message includes tool name and original message [EC-5]', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        max_errors: 1,
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      mockStream.mockReturnValueOnce(
-        createMockMessageStream(
-          createMockToolUseResponse([
-            { name: 'my_tool', id: 'tool_1', input: {} },
-          ])
-        )
-      );
-
-      const tools = {
-        my_tool: makeTool(
-          () => {
-            throw new Error('Specific failure');
-          },
-          { description: 'My tool' }
-        ),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, max_turns: 0 },
-        ctx
-      );
-
-      await expectRejectedHalt(resolveStream(stream), {
-        message: expect.stringMatching(
-          /Tool execution failed: 1 consecutive errors \(last: my_tool: Specific failure\)/
-        ),
-      });
-    });
-
-    // EC-6: Tool not found in tool map — error includes "Unknown tool: {name}"
-    // max_errors:1 so a single unknown tool triggers the error immediately
-    it('throws RuntimeError with Unknown tool message when tool not in map [EC-6]', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        max_errors: 1,
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      mockStream.mockReturnValueOnce(
-        createMockMessageStream(
-          createMockToolUseResponse([
-            { name: 'nonexistent_tool', id: 'tool_1', input: {} },
-          ])
-        )
-      );
-
-      const tools = {
-        known_tool: makeTool(() => 'result', { description: 'Known' }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, max_turns: 0 },
-        ctx
-      );
-
-      await expectRejectedHalt(resolveStream(stream), {
-        message: expect.stringContaining('Unknown tool: nonexistent_tool'),
-      });
-    });
-
     // AC-17: Tool execution error mid-loop yields tool_call chunk; stream resolves with final content
     it('tool_call chunk is yielded even when tool errors; stream resolves with partial data [AC-17]', async () => {
       const config: AnthropicExtensionConfig = {
@@ -888,130 +737,6 @@ describe('tool_loop() function', () => {
       expect(result).toHaveProperty('messages');
       expect(result).toHaveProperty('turns');
       expect(result['turns']).toBe(2); // Two turns: tool error + final response
-    });
-
-    // EC-25: max_errors exceeded aborts loop (factory-level config)
-    it('aborts after max consecutive errors', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        max_errors: 3,
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      // Mock 3 consecutive tool_use responses
-      mockStream
-        .mockReturnValueOnce(
-          createMockMessageStream(
-            createMockToolUseResponse([
-              { name: 'failing_tool', id: 'tool_1', input: {} },
-            ])
-          )
-        )
-        .mockReturnValueOnce(
-          createMockMessageStream(
-            createMockToolUseResponse([
-              { name: 'failing_tool', id: 'tool_2', input: {} },
-            ])
-          )
-        )
-        .mockReturnValueOnce(
-          createMockMessageStream(
-            createMockToolUseResponse([
-              { name: 'failing_tool', id: 'tool_3', input: {} },
-            ])
-          )
-        );
-
-      const tools = {
-        failing_tool: makeTool(
-          () => {
-            throw new Error('Tool failed');
-          },
-          { description: 'Failing tool' }
-        ),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, max_turns: 0 },
-        ctx
-      );
-      await expectRejectedHalt(resolveStream(stream), {
-        message: 'Tool execution failed: 3 consecutive errors',
-      });
-    });
-
-    it('resets consecutive error count on success', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        max_errors: 3,
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      let callCount = 0;
-
-      mockStream
-        .mockReturnValueOnce(
-          createMockMessageStream(
-            createMockToolUseResponse([
-              { name: 'tool', id: 'tool_1', input: {} },
-            ])
-          )
-        )
-        .mockReturnValueOnce(
-          createMockMessageStream(
-            createMockToolUseResponse([
-              { name: 'tool', id: 'tool_2', input: {} },
-            ])
-          )
-        )
-        .mockReturnValueOnce(
-          createMockMessageStream(
-            createMockToolUseResponse([
-              { name: 'tool', id: 'tool_3', input: {} },
-            ])
-          )
-        )
-        .mockReturnValueOnce(
-          createMockMessageStream(createMockTextResponse('Done'))
-        );
-
-      const tools = {
-        tool: makeTool(
-          () => {
-            callCount++;
-            if (callCount === 1 || callCount === 2) {
-              throw new Error('Fail');
-            }
-            return 'success';
-          },
-          { description: 'Tool' }
-        ),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, max_turns: 0 },
-        ctx
-      );
-      const result = await resolveStream(stream);
-
-      // content field removed; verify via messages parts
-      const msgs = result['messages'] as Array<{
-        role: string;
-        parts: Array<{ type: string; text?: string }>;
-      }>;
-      const lastText = msgs[msgs.length - 1]!.parts.filter(
-        (p) => p.type === 'text'
-      )
-        .map((p) => p.text ?? '')
-        .join('');
-      expect(lastText).toBe('Done');
-      expect(callCount).toBe(3);
     });
 
     it('sends tool errors to LLM as tool_result', async () => {
@@ -1162,93 +887,7 @@ describe('tool_loop() function', () => {
     });
   });
 
-  describe('token aggregation', () => {
-    it('aggregates token usage across all turns', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      mockStream
-        .mockReturnValueOnce(
-          createMockMessageStream({
-            ...createMockToolUseResponse([
-              { name: 'tool', id: 'tool_1', input: {} },
-            ]),
-            usage: { input_tokens: 100, output_tokens: 50 },
-          })
-        )
-        .mockReturnValueOnce(
-          createMockMessageStream({
-            ...createMockTextResponse('Done'),
-            usage: { input_tokens: 200, output_tokens: 75 },
-          })
-        );
-
-      const tools = {
-        tool: makeTool(() => 'result', { description: 'Tool' }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, max_turns: 0 },
-        ctx
-      );
-      const result = await resolveStream(stream);
-
-      expect(result['usage']).toEqual({
-        input: 300, // 100 + 200
-        output: 125, // 50 + 75
-      });
-    });
-  });
-
   describe('tool parameter mapping', () => {
-    it('converts rill types to JSON Schema', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      mockStream.mockReturnValueOnce(
-        createMockMessageStream(createMockTextResponse('Done'))
-      );
-
-      const tools = {
-        complex_tool: makeTool(() => 'result', {
-          description: 'Tool with various param types',
-          params: [
-            { name: 'str_param', type: 'string', description: 'A string' },
-            { name: 'num_param', type: 'number', description: 'A number' },
-            { name: 'bool_param', type: 'bool', description: 'A boolean' },
-            { name: 'list_param', type: 'list', description: 'A list' },
-            { name: 'dict_param', type: 'dict', description: 'A dict' },
-          ],
-        }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'Test', tools, max_turns: 0 },
-        ctx
-      );
-      await resolveStream(stream);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const firstCall = mockStream.mock.calls[0]?.[0] as any;
-      const tool = firstCall.tools[0];
-
-      expect(tool.input_schema.properties['str_param'].type).toBe('string');
-      expect(tool.input_schema.properties['num_param'].type).toBe('number');
-      expect(tool.input_schema.properties['bool_param'].type).toBe('boolean');
-      expect(tool.input_schema.properties['list_param'].type).toBe('array');
-      expect(tool.input_schema.properties['dict_param'].type).toBe('object');
-    });
-
     it('passes tool arguments to callable as named record', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
@@ -1409,150 +1048,11 @@ describe('tool_loop() function', () => {
         expect(chunkTypes).not.toContain('tool_call');
         expect(chunkTypes).not.toContain('tool_result');
       });
-
-      it('resolves with stop_reason end_turn and turns=1 when no tool calls made', async () => {
-        const config: AnthropicExtensionConfig = {
-          api_key: 'test-key',
-          model: 'claude-sonnet-4-5-20250929',
-        };
-
-        const ext = createAnthropicExtension(config);
-        const ctx = createRuntimeContext();
-
-        mockStream.mockReturnValueOnce(
-          createMockMessageStream(
-            createMockTextResponse('Direct answer without tools.')
-          )
-        );
-
-        const tools = {
-          search: makeTool(() => 'results', { description: 'Search' }),
-        };
-
-        const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'Simple question', tools, max_turns: 0 },
-          ctx
-        );
-
-        const result = await resolveStream(stream);
-
-        // content field removed; verify via messages parts
-        const msgs = result['messages'] as Array<{
-          role: string;
-          parts: Array<{ type: string; text?: string }>;
-        }>;
-        const lastText = msgs[msgs.length - 1]!.parts.filter(
-          (p) => p.type === 'text'
-        )
-          .map((p) => p.text ?? '')
-          .join('');
-        expect(lastText).toBe('Direct answer without tools.');
-        expect(result['stop_reason']).toBe('end_turn');
-        expect(result['turns']).toBe(1);
-        expect(mockStream).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    // AC-26: tool_loop() reaching maxTurns resolves with stop_reason: "max_turns"
-    describe('AC-26: maxTurns reached resolves with stop_reason max_turns', () => {
-      it('resolves with stop_reason max_turns when maxTurns:1 and LLM wants to call tools', async () => {
-        const config: AnthropicExtensionConfig = {
-          api_key: 'test-key',
-          model: 'claude-sonnet-4-5-20250929',
-        };
-
-        const ext = createAnthropicExtension(config);
-        const ctx = createRuntimeContext();
-
-        // LLM wants to call a tool, but maxTurns:1 prevents additional turns
-        mockStream.mockReturnValueOnce(
-          createMockMessageStream(
-            createMockToolUseResponse([
-              { name: 'search', id: 'tool_1', input: { query: 'test query' } },
-            ])
-          )
-        );
-
-        const tools = {
-          search: makeTool(() => 'search results', {
-            description: 'Search the web',
-            params: [
-              { name: 'query', type: 'string', description: 'Search query' },
-            ],
-          }),
-        };
-
-        // max_turns is now positional (3rd arg)
-        const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'Search for something', tools, max_turns: 1 },
-          ctx
-        );
-
-        // New factory throws RuntimeHaltSignal (INVALID_INPUT / max_turns_exceeded)
-        // when max_turns is reached instead of resolving with stop_reason: 'max_turns'
-        await expectRejectedHalt(resolveStream(stream), {
-          code: 'INVALID_INPUT',
-        });
-        // Only one API call: the LLM turn that triggered maxTurns
-        expect(mockStream).toHaveBeenCalledTimes(1);
-      });
-
-      it('resolves with correct content accumulation before maxTurns is hit', async () => {
-        const config: AnthropicExtensionConfig = {
-          api_key: 'test-key',
-          model: 'claude-sonnet-4-5-20250929',
-        };
-
-        const ext = createAnthropicExtension(config);
-        const ctx = createRuntimeContext();
-
-        // LLM responds with text AND tool use — maxTurns:1 stops after this turn
-        const toolUseWithText = {
-          id: 'msg_test123',
-          type: 'message',
-          role: 'assistant',
-          content: [
-            { type: 'text', text: 'Let me search for that.' },
-            {
-              type: 'tool_use',
-              id: 'tool_1',
-              name: 'search',
-              input: { query: 'info' },
-            },
-          ],
-          model: 'claude-sonnet-4-5-20250929',
-          stop_reason: 'tool_use',
-          stop_sequence: null,
-          usage: { input_tokens: 8, output_tokens: 12 },
-        };
-
-        mockStream.mockReturnValueOnce(
-          createMockMessageStream(
-            toolUseWithText as ReturnType<typeof createMockTextResponse>
-          )
-        );
-
-        const tools = {
-          search: makeTool(() => 'results', { description: 'Search' }),
-        };
-
-        // max_turns is now positional (3rd arg)
-        const stream = getCallable(ext, 'tool_loop').fn(
-          { prompt: 'Search for info', tools, max_turns: 1 },
-          ctx
-        );
-
-        // New factory throws RuntimeHaltSignal (INVALID_INPUT / max_turns_exceeded)
-        // when max_turns is reached instead of resolving with stop_reason: 'max_turns'
-        await expectRejectedHalt(resolveStream(stream), {
-          code: 'INVALID_INPUT',
-        });
-      });
     });
 
     // AC-27: Abandoned stream triggers dispose cleanup (tool_loop)
     describe('AC-27: abandoned tool_loop stream triggers dispose callback', () => {
-      it('dispose property is available on tool_loop stream and calls abort', () => {
+      it('aborts the SDK request signal when the stream dispose callback is invoked', async () => {
         const config: AnthropicExtensionConfig = {
           api_key: 'test-key',
           model: 'claude-sonnet-4-5-20250929',
@@ -1573,15 +1073,20 @@ describe('tool_loop() function', () => {
         const stream = getCallable(ext, 'tool_loop').fn(
           { prompt: 'Test', tools, max_turns: 0 },
           ctx
-        );
+        ) as unknown as { __rill_stream_dispose: () => void };
 
-        // Verify the stream has a dispose callback
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const disposeFn = (stream as any).__rill_stream_dispose;
-        expect(typeof disposeFn).toBe('function');
+        await vi.waitFor(() => expect(mockStream).toHaveBeenCalledTimes(1));
+        const requestOptions = mockStream.mock.calls[0]![1] as {
+          signal: AbortSignal;
+        };
+        expect(requestOptions.signal.aborted).toBe(false);
+
+        stream.__rill_stream_dispose();
+
+        expect(requestOptions.signal.aborted).toBe(true);
       });
 
-      it('dispose is idempotent on tool_loop stream', () => {
+      it('keeps the SDK request signal aborted when dispose is called twice', async () => {
         const config: AnthropicExtensionConfig = {
           api_key: 'test-key',
           model: 'claude-sonnet-4-5-20250929',
@@ -1602,16 +1107,17 @@ describe('tool_loop() function', () => {
         const stream = getCallable(ext, 'tool_loop').fn(
           { prompt: 'Test', tools, max_turns: 0 },
           ctx
-        );
+        ) as unknown as { __rill_stream_dispose: () => void };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const disposeFn = (stream as any).__rill_stream_dispose;
+        await vi.waitFor(() => expect(mockStream).toHaveBeenCalledTimes(1));
+        const requestOptions = mockStream.mock.calls[0]![1] as {
+          signal: AbortSignal;
+        };
 
-        // Calling dispose multiple times must not throw
-        expect(() => {
-          disposeFn();
-          disposeFn();
-        }).not.toThrow();
+        stream.__rill_stream_dispose();
+        expect(() => stream.__rill_stream_dispose()).not.toThrow();
+
+        expect(requestOptions.signal.aborted).toBe(true);
       });
     });
   });

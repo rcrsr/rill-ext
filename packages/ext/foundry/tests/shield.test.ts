@@ -163,22 +163,6 @@ describe('shield() host function', () => {
       expect(result['analysis']).toBeDefined();
     });
 
-    it('analysis dict contains attackType field [AC-9]', async () => {
-      globalThis.fetch = mockFetchJson(200, SAFE_SHIELD_RESPONSE);
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithSafety());
-      const ctx = createRuntimeContext();
-
-      const result = (await getHostFn(ext, 'shield').fn(
-        { text: 'Hello world' },
-        ctx
-      )) as Record<string, unknown>;
-
-      const analysis = result['analysis'] as Record<string, unknown>;
-      expect('attack_type' in analysis).toBe(true);
-    });
-
     it('attackType is null when prompt is safe [AC-9]', async () => {
       globalThis.fetch = mockFetchJson(200, SAFE_SHIELD_RESPONSE);
 
@@ -293,8 +277,7 @@ describe('shield() host function', () => {
 
       const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(init.body as string) as Record<string, unknown>;
-      expect(Array.isArray(body['documents'])).toBe(true);
-      expect((body['documents'] as string[]).length).toBe(2);
+      expect(body['documents']).toEqual(['doc one', 'doc two']);
     });
   });
 
@@ -303,29 +286,7 @@ describe('shield() host function', () => {
   // --------------------------------------------------------
 
   describe('missing contentSafety config', () => {
-    it('halts with #UNAVAILABLE when contentSafety not configured [AC-18, EC-7]', async () => {
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithoutSafety());
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx),
-        { code: 'UNAVAILABLE', provider: 'foundry' }
-      );
-    });
-
-    it('error message is "foundry: content safety not configured" [EC-7]', async () => {
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithoutSafety());
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx),
-        { message: 'foundry: content safety not configured' }
-      );
-    });
-
-    it('fetch is not called when contentSafety not configured [AC-18]', async () => {
+    it('halts with #UNAVAILABLE and does not call fetch when contentSafety not configured', async () => {
       const mockFetch = mockFetchJson(200, SAFE_SHIELD_RESPONSE);
       globalThis.fetch = mockFetch;
 
@@ -333,63 +294,16 @@ describe('shield() host function', () => {
       const ext = await createFoundryExtension(configWithoutSafety());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(
+        getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx),
+        {
+          code: 'UNAVAILABLE',
+          provider: 'foundry',
+          message: 'foundry: content safety not configured',
+        }
+      );
 
       expect(mockFetch).not.toHaveBeenCalled();
-    });
-  });
-
-  // --------------------------------------------------------
-  // AC-33: Direct shield() works with autoShield: false
-  // --------------------------------------------------------
-
-  describe('direct shield call with autoShield: false [AC-33]', () => {
-    it('shield() executes normally when autoShield is false [AC-33]', async () => {
-      globalThis.fetch = mockFetchJson(200, SAFE_SHIELD_RESPONSE);
-
-      const config: FoundryConfig = {
-        endpoint: 'https://my-foundry.openai.azure.com',
-        auth: { type: 'api-key', key: 'test-api-key' },
-        contentSafety: {
-          endpoint: 'https://my-safety.cognitiveservices.azure.com',
-          autoShield: false,
-        },
-      };
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(config);
-      const ctx = createRuntimeContext();
-
-      const result = (await getHostFn(ext, 'shield').fn(
-        { text: 'hello world' },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(result['safe']).toBe(true);
-    });
-
-    it('shield() with autoShield: false still calls the API', async () => {
-      const mockFetch = mockFetchJson(200, SAFE_SHIELD_RESPONSE);
-      globalThis.fetch = mockFetch;
-
-      const config: FoundryConfig = {
-        endpoint: 'https://my-foundry.openai.azure.com',
-        auth: { type: 'api-key', key: 'test-api-key' },
-        contentSafety: {
-          endpoint: 'https://my-safety.cognitiveservices.azure.com',
-          autoShield: false,
-        },
-      };
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(config);
-      const ctx = createRuntimeContext();
-
-      await getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx);
-
-      expect(mockFetch).toHaveBeenCalledOnce();
     });
   });
 

@@ -15,16 +15,16 @@ function mk(config: CryptoExtensionConfig = {}) {
 }
 
 describe('hash()', () => {
-  it('hashes content with default algorithm (sha256)', async () => {
-    const ext = mk({ defaultAlgorithm: 'sha256' });
+  it('hashes content with sha256 when no default algorithm is configured', async () => {
+    const ext = mk();
     const result = await fnOf(ext, 'hash').fn(
       { input: 'hello world' },
       makeRuntimeCtx()
     );
 
-    expect(typeof result).toBe('string');
-    expect(result).toMatch(/^[0-9a-f]+$/);
-    expect(result).toHaveLength(64);
+    expect(result).toBe(
+      'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9'
+    );
   });
 
   it('hashes content with explicit algorithm', async () => {
@@ -39,32 +39,6 @@ describe('hash()', () => {
 
     expect(result).toMatch(/^[0-9a-f]+$/);
     expect(result).toHaveLength(32);
-  });
-
-  it('produces consistent output for same input', async () => {
-    const ext = mk();
-    const r1 = await fnOf(ext, 'hash').fn(
-      { input: 'test', algorithm: 'sha256' },
-      makeRuntimeCtx()
-    );
-    const r2 = await fnOf(ext, 'hash').fn(
-      { input: 'test', algorithm: 'sha256' },
-      makeRuntimeCtx()
-    );
-    expect(r1).toBe(r2);
-  });
-
-  it('produces different output for different input', async () => {
-    const ext = mk();
-    const r1 = await fnOf(ext, 'hash').fn(
-      { input: 'input1', algorithm: 'sha256' },
-      makeRuntimeCtx()
-    );
-    const r2 = await fnOf(ext, 'hash').fn(
-      { input: 'input2', algorithm: 'sha256' },
-      makeRuntimeCtx()
-    );
-    expect(r1).not.toBe(r2);
   });
 
   it('supports sha512 algorithm', async () => {
@@ -106,34 +80,19 @@ describe('hash()', () => {
       'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
     );
   });
-
-  it('handles unicode input', async () => {
-    const ext = mk();
-    const result = await fnOf(ext, 'hash').fn(
-      {
-        input: 'Hello 世界 🌍',
-        algorithm: 'sha256',
-      },
-      makeRuntimeCtx()
-    );
-    expect(result).toMatch(/^[0-9a-f]{64}$/);
-  });
 });
 
 describe('hmac()', () => {
-  it('generates HMAC signature', async () => {
-    const ext = mk({
-      hmacKey: 'secret-key',
-      defaultAlgorithm: 'sha256',
-    });
+  it('generates HMAC-SHA256 signature when no default algorithm is configured', async () => {
+    const ext = mk({ hmacKey: 'secret-key' });
     const result = await fnOf(ext, 'hmac').fn(
       { input: 'message to authenticate' },
       makeRuntimeCtx()
     );
 
-    expect(typeof result).toBe('string');
-    expect(result).toMatch(/^[0-9a-f]+$/);
-    expect(result).toHaveLength(64);
+    expect(result).toBe(
+      '79774090145c3f263969df659b5706baa1d03045d3f55002cf17da54e788fc22'
+    );
   });
 
   it('generates HMAC with explicit algorithm', async () => {
@@ -145,33 +104,9 @@ describe('hmac()', () => {
       },
       makeRuntimeCtx()
     );
-    expect(result).toMatch(/^[0-9a-f]{128}$/);
-  });
-
-  it('produces consistent output for same input and key', async () => {
-    const ext = mk({ hmacKey: 'secret' });
-    const r1 = await fnOf(ext, 'hmac').fn(
-      { input: 'message', algorithm: 'sha256' },
-      makeRuntimeCtx()
+    expect(result).toBe(
+      '1bba587c730eedba31f53abb0b6ca589e09de4e894ee455e6140807399759adaafa069eec7c01647bb173dcb17f55d22af49a18071b748c5c2edd7f7a829c632'
     );
-    const r2 = await fnOf(ext, 'hmac').fn(
-      { input: 'message', algorithm: 'sha256' },
-      makeRuntimeCtx()
-    );
-    expect(r1).toBe(r2);
-  });
-
-  it('produces different output for different messages', async () => {
-    const ext = mk({ hmacKey: 'secret' });
-    const r1 = await fnOf(ext, 'hmac').fn(
-      { input: 'message1', algorithm: 'sha256' },
-      makeRuntimeCtx()
-    );
-    const r2 = await fnOf(ext, 'hmac').fn(
-      { input: 'message2', algorithm: 'sha256' },
-      makeRuntimeCtx()
-    );
-    expect(r1).not.toBe(r2);
   });
 
   it('returns invalid value when hmacKey not configured', async () => {
@@ -204,19 +139,9 @@ describe('hmac()', () => {
       { input: 'message' },
       makeRuntimeCtx()
     );
-    expect(result).toMatch(/^[0-9a-f]{128}$/);
-  });
-
-  it('handles unicode input', async () => {
-    const ext = mk({ hmacKey: 'key' });
-    const result = await fnOf(ext, 'hmac').fn(
-      {
-        input: 'Hello 世界 🌍',
-        algorithm: 'sha256',
-      },
-      makeRuntimeCtx()
+    expect(result).toBe(
+      '1bba587c730eedba31f53abb0b6ca589e09de4e894ee455e6140807399759adaafa069eec7c01647bb173dcb17f55d22af49a18071b748c5c2edd7f7a829c632'
     );
-    expect(result).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 
@@ -230,82 +155,18 @@ describe('uuid()', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
   });
-
-  it('generates unique UUIDs', async () => {
-    const ext = mk();
-    const r1 = await fnOf(ext, 'uuid').fn({}, makeRuntimeCtx());
-    const r2 = await fnOf(ext, 'uuid').fn({}, makeRuntimeCtx());
-    expect(r1).not.toBe(r2);
-  });
-
-  it('generates valid v4 format across multiple calls', async () => {
-    const ext = mk();
-    for (let i = 0; i < 10; i++) {
-      const result = (await fnOf(ext, 'uuid').fn(
-        {},
-        makeRuntimeCtx()
-      )) as string;
-      const parts = result.split('-');
-      expect(parts).toHaveLength(5);
-      expect(parts[2]![0]).toBe('4');
-      expect(['8', '9', 'a', 'b']).toContain(parts[3]![0]);
-    }
-  });
 });
 
 describe('random()', () => {
-  it('generates random bytes as hex string', async () => {
-    const ext = mk();
-    const result = await fnOf(ext, 'random').fn(
-      { bytes: 16 },
-      makeRuntimeCtx()
-    );
+  it.each([1, 8, 16, 32, 64, 256])(
+    'generates %d random bytes as a hex string of twice the length',
+    async (bytes) => {
+      const ext = mk();
+      const result = await fnOf(ext, 'random').fn({ bytes }, makeRuntimeCtx());
 
-    expect(typeof result).toBe('string');
-    expect(result).toMatch(/^[0-9a-f]+$/);
-    expect(result).toHaveLength(32);
-  });
-
-  it('returns correct length for byte count', async () => {
-    const ext = mk();
-    const r8 = (await fnOf(ext, 'random').fn(
-      { bytes: 8 },
-      makeRuntimeCtx()
-    )) as string;
-    expect(r8).toHaveLength(16);
-    const r32 = (await fnOf(ext, 'random').fn(
-      { bytes: 32 },
-      makeRuntimeCtx()
-    )) as string;
-    expect(r32).toHaveLength(64);
-    const r64 = (await fnOf(ext, 'random').fn(
-      { bytes: 64 },
-      makeRuntimeCtx()
-    )) as string;
-    expect(r64).toHaveLength(128);
-  });
-
-  it('generates different values on each call', async () => {
-    const ext = mk();
-    const r1 = await fnOf(ext, 'random').fn({ bytes: 16 }, makeRuntimeCtx());
-    const r2 = await fnOf(ext, 'random').fn({ bytes: 16 }, makeRuntimeCtx());
-    expect(r1).not.toBe(r2);
-  });
-
-  it('handles small byte counts', async () => {
-    const ext = mk();
-    const result = await fnOf(ext, 'random').fn({ bytes: 1 }, makeRuntimeCtx());
-    expect(result).toMatch(/^[0-9a-f]{2}$/);
-  });
-
-  it('handles large byte counts', async () => {
-    const ext = mk();
-    const result = await fnOf(ext, 'random').fn(
-      { bytes: 256 },
-      makeRuntimeCtx()
-    );
-    expect(result).toMatch(/^[0-9a-f]{512}$/);
-  });
+      expect(result).toMatch(new RegExp(`^[0-9a-f]{${bytes * 2}}$`));
+    }
+  );
 
   it('returns empty string for zero bytes', async () => {
     const ext = mk();

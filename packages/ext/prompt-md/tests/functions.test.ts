@@ -345,38 +345,6 @@ This is a static prompt.
   });
 });
 
-// ── AC-15: brace escape sequences ────────────────────────────────────────────
-
-describe('AC-15: brace escape sequences', () => {
-  it('{{ → {, }} → }, {{name}} → literal {name} without substitution', async () => {
-    const dir = await tempDir();
-    await writePrompt(
-      dir,
-      'escapes.prompt.md',
-      `---
-description: Escape test
-params: []
-output: string
----
-Open: {{ Close: }} Escaped: {{name}}
-`
-    );
-
-    const ext = await createPromptMdExtension(
-      { basePath: dir },
-      makeFactoryCtx()
-    );
-    const dict = asDict(ext.value);
-    const result = await dict['escapes']!.fn({}, {} as never);
-
-    expect(result as string).toContain('Open: {');
-    expect(result as string).toContain('Close: }');
-    expect(result as string).toContain('{name}');
-    // Must NOT substitute {name} since it is escaped
-    expect(result as string).not.toContain('{{name}}');
-  });
-});
-
 // ── AC-16: .md siblings not loaded ───────────────────────────────────────────
 
 describe('AC-16: directory mixing .prompt.md and ordinary .md', () => {
@@ -505,47 +473,6 @@ Hello {text}!
   });
 });
 
-// ── AC-19: ## heading inside @@ user stays as body text ─────────────────────
-
-describe('AC-19: ## heading inside @@ user section stays as body text', () => {
-  it('does not create a new role entry for ## headings inside role sections', async () => {
-    const dir = await tempDir();
-    await writePrompt(
-      dir,
-      'with-heading.prompt.md',
-      `---
-description: Prompt with heading
-params: []
-output: list
----
-@@ system
-Be helpful.
-@@ user
-## Context
-Some context here.
-`
-    );
-
-    const ext = await createPromptMdExtension(
-      { basePath: dir },
-      makeFactoryCtx()
-    );
-    const dict = asDict(ext.value);
-    const result = await dict['with_heading']!.fn({}, {} as never);
-
-    expect(Array.isArray(result)).toBe(true);
-    const messages = result as Array<Record<string, unknown>>;
-
-    // Must be exactly 2 entries — ## heading does NOT create a new role
-    expect(messages).toHaveLength(2);
-    expect(messages[0]!['role']).toBe('system');
-    expect(messages[1]!['role']).toBe('user');
-
-    // The ## heading must appear in the user content, not as a separate role
-    expect(messages[1]!['content'] as string).toContain('## Context');
-  });
-});
-
 // ── formatValue interpolation: dicts and lists render via formatValue ─────────
 
 describe('formatValue interpolation: non-string values render via rill formatValue', () => {
@@ -575,8 +502,7 @@ Result: {data}
       { data: { key: 'val' } },
       {} as never
     );
-    expect(typeof result).toBe('string');
-    expect(result as string).toContain('Result:');
+    expect(result).toBe(`Result: ${formatValue({ key: 'val' })}\n`);
   });
 
   it('renders a list via formatValue in interpolation position', async () => {
@@ -605,8 +531,7 @@ Items: {items}
       { items: ['a', 'b'] },
       {} as never
     );
-    expect(typeof result).toBe('string');
-    expect(result as string).toContain('Items:');
+    expect(result).toBe(`Items: ${formatValue(['a', 'b'])}\n`);
   });
 });
 

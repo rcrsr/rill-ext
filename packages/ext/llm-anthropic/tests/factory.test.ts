@@ -4,8 +4,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import {
+  createRuntimeContext,
+  getStatus,
+  type ApplicationCallable,
+  type RuntimeHaltSignal,
+} from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
+import { expectThrowHalt } from './_halt-helpers.js';
 
 // ============================================================
 // VALIDATION TESTS
@@ -13,116 +20,61 @@ import type { AnthropicExtensionConfig } from '../src/types.js';
 
 describe('createAnthropicExtension', () => {
   describe('configuration validation', () => {
-    // EC-1: Missing api_key
-    it('throws when api_key is missing', () => {
-      const config = {
-        model: 'claude-sonnet-4-5-20250929',
-      } as AnthropicExtensionConfig;
-
-      expect(() => createAnthropicExtension(config)).toThrow(
-        'api_key is required'
-      );
+    it.each([
+      {
+        label: 'a missing api_key',
+        config: { model: 'claude-sonnet-4-5-20250929' },
+        message: 'api_key is required',
+      },
+      {
+        label: 'an empty api_key',
+        config: { api_key: '', model: 'claude-sonnet-4-5-20250929' },
+        message: 'api_key cannot be empty',
+      },
+      {
+        label: 'a missing model',
+        config: { api_key: 'test-key' },
+        message: 'model is required',
+      },
+      {
+        label: 'an empty model',
+        config: { api_key: 'test-key', model: '' },
+        message: 'model is required',
+      },
+      {
+        label: 'a temperature below 0',
+        config: {
+          api_key: 'test-key',
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: -0.1,
+        },
+        message: 'temperature must be between 0 and 2',
+      },
+      {
+        label: 'a temperature above 2',
+        config: {
+          api_key: 'test-key',
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: 2.1,
+        },
+        message: 'temperature must be between 0 and 2',
+      },
+    ])('throws for $label', ({ config, message }) => {
+      expect(() =>
+        createAnthropicExtension(config as AnthropicExtensionConfig)
+      ).toThrow(message);
     });
 
-    // EC-3: Empty api_key
-    it('throws when api_key is empty', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: '',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      expect(() => createAnthropicExtension(config)).toThrow(
-        'api_key cannot be empty'
-      );
-    });
-
-    // EC-2: Missing model
-    it('throws when model is missing', () => {
-      const config = {
-        api_key: 'test-key',
-      } as AnthropicExtensionConfig;
-
-      expect(() => createAnthropicExtension(config)).toThrow(
-        'model is required'
-      );
-    });
-
-    // EC-2: Empty model
-    it('throws when model is empty', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: '',
-      };
-
-      expect(() => createAnthropicExtension(config)).toThrow(
-        'model is required'
-      );
-    });
-
-    // EC-4: Invalid temperature (below range)
-    it('throws when temperature is below 0', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        temperature: -0.1,
-      };
-
-      expect(() => createAnthropicExtension(config)).toThrow(
-        'temperature must be between 0 and 2'
-      );
-    });
-
-    // EC-4: Invalid temperature (above range)
-    it('throws when temperature is above 2', () => {
+    it.each([
+      { label: 'a temperature of 0', temperature: 0.0 },
+      { label: 'a temperature of 2', temperature: 2.0 },
+      { label: 'a temperature of 0.7', temperature: 0.7 },
+      { label: 'an omitted temperature', temperature: undefined },
+    ])('accepts $label', ({ temperature }) => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
-        temperature: 2.1,
-      };
-
-      expect(() => createAnthropicExtension(config)).toThrow(
-        'temperature must be between 0 and 2'
-      );
-    });
-
-    // Valid temperature at lower bound
-    it('accepts temperature of 0', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        temperature: 0.0,
-      };
-
-      expect(() => createAnthropicExtension(config)).not.toThrow();
-    });
-
-    // Valid temperature at upper bound
-    it('accepts temperature of 2', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        temperature: 2.0,
-      };
-
-      expect(() => createAnthropicExtension(config)).not.toThrow();
-    });
-
-    // Valid temperature in middle of range
-    it('accepts temperature of 0.7', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        temperature: 0.7,
-      };
-
-      expect(() => createAnthropicExtension(config)).not.toThrow();
-    });
-
-    // Omitted temperature (should be valid)
-    it('accepts omitted temperature', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
+        temperature,
       };
 
       expect(() => createAnthropicExtension(config)).not.toThrow();
@@ -131,29 +83,6 @@ describe('createAnthropicExtension', () => {
 
   // AC-1: Factory returns ExtensionFactoryResult with 5 functions in value dict
   describe('extension result structure', () => {
-    it('returns object with value dict containing 5 callable entries', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const result = createAnthropicExtension(config);
-      const value = result.value as Record<string, unknown>;
-
-      // Verify all 5 functions exist in the value dict (messages verb removed)
-      expect(value['message']).toBeDefined();
-      expect(value['embed']).toBeDefined();
-      expect(value['embed_batch']).toBeDefined();
-      expect(value['tool_loop']).toBeDefined();
-      expect(value['generate']).toBeDefined();
-
-      // messages verb was removed in unified-prompting migration
-      expect(value['messages']).toBeUndefined();
-
-      // Verify dispose exists on the factory result
-      expect(result.dispose).toBeDefined();
-    });
-
     it('message callable has correct structure', () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
@@ -194,6 +123,10 @@ describe('createAnthropicExtension', () => {
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
+        returnType: {
+          typeName: 'vector',
+          structure: { kind: 'vector' },
+        },
       });
     });
 
@@ -217,6 +150,10 @@ describe('createAnthropicExtension', () => {
         ],
         fn: expect.any(Function),
         annotations: { description: expect.any(String) },
+        returnType: {
+          typeName: 'list',
+          structure: { kind: 'list', element: { kind: 'vector' } },
+        },
       });
     });
 
@@ -248,28 +185,23 @@ describe('createAnthropicExtension', () => {
 
   // AC-28: dispose() called twice does not throw
   describe('dispose lifecycle', () => {
-    it('dispose can be called successfully', async () => {
-      const config: AnthropicExtensionConfig = {
+    it('disposes idempotently and halts calls with #DISPOSED afterwards', async () => {
+      const result = createAnthropicExtension({
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
-      };
+      });
+      const value = result.value as Record<string, ApplicationCallable>;
 
-      const result = createAnthropicExtension(config);
+      await expect(result.dispose?.()).resolves.toBeUndefined();
+      await expect(result.dispose?.()).resolves.toBeUndefined();
 
-      await expect(result.dispose?.()).resolves.not.toThrow();
-    });
-
-    it('dispose can be called multiple times (idempotent)', async () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const result = createAnthropicExtension(config);
-
-      // Call dispose twice
-      await expect(result.dispose?.()).resolves.not.toThrow();
-      await expect(result.dispose?.()).resolves.not.toThrow();
+      const thrown = expectThrowHalt(
+        () => value['message']!.fn({ prompt: 'Hello' }, createRuntimeContext()),
+        { code: 'DISPOSED' }
+      );
+      expect(getStatus((thrown as RuntimeHaltSignal).value).raw).toMatchObject({
+        kind: 'extension_disposed',
+      });
     });
   });
 });

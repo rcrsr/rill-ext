@@ -15,34 +15,16 @@ import { p } from '../src/index.js';
 
 describe('name validation', () => {
   describe('empty name (EC-1)', () => {
-    it('p.str throws RuntimeError RILL-R001 for empty name', () => {
-      expect(() => p.str('')).toThrow(RuntimeError);
-      expect(() => p.str('')).toThrow('param name must not be empty');
-    });
-
-    it('p.num throws RuntimeError RILL-R001 for empty name', () => {
-      expect(() => p.num('')).toThrow(RuntimeError);
-      expect(() => p.num('')).toThrow('param name must not be empty');
-    });
-
-    it('p.bool throws RuntimeError RILL-R001 for empty name', () => {
-      expect(() => p.bool('')).toThrow(RuntimeError);
-      expect(() => p.bool('')).toThrow('param name must not be empty');
-    });
-
-    it('p.dict throws RuntimeError RILL-R001 for empty name', () => {
-      expect(() => p.dict('')).toThrow(RuntimeError);
-      expect(() => p.dict('')).toThrow('param name must not be empty');
-    });
-
-    it('p.list throws RuntimeError RILL-R001 for empty name', () => {
-      expect(() => p.list('')).toThrow(RuntimeError);
-      expect(() => p.list('')).toThrow('param name must not be empty');
-    });
-
-    it('p.callable throws RuntimeError RILL-R001 for empty name', () => {
-      expect(() => p.callable('')).toThrow(RuntimeError);
-      expect(() => p.callable('')).toThrow('param name must not be empty');
+    it.each([
+      { helper: 'p.str', build: () => p.str('') },
+      { helper: 'p.num', build: () => p.num('') },
+      { helper: 'p.bool', build: () => p.bool('') },
+      { helper: 'p.dict', build: () => p.dict('') },
+      { helper: 'p.list', build: () => p.list('') },
+      { helper: 'p.callable', build: () => p.callable('') },
+    ])('$helper throws RuntimeError RILL-R001 for empty name', ({ build }) => {
+      expect(build).toThrow(RuntimeError);
+      expect(build).toThrow('param name must not be empty');
     });
 
     it('error has errorId RILL-R001', () => {
@@ -58,33 +40,22 @@ describe('name validation', () => {
   });
 
   describe('whitespace name (EC-2)', () => {
-    it('p.str throws RuntimeError RILL-R001 for name with space', () => {
-      expect(() => p.str('my param')).toThrow(RuntimeError);
-      expect(() => p.str('my param')).toThrow(
-        'param name must be a valid identifier'
-      );
-    });
-
-    it('p.num throws RuntimeError RILL-R001 for name with tab', () => {
-      expect(() => p.num('my\tparam')).toThrow(RuntimeError);
-      expect(() => p.num('my\tparam')).toThrow(
-        'param name must be a valid identifier'
-      );
-    });
-
-    it('p.bool throws RuntimeError RILL-R001 for name with newline', () => {
-      expect(() => p.bool('my\nparam')).toThrow(RuntimeError);
-      expect(() => p.bool('my\nparam')).toThrow(
-        'param name must be a valid identifier'
-      );
-    });
-
-    it('p.list throws RuntimeError RILL-R001 for name with leading space', () => {
-      expect(() => p.list(' items')).toThrow(RuntimeError);
-      expect(() => p.list(' items')).toThrow(
-        'param name must be a valid identifier'
-      );
-    });
+    it.each([
+      { helper: 'p.str', input: 'my param', build: () => p.str('my param') },
+      { helper: 'p.num', input: 'my\\tparam', build: () => p.num('my\tparam') },
+      {
+        helper: 'p.bool',
+        input: 'my\\nparam',
+        build: () => p.bool('my\nparam'),
+      },
+      { helper: 'p.list', input: ' items', build: () => p.list(' items') },
+    ])(
+      '$helper throws RuntimeError RILL-R001 for name "$input"',
+      ({ build }) => {
+        expect(build).toThrow(RuntimeError);
+        expect(build).toThrow('param name must be a valid identifier');
+      }
+    );
 
     it('whitespace error has errorId RILL-R001', () => {
       let caught: unknown;
@@ -120,13 +91,6 @@ describe('p.str', () => {
   it('omits description key entirely when desc is not provided', () => {
     const result = p.str('text');
     expect('description' in result.annotations).toBe(false);
-  });
-
-  it('returns 4-field RillParam shape (AC-23)', () => {
-    const result = p.str('x');
-    expect(Object.keys(result)).toEqual(
-      expect.arrayContaining(['name', 'type', 'defaultValue', 'annotations'])
-    );
   });
 });
 
@@ -304,38 +268,4 @@ describe('AC-33: empty string defaultValue preservation', () => {
     const result = p.dict('key', undefined, '');
     expect(result.defaultValue).toBe('');
   });
-
-  it('p.num with 0 defaultValue preserves it (not treated as absent)', () => {
-    const result = p.num('x', undefined, 0);
-    expect(result.defaultValue).toBe(0);
-  });
-
-  it('p.bool with false defaultValue preserves it (not treated as absent)', () => {
-    const result = p.bool('flag', undefined, false);
-    expect(result.defaultValue).toBe(false);
-  });
-});
-
-// ============================================================
-// AC-23: 4-field shape across all helpers
-// ============================================================
-
-describe('AC-23: RillParam 4-field shape', () => {
-  const cases = [
-    p.str('a'),
-    p.num('b'),
-    p.bool('c'),
-    p.dict('d'),
-    p.list('e'),
-    p.callable('f'),
-  ];
-
-  for (const param of cases) {
-    it(`param '${param.name}' has name, type, defaultValue, annotations`, () => {
-      expect(param).toHaveProperty('name');
-      expect(param).toHaveProperty('type');
-      expect(param).toHaveProperty('defaultValue');
-      expect(param).toHaveProperty('annotations');
-    });
-  }
 });

@@ -84,23 +84,10 @@ describe('from() host function', () => {
   });
 
   // ============================================================
-  // AC-3: filters by sender address
+  // filters by sender address
   // ============================================================
 
-  it('includes sender address in $filter query param [AC-3]', async () => {
-    const mockFetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-    globalThis.fetch = mockFetch;
-    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    await getCallable(ext, 'from').fn({ address: 'sender@example.com' }, ctx);
-
-    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('sender@example.com');
-    expect(url).toContain('$filter=');
-  });
-
-  it('returns MailMessageDict list filtered by sender [AC-3]', async () => {
+  it('returns MailMessageDict list filtered by sender', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -125,6 +112,7 @@ describe('from() host function', () => {
     await getCallable(ext, 'from').fn({ address: 'sender@example.com' }, ctx);
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('$filter=');
     expect(url).toContain('from/emailAddress/address');
     expect(url).toContain("'sender@example.com'");
   });
@@ -143,10 +131,10 @@ describe('from() host function', () => {
   });
 
   // ============================================================
-  // EC-3: empty address throws #INVALID_INPUT
+  // empty address throws #INVALID_INPUT
   // ============================================================
 
-  it('throws #INVALID_INPUT for empty address [EC-3]', async () => {
+  it('throws #INVALID_INPUT for empty address', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -159,7 +147,7 @@ describe('from() host function', () => {
     expect(getStatus(caught).message).toContain('address is required');
   });
 
-  it('throws #INVALID_INPUT for whitespace-only address [EC-3]', async () => {
+  it('throws #INVALID_INPUT for whitespace-only address', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -172,10 +160,10 @@ describe('from() host function', () => {
   });
 
   // ============================================================
-  // AC-19: event emission
+  // event emission
   // ============================================================
 
-  it('emits outlook:mail:read event on success [AC-19]', async () => {
+  it('emits outlook:mail:read event on success', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();

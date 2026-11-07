@@ -5,11 +5,7 @@
 
 import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
-import {
-  VERSION,
-  createQdrantExtension,
-  type QdrantConfig,
-} from '../src/index.js';
+import { VERSION, createQdrantExtension } from '../src/index.js';
 
 const _require = createRequire(import.meta.url);
 const _pkg = _require('../package.json') as { version: string };
@@ -19,33 +15,8 @@ const _pkg = _require('../package.json') as { version: string };
 // ============================================================
 
 describe('VERSION constant', () => {
-  it('exports VERSION constant (IC-1)', () => {
-    expect(VERSION).toBeDefined();
-  });
-
-  it('VERSION is a string (IC-1)', () => {
-    expect(typeof VERSION).toBe('string');
-  });
-
   it('VERSION matches package.json version (IC-1)', () => {
     expect(VERSION).toBe(_pkg.version);
-  });
-});
-
-// ============================================================
-// TYPE EXPORT TESTS
-// ============================================================
-
-describe('QdrantConfig type export', () => {
-  it('exports QdrantConfig type (IC-1)', () => {
-    // Type-only test: verify the type is exported and can be used
-    const config: QdrantConfig = {
-      url: 'http://localhost:6333',
-      collection: 'test',
-    };
-
-    expect(config.url).toBe('http://localhost:6333');
-    expect(config.collection).toBe('test');
   });
 });
 

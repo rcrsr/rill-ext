@@ -104,7 +104,7 @@ describe('Prompt Function Generation', () => {
       );
     });
 
-    it('sets defaultValue for optional arguments only', () => {
+    it('leaves defaultValue undefined for required, optional, and unspecified arguments', () => {
       const prompts: McpPrompt[] = [
         {
           name: 'test',
@@ -430,70 +430,6 @@ describe('Prompt Function Generation', () => {
       }
     });
 
-    it('handles connection lost errors', async () => {
-      const mockGetPrompt = vi
-        .fn()
-        .mockRejectedValue(new Error('connection closed unexpectedly'));
-
-      mockClient.getPrompt = mockGetPrompt;
-
-      const prompts: McpPrompt[] = [{ name: 'test' }];
-      const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-
-      await expectRejectsInvalid(
-        functions['test']!.fn({}, makeRuntimeCtx()),
-        'connection lost'
-      );
-    });
-
-    it('handles authentication errors', async () => {
-      const mockGetPrompt = vi
-        .fn()
-        .mockRejectedValue(new Error('unauthorized access'));
-
-      mockClient.getPrompt = mockGetPrompt;
-
-      const prompts: McpPrompt[] = [{ name: 'test' }];
-      const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-
-      await expectRejectsInvalid(
-        functions['test']!.fn({}, makeRuntimeCtx()),
-        'authentication failed'
-      );
-    });
-
-    it('handles protocol errors', async () => {
-      const mockGetPrompt = vi
-        .fn()
-        .mockRejectedValue(new Error('invalid response format'));
-
-      mockClient.getPrompt = mockGetPrompt;
-
-      const prompts: McpPrompt[] = [{ name: 'test' }];
-      const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-
-      await expectRejectsInvalid(
-        functions['test']!.fn({}, makeRuntimeCtx()),
-        'protocol'
-      );
-    });
-
-    it('wraps generic errors as tool errors', async () => {
-      const mockGetPrompt = vi
-        .fn()
-        .mockRejectedValue(new Error('Something went wrong'));
-
-      mockClient.getPrompt = mockGetPrompt;
-
-      const prompts: McpPrompt[] = [{ name: 'test' }];
-      const functions = generatePromptFunctions(prompts, mockClient, timeoutMs);
-
-      await expectRejectsInvalid(
-        functions['test']!.fn({}, makeRuntimeCtx()),
-        'Something went wrong'
-      );
-    });
-
     it('maps thrown errors via mapMcpError into invalid RillValues', async () => {
       const runtimeError = new Error('Runtime error');
       const mockGetPrompt = vi.fn().mockRejectedValue(runtimeError);
@@ -550,6 +486,14 @@ describe('Prompt Function Generation', () => {
 
       expect(msg1['content']).toBe('A');
       expect(msg2['content']).toBe('B');
+      expect(mockGetPrompt).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ name: 'p1' })
+      );
+      expect(mockGetPrompt).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ name: 'p2' })
+      );
     });
   });
 });

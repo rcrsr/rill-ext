@@ -156,22 +156,6 @@ describe('usage accumulator', () => {
     expect(result['output_tokens']).toBe(0);
   });
 
-  it('usage() result has both input_tokens and output_tokens fields (IR-7)', async () => {
-    const { createFoundryExtension } = await import('../src/factory.js');
-    const ext = await createFoundryExtension(validConfig());
-
-    const value = getHostFns(ext);
-    const usageFn = value['usage']!;
-
-    const result = usageFn.fn({}, {}) as Record<string, unknown>;
-
-    expect(result).toHaveProperty('input_tokens');
-    expect(result).toHaveProperty('output_tokens');
-    expect(typeof result['input_tokens']).toBe('number');
-    expect(typeof result['output_tokens']).toBe('number');
-  });
-
-  // AC-12: usage() returns non-zero token counts after LLM call
   it('accumulates tokens after a message() call (AC-12)', async () => {
     mockStream.mockReturnValue(createMockStreamRunner('Hello!', 15, 25));
 

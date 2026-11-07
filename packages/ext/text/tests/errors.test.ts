@@ -42,33 +42,24 @@ describe('html_to_text errors', () => {
     expect(meta.raw).toMatchObject({ kind: 'invalid_option_type' });
   });
 
-  // EC-7: word_wrap_width: 0 → invalid_word_wrap_width
-  it('EC-7: rejects word_wrap_width: 0 with INVALID_INPUT / invalid_word_wrap_width', async () => {
-    const ctx = makeRuntimeCtx();
-    const invalidateSpy = vi.spyOn(ctx, 'invalidate');
+  it.each([0, -1])(
+    'rejects word_wrap_width: %d with INVALID_INPUT / invalid_word_wrap_width',
+    async (width) => {
+      const ctx = makeRuntimeCtx();
+      const invalidateSpy = vi.spyOn(ctx, 'invalidate');
 
-    await fn('html_to_text')({ html: '<p>x</p>', word_wrap_width: 0 }, ctx);
+      await fn('html_to_text')(
+        { html: '<p>x</p>', word_wrap_width: width },
+        ctx
+      );
 
-    expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0]!;
-    expect(meta.code).toBe('INVALID_INPUT');
-    expect(meta.provider).toBe('text');
-    expect(meta.raw).toMatchObject({ kind: 'invalid_word_wrap_width' });
-  });
-
-  // EC-7: word_wrap_width: -1 → invalid_word_wrap_width
-  it('EC-7: rejects word_wrap_width: -1 with INVALID_INPUT / invalid_word_wrap_width', async () => {
-    const ctx = makeRuntimeCtx();
-    const invalidateSpy = vi.spyOn(ctx, 'invalidate');
-
-    await fn('html_to_text')({ html: '<p>x</p>', word_wrap_width: -1 }, ctx);
-
-    expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0]!;
-    expect(meta.code).toBe('INVALID_INPUT');
-    expect(meta.provider).toBe('text');
-    expect(meta.raw).toMatchObject({ kind: 'invalid_word_wrap_width' });
-  });
+      expect(invalidateSpy).toHaveBeenCalled();
+      const [, meta] = invalidateSpy.mock.calls[0]!;
+      expect(meta.code).toBe('INVALID_INPUT');
+      expect(meta.provider).toBe('text');
+      expect(meta.raw).toMatchObject({ kind: 'invalid_word_wrap_width' });
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -76,31 +67,21 @@ describe('html_to_text errors', () => {
 // ---------------------------------------------------------------------------
 
 describe('truncate errors', () => {
-  it('EC-2 / AC-24: rejects max: -5 with INVALID_INPUT / invalid_max', async () => {
-    const ctx = makeRuntimeCtx();
-    const invalidateSpy = vi.spyOn(ctx, 'invalidate');
+  it.each([-5, 0])(
+    'rejects max: %d with INVALID_INPUT / invalid_max',
+    async (max) => {
+      const ctx = makeRuntimeCtx();
+      const invalidateSpy = vi.spyOn(ctx, 'invalidate');
 
-    await fn('truncate')({ text: 'hello', max: -5 }, ctx);
+      await fn('truncate')({ text: 'hello', max }, ctx);
 
-    expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0]!;
-    expect(meta.code).toBe('INVALID_INPUT');
-    expect(meta.provider).toBe('text');
-    expect(meta.raw).toMatchObject({ kind: 'invalid_max' });
-  });
-
-  it('EC-3 / AC-25: rejects max: 0 with INVALID_INPUT / invalid_max', async () => {
-    const ctx = makeRuntimeCtx();
-    const invalidateSpy = vi.spyOn(ctx, 'invalidate');
-
-    await fn('truncate')({ text: 'hello', max: 0 }, ctx);
-
-    expect(invalidateSpy).toHaveBeenCalled();
-    const [, meta] = invalidateSpy.mock.calls[0]!;
-    expect(meta.code).toBe('INVALID_INPUT');
-    expect(meta.provider).toBe('text');
-    expect(meta.raw).toMatchObject({ kind: 'invalid_max' });
-  });
+      expect(invalidateSpy).toHaveBeenCalled();
+      const [, meta] = invalidateSpy.mock.calls[0]!;
+      expect(meta.code).toBe('INVALID_INPUT');
+      expect(meta.provider).toBe('text');
+      expect(meta.raw).toMatchObject({ kind: 'invalid_max' });
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------

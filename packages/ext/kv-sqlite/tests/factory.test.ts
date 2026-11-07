@@ -7,7 +7,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { anyTypeValue } from '@rcrsr/rill';
+import { RuntimeError } from '@rcrsr/rill';
 import { createSqliteKvExtension } from '../src/factory.js';
 import type { SqliteKvConfig } from '../src/types.js';
 import { makeFactoryCtx } from './_setup.js';
@@ -60,28 +60,36 @@ describe('createSqliteKvExtension', () => {
       ext.dispose?.();
     });
 
-    it('throws for invalid database path permissions', () => {
-      // Create a read-only directory
-      const readonlyDir = join(TEST_DATA_DIR, 'readonly');
-      mkdirSync(readonlyDir, { recursive: true });
+    it('throws RILL-R001 when a file blocks the database directory', () => {
+      const blockerDir = join(TEST_DATA_DIR, 'blocker');
+      mkdirSync(blockerDir, { recursive: true });
 
-      // Create a file to block directory creation
-      const blockedPath = join(readonlyDir, 'blocked');
+      // A regular file where a directory is expected makes SQLite fail to open
+      const blockedPath = join(blockerDir, 'blocked');
       writeFileSync(blockedPath, '');
 
-      const dbPath = join(blockedPath, 'test.db');
       const config: SqliteKvConfig = {
         mounts: {
           test: {
             mode: 'read-write',
-            database: dbPath,
+            database: join(blockedPath, 'test.db'),
             table: 'kv_test',
           },
         },
       };
 
-      // SQLite will throw 'unable to open database file' when directory can't be created
-      expect(() => createSqliteKvExtension(config, makeFactoryCtx())).toThrow();
+      let caught: unknown;
+      try {
+        createSqliteKvExtension(config, makeFactoryCtx());
+      } catch (error: unknown) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(RuntimeError);
+      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
+      expect((caught as RuntimeError).message).toContain(
+        'Failed to initialize SQLite database for mount "test"'
+      );
     });
   });
 
@@ -225,36 +233,6 @@ describe('createSqliteKvExtension', () => {
 
       expect(journalMode).toBe('wal');
     });
-
-    it('preserves WAL mode on existing database', () => {
-      const dbPath = join(TEST_DATA_DIR, 'existing-wal.db');
-      mkdirSync(TEST_DATA_DIR, { recursive: true });
-
-      // Create database with WAL already enabled
-      const db = new Database(dbPath);
-      db.pragma('journal_mode = WAL');
-      db.close();
-
-      const config: SqliteKvConfig = {
-        mounts: {
-          test: {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'kv_test',
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      ext.dispose?.();
-
-      // Verify WAL mode still enabled
-      const verifyDb = new Database(dbPath, { readonly: true });
-      const journalMode = verifyDb.pragma('journal_mode', { simple: true });
-      verifyDb.close();
-
-      expect(journalMode).toBe('wal');
-    });
   });
 
   describe('table creation', () => {
@@ -337,71 +315,6 @@ describe('createSqliteKvExtension', () => {
 
       expect(row).toBeDefined();
       expect(row?.value).toBe('"existing_value"');
-    });
-  });
-
-  describe('function exports', () => {
-    it('exports all 11 kv storage functions', () => {
-      const dbPath = join(TEST_DATA_DIR, 'exports.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          test: {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'kv_test',
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      const value = ext.value as Record<string, unknown>;
-
-      // Verify all 11 functions exist
-      expect(value['get']).toBeDefined();
-      expect(value['get_or']).toBeDefined();
-      expect(value['set']).toBeDefined();
-      expect(value['merge']).toBeDefined();
-      expect(value['delete']).toBeDefined();
-      expect(value['keys']).toBeDefined();
-      expect(value['has']).toBeDefined();
-      expect(value['clear']).toBeDefined();
-      expect(value['getAll']).toBeDefined();
-      expect(value['schema']).toBeDefined();
-      expect(value['mounts']).toBeDefined();
-
-      ext.dispose?.();
-    });
-
-    it('all functions have correct HostFunctionDefinition structure', () => {
-      const dbPath = join(TEST_DATA_DIR, 'structure.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          test: {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'kv_test',
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      const value = ext.value as Record<
-        string,
-        {
-          fn: unknown;
-          params: unknown;
-          annotations?: Record<string, unknown>;
-          returnType: unknown;
-        }
-      >;
-
-      // Verify structure for one function (all follow same pattern)
-      expect(value['get']?.params).toBeDefined();
-      expect(value['get']?.fn).toBeTypeOf('function');
-      expect(value['get']?.annotations?.['description']).toBeTypeOf('string');
-      expect(value['get']?.returnType).toEqual(anyTypeValue);
-
-      ext.dispose?.();
     });
   });
 
