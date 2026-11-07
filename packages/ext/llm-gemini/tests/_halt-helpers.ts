@@ -58,11 +58,10 @@ export function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
     return;
   }
   if (error instanceof RuntimeError) {
-    if (opts.code !== undefined || opts.provider !== undefined) {
-      throw new Error(
-        `expected a RuntimeHaltSignal carrying code/provider, got RuntimeError: ${error.message}`
-      );
-    }
+    expect(
+      { code: opts.code, provider: opts.provider },
+      'a RuntimeError carries no status code or provider'
+    ).toEqual({ code: undefined, provider: undefined });
     if (opts.message !== undefined) matchMessage(error.message, opts.message);
     return;
   }

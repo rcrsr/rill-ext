@@ -168,7 +168,7 @@ function autoShieldConfig(): FoundryConfig {
   };
 }
 
-/** Config with inference but NO contentSafety (autoShield implicitly false). */
+/** Config with contentSafety present but autoShield explicitly false. */
 function noShieldConfig(): FoundryConfig {
   return {
     endpoint: 'https://my-foundry.openai.azure.com',
@@ -181,6 +181,19 @@ function noShieldConfig(): FoundryConfig {
     contentSafety: {
       endpoint: 'https://my-safety.cognitiveservices.azure.com',
       autoShield: false,
+    },
+  };
+}
+
+/** Config with inference and NO contentSafety block at all. */
+function absentContentSafetyConfig(): FoundryConfig {
+  return {
+    endpoint: 'https://my-foundry.openai.azure.com',
+    auth: { type: 'api-key', key: 'test-api-key' },
+    inference: {
+      model: 'gpt-4o',
+      apiVersion: '2025-01-01-preview',
+      embedModel: 'text-embedding-ada-002',
     },
   };
 }
@@ -592,6 +605,23 @@ describe('auto-shield middleware', () => {
       const ctx = createRuntimeContext();
 
       // Calling message() should NOT trigger shield
+      await getHostFn(ext, 'message').fn({ prompt: 'hello' }, ctx);
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockStream).toHaveBeenCalledOnce();
+    });
+
+    it('shield fetch NOT called when contentSafety is absent', async () => {
+      const mockFetch = mockFetchJson(200, SAFE_SHIELD_RESPONSE);
+      globalThis.fetch = mockFetch;
+
+      const runner = createMockStreamRunner();
+      mockStream.mockReturnValue(runner);
+
+      const { createFoundryExtension } = await import('../src/factory.js');
+      const ext = await createFoundryExtension(absentContentSafetyConfig());
+      const ctx = createRuntimeContext();
+
       await getHostFn(ext, 'message').fn({ prompt: 'hello' }, ctx);
 
       expect(mockFetch).not.toHaveBeenCalled();

@@ -118,7 +118,9 @@ describe('Transport Creation', () => {
       await ext.dispose?.();
 
       expect(captured).toBeInstanceOf(StreamableHTTPClientTransport);
-      // The SDK keeps the resolved request options in a private field
+      // Couples to the SDK private `_requestInit` field of
+      // StreamableHTTPClientTransport (@modelcontextprotocol/sdk ^1.32.2 in
+      // package.json). A failure here after an SDK bump means the field moved.
       const requestInit: unknown = (captured as StreamableHTTPClientTransport)[
         '_requestInit'
       ];

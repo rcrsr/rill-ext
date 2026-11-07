@@ -212,23 +212,25 @@ function makeTool(
     description?: string;
     params?: Array<{ name: string; type: string; description?: string }>;
   }
-): RillValue {
-  const tool = callable(fn);
-  if (options?.description !== undefined) {
-    Object.assign(tool, { description: options.description });
-  }
-  if (options?.params !== undefined) {
-    Object.assign(tool, {
-      params: options.params.map((p) => ({
-        name: p.name,
-        type: { kind: p.type },
-        defaultValue: undefined,
-        annotations:
-          p.description !== undefined ? { description: p.description } : {},
-      })),
-    });
-  }
-  return tool;
+): ApplicationCallable {
+  const base = callable(fn);
+  return {
+    ...base,
+    annotations:
+      options?.description !== undefined
+        ? { description: options.description }
+        : base.annotations,
+    params:
+      options?.params !== undefined
+        ? options.params.map((p) => ({
+            name: p.name,
+            type: { kind: p.type },
+            defaultValue: undefined,
+            annotations:
+              p.description !== undefined ? { description: p.description } : {},
+          }))
+        : base.params,
+  };
 }
 
 // ============================================================
