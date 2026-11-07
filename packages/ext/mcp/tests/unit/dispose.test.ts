@@ -17,7 +17,7 @@ import {
   expectRejectsInvalid,
 } from '../_helpers.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { RuntimeContext } from '@rcrsr/rill';
+import { getStatus, type RuntimeContext } from '@rcrsr/rill';
 import type { McpExtensionConfig } from '../../src/types.js';
 
 describe('dispose() functionality', () => {
@@ -117,18 +117,20 @@ describe('dispose() functionality', () => {
       await expect(result.dispose?.()).resolves.toBeUndefined();
     });
 
-    it('disposes during active tool call - pending call rejects (BC-5)', async () => {
-      // Mock connection with one tool
-      let resolveToolCall: (value: CallToolResult) => void;
-      const toolCallPromise = new Promise<CallToolResult>((resolve) => {
-        resolveToolCall = resolve;
+    it('rejects pending call as connection lost and halts later calls after dispose (BC-5)', async () => {
+      let rejectToolCall: (reason: Error) => void = () => {};
+      const toolCallPromise = new Promise<CallToolResult>((_, reject) => {
+        rejectToolCall = reject;
       });
 
       vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
-      vi.spyOn(Client.prototype, 'close').mockImplementation(async () => {
-        // Simulate connection close during active call
-        return;
-      });
+      const mockClose = vi
+        .spyOn(Client.prototype, 'close')
+        .mockImplementation(() => {
+          // The real SDK rejects pending requests when the transport closes
+          rejectToolCall(new Error('MCP error -32000: Connection closed'));
+          return Promise.resolve();
+        });
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [
           {
@@ -147,11 +149,9 @@ describe('dispose() functionality', () => {
       vi.spyOn(Client.prototype, 'listPrompts').mockResolvedValue({
         prompts: [],
       });
-
-      // Mock callTool to hang until we resolve it
-      vi.spyOn(Client.prototype, 'callTool').mockImplementation(() => {
-        return toolCallPromise;
-      });
+      const mockCallTool = vi
+        .spyOn(Client.prototype, 'callTool')
+        .mockImplementation(() => toolCallPromise);
 
       const config: McpExtensionConfig = {
         transport: {
@@ -164,25 +164,45 @@ describe('dispose() functionality', () => {
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
       const tools = fns['tools'] as Record<string, unknown>;
+      const tool = getCallable(tools, 'long_running_tool');
 
-      // Start a long-running tool call
-      const toolCallResultPromise = getCallable(tools, 'long_running_tool').fn(
-        {},
-        makeRuntimeCtx()
-      );
+      let settled = false;
+      const pendingCall = Promise.resolve(tool.fn({}, makeRuntimeCtx()));
+      const settledTracker = pendingCall
+        .then(() => {
+          settled = true;
+        })
+        .catch(() => {
+          settled = true;
+        });
 
-      // Immediately dispose (while call is pending)
+      // The call stays pending until dispose closes the connection
+      await Promise.resolve();
+      expect(settled).toBe(false);
+
       await result.dispose?.();
 
-      // The pending tool call should reject with connection lost error
-      // Note: In practice, the MCP client.close() causes pending calls to fail
-      // We simulate this by rejecting the toolCallPromise after close
-      resolveToolCall!({
-        isError: true,
-        content: [{ type: 'text', text: 'connection lost' }],
-      });
+      expect(mockClose).toHaveBeenCalledTimes(1);
 
-      await expectRejectsInvalid(toolCallResultPromise, 'connection lost');
+      const pendingError = await expectRejectsInvalid(pendingCall);
+      await settledTracker;
+      expect(settled).toBe(true);
+      const pendingStatus = getStatus(pendingError);
+      expect(pendingStatus.code.name).toBe('UNAVAILABLE');
+      expect((pendingStatus.raw as { kind?: unknown }).kind).toBe(
+        'connection_lost'
+      );
+
+      const lateError = await expectRejectsInvalid(
+        Promise.resolve(tool.fn({}, makeRuntimeCtx()))
+      );
+      const lateStatus = getStatus(lateError);
+      expect(lateStatus.code.name).toBe('DISPOSED');
+      expect((lateStatus.raw as { kind?: unknown }).kind).toBe(
+        'extension_disposed'
+      );
+
+      expect(mockCallTool).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -164,6 +164,15 @@ export function failUnavailable(
   });
 }
 
+/** Call made after the extension was disposed. */
+export function failDisposed(ctx: RuntimeContext): RillValue {
+  return ctx.invalidate(new Error('mcp: extension disposed'), {
+    code: 'DISPOSED',
+    provider: PROVIDER,
+    raw: { kind: 'extension_disposed' },
+  });
+}
+
 // ============================================================
 // CATCH-BLOCK MAPPER
 // ============================================================

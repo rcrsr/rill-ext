@@ -16,7 +16,7 @@ import type {
   RillValue,
 } from '@rcrsr/rill';
 import { RuntimeError } from '@rcrsr/rill';
-import type { McpExtensionConfig } from './types.js';
+import type { McpExtensionConfig, McpLifecycleState } from './types.js';
 import {
   factoryError,
   processExitError,
@@ -128,7 +128,10 @@ export async function createMcpExtension(
   const timeout = config.timeout ?? 30000;
 
   // Shared lifecycle state for event tracking across all functions
-  const lifecycleState = { connectEmitted: false };
+  const lifecycleState: McpLifecycleState = {
+    connectEmitted: false,
+    disposed: false,
+  };
 
   // Generate tool functions from filtered tools
   const toolFunctions = generateToolFunctions(
@@ -185,14 +188,12 @@ export async function createMcpExtension(
   // ============================================================
   // STEP 5: RETURN EXTENSION RESULT WITH DISPOSE
   // ============================================================
-  let disposed = false;
-
   const dispose = async (): Promise<void> => {
     // Idempotent dispose - subsequent calls no-op
-    if (disposed) {
+    if (lifecycleState.disposed) {
       return;
     }
-    disposed = true;
+    lifecycleState.disposed = true;
 
     // NOTE: mcp:disconnect should be emitted here, but dispose()
     // is called after script execution when no RuntimeContext exists.

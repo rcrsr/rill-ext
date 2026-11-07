@@ -14,7 +14,8 @@ import {
   isInvalid,
   structureToTypeValue,
 } from '@rcrsr/rill';
-import { failTool, failTimeout, mapMcpError } from './errors.js';
+import type { McpLifecycleState } from './types.js';
+import { failDisposed, failTool, failTimeout, mapMcpError } from './errors.js';
 
 function describeError(error: unknown): string {
   if (isInvalid(error as RillValue)) {
@@ -177,7 +178,7 @@ function generateToolFunction(
   tool: McpTool,
   client: Client,
   timeoutMs: number,
-  lifecycleState: { connectEmitted: boolean }
+  lifecycleState: McpLifecycleState
 ): RillFunction {
   // Generate parameters from JSON Schema
   const params = generateParametersFromSchema(tool.inputSchema);
@@ -190,6 +191,10 @@ function generateToolFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
+    if (lifecycleState.disposed === true) {
+      throw failDisposed(ctx);
+    }
+
     // Emit mcp:connect on first tool call
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
@@ -280,7 +285,7 @@ export function generateToolFunctions(
   tools: McpTool[],
   client: Client,
   timeoutMs = 30000,
-  lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
+  lifecycleState: McpLifecycleState = { connectEmitted: false }
 ): Record<string, RillFunction> {
   // Sanitize tool names with collision detection
   const nameMap = sanitizeNames(tools.map((tool) => tool.name));

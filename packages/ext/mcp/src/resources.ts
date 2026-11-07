@@ -15,9 +15,10 @@ import {
   isInvalid,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
-import { failInput, failTimeout, mapMcpError } from './errors.js';
+import { failDisposed, failInput, failTimeout, mapMcpError } from './errors.js';
 import { sanitizeNames } from './naming.js';
 import { parseResourceContent } from './parsing.js';
+import type { McpLifecycleState } from './types.js';
 
 function describeError(error: unknown): string {
   if (isInvalid(error as RillValue)) {
@@ -148,13 +149,16 @@ function expandUriTemplate(
 export function createReadResourceFunction(
   client: Client,
   timeoutMs: number,
-  lifecycleState: { connectEmitted: boolean }
+  lifecycleState: McpLifecycleState
 ): RillFunction {
   const fn = async (
     args: Record<string, RillValue>,
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
+    if (lifecycleState.disposed === true) {
+      throw failDisposed(ctx);
+    }
 
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
@@ -235,7 +239,7 @@ function createStaticResourceFunction(
   resource: McpResource,
   client: Client,
   timeoutMs: number,
-  lifecycleState: { connectEmitted: boolean },
+  lifecycleState: McpLifecycleState,
   callableName: string
 ): RillFunction {
   // Build description: use resource.description if provided, otherwise derive from name.
@@ -256,6 +260,9 @@ function createStaticResourceFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
+    if (lifecycleState.disposed === true) {
+      throw failDisposed(ctx);
+    }
 
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
@@ -324,7 +331,7 @@ export function generateStaticResourceFunctions(
   resources: McpResource[],
   client: Client,
   timeoutMs: number,
-  lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
+  lifecycleState: McpLifecycleState = { connectEmitted: false }
 ): Record<string, RillFunction> {
   // Prefix resource names with "resource_" before sanitization
   const prefixedNames = resources.map(
@@ -377,7 +384,7 @@ function createResourceTemplateFunction(
   template: McpResourceTemplate,
   client: Client,
   timeoutMs: number,
-  lifecycleState: { connectEmitted: boolean }
+  lifecycleState: McpLifecycleState
 ): RillFunction {
   // Extract template variables
   const variables = extractTemplateVariables(template.uriTemplate);
@@ -392,6 +399,9 @@ function createResourceTemplateFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
+    if (lifecycleState.disposed === true) {
+      throw failDisposed(ctx);
+    }
 
     if (!lifecycleState.connectEmitted) {
       emitExtensionEvent(ctx, {
@@ -480,7 +490,7 @@ export function generateResourceTemplateFunctions(
   templates: McpResourceTemplate[],
   client: Client,
   timeoutMs: number,
-  lifecycleState: { connectEmitted: boolean } = { connectEmitted: false }
+  lifecycleState: McpLifecycleState = { connectEmitted: false }
 ): Record<string, RillFunction> {
   // Prefix template names with "resource_" before sanitization
   const prefixedNames = templates.map(
