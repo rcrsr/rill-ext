@@ -16,6 +16,7 @@
  */
 
 import {
+  RuntimeHaltSignal,
   toCallable,
   structureToTypeValue,
   emitExtensionEvent,
@@ -158,7 +159,7 @@ export function createGoogleWorkspaceExtension(
         });
 
       if (disposalState.isDisposed) {
-        throw disposed();
+        throw new RuntimeHaltSignal(disposed(), true);
       }
 
       if (capabilityCheck !== null) {

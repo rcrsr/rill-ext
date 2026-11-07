@@ -20,12 +20,15 @@ const execFileAsync = promisify(execFile);
 const PROVIDER = 'exec';
 
 /** Call made after the extension was disposed. */
-export function failDisposed(ctx: RuntimeContext): RillValue {
-  return ctx.invalidate(new Error('exec: extension disposed'), {
-    code: 'DISPOSED',
-    provider: PROVIDER,
-    raw: { kind: 'extension_disposed' },
-  });
+export function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error('exec: extension disposed'), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    }),
+    true
+  );
 }
 
 // ----------------------------------------------------------

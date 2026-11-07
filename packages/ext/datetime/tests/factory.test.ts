@@ -5,7 +5,15 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { getStatus, isInvalid } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  execute,
+  getStatus,
+  isInvalid,
+  parse,
+  RuntimeHaltSignal,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import { createDatetimeExtension } from '../src/factory.js';
 import type { DatetimeExtensionConfig } from '../src/types.js';
 import { makeFactoryCtx, makeRuntimeCtx, fnOf } from './_setup.js';
@@ -117,12 +125,50 @@ describe('datetime extension factory', () => {
           fnOf(ext, name).fn({}, makeRuntimeCtx())
         );
         expect(threw, `${name} should throw`).toBe(true);
-        expect(isInvalid(thrown as never), `${name} invalid`).toBe(true);
-        const status = getStatus(thrown as never);
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+        const invalid = (thrown as RuntimeHaltSignal).value;
+        expect(isInvalid(invalid), `${name} invalid`).toBe(true);
+        const status = getStatus(invalid);
         expect(status.code.name).toBe('DISPOSED');
         expect(status.provider).toBe('datetime');
         expect(status.raw).toMatchObject({ kind: 'extension_disposed' });
       }
     });
+  });
+});
+
+describe('datetime extension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = mk();
+    const ctx = createRuntimeContext({
+      functions: { zones: fnOf(ext, 'zones') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('zones()'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { zones() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

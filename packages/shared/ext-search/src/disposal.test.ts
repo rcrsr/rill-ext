@@ -1,12 +1,13 @@
 /**
  * Test suite for disposal lifecycle utilities.
- * Disposed state surfaces as an invalid RillValue via ctx.invalidate.
+ * Disposed state surfaces as a catchable halt signal wrapping an invalid RillValue.
  */
 
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import {
   createRuntimeContext,
   getStatus,
+  RuntimeHaltSignal,
   type RuntimeContext,
 } from '@rcrsr/rill';
 import { createDisposalState, checkDisposed, dispose } from './disposal.js';
@@ -44,8 +45,9 @@ describe('checkDisposed', () => {
   it('returns invalid DISPOSED value naming the provider when disposed', () => {
     const state = { isDisposed: true };
     const result = checkDisposed(ctx, state, provider);
-    expect(result).not.toBeNull();
-    const status = getStatus(result!);
+    expect(result).toBeInstanceOf(RuntimeHaltSignal);
+    expect(result!.catchable).toBe(true);
+    const status = getStatus(result!.value);
     expect(status.code.name).toBe('DISPOSED');
     expect(status.message).toBe(`${provider}: operation cancelled`);
     expect(status.raw['kind']).toBe('extension_disposed');

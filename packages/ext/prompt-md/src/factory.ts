@@ -10,6 +10,7 @@
 
 import { stat } from 'node:fs/promises';
 import {
+  RuntimeHaltSignal,
   RuntimeError,
   type ApplicationCallable,
   type CallableFn,
@@ -130,16 +131,19 @@ export async function createPromptMdExtension(
     const wrappedFn: CallableFn = (args, ctxLike, location) => {
       if (disposed) {
         const ctx = ctxLike as RuntimeContext;
-        throw ctx.invalidate(
-          new Error(
-            `prompt-md: extension has been disposed; cannot invoke "${name}"`
+        throw new RuntimeHaltSignal(
+          ctx.invalidate(
+            new Error(
+              `prompt-md: extension has been disposed; cannot invoke "${name}"`
+            ),
+            {
+              code: 'DISPOSED',
+              provider: 'prompt-md',
+              raw: { kind: 'extension_disposed', name },
+            }
           ),
-          {
-            code: 'DISPOSED',
-            provider: 'prompt-md',
-            raw: { kind: 'extension_disposed', name },
-          }
-        ) as unknown as RillValue;
+          true
+        );
       }
       return closure.fn(args, ctxLike, location);
     };

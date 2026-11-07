@@ -9,7 +9,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { getStatus, isInvalid, type RillValue } from '@rcrsr/rill';
+import {
+  getStatus,
+  isInvalid,
+  RuntimeHaltSignal,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createFileKvExtension } from '../src/factory.js';
 import { makeFactoryCtx, makeRuntimeCtx, fnOf } from './_setup.js';
 
@@ -120,6 +125,7 @@ describe('kv-file functions', () => {
 
       let threw = false;
       let thrown: unknown;
+      let halt: RuntimeHaltSignal | undefined;
       try {
         await fnOf(ext, 'set').fn(
           { mount: 'default', key: 'k', value: 'v' },
@@ -127,10 +133,17 @@ describe('kv-file functions', () => {
         );
       } catch (e) {
         threw = true;
-        thrown = e;
+        if (e instanceof RuntimeHaltSignal) {
+          halt = e;
+          thrown = e.value;
+        } else {
+          thrown = e;
+        }
       }
 
       expect(threw).toBe(true);
+      expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+      expect(halt?.catchable).toBe(true);
       expect(isInvalid(thrown as RillValue)).toBe(true);
       const status = getStatus(thrown as RillValue);
       expect(status.code.name).toBe('DISPOSED');

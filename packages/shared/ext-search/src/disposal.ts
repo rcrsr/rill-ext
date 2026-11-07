@@ -1,4 +1,8 @@
-import { type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import {
+  RuntimeHaltSignal,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import type { DisposalState } from './types.js';
 
 /**
@@ -10,22 +14,13 @@ export function createDisposalState(): DisposalState {
 }
 
 /**
- * Return an invalid RillValue when the extension instance is disposed,
- * otherwise null. Emits the rill-core generic `#DISPOSED` atom with
- * `raw.kind: 'extension_disposed'`. The caller throws the non-null result.
- *
- * @param ctx - Runtime context (provides `invalidate`)
- * @param state - DisposalState to check
- * @param provider - Extension provider name for diagnostic message
+ * Build the invalid RillValue for a disposed extension: generic `#DISPOSED`
+ * atom with `raw.kind: 'extension_disposed'`. Unconditional; exported for the wrapper, not re-exported from the barrel.
  */
-export function checkDisposed(
+export function buildDisposedInvalid(
   ctx: RuntimeContext,
-  state: DisposalState,
   provider: string
-): RillValue | null {
-  if (!state.isDisposed) {
-    return null;
-  }
+): RillValue {
   const error = new Error(`${provider}: operation cancelled`);
   return ctx.invalidate(error, {
     code: 'DISPOSED',
@@ -35,6 +30,27 @@ export function checkDisposed(
       message: `${provider}: operation cancelled`,
     },
   });
+}
+
+/**
+ * Return a catchable halt signal wrapping the `#DISPOSED` invalid
+ * (`raw.kind: 'extension_disposed'`) when the extension instance is
+ * disposed, otherwise null. The caller throws the non-null result; a bare
+ * thrown invalid would become `#R999` at the dispatch boundary.
+ *
+ * @param ctx - Runtime context (provides `invalidate`)
+ * @param state - DisposalState to check
+ * @param provider - Extension provider name for diagnostic message
+ */
+export function checkDisposed(
+  ctx: RuntimeContext,
+  state: DisposalState,
+  provider: string
+): RuntimeHaltSignal | null {
+  if (!state.isDisposed) {
+    return null;
+  }
+  return new RuntimeHaltSignal(buildDisposedInvalid(ctx, provider), true);
 }
 
 /**

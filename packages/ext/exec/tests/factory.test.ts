@@ -8,7 +8,15 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getStatus, isInvalid, type RillValue } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  execute,
+  getStatus,
+  isInvalid,
+  parse,
+  RuntimeHaltSignal,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import { createExecExtension } from '../src/factory.js';
 import type { ExecExtensionConfig } from '../src/types.js';
 import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
@@ -166,7 +174,7 @@ describe('exec extension factory', () => {
       if (ext?.dispose) await ext.dispose();
     });
 
-    it('aborts in-flight processes and returns invalid aborted', async () => {
+    it('aborts in-flight processes and returns invalid DISPOSED', async () => {
       ext = createExecExtension(
         {
           commands: { sleep: { binary: 'sleep', timeout: 10000 } },
@@ -183,9 +191,9 @@ describe('exec extension factory', () => {
 
       expect(Date.now() - start).toBeLessThan(2000);
       expect(isInvalid(result)).toBe(true);
-      expect(invalidateSpy).toHaveBeenCalledOnce();
-      expect(invalidateSpy.mock.calls[0]![1].raw).toMatchObject({
-        kind: 'aborted',
+      expect(getStatus(result).code.name).toBe('DISPOSED');
+      expect(invalidateSpy.mock.calls.at(-1)![1].raw).toMatchObject({
+        kind: 'extension_disposed',
       });
     });
 
@@ -217,8 +225,11 @@ describe('exec extension factory', () => {
             thrown = e;
           }
           expect(resolved).toBe(false);
-          expect(isInvalid(thrown as RillValue)).toBe(true);
-          const status = getStatus(thrown as RillValue);
+          expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+          expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+          const invalid = (thrown as RuntimeHaltSignal).value;
+          expect(isInvalid(invalid)).toBe(true);
+          const status = getStatus(invalid);
           expect(status.code.name).toBe('DISPOSED');
           expect(status.raw['kind']).toBe('extension_disposed');
           expect(status.provider).toBe('exec');
@@ -260,5 +271,43 @@ describe('exec extension factory', () => {
         kind: 'aborted',
       });
     });
+  });
+});
+
+describe('exec extension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = createExecExtension(
+      { commands: { echo: { binary: 'echo' } } },
+      makeFactoryCtx()
+    );
+    const ctx = createRuntimeContext({
+      functions: { commands: getCallable(ext, 'commands') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('commands()'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { commands() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

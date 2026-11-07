@@ -8,10 +8,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   RuntimeError,
   createRuntimeContext,
-  type ApplicationCallable,
   isInvalid,
   getStatus,
+  RuntimeHaltSignal,
+  execute,
+  parse,
+  type ApplicationCallable,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
@@ -413,6 +417,35 @@ describe('createOutlookExtension', () => {
       );
     });
 
+    it('returns #DISPOSED for an in-flight call aborted by dispose', async () => {
+      globalThis.fetch = vi.fn<typeof fetch>(
+        (_input, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          })
+      );
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
+      const ctx = createRuntimeContext();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
+      ctx.callbacks.onLogEvent = onLogEvent;
+
+      const pending = getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+      await ext.dispose!();
+      const result = (await pending) as RillValue;
+
+      expect(isInvalid(result)).toBe(true);
+      const status = getStatus(result);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+      expect(onLogEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'outlook:error' })
+      );
+    });
+
     it.each(POST_DISPOSE_CASES)(
       'throws #DISPOSED for $fn after dispose',
       async ({ fn, args }) => {
@@ -429,8 +462,11 @@ describe('createOutlookExtension', () => {
         );
 
         expect(thrown).toBeDefined();
-        expect(isInvalid(thrown as RillValue)).toBe(true);
-        const status = getStatus(thrown as RillValue);
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+        const invalid = (thrown as RuntimeHaltSignal).value;
+        expect(isInvalid(invalid)).toBe(true);
+        const status = getStatus(invalid);
         expect(status.code.name).toBe('DISPOSED');
         expect(status.provider).toBe('outlook');
         expect(status.raw['kind']).toBe('extension_disposed');
@@ -465,5 +501,40 @@ describe('createOutlookExtension', () => {
       await ext.dispose!();
       expect(fetchSpy).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('outlook extension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
+    const ctx = createRuntimeContext({
+      functions: { today: getCallable(ext, 'today') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('today()'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { today() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

@@ -15,7 +15,7 @@ import {
   isInvalid,
 } from '@rcrsr/rill';
 import type { DisposalState, InFlightState } from './types.js';
-import { checkDisposed } from './disposal.js';
+import { buildDisposedInvalid, checkDisposed } from './disposal.js';
 import { trackRequest } from './request.js';
 import { mapSearchError } from './errors.js';
 import { emitSuccessEvent, emitErrorEvent } from './events.js';
@@ -43,8 +43,10 @@ export type WrapFunction = (
 
 /**
  * Create a function wrapper that adds disposal check, in-flight tracking,
- * timing, event emission, and error mapping. The disposal check throws
- * before any work starts; all other failures are returned.
+ * timing, event emission, and error mapping. The disposal check throws a
+ * catchable RuntimeHaltSignal wrapping the #DISPOSED invalid
+ * before any work starts (before tracking or events); all other failures are
+ * returned.
  *
  * @param provider - Extension provider name (e.g., "exa", "tavily")
  * @param disposalState - DisposalState to check before operations
@@ -89,9 +91,15 @@ export function createSearchFunctionWrapper(
         return result;
       } catch (error: unknown) {
         const duration = Date.now() - startTime;
-        const invalid = isInvalid(error as RillValue)
-          ? (error as RillValue)
-          : mapSearchError(ctx, provider, error);
+        // dispose() cancelled this request: disposal wins over any other
+        // classification. Only abortAll aborts `controller`; a ctx.signal
+        // abort leaves it clear and maps through mapSearchError.
+        const invalid =
+          disposalState.isDisposed || controller.signal.aborted
+            ? buildDisposedInvalid(ctx, provider)
+            : isInvalid(error as RillValue)
+              ? (error as RillValue)
+              : mapSearchError(ctx, provider, error);
         const status = getStatus(invalid);
         emitErrorEvent(ctx, provider, duration, status.message);
         return invalid;

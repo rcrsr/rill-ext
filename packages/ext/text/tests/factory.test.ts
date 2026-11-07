@@ -7,14 +7,19 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  createRuntimeContext,
+  execute,
   getStatus,
   isInvalid,
+  parse,
+  RuntimeHaltSignal,
   type ApplicationCallable,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { createTextExtension } from '../src/factory.js';
 import type { TextExtensionConfig } from '../src/types.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 const EXPECTED_FUNCTIONS = [
   'html_to_text',
@@ -109,8 +114,11 @@ describe('text extension factory', () => {
           dict[name]!.fn(args, makeRuntimeCtx())
         );
 
-        expect(isInvalid(thrown as RillValue)).toBe(true);
-        const status = getStatus(thrown as RillValue);
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+        const invalid = (thrown as RuntimeHaltSignal).value;
+        expect(isInvalid(invalid)).toBe(true);
+        const status = getStatus(invalid);
         expect(status.code.name).toBe('DISPOSED');
         expect(status.provider).toBe('text');
         expect(status.raw['kind']).toBe('extension_disposed');
@@ -128,5 +136,40 @@ describe('text extension factory', () => {
 
       expect(isInvalid(result)).toBe(false);
     });
+  });
+});
+
+describe('text extension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = createTextExtension({}, makeFactoryCtx());
+    const ctx = createRuntimeContext({
+      functions: { dedent: getCallable(ext, 'dedent') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('dedent("x")'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { dedent("x") }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

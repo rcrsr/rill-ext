@@ -2,14 +2,18 @@
  * Test suite for search function wrapper factory.
  *
  * Operation errors surface as invalid RillValues; a call after dispose
- * throws the invalid DISPOSED value.
+ * throws a catchable halt signal wrapping the invalid DISPOSED value.
  */
 
 import { describe, it, expect, vi } from 'vitest';
 import {
+  anyTypeValue,
   createRuntimeContext,
+  execute,
   getStatus,
   isInvalid,
+  parse,
+  RuntimeHaltSignal,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -60,12 +64,61 @@ describe('createSearchFunctionWrapper', () => {
       const wrappedFn = wrap('search', fn);
 
       const thrown = await captureThrown(() => wrappedFn({}, makeCtx()));
-      expect(isInvalid(thrown as RillValue)).toBe(true);
-      const status = getStatus(thrown as RillValue);
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      const signal = thrown as RuntimeHaltSignal;
+      expect(signal.catchable).toBe(true);
+      expect(isInvalid(signal.value)).toBe(true);
+      const status = getStatus(signal.value);
       expect(status.code.name).toBe('DISPOSED');
       expect(status.raw['kind']).toBe('extension_disposed');
       expect(status.message).toBe(`${provider}: operation cancelled`);
       expect(fn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('runtime dispatch after dispose', () => {
+    function mountDisposed(): RuntimeContext {
+      const disposalState = createDisposalState();
+      const wrap = createSearchFunctionWrapper(
+        provider,
+        disposalState,
+        createInFlightState()
+      );
+      disposalState.isDisposed = true;
+      return createRuntimeContext({
+        functions: {
+          search: {
+            params: [],
+            fn: wrap('search', async () => ({
+              result: 'ok' as RillValue,
+              query: 'test',
+              resultCount: 1,
+            })),
+            annotations: { description: 'Test search' },
+            returnType: anyTypeValue,
+          },
+        },
+      });
+    }
+
+    it('rejects a script call with a catchable DISPOSED halt', async () => {
+      const thrown = await execute(parse('search()'), mountDisposed()).catch(
+        (e: unknown) => e
+      );
+
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+    });
+
+    it('completes a guarded script call with the DISPOSED invalid value', async () => {
+      const result = await execute(
+        parse('guard<on: list[#DISPOSED]> { search() }'),
+        mountDisposed()
+      );
+
+      expect(getStatus(result.result).code.name).toBe('DISPOSED');
     });
   });
 
@@ -207,7 +260,7 @@ describe('createSearchFunctionWrapper', () => {
   });
 
   describe('error mapping', () => {
-    it('maps an abort of the in-flight request to TIMEOUT request timeout', async () => {
+    it('maps an in-flight request aborted by dispose to DISPOSED', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
       const wrap = createSearchFunctionWrapper(
@@ -232,9 +285,38 @@ describe('createSearchFunctionWrapper', () => {
       const result = await pending;
 
       expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).code.name).toBe('TIMEOUT');
-      expect(getStatus(result).message).toBe(`${provider}: request timeout`);
+      expect(getStatus(result).code.name).toBe('DISPOSED');
+      expect(getStatus(result).raw).toMatchObject({
+        kind: 'extension_disposed',
+      });
       expect(inFlightState.controllers.size).toBe(0);
+    });
+
+    it('maps a ctx.signal abort to TIMEOUT when not disposed', async () => {
+      const disposalState = createDisposalState();
+      const inFlightState = createInFlightState();
+      const wrap = createSearchFunctionWrapper(
+        provider,
+        disposalState,
+        inFlightState
+      );
+      const wrappedFn = wrap(
+        'search',
+        (_args, _ctx, signal) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          })
+      );
+      const hostAbort = new AbortController();
+      const pending = wrappedFn({}, makeCtx({ signal: hostAbort.signal }));
+      hostAbort.abort();
+      const result = await pending;
+
+      expect(getStatus(result).code.name).toBe('TIMEOUT');
     });
   });
 
@@ -280,14 +362,18 @@ describe('createSearchFunctionWrapper', () => {
       disposalState.isDisposed = true;
       const a = await captureThrown(() => search({}, makeCtx()));
       const b = await captureThrown(() => suggest({}, makeCtx()));
-      expect(getStatus(a as RillValue).message).toBe(
+      expect(a).toBeInstanceOf(RuntimeHaltSignal);
+      expect(b).toBeInstanceOf(RuntimeHaltSignal);
+      const aValue = (a as RuntimeHaltSignal).value;
+      const bValue = (b as RuntimeHaltSignal).value;
+      expect(getStatus(aValue).message).toBe(
         `${provider}: operation cancelled`
       );
-      expect(getStatus(b as RillValue).message).toBe(
+      expect(getStatus(bValue).message).toBe(
         `${provider}: operation cancelled`
       );
-      expect(getStatus(a as RillValue).raw['kind']).toBe('extension_disposed');
-      expect(getStatus(b as RillValue).raw['kind']).toBe('extension_disposed');
+      expect(getStatus(aValue).raw['kind']).toBe('extension_disposed');
+      expect(getStatus(bValue).raw['kind']).toBe('extension_disposed');
     });
   });
 });

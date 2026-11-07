@@ -18,6 +18,7 @@ import {
   type RillFunction,
   type RillValue,
   type RuntimeContext,
+  RuntimeHaltSignal,
 } from '@rcrsr/rill';
 import type { FsExtensionContract } from '@rcrsr/rill-ext-fs-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
@@ -32,12 +33,19 @@ import {
 
 const PROVIDER = 'fs-local';
 
-const failDisposed = (ctx: RuntimeContext): RillValue =>
-  ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
-    code: 'DISPOSED',
-    provider: PROVIDER,
-    raw: { kind: 'extension_disposed' },
-  });
+/**
+ * Builds the halt for a call made after dispose(). Returns a catchable
+ * halt carrying #DISPOSED (raw.kind 'extension_disposed') for the caller to throw.
+ */
+const failDisposed = (ctx: RuntimeContext): RuntimeHaltSignal =>
+  new RuntimeHaltSignal(
+    ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    }),
+    true
+  );
 
 /**
  * Creates a local filesystem extension with sandboxed operations.

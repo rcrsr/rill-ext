@@ -5,7 +5,15 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { getStatus, isInvalid, type RillValue } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  execute,
+  getStatus,
+  isInvalid,
+  parse,
+  RuntimeHaltSignal,
+  type RillValue,
+} from '@rcrsr/rill';
 import crypto from 'node:crypto';
 import { createCryptoExtension } from '../src/factory.js';
 import type { CryptoExtensionConfig } from '../src/types.js';
@@ -65,14 +73,49 @@ describe('crypto extension factory', () => {
           thrown = e;
         }
         expect(resolved).toBe(false);
-        expect(isInvalid(thrown as RillValue)).toBe(true);
-        const status = getStatus(thrown as RillValue);
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+        const invalid = (thrown as RuntimeHaltSignal).value;
+        expect(isInvalid(invalid)).toBe(true);
+        const status = getStatus(invalid);
         expect(status.code.name).toBe('DISPOSED');
         expect(status.raw['kind']).toBe('extension_disposed');
         expect(status.provider).toBe('crypto');
       }
       expect(spy).not.toHaveBeenCalled();
       spy.mockRestore();
+    });
+
+    it('rejects a script call with a catchable DISPOSED halt through the runtime', async () => {
+      const ext = createCryptoExtensionT();
+      const ctx = createRuntimeContext({
+        functions: { uuid: fnOf(ext, 'uuid') },
+      });
+      await ext.dispose?.();
+
+      const thrown = await execute(parse('uuid()'), ctx).catch(
+        (e: unknown) => e
+      );
+
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+    });
+
+    it('completes a guarded script call with the DISPOSED invalid value', async () => {
+      const ext = createCryptoExtensionT();
+      const ctx = createRuntimeContext({
+        functions: { uuid: fnOf(ext, 'uuid') },
+      });
+      await ext.dispose?.();
+
+      const result = await execute(
+        parse('guard<on: list[#DISPOSED]> { uuid() }'),
+        ctx
+      );
+
+      expect(getStatus(result.result).code.name).toBe('DISPOSED');
     });
 
     it('disposes idempotently', async () => {

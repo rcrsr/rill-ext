@@ -28,7 +28,7 @@ import { dirname, join } from 'node:path';
 import { createMcpExtension } from '../../src/factory.js';
 import { getStatus, type RillValue } from '@rcrsr/rill';
 import {
-  expectRejectsInvalid,
+  expectRejectsHalt,
   makeFactoryCtx,
   makeRuntimeCtx,
 } from '../_helpers.js';
@@ -460,7 +460,7 @@ describe('Integration: stdio mock server', () => {
       await ext.dispose?.();
 
       // After dispose, calls halt with #DISPOSED without touching the client
-      const caught = await expectRejectsInvalid(
+      const caught = await expectRejectsHalt(
         hostFn(v['tools'], 'echo').fn({ message: 'test' }, mockContext)
       );
       const status = getStatus(caught as RillValue);

@@ -16,6 +16,7 @@ import {
   type RillFunction,
   type RillValue,
   type RuntimeContext,
+  RuntimeHaltSignal,
 } from '@rcrsr/rill';
 import {
   mapKvError,
@@ -194,12 +195,19 @@ export function createRedisKvExtension(
     );
   }
 
-  function disposedInvalid(runCtx: RuntimeContext): RillValue {
-    return runCtx.invalidate(new Error('Redis kv extension disposed'), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed' },
-    });
+  /**
+   * Builds the halt for a call made after dispose(). Returns a catchable
+   * halt carrying #DISPOSED (raw.kind 'extension_disposed') for the caller to throw.
+   */
+  function disposedInvalid(runCtx: RuntimeContext): RuntimeHaltSignal {
+    return new RuntimeHaltSignal(
+      runCtx.invalidate(new Error('Redis kv extension disposed'), {
+        code: 'DISPOSED',
+        provider: PROVIDER,
+        raw: { kind: 'extension_disposed' },
+      }),
+      true
+    );
   }
 
   async function scanKeys(pattern: string): Promise<string[]> {

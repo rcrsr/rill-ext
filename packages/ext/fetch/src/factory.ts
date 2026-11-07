@@ -5,6 +5,7 @@
  */
 
 import {
+  isInvalid,
   structureToTypeValue,
   toCallable,
   type CallableFn,
@@ -229,6 +230,15 @@ export function createFetchExtension(
           runCtx,
           semaphore
         );
+
+        // dispose() cancelled this request: report DISPOSED, not TIMEOUT.
+        if (disposed && isInvalid(result)) {
+          return runCtx.invalidate(new Error('fetch: extension disposed'), {
+            code: 'DISPOSED',
+            provider: 'fetch',
+            raw: { kind: 'extension_disposed' },
+          });
+        }
 
         return result;
       } finally {

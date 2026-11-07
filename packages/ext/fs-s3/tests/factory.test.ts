@@ -9,7 +9,13 @@ import {
   getStatus,
   isInvalid,
   RuntimeError,
+  RuntimeHaltSignal,
+  createRuntimeContext,
+  execute,
+  parse,
+  type ApplicationCallable,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { createS3FsExtension } from '../src/index.js';
 import type { S3FsConfig } from '../src/types.js';
@@ -331,17 +337,22 @@ describe('createS3FsExtension', () => {
       fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
     };
 
-    async function captureThrown(
-      fn: HostFn['fn']
-    ): Promise<{ resolved: boolean; thrown: unknown }> {
+    async function captureThrown(fn: HostFn['fn']): Promise<{
+      resolved: boolean;
+      thrown: unknown;
+      halt: RuntimeHaltSignal | undefined;
+    }> {
       try {
         await fn(
           { path: 'test/file.txt', src: 'test/a', dest: 'test/b' },
           makeRuntimeCtx()
         );
-        return { resolved: true, thrown: undefined };
+        return { resolved: true, thrown: undefined, halt: undefined };
       } catch (e) {
-        return { resolved: false, thrown: e };
+        if (e instanceof RuntimeHaltSignal) {
+          return { resolved: false, thrown: e.value, halt: e };
+        }
+        return { resolved: false, thrown: e, halt: undefined };
       }
     }
 
@@ -356,8 +367,10 @@ describe('createS3FsExtension', () => {
 
       await expect(ext.dispose?.()).resolves.toBeUndefined();
       for (const name of names) {
-        const { resolved, thrown } = await captureThrown(fns[name]!.fn);
+        const { resolved, thrown, halt } = await captureThrown(fns[name]!.fn);
         expect(resolved).toBe(false);
+        expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+        expect(halt?.catchable).toBe(true);
         expect(isInvalid(thrown as RillValue)).toBe(true);
         const status = getStatus(thrown as RillValue);
         expect(status.code.name).toBe('DISPOSED');
@@ -380,5 +393,50 @@ describe('createS3FsExtension', () => {
       expect(resolved).toBe(false);
       expect(getStatus(thrown as RillValue).code.name).toBe('DISPOSED');
     });
+  });
+});
+
+describe('createS3FsExtension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = createS3FsExtension(
+      {
+        region: 'us-west-2',
+        credentials: TEST_CREDENTIALS,
+        mounts: { test: BASE_MOUNT },
+      },
+      makeFactoryCtx()
+    );
+    const mounts = (ext.value as Record<string, ApplicationCallable>)[
+      'mounts'
+    ]!;
+    const ctx = createRuntimeContext({
+      functions: { mounts },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('mounts()'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { mounts() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

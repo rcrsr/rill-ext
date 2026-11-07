@@ -8,7 +8,13 @@ import {
   getStatus,
   isInvalid,
   structureToTypeValue,
+  RuntimeHaltSignal,
+  createRuntimeContext,
+  execute,
+  parse,
+  type ApplicationCallable,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { PROVIDER } from '../src/errors.js';
@@ -228,8 +234,11 @@ describe('createClaudeCodeExtension', () => {
           ARGS_BY_NAME[name]!
         );
         expect(resolved).toBe(false);
-        expect(isInvalid(thrown as RillValue)).toBe(true);
-        const status = getStatus(thrown as RillValue);
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+        const invalid = (thrown as RuntimeHaltSignal).value;
+        expect(isInvalid(invalid)).toBe(true);
+        const status = getStatus(invalid);
         expect(status.code.name).toBe('DISPOSED');
         expect(status.raw['kind']).toBe('extension_disposed');
         expect(status.provider).toBe(PROVIDER);
@@ -258,7 +267,10 @@ describe('createClaudeCodeExtension', () => {
         options: {},
       });
 
-      expect(getStatus(thrown as RillValue).code.name).toBe('DISPOSED');
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+      const invalid = (thrown as RuntimeHaltSignal).value;
+      expect(getStatus(invalid).code.name).toBe('DISPOSED');
     });
 
     it('throws #DISPOSED after the factory signal aborts', async () => {
@@ -338,5 +350,43 @@ describe('createClaudeCodeExtension', () => {
         expectInvalidThrow(() => v[fn].fn(args, ctx), 'INVALID_INPUT', message);
       }
     );
+  });
+});
+
+describe('createClaudeCodeExtension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
+    const prompt = (ext.value as Record<string, ApplicationCallable>)[
+      'prompt'
+    ]!;
+    const ctx = createRuntimeContext({
+      functions: { prompt },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('prompt("hi")'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { prompt("hi") }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

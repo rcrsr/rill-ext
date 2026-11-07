@@ -9,11 +9,15 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   RuntimeError,
   createRuntimeContext,
-  type ApplicationCallable,
-  type ExtensionFactoryResult,
   isInvalid,
   getStatus,
+  RuntimeHaltSignal,
+  execute,
+  parse,
+  type ApplicationCallable,
+  type ExtensionFactoryResult,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { makeFactoryCtx } from './_helpers.js';
 import { createGoogleWorkspaceExtension } from '../src/factory.js';
@@ -46,8 +50,11 @@ async function captureThrown(call: () => unknown): Promise<RillValue> {
 }
 
 function expectDisposedThrow(thrown: RillValue): void {
-  expect(isInvalid(thrown)).toBe(true);
-  const status = getStatus(thrown);
+  expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+  expect((thrown as unknown as RuntimeHaltSignal).catchable).toBe(true);
+  const invalid = (thrown as unknown as RuntimeHaltSignal).value;
+  expect(isInvalid(invalid)).toBe(true);
+  const status = getStatus(invalid);
   expect(status.code.name).toBe('DISPOSED');
   expect(status.provider).toBe(PROVIDER);
   expect(status.raw['kind']).toBe('extension_disposed');
@@ -418,5 +425,43 @@ describe('createGoogleWorkspaceExtension', () => {
         createGoogleWorkspaceExtension(BEARER_CONFIG, makeFactoryCtx())
       ).not.toThrow();
     });
+  });
+});
+
+describe('google-workspace extension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = createGoogleWorkspaceExtension(
+      ALL_CAPS_CONFIG,
+      makeFactoryCtx()
+    );
+    const ctx = createRuntimeContext({
+      functions: { gmail_search: getCallable(ext, 'gmail_search') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('gmail_search("q")'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { gmail_search("q") }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

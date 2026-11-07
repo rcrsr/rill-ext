@@ -5,6 +5,7 @@
  */
 
 import {
+  RuntimeHaltSignal,
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryCtx,
@@ -45,12 +46,15 @@ const stringListReturn = structureToTypeValue({
 const PROVIDER = 'text';
 
 /** Call made after the extension was disposed. */
-function failDisposed(ctx: RuntimeContext): RillValue {
-  return ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
-    code: 'DISPOSED',
-    provider: PROVIDER,
-    raw: { kind: 'extension_disposed' },
-  });
+function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    }),
+    true
+  );
 }
 
 // ============================================================

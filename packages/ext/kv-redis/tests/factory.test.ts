@@ -7,7 +7,12 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { getStatus, isInvalid, type RillValue } from '@rcrsr/rill';
+import {
+  getStatus,
+  isInvalid,
+  RuntimeHaltSignal,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createRedisKvExtension } from '../src/factory.js';
 import type { RedisKvExtensionConfig } from '../src/factory.js';
 import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
@@ -221,6 +226,7 @@ describe('createRedisKvExtension', () => {
       for (const name of names) {
         let threw = false;
         let thrown: unknown;
+        let halt: RuntimeHaltSignal | undefined;
         try {
           await callables[name]!.fn(
             {
@@ -234,10 +240,17 @@ describe('createRedisKvExtension', () => {
           );
         } catch (e) {
           threw = true;
-          thrown = e;
+          if (e instanceof RuntimeHaltSignal) {
+            halt = e;
+            thrown = e.value;
+          } else {
+            thrown = e;
+          }
         }
 
         expect(threw).toBe(true);
+        expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+        expect(halt?.catchable).toBe(true);
         expect(isInvalid(thrown as RillValue)).toBe(true);
         const status = getStatus(thrown as RillValue);
         expect(status.code.name).toBe('DISPOSED');

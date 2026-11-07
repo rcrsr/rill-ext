@@ -9,6 +9,7 @@ import {
   createVector,
   getStatus,
   isInvalid,
+  RuntimeHaltSignal,
   isVector,
   type ApplicationCallable,
   type RillValue,
@@ -27,7 +28,7 @@ function getCallable(
 
 /**
  * Call every host function on a disposed extension and assert each one throws
- * an invalid #DISPOSED value with raw kind extension_disposed, without
+ * a catchable halt signal wrapping #DISPOSED with raw kind extension_disposed, without
  * reaching the vendor SDK client.
  */
 async function expectAllDisposedThrows(
@@ -47,8 +48,13 @@ async function expectAllDisposedThrows(
       thrown = e;
     }
     expect(resolved, `${name} resolved after dispose`).toBe(false);
-    expect(isInvalid(thrown as RillValue), `${name} throws invalid`).toBe(true);
-    const status = getStatus(thrown as RillValue);
+    expect(thrown, `${name} throws halt signal`).toBeInstanceOf(
+      RuntimeHaltSignal
+    );
+    const signal = thrown as RuntimeHaltSignal;
+    expect(signal.catchable).toBe(true);
+    expect(isInvalid(signal.value), `${name} throws invalid`).toBe(true);
+    const status = getStatus(signal.value);
     expect(status.code.name).toBe('DISPOSED');
     expect(status.raw['kind']).toBe('extension_disposed');
     expect(status.provider).toBe('qdrant');

@@ -100,6 +100,14 @@ export function createExecExtension(
         );
 
         if (isInvalid(result as RillValue)) {
+          // dispose() cancelled this command: report DISPOSED, not TIMEOUT.
+          if (disposed) {
+            return runCtx.invalidate(new Error('exec: extension disposed'), {
+              code: 'DISPOSED',
+              provider: 'exec',
+              raw: { kind: 'extension_disposed' },
+            });
+          }
           return result as RillValue;
         }
 

@@ -204,7 +204,7 @@ export function createReadResourceFunction(
       return parseResourceContent(result);
     } catch (error) {
       if (isDisposed(lifecycleState)) {
-        throw failDisposed(ctx);
+        return failDisposed(ctx).value;
       }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
@@ -303,7 +303,7 @@ function createStaticResourceFunction(
       return parseResourceContent(result);
     } catch (error) {
       if (isDisposed(lifecycleState)) {
-        throw failDisposed(ctx);
+        return failDisposed(ctx).value;
       }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
@@ -463,7 +463,7 @@ function createResourceTemplateFunction(
       return parseResourceContent(result);
     } catch (error) {
       if (isDisposed(lifecycleState)) {
-        throw failDisposed(ctx);
+        return failDisposed(ctx).value;
       }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',

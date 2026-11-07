@@ -5,6 +5,7 @@
  */
 
 import {
+  RuntimeHaltSignal,
   structureToTypeValue,
   toCallable,
   type CallableFn,
@@ -216,13 +217,16 @@ export function createDatetimeExtension(
   // Validation helpers (return invalid RillValue or null on success)
   // ----------------------------------------------------------
 
-  function checkDisposed(runCtx: RuntimeContext): RillValue | null {
+  function checkDisposed(runCtx: RuntimeContext): RuntimeHaltSignal | null {
     if (disposed) {
-      return runCtx.invalidate(new Error('datetime: operation cancelled'), {
-        code: 'DISPOSED',
-        provider: PROVIDER,
-        raw: { kind: 'extension_disposed' },
-      });
+      return new RuntimeHaltSignal(
+        runCtx.invalidate(new Error('datetime: operation cancelled'), {
+          code: 'DISPOSED',
+          provider: PROVIDER,
+          raw: { kind: 'extension_disposed' },
+        }),
+        true
+      );
     }
     return null;
   }

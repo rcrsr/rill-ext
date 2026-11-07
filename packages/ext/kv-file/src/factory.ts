@@ -16,6 +16,7 @@ import {
   type RillFunction,
   type RillValue,
   type RuntimeContext,
+  RuntimeHaltSignal,
 } from '@rcrsr/rill';
 import type { KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
@@ -35,12 +36,19 @@ const getAllReturn = structureToTypeValue({
 
 const PROVIDER = 'kv-file';
 
-function failDisposed(ctx: RuntimeContext): RillValue {
-  return ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
-    code: 'DISPOSED',
-    provider: PROVIDER,
-    raw: { kind: 'extension_disposed' },
-  });
+/**
+ * Builds the halt for a call made after dispose(). Returns a catchable
+ * halt carrying #DISPOSED (raw.kind 'extension_disposed') for the caller to throw.
+ */
+function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    }),
+    true
+  );
 }
 
 /**

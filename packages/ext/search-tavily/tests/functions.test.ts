@@ -19,6 +19,7 @@ import {
   createRuntimeContext,
   getStatus,
   isInvalid,
+  RuntimeHaltSignal,
   type ApplicationCallable,
   type ExtensionFactoryCtx,
   type RillValue,
@@ -50,8 +51,11 @@ async function captureThrown(call: () => unknown): Promise<unknown> {
 }
 
 function expectDisposedThrown(thrown: unknown, provider: string): void {
-  expect(isInvalid(thrown as RillValue)).toBe(true);
-  const status = getStatus(thrown as RillValue);
+  expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+  const signal = thrown as RuntimeHaltSignal;
+  expect(signal.catchable).toBe(true);
+  expect(isInvalid(signal.value)).toBe(true);
+  const status = getStatus(signal.value);
   expect(status.code.name).toBe('DISPOSED');
   expect(status.raw['kind']).toBe('extension_disposed');
   expect(status.provider).toBe(provider);
@@ -649,7 +653,12 @@ describe('Tavily extension host functions', () => {
 
       const promise = getCallable(ext, 'search').fn({ query: 'test' }, ctx);
       await ext.dispose!();
-      await expectInvalidWithMessage(promise, 'tavily: request timeout');
+      const result = await expectInvalidWithMessage(
+        promise,
+        'tavily: operation cancelled'
+      );
+      expect(getStatus(result).code.name).toBe('DISPOSED');
+      expect(getStatus(result).raw['kind']).toBe('extension_disposed');
     });
   });
 
