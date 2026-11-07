@@ -1,4 +1,8 @@
-import { type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import {
+  RuntimeHaltSignal,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import type { DisposalState } from './types.js';
 
 /**
@@ -10,8 +14,29 @@ export function createDisposalState(): DisposalState {
 }
 
 /**
- * Return an invalid RillValue when the extension instance is disposed,
- * otherwise null. Emits the rill-core generic `#DISPOSED` atom.
+ * Build the invalid RillValue for a disposed extension: generic `#DISPOSED`
+ * atom with `raw.kind: 'extension_disposed'`. Unconditional; exported for the wrapper, not re-exported from the barrel.
+ */
+export function buildDisposedInvalid(
+  ctx: RuntimeContext,
+  provider: string
+): RillValue {
+  const error = new Error(`${provider}: operation cancelled`);
+  return ctx.invalidate(error, {
+    code: 'DISPOSED',
+    provider,
+    raw: {
+      kind: 'extension_disposed',
+      message: `${provider}: operation cancelled`,
+    },
+  });
+}
+
+/**
+ * Return a catchable halt signal wrapping the `#DISPOSED` invalid
+ * (`raw.kind: 'extension_disposed'`) when the extension instance is
+ * disposed, otherwise null. The caller throws the non-null result; a bare
+ * thrown invalid would become `#R999` at the dispatch boundary.
  *
  * @param ctx - Runtime context (provides `invalidate`)
  * @param state - DisposalState to check
@@ -21,16 +46,11 @@ export function checkDisposed(
   ctx: RuntimeContext,
   state: DisposalState,
   provider: string
-): RillValue | null {
+): RuntimeHaltSignal | null {
   if (!state.isDisposed) {
     return null;
   }
-  const error = new Error(`${provider}: operation cancelled`);
-  return ctx.invalidate(error, {
-    code: 'DISPOSED',
-    provider,
-    raw: { kind: 'disposed', message: `${provider}: operation cancelled` },
-  });
+  return new RuntimeHaltSignal(buildDisposedInvalid(ctx, provider), true);
 }
 
 /**
@@ -49,6 +69,8 @@ export async function dispose(
     return;
   }
 
+  state.isDisposed = true;
+
   if (cleanup) {
     try {
       await cleanup();
@@ -57,6 +79,4 @@ export async function dispose(
       console.warn(`Cleanup failed: ${message}`);
     }
   }
-
-  state.isDisposed = true;
 }

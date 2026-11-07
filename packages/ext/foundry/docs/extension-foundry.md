@@ -526,7 +526,7 @@ Counts accumulate across all `message`, `messages`, `tool_loop`, `generate`, and
 
 ### dispose()
 
-Release all resources held by the extension. Safe to call multiple times. Calling any host function after `dispose()` returns an invalid value carrying `#DISPOSED` (with `raw.kind == 'extension_disposed'`).
+Release all resources held by the extension. Safe to call multiple times. Calling any host function after `dispose()` throws (halts with) `#DISPOSED` (with `raw.kind == 'extension_disposed'`).
 
 ```rill
 $foundry.dispose()

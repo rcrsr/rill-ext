@@ -13,9 +13,12 @@ import {
   createRuntimeContext,
   formatValue,
   getStatus,
+  execute,
   isInvalid,
+  parse,
+  RuntimeHaltSignal,
   type ApplicationCallable,
-  type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
 import { makeFactoryCtx } from './_helpers.js';
@@ -422,20 +425,36 @@ body
       makeFactoryCtx()
     );
     const dict = asDict(ext.value);
-    const fn = dict['alive']!.fn;
+    const names = Object.keys(dict);
 
     await ext.dispose?.();
 
+    // Resolve the callables after dispose: entries must still be present.
+    const fns = Object.keys(dict).map((n) => dict[n]!.fn);
+
     const ctx = createRuntimeContext();
-    let caught: unknown;
-    try {
-      await fn({}, ctx);
-    } catch (err) {
-      caught = err;
+    expect(names).toEqual(['alive']);
+    for (const fn of fns) {
+      let caught: unknown;
+      let resolved = false;
+      try {
+        await fn({}, ctx);
+        resolved = true;
+      } catch (err) {
+        caught = err;
+      }
+      // The wrapper throws a catchable halt signal wrapping the invalid value.
+      expect(resolved).toBe(false);
+      expect(caught).toBeInstanceOf(RuntimeHaltSignal);
+      expect((caught as RuntimeHaltSignal).catchable).toBe(true);
+      const invalid = (caught as RuntimeHaltSignal).value;
+      expect(isInvalid(invalid)).toBe(true);
+      const status = getStatus(invalid);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.provider).toBe('prompt-md');
+      expect(status.raw['kind']).toBe('extension_disposed');
+      expect(status.raw['name']).toBe('alive');
     }
-    // The wrapper throws the invalid RillValue produced by ctx.invalidate.
-    expect(isInvalid(caught as RillValue)).toBe(true);
-    expect(getStatus(caught as RillValue).code.name).toBe('DISPOSED');
   });
 });
 
@@ -597,3 +616,54 @@ Articles: {articles}
 // known error paths are already covered by RILL-R001 (factory-time) or never
 // throw at runtime, and parseFile blocks list-output-without-markers at boot.
 // The branch is defensive, verified by code inspection.
+
+describe('prompt-md extension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const dir = await tempDir();
+    await writePrompt(
+      dir,
+      'alive.prompt.md',
+      `---
+description: Test
+params: []
+output: string
+---
+body
+`
+    );
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
+    const alive = asDict(ext.value)['alive']!;
+    const ctx = createRuntimeContext({
+      functions: { alive },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('alive()'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { alive() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
+  });
+});

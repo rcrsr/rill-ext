@@ -4,8 +4,13 @@
  * EC-1, EC-2, EC-3, EC-4, EC-5, EC-6, EC-16.
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { createRuntimeContext } from '@rcrsr/rill';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  RuntimeHaltSignal,
+} from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
 import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
 
@@ -22,6 +27,12 @@ function getHostFns(ext: { value: unknown }): HostFns {
 // ============================================================
 // MODULE MOCK
 // ============================================================
+
+const sdkMocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  stream: vi.fn(),
+  embed: vi.fn(),
+}));
 
 // Mock openai at the module level so AzureOpenAI never makes network calls.
 vi.mock('openai', () => {
@@ -43,21 +54,21 @@ vi.mock('openai', () => {
     default: class MockAzureOpenAI {
       chat = {
         completions: {
-          create: vi.fn(),
-          stream: vi.fn(),
+          create: sdkMocks.create,
+          stream: sdkMocks.stream,
         },
       };
-      embeddings = { create: vi.fn() };
+      embeddings = { create: sdkMocks.embed };
       static APIError = MockAPIError;
     },
     AzureOpenAI: class MockAzureOpenAI {
       chat = {
         completions: {
-          create: vi.fn(),
-          stream: vi.fn(),
+          create: sdkMocks.create,
+          stream: sdkMocks.stream,
         },
       };
-      embeddings = { create: vi.fn() };
+      embeddings = { create: sdkMocks.embed };
       static APIError = MockAPIError;
     },
     APIError: MockAPIError,
@@ -337,6 +348,13 @@ describe('createFoundryExtension', () => {
       await expect(ext.dispose?.()).resolves.toBeUndefined();
     });
 
+    afterEach(() => {
+      vi.restoreAllMocks();
+      sdkMocks.create.mockClear();
+      sdkMocks.stream.mockClear();
+      sdkMocks.embed.mockClear();
+    });
+
     // AC-27 / EC-16: All functions halt after dispose
     const DISPOSED_CASES: Array<{
       name: string;
@@ -374,28 +392,48 @@ describe('createFoundryExtension', () => {
       },
     ];
 
+    it('covers every host function in the disposal cases', async () => {
+      const createFoundryExtension = await importFactory();
+      const ext = await createFoundryExtension(validConfig());
+      await ext.dispose?.();
+
+      expect(DISPOSED_CASES.map((c) => c.name).sort()).toEqual(
+        Object.keys(getHostFns(ext)).sort()
+      );
+    });
+
     it.each(DISPOSED_CASES)(
       'halts $name() after dispose',
       async ({ name, args, sync }) => {
         const createFoundryExtension = await importFactory();
         const ext = await createFoundryExtension(validConfig());
         await ext.dispose?.();
+        const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
         const fn = getHostFns(ext)[name]!;
         const ctx = createRuntimeContext();
         const expected = {
           code: 'DISPOSED',
+          provider: 'foundry',
           message: 'foundry: extension disposed',
         };
 
-        if (sync) {
-          expectThrowHalt(() => fn.fn(args, ctx), expected);
-        } else {
-          await expectRejectedHalt(
-            fn.fn(args, ctx) as Promise<unknown>,
-            expected
-          );
-        }
+        const thrown = sync
+          ? expectThrowHalt(() => fn.fn(args, ctx), expected)
+          : await expectRejectedHalt(
+              fn.fn(args, ctx) as Promise<unknown>,
+              expected
+            );
+
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        const value = (thrown as RuntimeHaltSignal).value;
+        expect(isInvalid(value)).toBe(true);
+        const status = getStatus(value);
+        expect(status.raw['kind']).toBe('extension_disposed');
+        expect(sdkMocks.create).not.toHaveBeenCalled();
+        expect(sdkMocks.stream).not.toHaveBeenCalled();
+        expect(sdkMocks.embed).not.toHaveBeenCalled();
+        expect(fetchSpy).not.toHaveBeenCalled();
       }
     );
   });

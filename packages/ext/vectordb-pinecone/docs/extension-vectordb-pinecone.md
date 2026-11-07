@@ -188,7 +188,7 @@ generic atoms. Host scripts match coarsely (`guard #NOT_FOUND`) or finely
 | Vector dimension mismatch | `#TYPE_MISMATCH` | `dimension_mismatch` |
 | Index already exists | `#CONFLICT` | `collection_exists` |
 | Invalid `dimensions` arg on `create_collection` | `#INVALID_INPUT` | `invalid_dimensions` |
-| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `disposed` |
+| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `extension_disposed` |
 | Other SDK errors | `#UNAVAILABLE` | `sdk_error` |
 
 ## Cloud Pinecone Setup

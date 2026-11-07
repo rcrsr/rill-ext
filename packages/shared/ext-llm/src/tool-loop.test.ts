@@ -2333,7 +2333,11 @@ describe('executeToolLoop tool halt propagation', () => {
   it('rejects with a DISPOSED halt and emits a terminal tool_result event', async () => {
     const disposedValue = createRuntimeContext().invalidate(
       new Error('disposed'),
-      { code: 'DISPOSED', provider: 'test', raw: { kind: 'disposed' } }
+      {
+        code: 'DISPOSED',
+        provider: 'test',
+        raw: { kind: 'extension_disposed' },
+      }
     );
     const halt = new RuntimeHaltSignal(disposedValue, false);
     const toolFn = vi.fn((): RillValue => {
@@ -2360,6 +2364,39 @@ describe('executeToolLoop tool halt propagation', () => {
         error: expect.any(String),
         duration: expect.any(Number),
       })
+    );
+  });
+
+  it('rejects with a catchable DISPOSED halt without retrying the tool', async () => {
+    const disposedValue = createRuntimeContext().invalidate(
+      new Error('disposed'),
+      {
+        code: 'DISPOSED',
+        provider: 'test',
+        raw: { kind: 'extension_disposed' },
+      }
+    );
+    const halt = new RuntimeHaltSignal(disposedValue, true);
+    const toolFn = vi.fn((): RillValue => {
+      throw halt;
+    });
+    const callbacks = createSingleCallCallbacks();
+    const emitEvent = vi.fn();
+
+    const rejection: unknown = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      { halting_tool: createMockTool(toolFn) },
+      3,
+      callbacks,
+      emitEvent
+    ).catch((error: unknown) => error);
+
+    expect(rejection).toBe(halt);
+    expect(toolFn).toHaveBeenCalledTimes(1);
+    expect(callbacks.callAPI).toHaveBeenCalledTimes(1);
+    expect(emitEvent).toHaveBeenCalledWith(
+      'tool_result',
+      expect.objectContaining({ tool_name: 'halting_tool' })
     );
   });
 

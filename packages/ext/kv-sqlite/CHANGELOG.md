@@ -7,6 +7,10 @@
 - **Test suite trust:** Tests are type-checked; dispose tests assert one database close per mount. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, tightens weak or misnamed assertions, and runs the shared KV contract suite. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 
+### Fixed
+
+- **Post-dispose calls throw:** Calls after `dispose()` throw `#DISPOSED` instead of returning it. Use `guard`, not `??`. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

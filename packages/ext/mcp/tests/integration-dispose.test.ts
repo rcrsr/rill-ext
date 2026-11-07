@@ -18,7 +18,7 @@ import {
   makeFactoryCtx,
   makeRuntimeCtx,
   getCallable,
-  expectRejectsInvalid,
+  expectRejectsHalt,
 } from './_helpers.js';
 import type { McpExtensionConfig } from '../src/types.js';
 
@@ -111,7 +111,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       await extension.dispose?.();
 
       // The pending tool call reports the disposal, not the transport error
-      const pendingError = await expectRejectsInvalid(toolCallPromise);
+      const pendingError = await toolCallPromise;
       expect(getStatus(pendingError).code.name).toBe('DISPOSED');
       expect(getStatus(pendingError).raw['kind']).toBe('extension_disposed');
     });
@@ -186,7 +186,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
       // Both pending calls report the disposal
       for (const call of [call1, call2]) {
-        const error = await expectRejectsInvalid(call);
+        const error = await call;
         expect(getStatus(error).code.name).toBe('DISPOSED');
       }
     });
@@ -339,7 +339,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       await extension.dispose?.();
 
       // Tool call after dispose halts without touching the client
-      const caught = await expectRejectsInvalid(
+      const caught = await expectRejectsHalt(
         getCallable(tools, 'test_tool').fn(
           { param1: 'value' },
           makeRuntimeCtx()
@@ -401,7 +401,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       await extension.dispose?.();
 
       // Every resource path halts without touching the client
-      const readCaught = await expectRejectsInvalid(
+      const readCaught = await expectRejectsHalt(
         getCallable(resources, 'read_resource').fn(
           { uri: 'test://resource' },
           makeRuntimeCtx()
@@ -409,7 +409,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       );
       expectDisposedStatus(readCaught);
 
-      const staticCaught = await expectRejectsInvalid(
+      const staticCaught = await expectRejectsHalt(
         getCallable(resources, 'resource_test_resource').fn(
           {},
           makeRuntimeCtx()
@@ -417,7 +417,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       );
       expectDisposedStatus(staticCaught);
 
-      const templateCaught = await expectRejectsInvalid(
+      const templateCaught = await expectRejectsHalt(
         getCallable(resources, 'resource_item').fn(
           { id: 'x' },
           makeRuntimeCtx()
@@ -486,7 +486,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       await extension.dispose?.();
 
       // Prompt call after dispose halts without touching the client
-      const caught = await expectRejectsInvalid(
+      const caught = await expectRejectsHalt(
         getCallable(prompts, 'test').fn({}, makeRuntimeCtx())
       );
       expectDisposedStatus(caught);

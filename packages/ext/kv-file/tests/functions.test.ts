@@ -9,7 +9,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { getStatus } from '@rcrsr/rill';
+import {
+  getStatus,
+  isInvalid,
+  RuntimeHaltSignal,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createFileKvExtension } from '../src/factory.js';
 import { makeFactoryCtx, makeRuntimeCtx, fnOf } from './_setup.js';
 
@@ -101,6 +106,71 @@ describe('kv-file functions', () => {
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/exceeds size limit/);
+    });
+  });
+
+  describe('dispose', () => {
+    it('disposes twice without error', async () => {
+      const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
+      await ext.dispose!();
+
+      await expect(ext.dispose!()).resolves.toBeUndefined();
+    });
+
+    it('throws #DISPOSED on set and leaves the store file unchanged', async () => {
+      await fs.writeFile(storePath, JSON.stringify({ existing: 'data' }));
+      const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
+      await ext.dispose!();
+      const before = await fs.readFile(storePath);
+
+      let threw = false;
+      let thrown: unknown;
+      let halt: RuntimeHaltSignal | undefined;
+      try {
+        await fnOf(ext, 'set').fn(
+          { mount: 'default', key: 'k', value: 'v' },
+          makeRuntimeCtx()
+        );
+      } catch (e) {
+        threw = true;
+        if (e instanceof RuntimeHaltSignal) {
+          halt = e;
+          thrown = e.value;
+        } else {
+          thrown = e;
+        }
+      }
+
+      expect(threw).toBe(true);
+      expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+      expect(halt?.catchable).toBe(true);
+      expect(isInvalid(thrown as RillValue)).toBe(true);
+      const status = getStatus(thrown as RillValue);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+      expect(status.provider).toBe('kv-file');
+      expect(Buffer.compare(await fs.readFile(storePath), before)).toBe(0);
+    });
+
+    it('throws #DISPOSED for a set that races dispose during the lazy store load', async () => {
+      await fs.writeFile(storePath, JSON.stringify({ existing: 'data' }));
+      const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
+      const before = await fs.readFile(storePath);
+
+      const pending = Promise.resolve(
+        fnOf(ext, 'set').fn(
+          { mount: 'default', key: 'k', value: 'v' },
+          makeRuntimeCtx()
+        )
+      ).catch((e: unknown) => e);
+      await ext.dispose!();
+
+      const halt = await pending;
+      expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+      expect(getStatus((halt as RuntimeHaltSignal).value).code.name).toBe(
+        'DISPOSED'
+      );
+      expect(Buffer.compare(await fs.readFile(storePath), before)).toBe(0);
     });
   });
 });

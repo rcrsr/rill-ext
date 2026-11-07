@@ -185,7 +185,7 @@ generic atoms. Host scripts match coarsely (`guard #NOT_FOUND`) or finely
 | Vector dimension mismatch | `#TYPE_MISMATCH` | `dimension_mismatch` |
 | Collection already exists | `#CONFLICT` | `collection_exists` |
 | Invalid vector format from response | `#PROTOCOL` | `invalid_vector_format` |
-| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `disposed` |
+| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `extension_disposed` |
 | Other SDK errors | `#UNAVAILABLE` | `sdk_error` |
 
 ## Local ChromaDB Setup

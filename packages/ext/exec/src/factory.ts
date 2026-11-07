@@ -5,6 +5,7 @@
  */
 
 import {
+  getStatus,
   isInvalid,
   structureToTypeValue,
   toCallable,
@@ -20,7 +21,7 @@ import type {
   CommandResult,
   ExecExtensionConfig,
 } from './types.js';
-import { runCommand } from './runner.js';
+import { failDisposed, runCommand } from './runner.js';
 
 /**
  * Creates an exec extension with sandboxed command execution.
@@ -36,6 +37,7 @@ export function createExecExtension(
   const inheritEnv = config.inheritEnv ?? false;
 
   const abortControllers: AbortController[] = [];
+  let disposed = false;
 
   const getTimeout = (cmd: CommandConfig): number =>
     cmd.timeout ?? globalTimeout;
@@ -99,6 +101,20 @@ export function createExecExtension(
         );
 
         if (isInvalid(result as RillValue)) {
+          // dispose() cancelled this command: report DISPOSED, not TIMEOUT.
+          // Only the abort-shaped failure is remapped; a genuine failure that
+          // resolved while dispose ran keeps its own atom.
+          if (
+            disposed &&
+            controller.signal.aborted &&
+            getStatus(result as RillValue).raw['kind'] === 'aborted'
+          ) {
+            return runCtx.invalidate(new Error('exec: extension disposed'), {
+              code: 'DISPOSED',
+              provider: 'exec',
+              raw: { kind: 'extension_disposed' },
+            });
+          }
           return result as RillValue;
         }
 
@@ -180,6 +196,7 @@ export function createExecExtension(
   // ----------------------------------------------------------
 
   const dispose = async (): Promise<void> => {
+    disposed = true;
     for (const controller of abortControllers) {
       controller.abort();
     }
@@ -192,7 +209,14 @@ export function createExecExtension(
 
   const callableDict: Record<string, RillValue> = {};
   for (const [name, def] of Object.entries(functions)) {
-    callableDict[name] = toCallable(def);
+    const guarded: RillFunction = {
+      ...def,
+      fn: (args, runCtx, location) => {
+        if (disposed) throw failDisposed(runCtx as RuntimeContext);
+        return def.fn(args, runCtx, location);
+      },
+    };
+    callableDict[name] = toCallable(guarded);
   }
 
   return {

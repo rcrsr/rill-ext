@@ -10,6 +10,10 @@
 
 - **Test suite trust:** Removed the opt-in perf benchmark file, whose timing bound was unreliable on shared runners. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 
+### Fixed
+
+- **Post-dispose calls throw:** Calls after `dispose()` now throw `#DISPOSED` (`raw.kind` `extension_disposed`) instead of `#INVALID_INPUT`. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

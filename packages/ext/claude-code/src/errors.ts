@@ -13,7 +13,7 @@ import {
   type RuntimeContext,
 } from '@rcrsr/rill';
 
-const PROVIDER = 'claude-code';
+export const PROVIDER = 'claude-code';
 
 export type SpawnErrorKind =
   | 'binary_missing'
@@ -81,6 +81,18 @@ export function mapSpawnError(ctx: RuntimeContext, error: unknown): RillValue {
     provider: PROVIDER,
     raw: { kind: 'unknown_error', message: detail },
   });
+}
+
+/** Call made after the extension was disposed. */
+export function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error('claude-code: extension disposed'), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    }),
+    true
+  );
 }
 
 function codeForKind(

@@ -186,9 +186,10 @@ generic atoms. Host scripts match coarsely (`guard #RATE_LIMIT`) or finely
 | Quota exceeded (HTTP 402) | `#QUOTA_EXCEEDED` | `quota_exceeded` |
 | Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
 | Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
+| In-flight request aborted by `dispose()` (returned) | `#DISPOSED` | `extension_disposed` |
 | Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
-| Called after `dispose()` | `#DISPOSED` | `disposed` |
+| Called after `dispose()` | `#DISPOSED` | `extension_disposed` |
 
 ## Events
 

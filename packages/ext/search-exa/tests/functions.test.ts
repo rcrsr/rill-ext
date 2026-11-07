@@ -19,6 +19,7 @@ import {
   createRuntimeContext,
   getStatus,
   isInvalid,
+  RuntimeHaltSignal,
   type ApplicationCallable,
   type ExtensionFactoryCtx,
   type RillValue,
@@ -34,6 +35,34 @@ function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
     signal: signal ?? new AbortController().signal,
     registerErrorCode: () => {},
   };
+}
+
+/** Run a call and return whatever it throws; fail if it does not throw. */
+async function captureThrown(call: () => unknown): Promise<unknown> {
+  try {
+    await call();
+  } catch (e: unknown) {
+    return e;
+  }
+  throw new Error('expected call to throw');
+}
+
+function expectDisposedThrown(thrown: unknown, provider: string): void {
+  expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+  const signal = thrown as RuntimeHaltSignal;
+  expect(signal.catchable).toBe(true);
+  expect(isInvalid(signal.value)).toBe(true);
+  const status = getStatus(signal.value);
+  expect(status.code.name).toBe('DISPOSED');
+  expect(status.raw['kind']).toBe('extension_disposed');
+  expect(status.provider).toBe(provider);
+}
+
+async function expectDisposedThrow(
+  call: () => unknown,
+  provider: string
+): Promise<void> {
+  expectDisposedThrown(await captureThrown(call), provider);
 }
 
 async function expectInvalidWithMessage(
@@ -221,6 +250,24 @@ describe('Exa extension host functions', () => {
         'INVALID_INPUT',
         'query is required'
       );
+    });
+
+    it('throws DISPOSED from every function without calling fetch', async () => {
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
+      const ctx = createRuntimeContext();
+      const fetchMock = mockFetchJson(200, {});
+      globalThis.fetch = fetchMock;
+      await ext.dispose!();
+
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect(names.length).toBeGreaterThan(0);
+      for (const name of names) {
+        await expectDisposedThrow(
+          () => getCallable(ext, name).fn({}, ctx),
+          'exa'
+        );
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('maps HTTP 401 to #AUTH authentication failed', async () => {

@@ -298,6 +298,23 @@ describe('runner: error handling', () => {
     expect(status.message).toMatch(/timed out.*100ms/);
   });
 
+  it('returns DISPOSED when dispose aborts a running command', async () => {
+    const ext = createExecExtension(
+      { commands: { sleep: { binary: 'sleep', maxBuffer: 1024 } } },
+      makeFactoryCtx()
+    );
+
+    const pending = getCallable(ext, 'sleep').fn(
+      { args: ['10'] },
+      makeRuntimeCtx()
+    );
+    await ext.dispose!();
+    const status = invalidStatus(await pending);
+
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
   it('returns invalid value when output exceeds maxBuffer', async () => {
     const result = await runCommand(
       'sh',

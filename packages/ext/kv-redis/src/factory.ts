@@ -16,6 +16,7 @@ import {
   type RillFunction,
   type RillValue,
   type RuntimeContext,
+  RuntimeHaltSignal,
 } from '@rcrsr/rill';
 import {
   mapKvError,
@@ -194,12 +195,19 @@ export function createRedisKvExtension(
     );
   }
 
-  function disposedInvalid(runCtx: RuntimeContext): RillValue {
-    return runCtx.invalidate(new Error('Redis kv extension disposed'), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed' },
-    });
+  /**
+   * Builds the halt for a call made after dispose(). Returns a catchable
+   * halt carrying #DISPOSED (raw.kind 'extension_disposed') for the caller to throw.
+   */
+  function disposedInvalid(runCtx: RuntimeContext): RuntimeHaltSignal {
+    return new RuntimeHaltSignal(
+      runCtx.invalidate(new Error('Redis kv extension disposed'), {
+        code: 'DISPOSED',
+        provider: PROVIDER,
+        raw: { kind: 'extension_disposed' },
+      }),
+      true
+    );
   }
 
   async function scanKeys(pattern: string): Promise<string[]> {
@@ -225,7 +233,7 @@ export function createRedisKvExtension(
 
   const get: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -257,7 +265,7 @@ export function createRedisKvExtension(
 
   const get_or: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const fallback = args['fallback'] as RillValue;
@@ -276,7 +284,7 @@ export function createRedisKvExtension(
 
   const set: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const value = args['value'] as RillValue;
@@ -368,7 +376,7 @@ export function createRedisKvExtension(
 
   const merge: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const partial = args['partial'] as Record<string, RillValue>;
@@ -477,7 +485,7 @@ export function createRedisKvExtension(
 
   const deleteKey: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -498,7 +506,7 @@ export function createRedisKvExtension(
 
   const keys: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
     if (!mountConfig) return unknownMount(runCtx, mountName);
@@ -515,7 +523,7 @@ export function createRedisKvExtension(
 
   const has: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -532,7 +540,7 @@ export function createRedisKvExtension(
 
   const clear: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
     if (!mountConfig) return unknownMount(runCtx, mountName);
@@ -570,7 +578,7 @@ export function createRedisKvExtension(
 
   const getAll: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
     if (!mountConfig) return unknownMount(runCtx, mountName);
@@ -599,6 +607,7 @@ export function createRedisKvExtension(
 
   const schema: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
     if (!mountConfig) return unknownMount(runCtx, mountName);
@@ -616,7 +625,8 @@ export function createRedisKvExtension(
     return result;
   };
 
-  const mountsList: CallableFn = async () => {
+  const mountsList: CallableFn = async (_args, runtimeCtx) => {
+    if (disposed) throw disposedInvalid(runtimeCtx as RuntimeContext);
     const result: RillValue[] = [];
     for (const [name, mountConfig] of Object.entries(config.mounts)) {
       result.push({

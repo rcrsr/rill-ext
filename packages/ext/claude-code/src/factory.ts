@@ -21,7 +21,7 @@ import type { ClaudeCodeConfig, ClaudeMessage } from './types.js';
 import { spawnClaudeCli } from './process.js';
 import { createStreamParser } from './stream-parser.js';
 import { extractResult } from './result.js';
-import { mapSpawnError } from './errors.js';
+import { failDisposed, mapSpawnError } from './errors.js';
 
 // ============================================================
 // TYPES
@@ -371,8 +371,14 @@ export function createClaudeCodeExtension(
     disposers: new Set(),
   };
 
+  let disposed = false;
+
   // Dispose function for cleanup
   const dispose = (): void => {
+    if (disposed) {
+      return;
+    }
+    disposed = true;
     // Cleanup failure logs warning, doesn't throw
     for (const disposer of tracker.disposers) {
       try {
@@ -410,6 +416,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (args, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
+        if (disposed) throw failDisposed(ctx);
         const text = args['text'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
@@ -493,6 +500,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (fnArgs, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
+        if (disposed) throw failDisposed(ctx);
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
@@ -580,6 +588,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (fnArgs, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
+        if (disposed) throw failDisposed(ctx);
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 

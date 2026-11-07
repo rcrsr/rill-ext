@@ -254,7 +254,7 @@ function generateToolFunction(
       return parseToolResult(result);
     } catch (error) {
       if (isDisposed(lifecycleState)) {
-        throw failDisposed(ctx);
+        return failDisposed(ctx).value;
       }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',

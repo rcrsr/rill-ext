@@ -7,6 +7,7 @@ import {
   createRuntimeContext,
   isInvalid,
   getStatus,
+  RuntimeHaltSignal,
   type ApplicationCallable,
   type ExtensionFactoryCtx,
   type RillValue,
@@ -27,7 +28,8 @@ export function makeRuntimeCtx(): RuntimeContext {
 /**
  * Drop-in replacement for `expect(promise).rejects.toThrow(needle)` when the
  * rejection is an invalid RillValue produced by `ctx.invalidate` (which is
- * a plain object that vitest's toThrow matcher cannot inspect).
+ * a plain object that vitest's toThrow matcher cannot inspect), or a
+ * `RuntimeHaltSignal` wrapping one (unwrapped to its `.value`).
  */
 export async function expectRejectsInvalid(
   promise: unknown,
@@ -37,7 +39,7 @@ export async function expectRejectsInvalid(
   try {
     await promise;
   } catch (err) {
-    caught = err;
+    caught = err instanceof RuntimeHaltSignal ? err.value : err;
   }
   expect(isInvalid(caught as RillValue)).toBe(true);
   if (needle !== undefined) {
@@ -49,6 +51,25 @@ export async function expectRejectsInvalid(
     }
   }
   return caught as RillValue;
+}
+
+/**
+ * Asserts the promise rejects with a catchable `RuntimeHaltSignal` (the
+ * post-dispose contract) and returns the wrapped invalid value. A bare thrown
+ * invalid fails this helper.
+ */
+export async function expectRejectsHalt(promise: unknown): Promise<RillValue> {
+  let caught: unknown;
+  try {
+    await promise;
+  } catch (err) {
+    caught = err;
+  }
+  expect(caught).toBeInstanceOf(RuntimeHaltSignal);
+  const halt = caught as RuntimeHaltSignal;
+  expect(halt.catchable).toBe(true);
+  expect(isInvalid(halt.value)).toBe(true);
+  return halt.value;
 }
 
 /**

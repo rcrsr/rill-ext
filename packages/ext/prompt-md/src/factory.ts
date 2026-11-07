@@ -10,6 +10,7 @@
 
 import { stat } from 'node:fs/promises';
 import {
+  RuntimeHaltSignal,
   RuntimeError,
   type ApplicationCallable,
   type CallableFn,
@@ -130,16 +131,19 @@ export async function createPromptMdExtension(
     const wrappedFn: CallableFn = (args, ctxLike, location) => {
       if (disposed) {
         const ctx = ctxLike as RuntimeContext;
-        throw ctx.invalidate(
-          new Error(
-            `prompt-md: extension has been disposed; cannot invoke "${name}"`
+        throw new RuntimeHaltSignal(
+          ctx.invalidate(
+            new Error(
+              `prompt-md: extension has been disposed; cannot invoke "${name}"`
+            ),
+            {
+              code: 'DISPOSED',
+              provider: 'prompt-md',
+              raw: { kind: 'extension_disposed', name },
+            }
           ),
-          {
-            code: 'DISPOSED',
-            provider: 'prompt-md',
-            raw: { kind: 'disposed', name },
-          }
-        ) as unknown as RillValue;
+          true
+        );
       }
       return closure.fn(args, ctxLike, location);
     };
@@ -153,11 +157,8 @@ export async function createPromptMdExtension(
 
   // ── dispose ───────────────────────────────────────────────────────────────
   const dispose = async (): Promise<void> => {
+    // Entries stay in the dict so post-dispose calls reach the guard and throw #DISPOSED.
     disposed = true;
-    // Clear all closure references to allow GC.
-    for (const key of Object.keys(innerDict)) {
-      delete innerDict[key];
-    }
   };
 
   // ── Return ────────────────────────────────────────────────────────────────

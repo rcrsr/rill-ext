@@ -17,7 +17,14 @@ import {
   expectRejectsInvalid,
 } from '../_helpers.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { getStatus, type RuntimeContext } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  execute,
+  getStatus,
+  parse,
+  RuntimeHaltSignal,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import type { McpExtensionConfig } from '../../src/types.js';
 
 describe('dispose() functionality', () => {
@@ -102,7 +109,7 @@ describe('dispose() functionality', () => {
 
       expect(mockClose).toHaveBeenCalledTimes(1);
 
-      const pendingError = await expectRejectsInvalid(pendingCall);
+      const pendingError = await pendingCall;
       await settledTracker;
       expect(settled).toBe(true);
       const pendingStatus = getStatus(pendingError);
@@ -111,9 +118,9 @@ describe('dispose() functionality', () => {
         'extension_disposed'
       );
 
-      const lateError = await expectRejectsInvalid(
-        Promise.resolve(tool.fn({}, makeRuntimeCtx()))
-      );
+      const latePromise = Promise.resolve(tool.fn({}, makeRuntimeCtx()));
+      await expect(latePromise).rejects.toBeInstanceOf(RuntimeHaltSignal);
+      const lateError = await expectRejectsInvalid(latePromise);
       const lateStatus = getStatus(lateError);
       expect(lateStatus.code.name).toBe('DISPOSED');
       expect((lateStatus.raw as { kind?: unknown }).kind).toBe(
@@ -189,5 +196,66 @@ describe('dispose() functionality', () => {
       // Cleanup
       await result.dispose?.();
     });
+  });
+});
+
+describe('mcp extension - runtime dispatch after dispose', () => {
+  beforeEach(() => {
+    vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+    vi.spyOn(Client.prototype, 'close').mockResolvedValue();
+    vi.spyOn(Client.prototype, 'getServerCapabilities').mockReturnValue({
+      tools: {},
+    });
+    vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
+      tools: [
+        {
+          name: 'ping',
+          description: 'Ping tool',
+          inputSchema: { type: 'object', properties: {} },
+        },
+      ],
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = await createMcpExtension(
+      { transport: { type: 'stdio', command: 'echo', args: ['test'] } },
+      makeFactoryCtx()
+    );
+    const tools = (ext.value as Record<string, unknown>)['tools'] as Record<
+      string,
+      unknown
+    >;
+    const ctx = createRuntimeContext({
+      functions: { ping: getCallable(tools, 'ping') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('ping()'), ctx).catch((e: unknown) => e);
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { ping() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

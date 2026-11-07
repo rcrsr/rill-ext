@@ -11,6 +11,7 @@
 
 import {
   RuntimeError,
+  RuntimeHaltSignal,
   isInvalid,
   type RillValue,
   type RuntimeContext,
@@ -173,13 +174,19 @@ export function isDisposed(state: McpLifecycleState): boolean {
   return state.disposed === true;
 }
 
-/** Call made after the extension was disposed. */
-export function failDisposed(ctx: RuntimeContext): RillValue {
-  return ctx.invalidate(new Error('mcp: extension disposed'), {
-    code: 'DISPOSED',
-    provider: PROVIDER,
-    raw: { kind: 'extension_disposed' },
-  });
+/**
+ * Call made after the extension was disposed. Returns a halt signal: entry
+ * guards throw it; in-flight catch sites return its `.value`.
+ */
+export function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error('mcp: extension disposed'), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    }),
+    true
+  );
 }
 
 // ============================================================

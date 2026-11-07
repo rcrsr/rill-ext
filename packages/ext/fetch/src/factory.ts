@@ -5,6 +5,8 @@
  */
 
 import {
+  getStatus,
+  isInvalid,
   structureToTypeValue,
   toCallable,
   type CallableFn,
@@ -23,6 +25,7 @@ import {
   buildRequest,
   executeRequest,
   createSemaphore,
+  failDisposed,
   type InternalFetchConfig,
   type InternalEndpointConfig,
   type EndpointArg,
@@ -190,6 +193,7 @@ export function createFetchExtension(
   // ENDPOINT FUNCTIONS
   // ============================================================
 
+  let disposed = false;
   const functions: Record<string, RillFunction> = {};
 
   for (const [endpointName, endpointConfig] of Object.entries(
@@ -227,6 +231,22 @@ export function createFetchExtension(
           runCtx,
           semaphore
         );
+
+        // dispose() cancelled this request: report DISPOSED, not TIMEOUT.
+        // Only the abort-shaped failure is remapped; a genuine failure that
+        // resolved while dispose ran keeps its own atom.
+        if (
+          disposed &&
+          controller.signal.aborted &&
+          isInvalid(result) &&
+          getStatus(result).raw['kind'] === 'request_timeout'
+        ) {
+          return runCtx.invalidate(new Error('fetch: extension disposed'), {
+            code: 'DISPOSED',
+            provider: 'fetch',
+            raw: { kind: 'extension_disposed' },
+          });
+        }
 
         return result;
       } finally {
@@ -320,6 +340,7 @@ export function createFetchExtension(
   // ============================================================
 
   const dispose = (): void => {
+    disposed = true;
     for (const controller of activeControllers) {
       controller.abort();
     }
@@ -332,7 +353,14 @@ export function createFetchExtension(
 
   const callableDict: Record<string, RillValue> = {};
   for (const [name, def] of Object.entries(functions)) {
-    callableDict[name] = toCallable(def);
+    const guarded: RillFunction = {
+      ...def,
+      fn: (args, ctxLike, location) => {
+        if (disposed) throw failDisposed(ctxLike);
+        return def.fn(args, ctxLike, location);
+      },
+    };
+    callableDict[name] = toCallable(guarded);
   }
 
   return {

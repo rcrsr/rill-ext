@@ -6,7 +6,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getStatus, isInvalid, type ApplicationCallable } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  execute,
+  getStatus,
+  isInvalid,
+  parse,
+  RuntimeHaltSignal,
+  type ApplicationCallable,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import {
   createFetchExtension,
   type FetchExtensionConfig,
@@ -22,6 +31,9 @@ type MockResponse = {
   headers?: Record<string, string> | undefined;
   body: string;
   delay?: number | undefined;
+  // Resolve after `delay` even when the signal aborts, simulating a response
+  // that completed while dispose() ran.
+  ignoreAbort?: boolean | undefined;
 };
 
 let mockResponses: MockResponse[] = [];
@@ -43,7 +55,8 @@ function mockFetch(
   }
 
   const delay = mockResponse.delay ?? 0;
-  const signal = options?.signal;
+  const signal =
+    mockResponse.ignoreAbort === true ? undefined : options?.signal;
 
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -452,6 +465,48 @@ describe('createFetchExtension', () => {
   });
 
   describe('dispose()', () => {
+    it('throws DISPOSED from every function after dispose', async () => {
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+          },
+          listPosts: { method: 'GET', path: '/posts' },
+        },
+      };
+      const ext = createFetchExtension(config, makeFactoryCtx());
+      await ext.dispose!();
+      await ext.dispose!();
+
+      const names = Object.keys(ext.value as object);
+      expect(names).toEqual(
+        expect.arrayContaining(['getUser', 'listPosts', 'endpoints'])
+      );
+      for (const name of names) {
+        let thrown: unknown;
+        let resolved = false;
+        try {
+          await getCallable(ext, name).fn({ id: '1' }, makeRuntimeCtx());
+          resolved = true;
+        } catch (e) {
+          thrown = e;
+        }
+        expect(resolved).toBe(false);
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+        const invalid = (thrown as RuntimeHaltSignal).value;
+        expect(isInvalid(invalid)).toBe(true);
+        const status = getStatus(invalid);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.provider).toBe('fetch');
+        expect(status.raw['kind']).toBe('extension_disposed');
+      }
+      expect(fetchCallCount).toBe(0);
+    });
+
     it('dispose can be called multiple times without error', () => {
       const config: FetchExtensionConfig = {
         baseUrl: 'https://api.example.com',
@@ -473,7 +528,7 @@ describe('createFetchExtension', () => {
       expect(() => dispose!()).not.toThrow();
     });
 
-    it('dispose aborts in-flight requests', async () => {
+    it('returns DISPOSED for in-flight requests aborted by dispose', async () => {
       mockResponses.push({ status: 200, body: '{"id":123}', delay: 500 });
 
       const config: FetchExtensionConfig = {
@@ -500,7 +555,40 @@ describe('createFetchExtension', () => {
 
       const result = await requestPromise;
       const status = getStatus(result);
-      expect(status.code.name).toBe('TIMEOUT');
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.provider).toBe('fetch');
+      expect(status.raw).toMatchObject({ kind: 'extension_disposed' });
+    });
+
+    it('keeps the original atom when a response fails while dispose runs', async () => {
+      mockResponses.push({
+        status: 404,
+        body: '{"error":"missing"}',
+        delay: 50,
+        ignoreAbort: true,
+      });
+
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+          },
+        },
+      };
+
+      const ext = createFetchExtension(config, makeFactoryCtx());
+      const requestPromise = getCallable(ext, 'getUser').fn(
+        { id: '123' },
+        makeRuntimeCtx()
+      );
+      ext.dispose!();
+
+      const status = getStatus(await requestPromise);
+      expect(status.code.name).not.toBe('DISPOSED');
+      expect(status.raw['kind']).not.toBe('extension_disposed');
     });
 
     it('aborts when ctx.signal fires', async () => {
@@ -537,5 +625,46 @@ describe('createFetchExtension', () => {
       const status = getStatus(result);
       expect(status.code.name).toBe('TIMEOUT');
     });
+  });
+});
+
+describe('fetch extension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = createFetchExtension(
+      {
+        baseUrl: 'https://api.example.com',
+        endpoints: { listPosts: { method: 'GET', path: '/posts' } },
+      },
+      makeFactoryCtx()
+    );
+    const ctx = createRuntimeContext({
+      functions: { endpoints: getCallable(ext, 'endpoints') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('endpoints()'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { endpoints() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

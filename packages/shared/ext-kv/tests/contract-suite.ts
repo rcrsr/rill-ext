@@ -8,8 +8,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createRuntimeContext,
+  execute,
   getStatus,
   isInvalid,
+  parse,
+  RuntimeHaltSignal,
   type ApplicationCallable,
   type ExtensionFactoryResult,
   type RillValue,
@@ -39,7 +42,29 @@ function callFn(
   if (callable === undefined) {
     return Promise.reject(new Error(`extension has no function '${name}'`));
   }
-  return Promise.resolve(callable.fn(args, createRuntimeContext()));
+  return Promise.resolve().then(() =>
+    callable.fn(args, createRuntimeContext())
+  );
+}
+
+/**
+ * Returns what a call throws or rejects with. A thrown RuntimeHaltSignal is
+ * reported as `halt` and its invalid value is unwrapped into `thrown`.
+ */
+async function captureThrown(call: () => Promise<RillValue>): Promise<{
+  threw: boolean;
+  thrown: unknown;
+  halt: RuntimeHaltSignal | undefined;
+}> {
+  try {
+    await call();
+  } catch (e) {
+    if (e instanceof RuntimeHaltSignal) {
+      return { threw: true, thrown: e.value, halt: e };
+    }
+    return { threw: true, thrown: e, halt: undefined };
+  }
+  return { threw: false, thrown: undefined, halt: undefined };
 }
 
 function expectInvalid(
@@ -675,6 +700,77 @@ export function describeKvContract(
           'INVALID_INPUT',
           'exceeds size limit'
         );
+      });
+    });
+
+    describe('after dispose', () => {
+      it('throws #DISPOSED from every host function', async () => {
+        const ext = make(state);
+        await ext.dispose?.();
+        const names = Object.keys(ext.value as Record<string, unknown>);
+        expect(names.length).toBeGreaterThan(0);
+
+        for (const name of names) {
+          const { threw, thrown, halt } = await captureThrown(() =>
+            callFn(ext, name, {
+              mount: 'state',
+              key: 'k',
+              value: 'v',
+              partial: { a: 1 },
+              fallback: 'x',
+            })
+          );
+
+          expect(threw).toBe(true);
+          expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+          expect(halt?.catchable).toBe(true);
+          expect(isInvalid(thrown as RillValue)).toBe(true);
+          const status = getStatus(thrown as RillValue);
+          expect(status.code.name).toBe('DISPOSED');
+          expect(status.raw['kind']).toBe('extension_disposed');
+          expect(status.provider).toBe(backend);
+        }
+      });
+
+      it('rejects a script call with a catchable DISPOSED halt through the runtime', async () => {
+        const ext = make(state);
+        const mounts = (ext.value as Record<string, ApplicationCallable>)[
+          'mounts'
+        ]!;
+        const ctx = createRuntimeContext({ functions: { mounts } });
+        await ext.dispose?.();
+
+        const thrown = await execute(parse('mounts()'), ctx).catch(
+          (e: unknown) => e
+        );
+
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        const status = getStatus((thrown as RuntimeHaltSignal).value);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.raw['kind']).toBe('extension_disposed');
+      });
+
+      it('completes a guarded script call with the DISPOSED invalid value', async () => {
+        const ext = make(state);
+        const mounts = (ext.value as Record<string, ApplicationCallable>)[
+          'mounts'
+        ]!;
+        const ctx = createRuntimeContext({ functions: { mounts } });
+        await ext.dispose?.();
+
+        const result = await execute(
+          parse('guard<on: list[#DISPOSED]> { mounts() }'),
+          ctx
+        );
+
+        expect(getStatus(result.result).code.name).toBe('DISPOSED');
+      });
+
+      it('disposes twice without error', async () => {
+        const ext = make(state);
+        await ext.dispose?.();
+
+        await expect(Promise.resolve(ext.dispose?.())).resolves.toBeUndefined();
       });
     });
   });

@@ -108,8 +108,8 @@ Where `<Service>` is `Gmail`, `Drive`, or `Calendar`; `<operation>` is the funct
 |-----------|------|---|---------|
 | Request exceeds 30 s timeout | `#TIMEOUT` | `request_timeout` | `google: request timeout` |
 | Session token variable absent from RuntimeContext | `#AUTH` | `session_token_missing` | `google: session token '<var>' not found` |
-| `dispose()` already called | `#DISPOSED` | `disposed` | `google: operation cancelled` |
-| In-flight request aborted by `dispose()` | `#DISPOSED` | `disposed` | `google: operation cancelled` |
+| Host function called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` | `google: operation cancelled` |
+| In-flight request aborted by `dispose()` (returned) | `#DISPOSED` | `extension_disposed` | `google: operation cancelled` |
 | Network connection failure (DNS, refused) | `#UNAVAILABLE` | `connection_failed` | `google: <service> connection failed` |
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` | `google: unexpected response format` |
 

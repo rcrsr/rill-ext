@@ -1,4 +1,4 @@
-import { type RillValue, type RuntimeContext } from '@rcrsr/rill';
+import { RuntimeHaltSignal, type RuntimeContext } from '@rcrsr/rill';
 import type { DisposalState } from './types.js';
 
 /**
@@ -10,8 +10,10 @@ export function createDisposalState(_provider: string): DisposalState {
 }
 
 /**
- * Return an invalid RillValue (atom `#DISPOSED`) when the extension
- * instance is disposed, otherwise null.
+ * Return a catchable halt signal wrapping the `#DISPOSED` invalid (raw kind
+ * `extension_disposed`) when the extension instance is disposed, otherwise
+ * null. The caller throws a non-null result; a bare thrown invalid would
+ * become `#R999` at the dispatch boundary.
  *
  * @param ctx - Runtime context (provides `invalidate`)
  * @param state - DisposalState to check
@@ -21,14 +23,18 @@ export function checkDisposed(
   ctx: RuntimeContext,
   state: DisposalState,
   provider: string
-): RillValue | null {
+): RuntimeHaltSignal | null {
   if (!state.isDisposed) return null;
   const error = new Error(`${provider}: operation cancelled`);
-  return ctx.invalidate(error, {
+  const invalid = ctx.invalidate(error, {
     code: 'DISPOSED',
     provider,
-    raw: { kind: 'disposed', message: `${provider}: operation cancelled` },
+    raw: {
+      kind: 'extension_disposed',
+      message: `${provider}: operation cancelled`,
+    },
   });
+  return new RuntimeHaltSignal(invalid, true);
 }
 
 export async function dispose(
@@ -36,6 +42,7 @@ export async function dispose(
   cleanup?: () => Promise<void>
 ): Promise<void> {
   if (state.isDisposed) return;
+  state.isDisposed = true;
   if (cleanup) {
     try {
       await cleanup();
@@ -44,5 +51,4 @@ export async function dispose(
       console.warn(`Cleanup failed: ${message}`);
     }
   }
-  state.isDisposed = true;
 }

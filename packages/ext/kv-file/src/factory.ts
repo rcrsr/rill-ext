@@ -16,6 +16,7 @@ import {
   type RillFunction,
   type RillValue,
   type RuntimeContext,
+  RuntimeHaltSignal,
 } from '@rcrsr/rill';
 import type { KvExtensionContract } from '@rcrsr/rill-ext-kv-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
@@ -34,6 +35,21 @@ const getAllReturn = structureToTypeValue({
 });
 
 const PROVIDER = 'kv-file';
+
+/**
+ * Builds the halt for a call made after dispose(). Returns a catchable
+ * halt carrying #DISPOSED (raw.kind 'extension_disposed') for the caller to throw.
+ */
+function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    }),
+    true
+  );
+}
 
 /**
  * Creates a file-based kv extension with JSON persistence.
@@ -67,6 +83,8 @@ export function createFileKvExtension(
       'KV file extension requires either "mounts" or "store" configuration'
     );
   }
+
+  let disposed = false;
 
   // Store instances keyed by mount name (lazy-initialized)
   const stores = new Map<
@@ -137,6 +155,9 @@ export function createFileKvExtension(
     }
 
     storeState.instance = await storeState.promise;
+    // dispose() may have run while the store loaded; it flushed only stores
+    // already resolved, so this call must not touch the store.
+    if (disposed) throw failDisposed(runCtx);
     if (storeState.instance.loadError !== null) {
       return { ok: false, invalid: storeState.instance.loadError };
     }
@@ -149,6 +170,7 @@ export function createFileKvExtension(
 
   const get: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const value = r.store.get(args['key'] as string, runCtx);
@@ -158,6 +180,7 @@ export function createFileKvExtension(
 
   const get_or: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const key = args['key'] as string;
@@ -171,6 +194,7 @@ export function createFileKvExtension(
 
   const set: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const setResult = await r.store.set(
@@ -184,6 +208,7 @@ export function createFileKvExtension(
 
   const merge: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const key = args['key'] as string;
@@ -219,6 +244,7 @@ export function createFileKvExtension(
 
   const deleteKey: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const result = r.store.delete(args['key'] as string, runCtx);
@@ -228,6 +254,7 @@ export function createFileKvExtension(
 
   const keys: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     return r.store.keys();
@@ -235,6 +262,7 @@ export function createFileKvExtension(
 
   const has: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     return r.store.has(args['key'] as string);
@@ -242,6 +270,7 @@ export function createFileKvExtension(
 
   const clear: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const result = r.store.clear(runCtx);
@@ -251,6 +280,7 @@ export function createFileKvExtension(
 
   const getAll: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     return r.store.getAll();
@@ -258,6 +288,7 @@ export function createFileKvExtension(
 
   const schema: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = mounts[mountName];
 
@@ -286,7 +317,8 @@ export function createFileKvExtension(
     return result;
   };
 
-  const mountsList: CallableFn = async () => {
+  const mountsList: CallableFn = async (_args, ctx) => {
+    if (disposed) throw failDisposed(ctx as RuntimeContext);
     const result: RillValue[] = [];
     for (const [name, cfg] of Object.entries(mounts)) {
       result.push({
@@ -305,6 +337,8 @@ export function createFileKvExtension(
   // ----------------------------------------------------------
 
   const dispose = async (): Promise<void> => {
+    if (disposed) return;
+    disposed = true;
     const flushPromises: Promise<void>[] = [];
     for (const storeState of stores.values()) {
       if (storeState.instance && storeState.instance.loadError === null) {

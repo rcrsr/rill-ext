@@ -19,6 +19,7 @@ import {
   createRuntimeContext,
   getStatus,
   isInvalid,
+  RuntimeHaltSignal,
   type ApplicationCallable,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
@@ -31,6 +32,34 @@ function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
     signal: signal ?? new AbortController().signal,
     registerErrorCode: () => {},
   };
+}
+
+/** Run a call and return whatever it throws; fail if it does not throw. */
+async function captureThrown(call: () => unknown): Promise<unknown> {
+  try {
+    await call();
+  } catch (e: unknown) {
+    return e;
+  }
+  throw new Error('expected call to throw');
+}
+
+function expectDisposedThrown(thrown: unknown, provider: string): void {
+  expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+  const signal = thrown as RuntimeHaltSignal;
+  expect(signal.catchable).toBe(true);
+  expect(isInvalid(signal.value)).toBe(true);
+  const status = getStatus(signal.value);
+  expect(status.code.name).toBe('DISPOSED');
+  expect(status.raw['kind']).toBe('extension_disposed');
+  expect(status.provider).toBe(provider);
+}
+
+async function expectDisposedThrow(
+  call: () => unknown,
+  provider: string
+): Promise<void> {
+  expectDisposedThrown(await captureThrown(call), provider);
 }
 
 async function expectInvalidWithMessage(
@@ -452,15 +481,33 @@ describe('SearXNG extension host functions', () => {
       );
     });
 
-    it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
+    it('throws DISPOSED after dispose', async () => {
       const ext = await createTestExtension();
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expectInvalidWithMessage(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
-        'searxng: operation cancelled'
+      await expectDisposedThrow(
+        () => getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'searxng'
       );
+    });
+
+    it('throws DISPOSED from every function without calling fetch', async () => {
+      const ext = await createTestExtension();
+      const ctx = createRuntimeContext();
+      const fetchMock = mockFetchJson(200, {});
+      globalThis.fetch = fetchMock;
+      await ext.dispose!();
+
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect(names.length).toBeGreaterThan(0);
+      for (const name of names) {
+        await expectDisposedThrow(
+          () => getCallable(ext, name).fn({}, ctx),
+          'searxng'
+        );
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 
@@ -581,14 +628,14 @@ describe('SearXNG extension host functions', () => {
       );
     });
 
-    it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
+    it('throws DISPOSED after dispose', async () => {
       const ext = await createTestExtension();
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expectInvalidWithMessage(
-        getCallable(ext, 'config').fn({}, ctx),
-        'searxng: operation cancelled'
+      await expectDisposedThrow(
+        () => getCallable(ext, 'config').fn({}, ctx),
+        'searxng'
       );
     });
   });
@@ -631,8 +678,13 @@ describe('SearXNG extension host functions', () => {
       // Dispose while request is in-flight
       await ext.dispose!();
 
-      // The in-flight request should reject with mapped AbortError
-      await expectInvalidWithMessage(promise, 'searxng: request timeout');
+      // The in-flight request returns #DISPOSED, not a timeout
+      const result = await expectInvalidWithMessage(
+        promise,
+        'searxng: operation cancelled'
+      );
+      expect(getStatus(result).code.name).toBe('DISPOSED');
+      expect(getStatus(result).raw['kind']).toBe('extension_disposed');
     });
   });
 });

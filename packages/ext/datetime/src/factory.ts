@@ -5,6 +5,7 @@
  */
 
 import {
+  RuntimeHaltSignal,
   structureToTypeValue,
   toCallable,
   type CallableFn,
@@ -216,13 +217,16 @@ export function createDatetimeExtension(
   // Validation helpers (return invalid RillValue or null on success)
   // ----------------------------------------------------------
 
-  function checkDisposed(runCtx: RuntimeContext): RillValue | null {
+  function checkDisposed(runCtx: RuntimeContext): RuntimeHaltSignal | null {
     if (disposed) {
-      return runCtx.invalidate(new Error('datetime: operation cancelled'), {
-        code: 'INVALID_INPUT',
-        provider: PROVIDER,
-        raw: { kind: 'disposed' },
-      });
+      return new RuntimeHaltSignal(
+        runCtx.invalidate(new Error('datetime: operation cancelled'), {
+          code: 'DISPOSED',
+          provider: PROVIDER,
+          raw: { kind: 'extension_disposed' },
+        }),
+        true
+      );
     }
     return null;
   }
@@ -426,7 +430,7 @@ export function createDatetimeExtension(
   const iso: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
-    if (dInv) return dInv;
+    if (dInv) throw dInv;
     const dt = extractDatetime(args['dt'] as RillValue, runCtx);
     if (!dt.ok) return dt.invalid;
     const zoneArg = extractString(args['zone'] as RillValue, runCtx);
@@ -453,7 +457,7 @@ export function createDatetimeExtension(
   const date: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
-    if (dInv) return dInv;
+    if (dInv) throw dInv;
     const dt = extractDatetime(args['dt'] as RillValue, runCtx);
     if (!dt.ok) return dt.invalid;
     const zoneArg = extractString(args['zone'] as RillValue, runCtx);
@@ -473,7 +477,7 @@ export function createDatetimeExtension(
   const time: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
-    if (dInv) return dInv;
+    if (dInv) throw dInv;
     const dt = extractDatetime(args['dt'] as RillValue, runCtx);
     if (!dt.ok) return dt.invalid;
     const zoneArg = extractString(args['zone'] as RillValue, runCtx);
@@ -496,7 +500,7 @@ export function createDatetimeExtension(
   const offset: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
-    if (dInv) return dInv;
+    if (dInv) throw dInv;
     const zoneArg = extractString(args['zone'] as RillValue, runCtx);
     if (!zoneArg.ok) return zoneArg.invalid;
     const zInv = validateZone(zoneArg.value, runCtx);
@@ -523,7 +527,7 @@ export function createDatetimeExtension(
   const zones: CallableFn = async (_args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
-    if (dInv) return dInv;
+    if (dInv) throw dInv;
     return Array.from(validZones) as unknown as RillValue;
   };
 
@@ -534,7 +538,7 @@ export function createDatetimeExtension(
   const format: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
-    if (dInv) return dInv;
+    if (dInv) throw dInv;
     const dt = extractDatetime(args['dt'] as RillValue, runCtx);
     if (!dt.ok) return dt.invalid;
     const patternArg = extractString(args['pattern'] as RillValue, runCtx);
@@ -553,7 +557,7 @@ export function createDatetimeExtension(
   const parse: CallableFn = async (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
-    if (dInv) return dInv;
+    if (dInv) throw dInv;
     const strArg = extractString(args['str'] as RillValue, runCtx);
     if (!strArg.ok) return strArg.invalid;
     const patternArg = extractString(args['pattern'] as RillValue, runCtx);

@@ -1,12 +1,13 @@
 /**
  * Test suite for disposal lifecycle utilities.
- * Disposed state surfaces as an invalid RillValue via ctx.invalidate.
+ * Disposed state surfaces as a catchable halt signal wrapping an invalid RillValue.
  */
 
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import {
   createRuntimeContext,
   getStatus,
+  RuntimeHaltSignal,
   type RuntimeContext,
 } from '@rcrsr/rill';
 import { createDisposalState, checkDisposed, dispose } from './disposal.js';
@@ -44,10 +45,12 @@ describe('checkDisposed', () => {
   it('returns invalid DISPOSED value naming the provider when disposed', () => {
     const state = { isDisposed: true };
     const result = checkDisposed(ctx, state, provider);
-    expect(result).not.toBeNull();
-    const status = getStatus(result!);
+    expect(result).toBeInstanceOf(RuntimeHaltSignal);
+    expect(result!.catchable).toBe(true);
+    const status = getStatus(result!.value);
     expect(status.code.name).toBe('DISPOSED');
     expect(status.message).toBe(`${provider}: operation cancelled`);
+    expect(status.raw['kind']).toBe('extension_disposed');
   });
 });
 
@@ -58,7 +61,7 @@ describe('dispose', () => {
     expect(state.isDisposed).toBe(true);
   });
 
-  it('calls cleanup once and sets disposed flag after', async () => {
+  it('calls cleanup once and sets disposed flag before it runs', async () => {
     const state = createDisposalState();
     let flagDuringCleanup: boolean | undefined;
     const cleanup = vi.fn(async () => {
@@ -66,7 +69,7 @@ describe('dispose', () => {
     });
     await dispose(state, cleanup);
     expect(cleanup).toHaveBeenCalledTimes(1);
-    expect(flagDuringCleanup).toBe(false);
+    expect(flagDuringCleanup).toBe(true);
     expect(state.isDisposed).toBe(true);
   });
 
@@ -76,6 +79,13 @@ describe('dispose', () => {
     await dispose(state, cleanup);
     await dispose(state, cleanup);
     await dispose(state, cleanup);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs cleanup once when dispose is called concurrently', async () => {
+    const state = createDisposalState();
+    const cleanup = vi.fn(async () => {});
+    await Promise.all([dispose(state, cleanup), dispose(state, cleanup)]);
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 

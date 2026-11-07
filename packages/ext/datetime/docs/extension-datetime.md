@@ -173,4 +173,4 @@ generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
 | Pattern contains unrecognized format token | `#INVALID_INPUT` | `unknown_format_token` |
 | Input string does not match the given pattern | `#INVALID_INPUT` | `parse_mismatch` |
 | Argument type does not match expected type | `#INVALID_INPUT` | `type_mismatch` |
-| Extension disposed while operation in progress | `#DISPOSED` | `disposed` |
+| Called after `dispose()` | `#DISPOSED` | `extension_disposed` |

@@ -16,6 +16,7 @@
  */
 
 import {
+  RuntimeHaltSignal,
   toCallable,
   structureToTypeValue,
   emitExtensionEvent,
@@ -151,11 +152,14 @@ export function createGoogleWorkspaceExtension(
         ctx.invalidate(new Error('google: operation cancelled'), {
           code: 'DISPOSED',
           provider: PROVIDER,
-          raw: { kind: 'disposed', message: 'google: operation cancelled' },
+          raw: {
+            kind: 'extension_disposed',
+            message: 'google: operation cancelled',
+          },
         });
 
       if (disposalState.isDisposed) {
-        return disposed();
+        throw new RuntimeHaltSignal(disposed(), true);
       }
 
       if (capabilityCheck !== null) {

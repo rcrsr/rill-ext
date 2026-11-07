@@ -6,10 +6,36 @@
  * - Configuration validation failure
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import {
+  getStatus,
+  isInvalid,
+  RuntimeHaltSignal,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createRedisKvExtension } from '../src/factory.js';
 import type { RedisKvExtensionConfig } from '../src/factory.js';
-import { makeFactoryCtx } from './_setup.js';
+import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+
+const redisMock = vi.hoisted(() => ({
+  on: vi.fn(),
+  quit: vi.fn(() => Promise.resolve('OK')),
+  disconnect: vi.fn(),
+  get: vi.fn(),
+  set: vi.fn(),
+  del: vi.fn(),
+  scan: vi.fn(),
+  exists: vi.fn(),
+  mget: vi.fn(),
+  eval: vi.fn(),
+  pipeline: vi.fn(),
+}));
+
+vi.mock('ioredis', () => ({
+  Redis: vi.fn(function () {
+    return redisMock;
+  }),
+}));
 
 const validMounts = { test: { mode: 'read-write', prefix: 'test:' } } as const;
 
@@ -176,6 +202,73 @@ describe('createRedisKvExtension', () => {
 
       // Second dispose should not throw
       await expect(result.dispose?.()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('after dispose', () => {
+    it('throws #DISPOSED from every host function without touching the client', async () => {
+      const result = createRedisKvExtension(
+        {
+          url: 'redis://localhost:6379',
+          mounts: { test: { mode: 'read-write', prefix: 'test:' } },
+        },
+        makeFactoryCtx()
+      );
+      await result.dispose?.();
+      const callables = result.value as unknown as Record<
+        string,
+        { fn: (a: Record<string, RillValue>, c: unknown) => unknown }
+      >;
+      const names = Object.keys(callables);
+      expect(names.length).toBeGreaterThan(0);
+      for (const m of Object.values(redisMock)) m.mockClear();
+
+      for (const name of names) {
+        let threw = false;
+        let thrown: unknown;
+        let halt: RuntimeHaltSignal | undefined;
+        try {
+          await callables[name]!.fn(
+            {
+              mount: 'test',
+              key: 'k',
+              value: 'v',
+              partial: { a: 1 },
+              fallback: 'x',
+            },
+            makeRuntimeCtx()
+          );
+        } catch (e) {
+          threw = true;
+          if (e instanceof RuntimeHaltSignal) {
+            halt = e;
+            thrown = e.value;
+          } else {
+            thrown = e;
+          }
+        }
+
+        expect(threw).toBe(true);
+        expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+        expect(halt?.catchable).toBe(true);
+        expect(isInvalid(thrown as RillValue)).toBe(true);
+        const status = getStatus(thrown as RillValue);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.raw['kind']).toBe('extension_disposed');
+        expect(status.provider).toBe('kv-redis');
+      }
+      for (const m of [
+        redisMock.get,
+        redisMock.set,
+        redisMock.del,
+        redisMock.scan,
+        redisMock.exists,
+        redisMock.mget,
+        redisMock.eval,
+        redisMock.pipeline,
+      ]) {
+        expect(m).not.toHaveBeenCalled();
+      }
     });
   });
 });

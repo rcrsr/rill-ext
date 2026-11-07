@@ -5,7 +5,15 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { getStatus } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  execute,
+  getStatus,
+  isInvalid,
+  parse,
+  RuntimeHaltSignal,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import { createDatetimeExtension } from '../src/factory.js';
 import type { DatetimeExtensionConfig } from '../src/types.js';
 import { makeFactoryCtx, makeRuntimeCtx, fnOf } from './_setup.js';
@@ -85,26 +93,82 @@ describe('datetime extension factory', () => {
     });
   });
 
-  // ============================================================
-  // AC-E4 / EC-4: Function call after dispose returns invalid value
-  // ============================================================
-
   describe('post-dispose function calls', () => {
-    it.each([
-      { name: 'iso', args: { dt: 0, zone: 'UTC' } },
-      { name: 'zones', args: {} },
-      { name: 'format', args: { dt: 0, pattern: 'YYYY-MM-DD' } },
-    ])(
-      'returns invalid value with message "datetime: operation cancelled" when $name is called after dispose',
-      async ({ name, args }) => {
-        const ext = mk();
-        await ext.dispose!();
+    const KEYS = ['iso', 'date', 'time', 'offset', 'zones', 'format', 'parse'];
 
-        const result = await fnOf(ext, name).fn(args, makeRuntimeCtx());
-        const status = getStatus(result);
-        expect(status.code.name).toBe('INVALID_INPUT');
-        expect(status.message).toMatch(/datetime: operation cancelled/);
+    async function captureThrown(call: () => unknown): Promise<{
+      threw: boolean;
+      thrown: unknown;
+    }> {
+      try {
+        await call();
+      } catch (e) {
+        return { threw: true, thrown: e };
       }
+      return { threw: false, thrown: undefined };
+    }
+
+    it('exposes exactly the 7 expected keys', () => {
+      expect(Object.keys(mk().value as Record<string, unknown>).sort()).toEqual(
+        [...KEYS].sort()
+      );
+    });
+
+    it('throws DISPOSED with extension_disposed for every function', async () => {
+      const ext = mk();
+      await ext.dispose!();
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect(names.length).toBe(7);
+
+      for (const name of names) {
+        const { threw, thrown } = await captureThrown(() =>
+          fnOf(ext, name).fn({}, makeRuntimeCtx())
+        );
+        expect(threw, `${name} should throw`).toBe(true);
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+        const invalid = (thrown as RuntimeHaltSignal).value;
+        expect(isInvalid(invalid), `${name} invalid`).toBe(true);
+        const status = getStatus(invalid);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.provider).toBe('datetime');
+        expect(status.raw).toMatchObject({ kind: 'extension_disposed' });
+      }
+    });
+  });
+});
+
+describe('datetime extension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = mk();
+    const ctx = createRuntimeContext({
+      functions: { zones: fnOf(ext, 'zones') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('zones()'), ctx).catch(
+      (e: unknown) => e
     );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { zones() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

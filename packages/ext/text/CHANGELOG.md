@@ -7,6 +7,10 @@
 - **Test suite trust:** Test files are type-checked and their type errors fixed. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 
+### Fixed
+
+- **Post-dispose calls throw:** Host functions called after `dispose()` now throw `#DISPOSED` instead of running. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

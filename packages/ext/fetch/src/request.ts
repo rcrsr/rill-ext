@@ -88,6 +88,20 @@ export interface FetchOptions {
 
 const PROVIDER = 'fetch';
 
+/**
+ * Build the invalid value thrown when a host function is called after dispose.
+ */
+export function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
+  return new RuntimeHaltSignal(
+    ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
+      code: 'DISPOSED',
+      provider: PROVIDER,
+      raw: { kind: 'extension_disposed' },
+    }),
+    true
+  );
+}
+
 // ============================================================
 // CONCURRENCY SEMAPHORE
 // ============================================================

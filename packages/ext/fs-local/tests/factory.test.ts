@@ -8,7 +8,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { getStatus, isInvalid, RuntimeError } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  execute,
+  getStatus,
+  isInvalid,
+  parse,
+  RuntimeError,
+  RuntimeHaltSignal,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import { createLocalFsExtension } from '../src/factory.js';
 import type { FsLocalExtensionConfig } from '../src/types.js';
 import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
@@ -106,5 +115,126 @@ describe('createLocalFsExtension - factory', () => {
       });
       await expect(fs.stat(overLimitPath)).rejects.toThrow(/ENOENT/);
     });
+  });
+
+  describe('after dispose', () => {
+    const captureThrown = async (
+      call: () => unknown
+    ): Promise<{
+      threw: boolean;
+      thrown: unknown;
+      halt: RuntimeHaltSignal | undefined;
+    }> => {
+      try {
+        await call();
+      } catch (e) {
+        if (e instanceof RuntimeHaltSignal) {
+          return { threw: true, thrown: e.value, halt: e };
+        }
+        return { threw: true, thrown: e, halt: undefined };
+      }
+      return { threw: false, thrown: undefined, halt: undefined };
+    };
+
+    it('throws #DISPOSED with extension_disposed from every function', async () => {
+      const ext = await createLocalFsExtension(
+        { mounts: { workspace: { path: testMount, mode: 'read-write' } } },
+        makeFactoryCtx()
+      );
+      await ext.dispose?.();
+      await ext.dispose?.();
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect(names).toHaveLength(12);
+
+      for (const name of names) {
+        const { threw, thrown, halt } = await captureThrown(() =>
+          getCallable(ext, name).fn(
+            {
+              path: '/workspace/a.txt',
+              content: 'x',
+              from: '/workspace/a.txt',
+              to: '/workspace/b.txt',
+            },
+            makeRuntimeCtx()
+          )
+        );
+
+        expect(threw).toBe(true);
+        expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+        expect(halt?.catchable).toBe(true);
+        expect(isInvalid(thrown as never)).toBe(true);
+        const status = getStatus(thrown as never);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.raw['kind']).toBe('extension_disposed');
+        expect(status.provider).toBe('fs-local');
+      }
+    });
+
+    it('creates no file when write is called after dispose', async () => {
+      const ext = await createLocalFsExtension(
+        { mounts: { workspace: { path: testMount, mode: 'read-write' } } },
+        makeFactoryCtx()
+      );
+      await ext.dispose?.();
+      const target = path.join(testMount, 'late.txt');
+
+      const { threw } = await captureThrown(() =>
+        getCallable(ext, 'write').fn(
+          { path: '/workspace/late.txt', content: 'x' },
+          makeRuntimeCtx()
+        )
+      );
+
+      expect(threw).toBe(true);
+      await expect(fs.stat(target)).rejects.toThrow(/ENOENT/);
+    });
+  });
+});
+
+describe('createLocalFsExtension - runtime dispatch after dispose', () => {
+  let mount: string;
+
+  beforeEach(async () => {
+    mount = await fs.mkdtemp(path.join(os.tmpdir(), 'rill-fs-local-rt-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(mount, { recursive: true, force: true });
+  });
+
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = await createLocalFsExtension(
+      { mounts: { workspace: { path: mount, mode: 'read-write' } } },
+      makeFactoryCtx()
+    );
+    const ctx = createRuntimeContext({
+      functions: { mounts: getCallable(ext, 'mounts') },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('mounts()'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { mounts() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });

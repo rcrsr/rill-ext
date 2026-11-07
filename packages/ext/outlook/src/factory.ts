@@ -12,6 +12,7 @@
  */
 
 import {
+  RuntimeHaltSignal,
   toCallable,
   structureToTypeValue,
   emitExtensionEvent,
@@ -168,10 +169,10 @@ export function createOutlookExtension(
         const invalid = ctx.invalidate(new Error(message), {
           code: 'DISPOSED',
           provider: PROVIDER,
-          raw: { kind: 'disposed', message },
+          raw: { kind: 'extension_disposed', message },
         });
         emitError(message);
-        return invalid;
+        throw new RuntimeHaltSignal(invalid, true);
       }
 
       if (capabilityCheck !== null) {
@@ -205,9 +206,17 @@ export function createOutlookExtension(
 
         return result;
       } catch (error: unknown) {
-        const invalid = isInvalid(error as RillValue)
-          ? (error as RillValue)
-          : mapFetchError(ctx, error);
+        // dispose() cancelled this request: disposal wins over other mapping.
+        const disposedMessage = `${PROVIDER}: operation cancelled`;
+        const invalid = disposalState.isDisposed
+          ? ctx.invalidate(new Error(disposedMessage), {
+              code: 'DISPOSED',
+              provider: PROVIDER,
+              raw: { kind: 'extension_disposed', message: disposedMessage },
+            })
+          : isInvalid(error as RillValue)
+            ? (error as RillValue)
+            : mapFetchError(ctx, error);
         emitError(getStatus(invalid).message);
         return invalid;
       } finally {
@@ -439,14 +448,14 @@ export function createOutlookExtension(
       return;
     }
 
+    // Mark disposed first so aborted in-flight calls map to DISPOSED
+    disposalState.isDisposed = true;
+
     // Abort all tracked controllers
     for (const controller of inFlightState.controllers) {
       controller.abort();
     }
     inFlightState.controllers.clear();
-
-    // Mark disposed (prevents further operations)
-    disposalState.isDisposed = true;
   };
 
   // ============================================================

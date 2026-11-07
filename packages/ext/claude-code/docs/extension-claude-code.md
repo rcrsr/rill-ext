@@ -199,6 +199,7 @@ generic atoms. Host scripts match coarsely (`guard #UNAVAILABLE`) or finely
 | Cooperative cancellation propagated from `ctx.signal` | `#TIMEOUT` | `request_cancelled` |
 | CLI exited with a non-zero status | `#UNAVAILABLE` | `exit_nonzero` |
 | Other spawn / process failure | `#UNAVAILABLE` | `unknown_error` |
+| Any call after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
 
 ## Events
 

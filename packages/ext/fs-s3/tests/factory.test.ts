@@ -3,12 +3,19 @@
  * Validates configuration, S3 client initialization, and function exports.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { S3Client } from '@aws-sdk/client-s3';
 import {
   getStatus,
   isInvalid,
   RuntimeError,
+  RuntimeHaltSignal,
+  createRuntimeContext,
+  execute,
+  parse,
+  type ApplicationCallable,
   type RillValue,
+  type RuntimeContext,
 } from '@rcrsr/rill';
 import { createS3FsExtension } from '../src/index.js';
 import type { S3FsConfig } from '../src/types.js';
@@ -326,39 +333,113 @@ describe('createS3FsExtension', () => {
       );
     }
 
-    function callRead(
-      ext: ReturnType<typeof createS3FsExtension>
-    ): Promise<unknown> {
-      const v = ext.value as unknown as Record<
-        string,
-        {
-          fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+    type HostFn = {
+      fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+    };
+
+    async function captureThrown(fn: HostFn['fn']): Promise<{
+      resolved: boolean;
+      thrown: unknown;
+      halt: RuntimeHaltSignal | undefined;
+    }> {
+      try {
+        await fn(
+          { path: 'test/file.txt', src: 'test/a', dest: 'test/b' },
+          makeRuntimeCtx()
+        );
+        return { resolved: true, thrown: undefined, halt: undefined };
+      } catch (e) {
+        if (e instanceof RuntimeHaltSignal) {
+          return { resolved: false, thrown: e.value, halt: e };
         }
-      >;
-      return v['read']!.fn({ path: 'test/file.txt' }, makeRuntimeCtx());
+        return { resolved: false, thrown: e, halt: undefined };
+      }
     }
 
-    it('halts later calls with #DISPOSED and raw.kind extension_disposed', async () => {
-      const ext = createTestExtension();
+    it('throws #DISPOSED with raw.kind extension_disposed from every function', async () => {
+      const sendSpy = vi
+        .spyOn(S3Client.prototype, 'send')
+        .mockResolvedValue({} as never);
+      try {
+        const ext = createTestExtension();
+        const fns = ext.value as unknown as Record<string, HostFn>;
+        const names = Object.keys(fns);
+        expect(names).toHaveLength(12);
 
-      await expect(ext.dispose?.()).resolves.toBeUndefined();
-      const result = await callRead(ext);
-
-      expect(isInvalid(result as RillValue)).toBe(true);
-      const status = getStatus(result as RillValue);
-      expect(status.code.name).toBe('DISPOSED');
-      expect(status.raw['kind']).toBe('extension_disposed');
+        await expect(ext.dispose?.()).resolves.toBeUndefined();
+        for (const name of names) {
+          const { resolved, thrown, halt } = await captureThrown(fns[name]!.fn);
+          expect(resolved).toBe(false);
+          expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+          expect(halt?.catchable).toBe(true);
+          expect(isInvalid(thrown as RillValue)).toBe(true);
+          const status = getStatus(thrown as RillValue);
+          expect(status.code.name).toBe('DISPOSED');
+          expect(status.raw['kind']).toBe('extension_disposed');
+          expect(status.provider).toBe('fs-s3');
+        }
+        expect(sendSpy).not.toHaveBeenCalled();
+      } finally {
+        sendSpy.mockRestore();
+      }
     });
 
-    it('resolves on repeated dispose and keeps halting calls', async () => {
+    it('resolves on repeated dispose and keeps throwing', async () => {
       const ext = createTestExtension();
+      const fns = ext.value as unknown as Record<string, HostFn>;
 
       await expect(ext.dispose?.()).resolves.toBeUndefined();
       await expect(ext.dispose?.()).resolves.toBeUndefined();
       await expect(ext.dispose?.()).resolves.toBeUndefined();
-      const result = await callRead(ext);
+      const { resolved, thrown } = await captureThrown(fns['read']!.fn);
 
-      expect(getStatus(result as RillValue).code.name).toBe('DISPOSED');
+      expect(resolved).toBe(false);
+      expect(getStatus(thrown as RillValue).code.name).toBe('DISPOSED');
     });
+  });
+});
+
+describe('createS3FsExtension - runtime dispatch after dispose', () => {
+  async function mountDisposed(): Promise<RuntimeContext> {
+    const ext = createS3FsExtension(
+      {
+        region: 'us-west-2',
+        credentials: TEST_CREDENTIALS,
+        mounts: { test: BASE_MOUNT },
+      },
+      makeFactoryCtx()
+    );
+    const mounts = (ext.value as Record<string, ApplicationCallable>)[
+      'mounts'
+    ]!;
+    const ctx = createRuntimeContext({
+      functions: { mounts },
+    });
+    await ext.dispose?.();
+    return ctx;
+  }
+
+  it('rejects a script call with a catchable DISPOSED halt', async () => {
+    const ctx = await mountDisposed();
+
+    const thrown = await execute(parse('mounts()'), ctx).catch(
+      (e: unknown) => e
+    );
+
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('completes a guarded script call with the DISPOSED invalid value', async () => {
+    const ctx = await mountDisposed();
+
+    const result = await execute(
+      parse('guard<on: list[#DISPOSED]> { mounts() }'),
+      ctx
+    );
+
+    expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });
