@@ -84,7 +84,7 @@ describe('Capability Discovery', () => {
       const mockListPrompts = vi.fn().mockResolvedValue({
         prompts: [{ name: 'prompt1', description: 'Prompt 1', arguments: [] }],
       });
-      const mockConnect = vi.fn().mockResolvedValue();
+      const mockConnect = vi.fn<() => Promise<void>>().mockResolvedValue();
 
       // Spy on Client constructor to inject mocks
       vi.spyOn(Client.prototype, 'connect').mockImplementation(mockConnect);

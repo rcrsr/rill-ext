@@ -37,8 +37,8 @@ describe('dispose() functionality', () => {
   describe('BC-5: dispose() idempotent', () => {
     it('allows multiple dispose calls without errors', async () => {
       // Mock successful connection
-      const mockClose = vi.fn().mockResolvedValue();
-      const mockConnect = vi.fn().mockResolvedValue();
+      const mockClose = vi.fn<() => Promise<void>>().mockResolvedValue();
+      const mockConnect = vi.fn<() => Promise<void>>().mockResolvedValue();
 
       vi.spyOn(Client.prototype, 'connect').mockImplementation(mockConnect);
       vi.spyOn(Client.prototype, 'close').mockImplementation(mockClose);
