@@ -155,6 +155,9 @@ export function createFileKvExtension(
     }
 
     storeState.instance = await storeState.promise;
+    // dispose() may have run while the store loaded; it flushed only stores
+    // already resolved, so this call must not touch the store.
+    if (disposed) throw failDisposed(runCtx);
     if (storeState.instance.loadError !== null) {
       return { ok: false, invalid: storeState.instance.loadError };
     }

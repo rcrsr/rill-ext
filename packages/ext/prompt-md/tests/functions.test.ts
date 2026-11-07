@@ -426,9 +426,11 @@ body
     );
     const dict = asDict(ext.value);
     const names = Object.keys(dict);
-    const fns = names.map((n) => dict[n]!.fn);
 
     await ext.dispose?.();
+
+    // Resolve the callables after dispose: entries must still be present.
+    const fns = Object.keys(dict).map((n) => dict[n]!.fn);
 
     const ctx = createRuntimeContext();
     expect(names).toEqual(['alive']);

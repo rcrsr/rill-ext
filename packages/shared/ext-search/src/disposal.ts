@@ -69,6 +69,8 @@ export async function dispose(
     return;
   }
 
+  state.isDisposed = true;
+
   if (cleanup) {
     try {
       await cleanup();
@@ -77,6 +79,4 @@ export async function dispose(
       console.warn(`Cleanup failed: ${message}`);
     }
   }
-
-  state.isDisposed = true;
 }

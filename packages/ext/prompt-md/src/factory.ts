@@ -157,11 +157,8 @@ export async function createPromptMdExtension(
 
   // ── dispose ───────────────────────────────────────────────────────────────
   const dispose = async (): Promise<void> => {
+    // Entries stay in the dict so post-dispose calls reach the guard and throw #DISPOSED.
     disposed = true;
-    // Clear all closure references to allow GC.
-    for (const key of Object.keys(innerDict)) {
-      delete innerDict[key];
-    }
   };
 
   // ── Return ────────────────────────────────────────────────────────────────

@@ -151,5 +151,26 @@ describe('kv-file functions', () => {
       expect(status.provider).toBe('kv-file');
       expect(Buffer.compare(await fs.readFile(storePath), before)).toBe(0);
     });
+
+    it('throws #DISPOSED for a set that races dispose during the lazy store load', async () => {
+      await fs.writeFile(storePath, JSON.stringify({ existing: 'data' }));
+      const ext = createFileKvExtension({ store: storePath }, makeFactoryCtx());
+      const before = await fs.readFile(storePath);
+
+      const pending = Promise.resolve(
+        fnOf(ext, 'set').fn(
+          { mount: 'default', key: 'k', value: 'v' },
+          makeRuntimeCtx()
+        )
+      ).catch((e: unknown) => e);
+      await ext.dispose!();
+
+      const halt = await pending;
+      expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+      expect(getStatus((halt as RuntimeHaltSignal).value).code.name).toBe(
+        'DISPOSED'
+      );
+      expect(Buffer.compare(await fs.readFile(storePath), before)).toBe(0);
+    });
   });
 });

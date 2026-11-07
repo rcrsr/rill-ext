@@ -196,6 +196,12 @@ Provides the same 11 functions as the core kv extension:
 
 **Namespace convention:** `kv` or `state`
 
+## Errors
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
+
 ## See Also
 
 - [rill](https://github.com/rcrsr/rill) — Core language runtime

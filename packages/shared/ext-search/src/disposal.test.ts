@@ -61,7 +61,7 @@ describe('dispose', () => {
     expect(state.isDisposed).toBe(true);
   });
 
-  it('calls cleanup once and sets disposed flag after', async () => {
+  it('calls cleanup once and sets disposed flag before it runs', async () => {
     const state = createDisposalState();
     let flagDuringCleanup: boolean | undefined;
     const cleanup = vi.fn(async () => {
@@ -69,7 +69,7 @@ describe('dispose', () => {
     });
     await dispose(state, cleanup);
     expect(cleanup).toHaveBeenCalledTimes(1);
-    expect(flagDuringCleanup).toBe(false);
+    expect(flagDuringCleanup).toBe(true);
     expect(state.isDisposed).toBe(true);
   });
 
@@ -79,6 +79,13 @@ describe('dispose', () => {
     await dispose(state, cleanup);
     await dispose(state, cleanup);
     await dispose(state, cleanup);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs cleanup once when dispose is called concurrently', async () => {
+    const state = createDisposalState();
+    const cleanup = vi.fn(async () => {});
+    await Promise.all([dispose(state, cleanup), dispose(state, cleanup)]);
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 

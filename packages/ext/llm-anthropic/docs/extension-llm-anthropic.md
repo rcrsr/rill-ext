@@ -355,6 +355,7 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 | `generate()` failed to parse response JSON | `#PROTOCOL` | `json_parse_failed` |
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
 | Other SDK / unknown failure | `#UNAVAILABLE` | `unknown_error` |
+| Called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
 
 ## Events
 

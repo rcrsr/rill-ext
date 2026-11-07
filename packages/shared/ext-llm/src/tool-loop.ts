@@ -632,10 +632,14 @@ export async function executeToolLoop(
 
         emitEvent('tool_result', { tool_name: name, duration });
       } catch (error: unknown) {
-        // Abort and programmer-error halts bypass guard/retry semantics:
-        // close the tool_call with a terminal event, then propagate with the
-        // original atom without counting a recoverable tool error.
-        if (error instanceof RuntimeHaltSignal && error.catchable === false) {
+        // Abort, programmer-error and #DISPOSED halts bypass guard/retry
+        // semantics: close the tool_call with a terminal event, then propagate
+        // with the original atom without counting a recoverable tool error.
+        if (
+          error instanceof RuntimeHaltSignal &&
+          (error.catchable === false ||
+            getStatus(error.value).code.name === 'DISPOSED')
+        ) {
           emitEvent('tool_result', {
             tool_name: name,
             error: readHaltMessage(error),

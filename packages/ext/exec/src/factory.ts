@@ -101,7 +101,7 @@ export function createExecExtension(
 
         if (isInvalid(result as RillValue)) {
           // dispose() cancelled this command: report DISPOSED, not TIMEOUT.
-          if (disposed) {
+          if (disposed && controller.signal.aborted) {
             return runCtx.invalidate(new Error('exec: extension disposed'), {
               code: 'DISPOSED',
               provider: 'exec',

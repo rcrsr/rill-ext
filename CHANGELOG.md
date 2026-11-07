@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Test suite trust:** type-checks test files, fixes false-pass tests, and runs kv-redis and fs-s3 integration suites in CI. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant, self-evident and misnamed tests across every package, adds a shared KV contract suite run by kv-file, kv-sqlite and kv-redis, and deletes dead helpers in the shared vector package and mcp. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
-- **Post-dispose delivery (breaking for scripts):** kv-redis, kv-sqlite and fs-s3 now throw `#DISPOSED` after `dispose()` instead of returning it. A `??` fallback past a disposed call must become `guard`. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+- **Post-dispose delivery (breaking for scripts):** kv-redis, kv-sqlite, fs-s3, outlook, google-workspace, the five search extensions (brave, exa, searxng, serper, tavily) and the three vector extensions (chroma, pinecone, qdrant) now throw `#DISPOSED` after `dispose()` instead of returning it; datetime now throws `#DISPOSED` instead of returning `#INVALID_INPUT`. A `??` fallback past a disposed call must become `guard`. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
 
 ### Fixed
 

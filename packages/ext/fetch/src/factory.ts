@@ -232,7 +232,7 @@ export function createFetchExtension(
         );
 
         // dispose() cancelled this request: report DISPOSED, not TIMEOUT.
-        if (disposed && isInvalid(result)) {
+        if (controller.signal.aborted && disposed && isInvalid(result)) {
           return runCtx.invalidate(new Error('fetch: extension disposed'), {
             code: 'DISPOSED',
             provider: 'fetch',

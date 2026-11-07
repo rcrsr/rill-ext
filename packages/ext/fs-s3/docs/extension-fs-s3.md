@@ -185,6 +185,12 @@ All `path`, `src`, and `dest` arguments use `/mount/path` format. `stat` returns
 
 **Namespace convention:** `fs` or `s3`
 
+## Errors
+
+| Failure | Atom | `meta.raw.kind` |
+|---|---|---|
+| Called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
+
 ## See Also
 
 - [rill](https://github.com/rcrsr/rill) — Core language runtime

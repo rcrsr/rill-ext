@@ -360,25 +360,28 @@ describe('createS3FsExtension', () => {
       const sendSpy = vi
         .spyOn(S3Client.prototype, 'send')
         .mockResolvedValue({} as never);
-      const ext = createTestExtension();
-      const fns = ext.value as unknown as Record<string, HostFn>;
-      const names = Object.keys(fns);
-      expect(names).toHaveLength(12);
+      try {
+        const ext = createTestExtension();
+        const fns = ext.value as unknown as Record<string, HostFn>;
+        const names = Object.keys(fns);
+        expect(names).toHaveLength(12);
 
-      await expect(ext.dispose?.()).resolves.toBeUndefined();
-      for (const name of names) {
-        const { resolved, thrown, halt } = await captureThrown(fns[name]!.fn);
-        expect(resolved).toBe(false);
-        expect(halt).toBeInstanceOf(RuntimeHaltSignal);
-        expect(halt?.catchable).toBe(true);
-        expect(isInvalid(thrown as RillValue)).toBe(true);
-        const status = getStatus(thrown as RillValue);
-        expect(status.code.name).toBe('DISPOSED');
-        expect(status.raw['kind']).toBe('extension_disposed');
-        expect(status.provider).toBe('fs-s3');
+        await expect(ext.dispose?.()).resolves.toBeUndefined();
+        for (const name of names) {
+          const { resolved, thrown, halt } = await captureThrown(fns[name]!.fn);
+          expect(resolved).toBe(false);
+          expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+          expect(halt?.catchable).toBe(true);
+          expect(isInvalid(thrown as RillValue)).toBe(true);
+          const status = getStatus(thrown as RillValue);
+          expect(status.code.name).toBe('DISPOSED');
+          expect(status.raw['kind']).toBe('extension_disposed');
+          expect(status.provider).toBe('fs-s3');
+        }
+        expect(sendSpy).not.toHaveBeenCalled();
+      } finally {
+        sendSpy.mockRestore();
       }
-      expect(sendSpy).not.toHaveBeenCalled();
-      sendSpy.mockRestore();
     });
 
     it('resolves on repeated dispose and keeps throwing', async () => {
