@@ -756,8 +756,8 @@ describe('success cases', () => {
       expect(mockEmitEvent).toHaveBeenCalledOnce();
       const [emittedCtx, emittedPayload] = mockEmitEvent.mock.calls[0]!;
       expect(emittedCtx).toBe(ctx);
-      expect(emittedPayload.event).toBe('google:calendar:events');
-      expect(typeof emittedPayload.duration).toBe('number');
+      expect(emittedPayload['event']).toBe('google:calendar:events');
+      expect(typeof emittedPayload['duration']).toBe('number');
     });
 
     it('makes GET request to /calendars/primary/events', async () => {
@@ -830,8 +830,8 @@ describe('success cases', () => {
 
       expect(mockEmitEvent).toHaveBeenCalledOnce();
       const [, payload] = mockEmitEvent.mock.calls[0]!;
-      expect(payload.event).toBe('google:calendar:today');
-      expect(typeof payload.duration).toBe('number');
+      expect(payload['event']).toBe('google:calendar:today');
+      expect(typeof payload['duration']).toBe('number');
     });
 
     it('makes GET request for today primary calendar', async () => {
@@ -887,8 +887,8 @@ describe('success cases', () => {
 
       expect(mockEmitEvent).toHaveBeenCalledOnce();
       const [, payload] = mockEmitEvent.mock.calls[0]!;
-      expect(payload.event).toBe('google:calendar:create_event');
-      expect(typeof payload.duration).toBe('number');
+      expect(payload['event']).toBe('google:calendar:create_event');
+      expect(typeof payload['duration']).toBe('number');
     });
 
     it('makes POST request to /calendars/primary/events', async () => {
@@ -1001,8 +1001,8 @@ describe('success cases', () => {
 
       expect(mockEmitEvent).toHaveBeenCalledOnce();
       const [, payload] = mockEmitEvent.mock.calls[0]!;
-      expect(payload.event).toBe('google:calendar:free_busy');
-      expect(typeof payload.duration).toBe('number');
+      expect(payload['event']).toBe('google:calendar:free_busy');
+      expect(typeof payload['duration']).toBe('number');
     });
 
     it('makes POST request to /freeBusy', async () => {
@@ -1099,8 +1099,8 @@ describe('AC-13: calendar events include subsystem field', () => {
     // mockEmitEvent is the vi.mocked(emitExtensionEvent) from the module mock
     expect(mockEmitEvent).toHaveBeenCalledOnce();
     const [, payload] = mockEmitEvent.mock.calls[0]!;
-    expect(payload.subsystem).toBe('extension:google-workspace');
-    expect(payload.event).toBe('google:calendar:events');
+    expect(payload['subsystem']).toBe('extension:google-workspace');
+    expect(payload['event']).toBe('google:calendar:events');
   });
 
   it('calendar_create_event emits subsystem extension:google-workspace', async () => {
@@ -1118,7 +1118,7 @@ describe('AC-13: calendar events include subsystem field', () => {
     );
 
     const [, payload] = mockEmitEvent.mock.calls[0]!;
-    expect(payload.subsystem).toBe('extension:google-workspace');
+    expect(payload['subsystem']).toBe('extension:google-workspace');
   });
 
   it('calendar_free_busy emits subsystem extension:google-workspace', async () => {
@@ -1139,7 +1139,7 @@ describe('AC-13: calendar events include subsystem field', () => {
     );
 
     const [, payload] = mockEmitEvent.mock.calls[0]!;
-    expect(payload.subsystem).toBe('extension:google-workspace');
+    expect(payload['subsystem']).toBe('extension:google-workspace');
   });
 
   it('calendar_today emits subsystem extension:google-workspace', async () => {
@@ -1154,7 +1154,7 @@ describe('AC-13: calendar events include subsystem field', () => {
     await getCallable(ext, 'calendar_today').fn({}, ctx);
 
     const [, payload] = mockEmitEvent.mock.calls[0]!;
-    expect(payload.subsystem).toBe('extension:google-workspace');
+    expect(payload['subsystem']).toBe('extension:google-workspace');
   });
 });
 

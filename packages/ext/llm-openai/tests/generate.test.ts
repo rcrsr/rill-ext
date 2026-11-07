@@ -312,7 +312,7 @@ describe('generate() function', () => {
     it('emits openai:error event when provider API returns an error', async () => {
       const { APIError } = await import('openai');
       mockCreate.mockRejectedValue(
-        new APIError(429, {}, 'Rate limit exceeded', {})
+        new APIError(429, {}, 'Rate limit exceeded', new Headers())
       );
 
       const events: Array<Record<string, unknown>> = [];

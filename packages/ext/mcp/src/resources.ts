@@ -63,7 +63,7 @@ interface McpResourceContent {
 /**
  * MCP resource read result.
  */
-export interface McpResourceResult {
+interface McpResourceResult {
   readonly contents: McpResourceContent[];
 }
 

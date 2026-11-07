@@ -48,6 +48,19 @@ jobs:
       matrix:
         node-version: ['22', '24', '25']
 
+    # Redis backs the kv-redis integration suite. MinIO starts in a step below
+    # because a service container cannot take a command argument.
+    services:
+      redis:
+        image: redis:7-alpine@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b50ade939941ce14b
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -61,6 +74,20 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # MinIO backs the fs-s3 integration suite.
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            cgr.dev/chainguard/minio@sha256:268d68a2a3b6fc65f905a61f84d7eab6345ce6bff14f551e2b028ec31e6a1341 \
+            server /data
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live; then exit 0; fi
+            sleep 1
+          done
+          docker logs minio
+          exit 1
 
       # The root `check`, not `pnpm -r run check`. `-r` excludes the workspace
       # root, so every root-only script — check:format, check:deps,
@@ -80,5 +107,11 @@ jobs:
       # one script that contributors and CI both invoke is worth more than the
       # time saved by splitting the Node-sensitive checks (build, check:types,
       # test) out onto their own step.
+      #
+      # RILL_EXT_REQUIRE_SERVICES makes the kv-redis and fs-s3 integration
+      # suites fail at load when their service is unreachable, instead of
+      # skipping and reporting green.
       - name: Run checks
+        env:
+          RILL_EXT_REQUIRE_SERVICES: '1'
         run: pnpm run check

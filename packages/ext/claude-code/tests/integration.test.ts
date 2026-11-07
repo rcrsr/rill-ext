@@ -46,11 +46,11 @@ vi.mock('../src/result.js');
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream(
+async function resolveStream<T = Record<string, unknown>>(
   stream: unknown
-): Promise<Record<string, unknown>> {
+): Promise<T> {
   return (
-    stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
+    stream as { __rill_stream_resolve: () => Promise<T> }
   ).__rill_stream_resolve();
 }
 
@@ -114,7 +114,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         ctx
       );
 
-      expect(isRillStream(stream)).toBe(true);
+      expect(isRillStream(stream as RillValue)).toBe(true);
     });
 
     it('skill() returns RillStream (isRillStream is true)', async () => {
@@ -158,7 +158,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         ctx
       );
 
-      expect(isRillStream(stream)).toBe(true);
+      expect(isRillStream(stream as RillValue)).toBe(true);
     });
 
     it('command() returns RillStream (isRillStream is true)', async () => {
@@ -202,7 +202,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         ctx
       );
 
-      expect(isRillStream(stream)).toBe(true);
+      expect(isRillStream(stream as RillValue)).toBe(true);
     });
   });
 
@@ -267,7 +267,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         ctx
       );
 
-      expect(isRillStream(stream)).toBe(true);
+      expect(isRillStream(stream as RillValue)).toBe(true);
 
       const chunks = await collectChunks(stream);
 
@@ -380,10 +380,10 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       );
 
       // AC-10: verify it's a stream
-      expect(isRillStream(stream)).toBe(true);
+      expect(isRillStream(stream as RillValue)).toBe(true);
 
       // AC-12: resolve and verify result structure
-      const result = (await resolveStream(stream)) as ClaudeCodeResult;
+      const result = await resolveStream<ClaudeCodeResult>(stream);
 
       expect(result.result).toBe('Hello! How can I help?');
       expect(result.tokens.prompt).toBe(10);
@@ -611,7 +611,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         { text: 'Test', options: {} },
         ctx
       );
-      const result = (await resolveStream(stream)) as ClaudeCodeResult;
+      const result = await resolveStream<ClaudeCodeResult>(stream);
 
       // Verify all 5 token fields present
       expect(result.tokens.prompt).toBe(20);
@@ -666,7 +666,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         { text: 'Test', options: {} },
         ctx
       );
-      const result = (await resolveStream(stream)) as ClaudeCodeResult;
+      const result = await resolveStream<ClaudeCodeResult>(stream);
 
       // Verify exact cost extraction
       expect(result.cost).toBe(0.00456);
@@ -717,7 +717,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         { text: 'Test', options: {} },
         ctx
       );
-      const result = (await resolveStream(stream)) as ClaudeCodeResult;
+      const result = await resolveStream<ClaudeCodeResult>(stream);
 
       // Verify empty string
       expect(result.result).toBe('');
@@ -768,7 +768,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         { text: 'Test', options: {} },
         ctx
       );
-      const result = (await resolveStream(stream)) as ClaudeCodeResult;
+      const result = await resolveStream<ClaudeCodeResult>(stream);
 
       // Verify all zeros
       expect(result.tokens.prompt).toBe(0);

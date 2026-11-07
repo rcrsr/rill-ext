@@ -44,7 +44,19 @@ async function testParseToolResult(result: McpToolResult): Promise<RillValue> {
   );
 
   // Call the generated function with empty args
-  return await functions.test_tool!.fn({}, mockContext);
+  return await functions['test_tool']!.fn({}, mockContext);
+}
+
+function asDict(value: RillValue | undefined): Record<string, RillValue> {
+  expect(typeof value).toBe('object');
+  expect(value).not.toBe(null);
+  expect(Array.isArray(value)).toBe(false);
+  return value as Record<string, RillValue>;
+}
+
+function asList(value: RillValue | undefined): RillValue[] {
+  expect(Array.isArray(value)).toBe(true);
+  return value as RillValue[];
 }
 
 describe('AC-8: Type conversion', () => {
@@ -59,13 +71,13 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
       expect(typeof parsed).toBe('object');
       expect(parsed).not.toBe(null);
       expect(Array.isArray(parsed)).toBe(false);
-      expect(parsed.status).toBe('ok');
-      expect(parsed.count).toBe(42);
+      expect(parsed['status']).toBe('ok');
+      expect(parsed['count']).toBe(42);
     });
 
     it('parses valid JSON array as-is', async () => {
@@ -158,14 +170,14 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
       expect(typeof parsed).toBe('object');
       expect(parsed).not.toBe(null);
-      expect(parsed.type).toBe('image');
-      expect(typeof parsed.data).toBe('string');
-      expect(parsed.data.length).toBeGreaterThan(0);
-      expect(parsed.mime).toBe('image/png');
+      expect(parsed['type']).toBe('image');
+      expect(typeof parsed['data']).toBe('string');
+      expect(parsed['data']).not.toBe('');
+      expect(parsed['mime']).toBe('image/png');
     });
 
     it('defaults to image/png when mimeType missing', async () => {
@@ -178,10 +190,10 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
-      expect(parsed.type).toBe('image');
-      expect(parsed.mime).toBe('image/png');
+      expect(parsed['type']).toBe('image');
+      expect(parsed['mime']).toBe('image/png');
     });
 
     it('handles missing data property', async () => {
@@ -194,11 +206,11 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
-      expect(parsed.type).toBe('image');
-      expect(parsed.data).toBe('');
-      expect(parsed.mime).toBe('image/jpeg');
+      expect(parsed['type']).toBe('image');
+      expect(parsed['data']).toBe('');
+      expect(parsed['mime']).toBe('image/jpeg');
     });
   });
 
@@ -274,19 +286,19 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
       expect(typeof parsed).toBe('object');
       expect(parsed).not.toBe(null);
-      expect(Array.isArray(parsed.content)).toBe(true);
-      expect(parsed.content).toHaveLength(2);
+      expect(Array.isArray(parsed['content'])).toBe(true);
+      expect(parsed['content']).toHaveLength(2);
 
-      const [textBlock, imageBlock] = parsed.content;
-      expect(textBlock.type).toBe('text');
-      expect(textBlock.text).toBe('Description');
-      expect(imageBlock.type).toBe('image');
-      expect(imageBlock.data).toBe('base64');
-      expect(imageBlock.mime).toBe('image/png');
+      const [textBlock, imageBlock] = asList(parsed['content']).map(asDict);
+      expect(textBlock?.['type']).toBe('text');
+      expect(textBlock?.['text']).toBe('Description');
+      expect(imageBlock?.['type']).toBe('image');
+      expect(imageBlock?.['data']).toBe('base64');
+      expect(imageBlock?.['mime']).toBe('image/png');
     });
 
     it('returns structured dict for multiple images', async () => {
@@ -297,19 +309,19 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
       expect(typeof parsed).toBe('object');
-      expect(Array.isArray(parsed.content)).toBe(true);
-      expect(parsed.content).toHaveLength(2);
+      expect(Array.isArray(parsed['content'])).toBe(true);
+      expect(parsed['content']).toHaveLength(2);
 
-      const [img1, img2] = parsed.content;
-      expect(img1.type).toBe('image');
-      expect(img1.data).toBe('image1');
-      expect(img1.mime).toBe('image/png');
-      expect(img2.type).toBe('image');
-      expect(img2.data).toBe('image2');
-      expect(img2.mime).toBe('image/jpeg');
+      const [img1, img2] = asList(parsed['content']).map(asDict);
+      expect(img1?.['type']).toBe('image');
+      expect(img1?.['data']).toBe('image1');
+      expect(img1?.['mime']).toBe('image/png');
+      expect(img2?.['type']).toBe('image');
+      expect(img2?.['data']).toBe('image2');
+      expect(img2?.['mime']).toBe('image/jpeg');
     });
 
     it('handles unknown content types in mixed content', async () => {
@@ -323,16 +335,16 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
       expect(typeof parsed).toBe('object');
-      expect(Array.isArray(parsed.content)).toBe(true);
-      expect(parsed.content).toHaveLength(2);
+      expect(Array.isArray(parsed['content'])).toBe(true);
+      expect(parsed['content']).toHaveLength(2);
 
-      const [textBlock, unknownBlock] = parsed.content;
-      expect(textBlock.type).toBe('text');
-      expect(unknownBlock.type).toBe('unknown');
-      expect(unknownBlock.text).toBe('Mystery content');
+      const [textBlock, unknownBlock] = asList(parsed['content']).map(asDict);
+      expect(textBlock?.['type']).toBe('text');
+      expect(unknownBlock?.['type']).toBe('unknown');
+      expect(unknownBlock?.['text']).toBe('Mystery content');
     });
   });
 
@@ -391,13 +403,13 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
       expect(typeof parsed).toBe('object');
-      expect(parsed.user).toBeDefined();
-      expect(parsed.user.id).toBe(123);
-      expect(parsed.user.name).toBe('Alice');
-      expect(parsed.timestamp).toBe('2024-01-01');
+      expect(parsed['user']).toBeDefined();
+      expect(asDict(parsed['user'])['id']).toBe(123);
+      expect(asDict(parsed['user'])['name']).toBe('Alice');
+      expect(parsed['timestamp']).toBe('2024-01-01');
     });
 
     it('handles JSON with null values', async () => {
@@ -410,10 +422,10 @@ describe('AC-8: Type conversion', () => {
         ],
       };
 
-      const parsed = await testParseToolResult(result);
+      const parsed = asDict(await testParseToolResult(result));
 
-      expect(parsed.value).toBe(null);
-      expect(parsed.active).toBe(false);
+      expect(parsed['value']).toBe(null);
+      expect(parsed['active']).toBe(false);
     });
 
     it('handles JSON primitives (number)', async () => {

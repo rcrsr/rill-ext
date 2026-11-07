@@ -119,7 +119,7 @@ describe('types module', () => {
       expect(block.type).toBe('tool_use');
       expect(block.id).toBe('tool_123');
       expect(block.name).toBe('Read');
-      expect(block.input.file_path).toBe('/path/to/file');
+      expect(block.input['file_path']).toBe('/path/to/file');
     });
 
     it('validates ToolResultBlock structure', () => {

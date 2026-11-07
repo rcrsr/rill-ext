@@ -464,7 +464,7 @@ describe('Process Manager', () => {
       // Each timeout fires independently
       for (let i = 0; i < 10; i++) {
         vi.advanceTimersByTime(1000);
-        expect(mockPtys[i].kill).toHaveBeenCalled();
+        expect(mockPtys[i]?.kill).toHaveBeenCalled();
       }
 
       // All can be disposed

@@ -506,7 +506,12 @@ describe('generate() function', () => {
     // AC-27 / EC-6: Provider API error emits anthropic:error event
     it('emits anthropic:error event when provider API throws', async () => {
       const { APIError } = await import('@anthropic-ai/sdk');
-      const apiError = new APIError(429, {}, 'Rate limit exceeded', {});
+      const apiError = new APIError(
+        429,
+        {},
+        'Rate limit exceeded',
+        new Headers()
+      );
       mockCreate.mockRejectedValue(apiError);
 
       const events = createEventCollector();
@@ -522,7 +527,7 @@ describe('generate() function', () => {
 
       const errorEvents = events.filter((e) => e.event === 'anthropic:error');
       expect(errorEvents).toHaveLength(1);
-      expect(errorEvents[0]!.error).toContain('Rate limit exceeded');
+      expect(errorEvents[0]!['error']).toContain('Rate limit exceeded');
     });
   });
 
@@ -553,10 +558,10 @@ describe('generate() function', () => {
 
       const event = generateEvents[0]!;
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(event.model).toBe('claude-3-5-sonnet-20241022');
-      expect(event.usage).toEqual({ input: 50, output: 20 });
-      expect(typeof event.duration).toBe('number');
-      expect(event.duration).toBeGreaterThanOrEqual(0);
+      expect(event['model']).toBe('claude-3-5-sonnet-20241022');
+      expect(event['usage']).toEqual({ input: 50, output: 20 });
+      expect(typeof event['duration']).toBe('number');
+      expect(event['duration']).toBeGreaterThanOrEqual(0);
     });
 
     // AC-35: Failed call emits anthropic:error event
@@ -579,8 +584,8 @@ describe('generate() function', () => {
 
       const event = errorEvents[0]!;
       expect(event.subsystem).toBe('extension:anthropic');
-      expect(typeof event.error).toBe('string');
-      expect(typeof event.duration).toBe('number');
+      expect(typeof event['error']).toBe('string');
+      expect(typeof event['duration']).toBe('number');
     });
 
     it('does not emit anthropic:generate event on failure', async () => {

@@ -192,7 +192,12 @@ describe('extension event emission', () => {
 
     it('emits foundry:message:error event on API failure', async () => {
       const OpenAI = await import('openai');
-      const apiError = new OpenAI.APIError(401, {}, 'Unauthorized', {});
+      const apiError = new OpenAI.APIError(
+        401,
+        {},
+        'Unauthorized',
+        new Headers()
+      );
       mockStream.mockReturnValue(createErrorStreamRunner(apiError));
 
       const { createFoundryExtension } = await import('../src/factory.js');

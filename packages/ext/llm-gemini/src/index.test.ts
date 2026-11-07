@@ -6,7 +6,7 @@
 import { createRequire } from 'node:module';
 import { describe, it, expect } from 'vitest';
 import { VERSION } from './index.js';
-import type { LLMExtensionConfig, GeminiExtensionConfig } from './types.js';
+import type { GeminiExtensionConfig } from './types.js';
 
 const _require = createRequire(import.meta.url);
 const _pkg = _require('../package.json') as { version: string };
@@ -15,15 +15,6 @@ describe('Google Extension Scaffolding (Task 4.1)', () => {
   describe('Barrel exports VERSION, types, factory', () => {
     it('exports VERSION matching package.json', () => {
       expect(VERSION).toBe(_pkg.version);
-    });
-
-    it('exports type LLMExtensionConfig', () => {
-      // Type-only test: validate that the type exists and compiles
-      const _testConfig: LLMExtensionConfig = {
-        model: 'gemini-2.0-flash',
-        api_key: 'test-key',
-      };
-      expect(_testConfig.model).toBe('gemini-2.0-flash');
     });
 
     it('exports type GeminiExtensionConfig', () => {
@@ -36,8 +27,8 @@ describe('Google Extension Scaffolding (Task 4.1)', () => {
     });
   });
 
-  describe('GeminiExtensionConfig extends LLMExtensionConfig', () => {
-    it('accepts base LLMExtensionConfig fields', () => {
+  describe('GeminiExtensionConfig extends LLMProviderConfig', () => {
+    it('accepts base LLMProviderConfig fields', () => {
       const config: GeminiExtensionConfig = {
         model: 'gemini-2.0-flash',
         api_key: 'test-api-key',

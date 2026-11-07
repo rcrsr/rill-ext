@@ -78,9 +78,10 @@ async function* makePartialDisconnectIterable(
  * Returns collected chunks and the resolved dict value.
  */
 async function collectStream(
-  stream: RillValue,
+  pendingStream: RillValue | Promise<RillValue>,
   ctx: ReturnType<typeof createRuntimeContext>
 ): Promise<{ chunks: string[]; resolved: Record<string, unknown> }> {
+  const stream = await pendingStream;
   const chunks: string[] = [];
   let current = stream as RillStream;
 
@@ -880,16 +881,18 @@ function makeTool(
 ): RillValue {
   const tool = callable(fn);
   if (options?.description !== undefined) {
-    (tool as Record<string, unknown>)['description'] = options.description;
+    Object.assign(tool, { description: options.description });
   }
   if (options?.params !== undefined) {
-    (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
-      name: p.name,
-      type: { kind: p.type },
-      defaultValue: undefined,
-      annotations:
-        p.description !== undefined ? { description: p.description } : {},
-    }));
+    Object.assign(tool, {
+      params: options.params.map((p) => ({
+        name: p.name,
+        type: { kind: p.type },
+        defaultValue: undefined,
+        annotations:
+          p.description !== undefined ? { description: p.description } : {},
+      })),
+    });
   }
   return tool;
 }
@@ -923,12 +926,13 @@ async function* makeToolLoopStream(
  * Chunks are dicts (text_delta, tool_call, tool_result).
  */
 async function collectToolLoopStream(
-  stream: RillValue,
+  pendingStream: RillValue | Promise<RillValue>,
   ctx: ReturnType<typeof createRuntimeContext>
 ): Promise<{
   chunks: Array<Record<string, unknown>>;
   resolved: Record<string, unknown>;
 }> {
+  const stream = await pendingStream;
   const chunks: Array<Record<string, unknown>> = [];
   let current = stream as RillStream;
 
@@ -954,9 +958,9 @@ describe('tool_loop() function', () => {
 
   describe('streaming (AC-7, AC-8, AC-9)', () => {
     // AC-7: tool_loop() returns a RillStream value
-    it('returns a RillStream', () => {
+    it('returns a RillStream', async () => {
       mockGenerateContentStream.mockResolvedValue(
-        makeToolLoopStream([{ text: 'Hello', functionCalls: undefined }])
+        makeToolLoopStream([{ text: 'Hello' }])
       );
 
       const config: GeminiExtensionConfig = {
@@ -969,7 +973,7 @@ describe('tool_loop() function', () => {
 
       const tools = { tool: makeTool(vi.fn(), { description: 'Tool' }) };
 
-      const result = getCallable(ext, 'tool_loop').fn(
+      const result = await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Hello', tools },
         ctx
       );
@@ -1216,7 +1220,7 @@ describe('tool_loop() function', () => {
 
   describe('error cases', () => {
     // EC-22: Empty prompt — normalizePrompt returns invalid RillValue (synchronous return, not throw)
-    it('returns invalid RillValue for empty prompt', () => {
+    it('returns invalid RillValue for empty prompt', async () => {
       const config: GeminiExtensionConfig = {
         api_key: 'test-key',
         model: 'gemini-2.0-flash',
@@ -1227,12 +1231,12 @@ describe('tool_loop() function', () => {
 
       const tools = { test: makeTool(vi.fn()) };
 
-      const result = getCallable(ext, 'tool_loop').fn(
+      const result = await getCallable(ext, 'tool_loop').fn(
         { prompt: '   ', tools },
         ctx
       );
       expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result as RillValue).message).toContain(
+      expect(getStatus(result).message).toContain(
         'prompt string cannot be empty'
       );
     });

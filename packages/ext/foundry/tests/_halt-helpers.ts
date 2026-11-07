@@ -58,6 +58,11 @@ function expectHalt(error: unknown, opts: HaltExpectation = {}): void {
     return;
   }
   if (error instanceof RuntimeError) {
+    if (opts.code !== undefined || opts.provider !== undefined) {
+      throw new Error(
+        `expected a RuntimeHaltSignal carrying code/provider, got RuntimeError: ${error.message}`
+      );
+    }
     if (opts.message !== undefined) matchMessage(error.message, opts.message);
     return;
   }
@@ -94,10 +99,10 @@ export function expectThrowHalt(
  * the given expectation.
  */
 export async function expectRejectedHalt(
-  promise: Promise<unknown>,
+  promise: unknown,
   opts: HaltExpectation = {}
 ): Promise<unknown> {
-  const error = await promise.then(
+  const error = await Promise.resolve(promise).then(
     () => {
       throw new Error('expected promise to reject');
     },

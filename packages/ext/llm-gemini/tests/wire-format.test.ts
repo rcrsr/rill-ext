@@ -396,15 +396,15 @@ describe('Gemini wire-format translation', () => {
       const parts = extractAllParts(
         mockGenerateContentStream.mock.calls[0]![0]
       );
-      for (const part of parts) {
+      const textParts = parts.filter((part) => 'text' in part);
+      expect(textParts.length).toBeGreaterThan(0);
+      for (const part of textParts) {
         const keys = Object.keys(part);
-        if ('text' in part) {
-          // A text Part must not also carry inlineData, fileData, functionCall, or functionResponse
-          expect(keys).not.toContain('inlineData');
-          expect(keys).not.toContain('fileData');
-          expect(keys).not.toContain('functionCall');
-          expect(keys).not.toContain('functionResponse');
-        }
+        // A text Part must not also carry inlineData, fileData, functionCall, or functionResponse
+        expect(keys).not.toContain('inlineData');
+        expect(keys).not.toContain('fileData');
+        expect(keys).not.toContain('functionCall');
+        expect(keys).not.toContain('functionResponse');
       }
     });
 
@@ -434,14 +434,14 @@ describe('Gemini wire-format translation', () => {
       const parts = extractAllParts(
         mockGenerateContentStream.mock.calls[0]![0]
       );
-      for (const part of parts) {
-        if ('inlineData' in part) {
-          const keys = Object.keys(part);
-          expect(keys).not.toContain('text');
-          expect(keys).not.toContain('fileData');
-          expect(keys).not.toContain('functionCall');
-          expect(keys).not.toContain('functionResponse');
-        }
+      const inlineParts = parts.filter((part) => 'inlineData' in part);
+      expect(inlineParts.length).toBeGreaterThan(0);
+      for (const part of inlineParts) {
+        const keys = Object.keys(part);
+        expect(keys).not.toContain('text');
+        expect(keys).not.toContain('fileData');
+        expect(keys).not.toContain('functionCall');
+        expect(keys).not.toContain('functionResponse');
       }
     });
 
@@ -474,21 +474,23 @@ describe('Gemini wire-format translation', () => {
       const parts = extractAllParts(
         mockGenerateContentStream.mock.calls[0]![0]
       );
-      for (const part of parts) {
-        if ('functionCall' in part) {
-          const keys = Object.keys(part);
-          expect(keys).not.toContain('text');
-          expect(keys).not.toContain('inlineData');
-          expect(keys).not.toContain('fileData');
-          expect(keys).not.toContain('functionResponse');
-        }
-        if ('functionResponse' in part) {
-          const keys = Object.keys(part);
-          expect(keys).not.toContain('text');
-          expect(keys).not.toContain('inlineData');
-          expect(keys).not.toContain('fileData');
-          expect(keys).not.toContain('functionCall');
-        }
+      const callParts = parts.filter((part) => 'functionCall' in part);
+      const responseParts = parts.filter((part) => 'functionResponse' in part);
+      expect(callParts.length).toBeGreaterThan(0);
+      expect(responseParts.length).toBeGreaterThan(0);
+      for (const part of callParts) {
+        const keys = Object.keys(part);
+        expect(keys).not.toContain('text');
+        expect(keys).not.toContain('inlineData');
+        expect(keys).not.toContain('fileData');
+        expect(keys).not.toContain('functionResponse');
+      }
+      for (const part of responseParts) {
+        const keys = Object.keys(part);
+        expect(keys).not.toContain('text');
+        expect(keys).not.toContain('inlineData');
+        expect(keys).not.toContain('fileData');
+        expect(keys).not.toContain('functionCall');
       }
     });
   });

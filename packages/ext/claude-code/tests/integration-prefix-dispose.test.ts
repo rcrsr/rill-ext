@@ -5,7 +5,7 @@
  * Covers: IC-7, IR-1, IR-5, EC-16
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { makeFactoryCtx, extValue } from './_helpers.js';
 import type { IPty } from 'node-pty';
@@ -78,11 +78,11 @@ beforeEach(() => {
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream(
+async function resolveStream<T = Record<string, unknown>>(
   stream: unknown
-): Promise<Record<string, unknown>> {
+): Promise<T> {
   return (
-    stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
+    stream as { __rill_stream_resolve: () => Promise<T> }
   ).__rill_stream_resolve();
 }
 
@@ -114,7 +114,9 @@ describe('IR-1: Factory result has correct value shape', () => {
     // Verify dispose is on ext, not on ext.value
     expect(ext.dispose).toBeDefined();
     expect(typeof ext.dispose).toBe('function');
-    expect(v['dispose']).toBeUndefined();
+    expect(
+      (v as unknown as Record<string, unknown>)['dispose']
+    ).toBeUndefined();
   });
 
   it('preserves function definitions on ext.value', async () => {
@@ -127,10 +129,10 @@ describe('IR-1: Factory result has correct value shape', () => {
     // Verify function definitions are intact
     const promptDef = v['prompt'];
     expect(promptDef.params).toHaveLength(2);
-    expect(promptDef.params[0].name).toBe('text');
-    expect(promptDef.params[0].type).toEqual({ kind: 'string' });
-    expect(promptDef.params[1].name).toBe('options');
-    expect(promptDef.params[1].type).toEqual({
+    expect(promptDef.params[0]?.name).toBe('text');
+    expect(promptDef.params[0]?.type).toEqual({ kind: 'string' });
+    expect(promptDef.params[1]?.name).toBe('options');
+    expect(promptDef.params[1]?.type).toEqual({
       kind: 'dict',
       fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } },
     });
@@ -186,7 +188,7 @@ describe('IR-1: Factory result has correct value shape', () => {
     const stream = v['prompt'].fn({ text: 'Test prompt', options: {} }, ctx);
 
     // Resolve stream to get final result
-    const result = (await resolveStream(stream)) as ClaudeCodeResult;
+    const result = await resolveStream<ClaudeCodeResult>(stream);
 
     // Verify execution succeeded
     expect(result).toBeDefined();
@@ -274,7 +276,7 @@ describe('IR-5: dispose terminates active child processes', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
-    const disposeFns: Array<() => void> = [];
+    const disposeFns: Array<Mock<() => void>> = [];
 
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
       const disposeFn = vi.fn();
@@ -433,7 +435,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
-    const disposeFns: Array<() => void> = [];
+    const disposeFns: Array<Mock<() => void>> = [];
 
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
       const disposeFn = vi.fn();

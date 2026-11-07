@@ -178,7 +178,7 @@ describe('extension event emission', () => {
 
     it('emits openai:error event on API failure', async () => {
       const { APIError } = await import('openai');
-      const apiError = new APIError(401, {}, 'Invalid API key', {});
+      const apiError = new APIError(401, {}, 'Invalid API key', new Headers());
       const runner = createErrorStreamRunner(apiError);
       mockStream.mockReturnValue(runner);
 

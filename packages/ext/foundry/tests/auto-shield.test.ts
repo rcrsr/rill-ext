@@ -6,7 +6,15 @@
  * Covers: AC-8, AC-19, AC-31, AC-32.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { createRuntimeContext, callable, type RillValue } from '@rcrsr/rill';
 import type { FoundryConfig } from '../src/types.js';
 import { expectRejectedHalt } from './_halt-helpers.js';
@@ -87,15 +95,12 @@ function getHostFn(ext: { value: unknown }, name: string) {
 }
 
 /** Build a fetch mock returning a JSON response with the given status. */
-function mockFetchJson(
-  status: number,
-  body: unknown
-): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
+function mockFetchJson(status: number, body: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: vi.fn().mockResolvedValue(body),
-  });
+  } as unknown as Response);
 }
 
 /** Safe shield response from Content Safety API. */
@@ -173,6 +178,10 @@ function noShieldConfig(): FoundryConfig {
       apiVersion: '2025-01-01-preview',
       embedModel: 'text-embedding-ada-002',
     },
+    contentSafety: {
+      endpoint: 'https://my-safety.cognitiveservices.azure.com',
+      autoShield: false,
+    },
   };
 }
 
@@ -219,9 +228,7 @@ describe('auto-shield middleware', () => {
       );
 
       // Shield fetch was called
-      expect(
-        globalThis.fetch as ReturnType<typeof vi.fn>
-      ).toHaveBeenCalledOnce();
+      expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledOnce();
       // Model stream was called
       expect(mockStream).toHaveBeenCalledOnce();
     });
@@ -573,7 +580,7 @@ describe('auto-shield middleware', () => {
   // --------------------------------------------------------
 
   describe('no auto-shield when autoShield is false', () => {
-    it('shield fetch NOT called when autoShield not configured', async () => {
+    it('shield fetch NOT called when contentSafety sets autoShield false', async () => {
       const mockFetch = mockFetchJson(200, SAFE_SHIELD_RESPONSE);
       globalThis.fetch = mockFetch;
 
@@ -585,9 +592,10 @@ describe('auto-shield middleware', () => {
       const ctx = createRuntimeContext();
 
       // Calling message() should NOT trigger shield
-      getHostFn(ext, 'message').fn({ prompt: 'hello' }, ctx);
+      await getHostFn(ext, 'message').fn({ prompt: 'hello' }, ctx);
 
       expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockStream).toHaveBeenCalledOnce();
     });
   });
 });

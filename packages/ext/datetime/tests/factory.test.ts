@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { getStatus } from '@rcrsr/rill';
 import { createDatetimeExtension } from '../src/factory.js';
 import type { DatetimeExtensionConfig } from '../src/types.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import { makeFactoryCtx, makeRuntimeCtx, fnOf } from './_setup.js';
 
 function mk(config?: DatetimeExtensionConfig) {
   return createDatetimeExtension(config ?? {}, makeFactoryCtx());
@@ -43,7 +43,7 @@ describe('datetime extension factory', () => {
     it('wraps each function as callable with params, fn, annotations, returnType', () => {
       const ext = mk();
 
-      expect(ext.value.iso).toMatchObject({
+      expect(fnOf(ext, 'iso')).toMatchObject({
         __type: 'callable',
         kind: 'application',
         params: expect.any(Array),
@@ -70,7 +70,7 @@ describe('datetime extension factory', () => {
       ] as const;
 
       for (const key of keys) {
-        const fn = ext.value[key] as Record<string, unknown>;
+        const fn = fnOf(ext, key);
         expect(fn, `${key} should be a callable`).toMatchObject({
           __type: 'callable',
           kind: 'application',
@@ -143,7 +143,7 @@ describe('datetime extension factory', () => {
       const ext = mk();
       await ext.dispose!();
 
-      const result = await ext.value.iso.fn(
+      const result = await fnOf(ext, 'iso').fn(
         { dt: Date.now(), zone: 'UTC' },
         makeRuntimeCtx()
       );
@@ -156,7 +156,7 @@ describe('datetime extension factory', () => {
       const ext = mk();
       await ext.dispose!();
 
-      const result = await ext.value.zones.fn({}, makeRuntimeCtx());
+      const result = await fnOf(ext, 'zones').fn({}, makeRuntimeCtx());
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/datetime: operation cancelled/);
@@ -166,7 +166,7 @@ describe('datetime extension factory', () => {
       const ext = mk();
       await ext.dispose!();
 
-      const result = await ext.value.format.fn(
+      const result = await fnOf(ext, 'format').fn(
         { dt: Date.now(), pattern: 'YYYY-MM-DD' },
         makeRuntimeCtx()
       );

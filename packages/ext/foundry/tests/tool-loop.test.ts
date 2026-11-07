@@ -215,16 +215,18 @@ function makeTool(
 ): RillValue {
   const tool = callable(fn);
   if (options?.description !== undefined) {
-    (tool as Record<string, unknown>)['description'] = options.description;
+    Object.assign(tool, { description: options.description });
   }
   if (options?.params !== undefined) {
-    (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
-      name: p.name,
-      type: { kind: p.type },
-      defaultValue: undefined,
-      annotations:
-        p.description !== undefined ? { description: p.description } : {},
-    }));
+    Object.assign(tool, {
+      params: options.params.map((p) => ({
+        name: p.name,
+        type: { kind: p.type },
+        defaultValue: undefined,
+        annotations:
+          p.description !== undefined ? { description: p.description } : {},
+      })),
+    });
   }
   return tool;
 }
@@ -266,7 +268,7 @@ describe('tool_loop() function', () => {
         my_tool: makeTool(() => 'result', { description: 'A tool' }),
       };
 
-      const result = getCallable(ext, 'tool_loop').fn(
+      const result = await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Run something', tools, options: {} },
         ctx
       );

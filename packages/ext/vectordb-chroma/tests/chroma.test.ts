@@ -963,7 +963,7 @@ describe('Request cancellation', () => {
     });
   });
 
-  it('dispose during upsert_batch aborts pending requests (AC-9)', async () => {
+  it('dispose during upsert_batch lets the in-flight batch settle and rejects later calls', async () => {
     const config: ChromaConfig = {
       collection: 'test_collection',
     };
@@ -977,26 +977,27 @@ describe('Request cancellation', () => {
       metadata: {},
     }));
 
-    // Mock slow responses
-    let callCount = 0;
+    // Dispose from inside the third upsert call; no timers involved
+    mockUpsert.mockClear();
+    mockQuery.mockClear();
     mockUpsert.mockImplementation(async () => {
-      callCount++;
-      if (callCount === 3) {
-        // Dispose during third call
+      if (mockUpsert.mock.calls.length === 3) {
         await ext.dispose!();
       }
-      await new Promise((resolve) => setTimeout(resolve, 10));
       return undefined;
     });
 
-    // Start batch operation
-    const batchPromise = getCallable(ext, 'upsert_batch').fn(
+    const batchResult = await getCallable(ext, 'upsert_batch').fn(
       { items: items },
       ctx
     );
 
-    // After disposal, subsequent operations should fail
-    await expect(batchPromise).resolves.toBeDefined();
+    // The in-flight batch settles with a result dict, not an invalid value
+    expect(isInvalid(batchResult)).toBe(false);
+    expect(mockUpsert.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect((batchResult as Record<string, RillValue>)['succeeded']).toBe(
+      mockUpsert.mock.calls.length
+    );
 
     // New operations should fail after dispose
     const queryVector = createVector(
@@ -1011,6 +1012,7 @@ describe('Request cancellation', () => {
       'chroma: operation cancelled',
       'DISPOSED'
     );
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 

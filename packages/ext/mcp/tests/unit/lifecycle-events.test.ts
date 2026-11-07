@@ -91,10 +91,10 @@ describe('mcp:connect event', () => {
     // Verify emitted before tool_call
     const calls = vi.mocked(emitExtensionEvent).mock.calls;
     const connectIndex = calls.findIndex(
-      (call) => call[1].event === 'mcp:connect'
+      (call) => call[1]['event'] === 'mcp:connect'
     );
     const toolCallIndex = calls.findIndex(
-      (call) => call[1].event === 'mcp:tool_call'
+      (call) => call[1]['event'] === 'mcp:tool_call'
     );
     expect(connectIndex).toBeLessThan(toolCallIndex);
   });
@@ -133,13 +133,13 @@ describe('mcp:connect event', () => {
     // Verify mcp:connect emitted only once
     const connectCalls = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:connect');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:connect');
     expect(connectCalls).toHaveLength(1);
 
     // Verify tool_call emitted three times
     const toolCallCalls = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:tool_call');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:tool_call');
     expect(toolCallCalls).toHaveLength(3);
   });
 
@@ -259,7 +259,7 @@ describe('mcp:connect event', () => {
     // Verify mcp:connect NOT emitted on second operation
     const connectCalls = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:connect');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:connect');
     expect(connectCalls).toHaveLength(0);
 
     // Third call to prompt does not emit connect
@@ -269,7 +269,7 @@ describe('mcp:connect event', () => {
     // Verify mcp:connect NOT emitted on third operation
     const connectCallsAfterPrompt = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:connect');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:connect');
     expect(connectCallsAfterPrompt).toHaveLength(0);
   });
 });
@@ -381,7 +381,7 @@ describe('mcp:tool_call event', () => {
     // Verify three tool_call events
     const toolCallEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:tool_call');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:tool_call');
     expect(toolCallEvents).toHaveLength(3);
 
     // Verify correct tool names
@@ -490,7 +490,7 @@ describe('mcp:resource_read event', () => {
     // Verify two resource_read events
     const resourceReadEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:resource_read');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:resource_read');
     expect(resourceReadEvents).toHaveLength(2);
 
     // Verify correct URIs
@@ -598,7 +598,7 @@ describe('mcp:prompt_get event', () => {
     // Verify three prompt_get events
     const promptGetEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:prompt_get');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:prompt_get');
     expect(promptGetEvents).toHaveLength(3);
 
     // Verify correct prompt names
@@ -637,7 +637,7 @@ describe('mcp:error event', () => {
     // Verify mcp:error emitted
     const errorEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:error');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
 
     // Verify error contains timeout information
@@ -646,7 +646,7 @@ describe('mcp:error event', () => {
       subsystem: 'extension:mcp',
       tool: 'slow-tool',
     });
-    expect(errorEvents[0]![1].error).toContain('timeout');
+    expect(errorEvents[0]![1]['error']).toContain('timeout');
   });
 
   it('emits on connection lost error', async () => {
@@ -669,9 +669,9 @@ describe('mcp:error event', () => {
     // Verify mcp:error emitted
     const errorEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:error');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0]![1].error).toContain('connection closed');
+    expect(errorEvents[0]![1]['error']).toContain('connection closed');
   });
 
   it('emits on authentication error', async () => {
@@ -694,9 +694,9 @@ describe('mcp:error event', () => {
     // Verify mcp:error emitted
     const errorEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:error');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0]![1].error).toContain('unauthorized');
+    expect(errorEvents[0]![1]['error']).toContain('unauthorized');
   });
 
   it('emits on protocol error', async () => {
@@ -719,9 +719,9 @@ describe('mcp:error event', () => {
     // Verify mcp:error emitted
     const errorEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:error');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0]![1].error).toContain('invalid response');
+    expect(errorEvents[0]![1]['error']).toContain('invalid response');
   });
 
   it('emits on resource read errors', async () => {
@@ -739,9 +739,9 @@ describe('mcp:error event', () => {
     // Verify mcp:error emitted
     const errorEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:error');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0]![1].error).toContain('resource not found');
+    expect(errorEvents[0]![1]['error']).toContain('resource not found');
   });
 
   it('emits on prompt errors', async () => {
@@ -764,9 +764,9 @@ describe('mcp:error event', () => {
     // Verify mcp:error emitted
     const errorEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:error');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
-    expect(errorEvents[0]![1].error).toContain('prompt not found');
+    expect(errorEvents[0]![1]['error']).toContain('prompt not found');
   });
 
   it('emits error event before throwing exception', async () => {
@@ -789,7 +789,7 @@ describe('mcp:error event', () => {
 
     const errorEvents = vi
       .mocked(emitExtensionEvent)
-      .mock.calls.filter((call) => call[1].event === 'mcp:error');
+      .mock.calls.filter((call) => call[1]['event'] === 'mcp:error');
     expect(errorEvents).toHaveLength(1);
   });
 });

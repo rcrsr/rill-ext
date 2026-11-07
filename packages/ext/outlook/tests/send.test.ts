@@ -3,7 +3,15 @@
  * Covers: AC-6, AC-16, AC-17, AC-19, AC-37, EC-6.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   createRuntimeContext,
   type ApplicationCallable,
@@ -26,11 +34,11 @@ function getCallable(
 }
 
 /** Mock fetch for 202 Accepted (send returns no body). */
-function mockFetch202(): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
+function mockFetch202(): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue({
     ok: true,
     status: 202,
-  });
+  } as unknown as Response);
 }
 
 // ============================================================
@@ -146,12 +154,21 @@ describe('send() host function', () => {
     const mock = mockFetch202();
     globalThis.fetch = mock;
 
-    const ext = createOutlookExtension({
-      auth: { type: 'session', tokenVar: 'myToken' },
-      capabilities: {
-        mail: { read: true, send: true, draft: true, flag: true, search: true },
+    const ext = createOutlookExtension(
+      {
+        auth: { type: 'session', tokenVar: 'myToken' },
+        capabilities: {
+          mail: {
+            read: true,
+            send: true,
+            draft: true,
+            flag: true,
+            search: true,
+          },
+        },
       },
-    });
+      makeFactoryCtx()
+    );
     const ctx = createRuntimeContext();
     ctx.variables.set('myToken', 'session-token-123');
 

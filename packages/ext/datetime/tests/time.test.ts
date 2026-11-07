@@ -8,18 +8,18 @@
 import { describe, it, expect } from 'vitest';
 import { getStatus } from '@rcrsr/rill';
 import { createDatetimeExtension } from '../src/factory.js';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import { makeFactoryCtx, makeRuntimeCtx, fnOf } from './_setup.js';
 
 function mk() {
   return createDatetimeExtension({}, makeFactoryCtx());
 }
 
 function getFormatFn(ext: ReturnType<typeof mk>) {
-  return ext.value.format.fn;
+  return fnOf(ext, 'format').fn;
 }
 
 function getParseFn(ext: ReturnType<typeof mk>) {
-  return ext.value.parse.fn;
+  return fnOf(ext, 'parse').fn;
 }
 
 // Epoch ms for a specific UTC instant.
@@ -219,7 +219,7 @@ describe('time::parse', () => {
         makeRuntimeCtx()
       );
       const parsed = await getParseFn(ext)(
-        { str: formatted as string, pattern },
+        { str: formatted, pattern },
         makeRuntimeCtx()
       );
 
@@ -234,7 +234,7 @@ describe('time::parse', () => {
         makeRuntimeCtx()
       );
       const parsed = await getParseFn(ext)(
-        { str: formatted as string, pattern },
+        { str: formatted, pattern },
         makeRuntimeCtx()
       );
 
@@ -250,7 +250,7 @@ describe('time::parse', () => {
         makeRuntimeCtx()
       );
       const parsed = await getParseFn(ext)(
-        { str: formatted as string, pattern },
+        { str: formatted, pattern },
         makeRuntimeCtx()
       );
 

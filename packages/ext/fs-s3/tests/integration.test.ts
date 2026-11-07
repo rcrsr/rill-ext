@@ -8,13 +8,25 @@
  * - Secret key: minioadmin
  * - Bucket 'test-bucket' created
  *
- * Tests skip gracefully if MinIO unavailable (for CI).
+ * Tests skip gracefully if MinIO is unavailable, unless
+ * RILL_EXT_REQUIRE_SERVICES=1, in which case the suite fails at load.
  */
 
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import {
+  getStatus,
+  isInvalid,
+  type ApplicationCallable,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createS3FsExtension } from '../src/index.js';
 import type { S3FsConfig } from '../src/types.js';
 import { S3Client, CreateBucketCommand } from '@aws-sdk/client-s3';
+import {
+  assertServiceAvailable,
+  makeFactoryCtx,
+  makeRuntimeCtx,
+} from './_setup.js';
 
 // MinIO configuration
 const MINIO_ENDPOINT = 'http://localhost:9000';
@@ -24,74 +36,35 @@ const MINIO_SECRET_KEY = 'minioadmin';
 const TEST_BUCKET = 'test-bucket';
 
 /**
- * Check if MinIO is available with timeout.
- * Tests skip if MinIO not running.
+ * Check if MinIO is reachable by creating the test bucket (idempotent).
  */
 async function isMinIOAvailable(): Promise<boolean> {
+  const client = new S3Client({
+    region: MINIO_REGION,
+    endpoint: MINIO_ENDPOINT,
+    credentials: {
+      accessKeyId: MINIO_ACCESS_KEY,
+      secretAccessKey: MINIO_SECRET_KEY,
+    },
+    forcePathStyle: true,
+  });
+
   try {
-    // Wrap in promise with timeout to prevent hanging on connection attempts
-    const timeoutPromise = new Promise<boolean>((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timeout')), 3000);
+    await client.send(new CreateBucketCommand({ Bucket: TEST_BUCKET }), {
+      abortSignal: AbortSignal.timeout(3000),
     });
-
-    const checkPromise = (async () => {
-      const client = new S3Client({
-        region: MINIO_REGION,
-        endpoint: MINIO_ENDPOINT,
-        credentials: {
-          accessKeyId: MINIO_ACCESS_KEY,
-          secretAccessKey: MINIO_SECRET_KEY,
-        },
-        forcePathStyle: true,
-        requestHandler: {
-          requestTimeout: 2000, // 2 second request timeout
-        },
-      });
-
-      // Try to create bucket (idempotent)
-      await client.send(
-        new CreateBucketCommand({
-          Bucket: TEST_BUCKET,
-        })
-      );
-
-      return true;
-    })();
-
-    return await Promise.race([checkPromise, timeoutPromise]);
+    return true;
   } catch (error) {
-    // Bucket already exists is success
     if (
-      error &&
-      typeof error === 'object' &&
-      'name' in error &&
-      (error as { name: string }).name === 'BucketAlreadyOwnedByYou'
+      error instanceof Error &&
+      (error.name === 'BucketAlreadyOwnedByYou' ||
+        error.name === 'BucketAlreadyExists')
     ) {
       return true;
     }
-
-    // Connection refused, timeout, or network error means MinIO not available
-    if (
-      error &&
-      typeof error === 'object' &&
-      ('code' in error || 'message' in error)
-    ) {
-      const code = ('code' in error && (error as { code: string }).code) || '';
-      const message =
-        ('message' in error && (error as { message: string }).message) || '';
-
-      if (
-        code === 'ECONNREFUSED' ||
-        code === 'NetworkingError' ||
-        message.includes('timeout')
-      ) {
-        return false;
-      }
-    }
-
-    // Other errors indicate MinIO might be available but misconfigured
-    console.warn('MinIO availability check failed:', error);
     return false;
+  } finally {
+    client.destroy();
   }
 }
 
@@ -113,33 +86,87 @@ function createMinIOConfig(
   };
 }
 
-// Skip all tests if MinIO unavailable
-let minioAvailable = false;
+const minioAvailable = await isMinIOAvailable();
+assertServiceAvailable('MinIO', minioAvailable);
 
-beforeAll(
-  async () => {
-    minioAvailable = await isMinIOAvailable();
-    if (!minioAvailable) {
-      console.warn(
-        'MinIO not available - skipping integration tests. Start MinIO with: docker run -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio server /data'
-      );
-    }
-  },
-  5000 // 5 second timeout for availability check
-);
+const extensions: Array<{
+  dispose?: (() => void | Promise<void>) | undefined;
+}> = [];
 
-// Clean up after each test by removing all objects with test prefix
+/**
+ * Create an extension that is disposed after the current test.
+ */
+function open(config: S3FsConfig): ReturnType<typeof createS3FsExtension> {
+  const ext = createS3FsExtension(config, makeFactoryCtx());
+  extensions.push(ext);
+  return ext;
+}
+
+type FsExt = ReturnType<typeof createS3FsExtension>;
+
+/**
+ * Call a named host function and return its raw result (valid or invalid).
+ */
+async function call(
+  ext: FsExt,
+  name: string,
+  args: Record<string, RillValue>
+): Promise<RillValue> {
+  const callable = (ext.value as Record<string, ApplicationCallable>)[name];
+  if (callable === undefined) {
+    throw new Error(`function ${name} missing from extension value`);
+  }
+  return callable.fn(args, makeRuntimeCtx());
+}
+
+/**
+ * Call a host function and fail the test if the result is an invalid value.
+ */
+async function callOk(
+  ext: FsExt,
+  name: string,
+  args: Record<string, RillValue>
+): Promise<RillValue> {
+  const result = await call(ext, name, args);
+  expect(
+    isInvalid(result),
+    `${name} returned invalid: ${isInvalid(result) ? JSON.stringify(getStatus(result).raw) : ''}`
+  ).toBe(false);
+  return result;
+}
+
+/**
+ * Assert a host function returns an invalid value with the given atom and raw.kind.
+ */
+async function expectInvalid(
+  ext: FsExt,
+  name: string,
+  args: Record<string, RillValue>,
+  code: string,
+  kind: string
+): Promise<void> {
+  const result = await call(ext, name, args);
+  expect(isInvalid(result)).toBe(true);
+  const status = getStatus(result);
+  expect(status.code.name).toBe(code);
+  expect(status.raw['kind']).toBe(kind);
+}
+
+function asList(value: RillValue): RillValue[] {
+  expect(Array.isArray(value)).toBe(true);
+  return value as RillValue[];
+}
+
 afterEach(async () => {
-  if (!minioAvailable) return;
-
-  // Cleanup handled by prefix-based isolation per test
+  for (const ext of extensions) {
+    await ext.dispose?.();
+  }
+  extensions.length = 0;
 });
 
-describe('Integration Tests', () => {
+describe.skipIf(!minioAvailable)('Integration Tests', () => {
   describe('AC-1: Backend Swap Without Script Changes', () => {
     it('executes identical operations with same results', async () => {
-      if (!minioAvailable) return;
-
       const config = createMinIOConfig({
         storage: {
           mode: 'read-write',
@@ -148,37 +175,39 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
       // Perform series of write operations
-      await ext.write?.fn({
+      await callOk(ext, 'write', {
         path: '/storage/report.txt',
         content: 'Initial content',
       });
-      await ext.write?.fn({
+      await callOk(ext, 'write', {
         path: '/storage/data.json',
         content: '{"count":42}',
       });
-      await ext.append?.fn({
+      await callOk(ext, 'append', {
         path: '/storage/report.txt',
         content: '\nAppended line',
       });
 
       // Verify read operations
-      const report = await ext.read?.fn({ path: '/storage/report.txt' });
+      const report = await callOk(ext, 'read', { path: '/storage/report.txt' });
       expect(report).toBe('Initial content\nAppended line');
 
-      const data = await ext.read?.fn({ path: '/storage/data.json' });
+      const data = await callOk(ext, 'read', { path: '/storage/data.json' });
       expect(data).toBe('{"count":42}');
 
       // Verify exists operation
-      expect(await ext.exists?.fn({ path: '/storage/report.txt' })).toBe(true);
-      expect(await ext.exists?.fn({ path: '/storage/missing.txt' })).toBe(
-        false
+      expect(await callOk(ext, 'exists', { path: '/storage/report.txt' })).toBe(
+        true
       );
+      expect(
+        await callOk(ext, 'exists', { path: '/storage/missing.txt' })
+      ).toBe(false);
 
       // Verify list operation
-      const files = await ext.list?.fn({ path: '/storage' });
+      const files = await callOk(ext, 'list', { path: '/storage' });
       expect(files).toHaveLength(2);
       expect(files).toContainEqual({
         name: 'report.txt',
@@ -187,7 +216,7 @@ describe('Integration Tests', () => {
       });
 
       // Verify stat operation
-      const stat = await ext.stat?.fn({ path: '/storage/report.txt' });
+      const stat = await callOk(ext, 'stat', { path: '/storage/report.txt' });
       expect(stat).toEqual({
         name: expect.any(String),
         type: 'file',
@@ -196,15 +225,17 @@ describe('Integration Tests', () => {
       });
 
       // Verify remove operation
-      expect(await ext.remove?.fn({ path: '/storage/data.json' })).toBe(true);
-      expect(await ext.exists?.fn({ path: '/storage/data.json' })).toBe(false);
+      expect(await callOk(ext, 'remove', { path: '/storage/data.json' })).toBe(
+        true
+      );
+      expect(await callOk(ext, 'exists', { path: '/storage/data.json' })).toBe(
+        false
+      );
     });
   });
 
   describe('AC-4: S3 Multi-Server File Access', () => {
     it('reads file written by another client instance', async () => {
-      if (!minioAvailable) return;
-
       const config = createMinIOConfig({
         output: {
           mode: 'read-write',
@@ -214,22 +245,22 @@ describe('Integration Tests', () => {
       });
 
       // Client A writes file
-      const clientA = createS3FsExtension(config);
-      await clientA.write?.fn({
+      const clientA = open(config);
+      await callOk(clientA, 'write', {
         path: '/output/report.txt',
         content: 'Server A content',
       });
 
       // Client B reads file (simulates different server)
-      const clientB = createS3FsExtension(config);
-      const content = await clientB.read?.fn({ path: '/output/report.txt' });
+      const clientB = open(config);
+      const content = await callOk(clientB, 'read', {
+        path: '/output/report.txt',
+      });
 
       expect(content).toBe('Server A content');
     });
 
     it('handles concurrent writes from multiple clients', async () => {
-      if (!minioAvailable) return;
-
       const config = createMinIOConfig({
         shared: {
           mode: 'read-write',
@@ -240,8 +271,8 @@ describe('Integration Tests', () => {
 
       // Simulate 3 concurrent clients writing different files
       const writePromises = Array.from({ length: 3 }, async (_, index) => {
-        const client = createS3FsExtension(config);
-        await client.write?.fn({
+        const client = open(config);
+        await callOk(client, 'write', {
           path: `/shared/file-${index}.txt`,
           content: `Content from client ${index}`,
         });
@@ -250,12 +281,12 @@ describe('Integration Tests', () => {
       await Promise.all(writePromises);
 
       // Verify all writes succeeded
-      const reader = createS3FsExtension(config);
-      const files = await reader.list?.fn({ path: '/shared' });
+      const reader = open(config);
+      const files = await callOk(reader, 'list', { path: '/shared' });
 
       expect(files).toHaveLength(3);
       for (let i = 0; i < 3; i++) {
-        const content = await reader.read?.fn({
+        const content = await callOk(reader, 'read', {
           path: `/shared/file-${i}.txt`,
         });
         expect(content).toBe(`Content from client ${i}`);
@@ -265,8 +296,6 @@ describe('Integration Tests', () => {
 
   describe('AC-5: S3 Compatible Service Support (MinIO)', () => {
     it('completes full fs operation suite against MinIO', async () => {
-      if (!minioAvailable) return;
-
       const config = createMinIOConfig({
         test: {
           mode: 'read-write',
@@ -276,26 +305,36 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
       // Test write
-      await ext.write?.fn({ path: '/test/sample.txt', content: 'Hello MinIO' });
+      await callOk(ext, 'write', {
+        path: '/test/sample.txt',
+        content: 'Hello MinIO',
+      });
 
       // Test read
-      const content = await ext.read?.fn({ path: '/test/sample.txt' });
+      const content = await callOk(ext, 'read', { path: '/test/sample.txt' });
       expect(content).toBe('Hello MinIO');
 
       // Test append
-      await ext.append?.fn({ path: '/test/sample.txt', content: ' from rill' });
-      const appended = await ext.read?.fn({ path: '/test/sample.txt' });
+      await callOk(ext, 'append', {
+        path: '/test/sample.txt',
+        content: ' from rill',
+      });
+      const appended = await callOk(ext, 'read', { path: '/test/sample.txt' });
       expect(appended).toBe('Hello MinIO from rill');
 
       // Test exists
-      expect(await ext.exists?.fn({ path: '/test/sample.txt' })).toBe(true);
-      expect(await ext.exists?.fn({ path: '/test/missing.txt' })).toBe(false);
+      expect(await callOk(ext, 'exists', { path: '/test/sample.txt' })).toBe(
+        true
+      );
+      expect(await callOk(ext, 'exists', { path: '/test/missing.txt' })).toBe(
+        false
+      );
 
       // Test stat
-      const stat = await ext.stat?.fn({ path: '/test/sample.txt' });
+      const stat = await callOk(ext, 'stat', { path: '/test/sample.txt' });
       expect(stat).toEqual({
         name: expect.any(String),
         type: 'file',
@@ -305,45 +344,51 @@ describe('Integration Tests', () => {
 
       // Test copy
       expect(
-        await ext.copy?.fn({
+        await callOk(ext, 'copy', {
           src: '/test/sample.txt',
           dest: '/test/sample-copy.txt',
         })
       ).toBe(true);
-      const copied = await ext.read?.fn({ path: '/test/sample-copy.txt' });
+      const copied = await callOk(ext, 'read', {
+        path: '/test/sample-copy.txt',
+      });
       expect(copied).toBe('Hello MinIO from rill');
 
       // Test move
       expect(
-        await ext.move?.fn({
+        await callOk(ext, 'move', {
           src: '/test/sample-copy.txt',
           dest: '/test/sample-moved.txt',
         })
       ).toBe(true);
-      expect(await ext.exists?.fn({ path: '/test/sample-copy.txt' })).toBe(
-        false
-      );
-      expect(await ext.exists?.fn({ path: '/test/sample-moved.txt' })).toBe(
-        true
-      );
+      expect(
+        await callOk(ext, 'exists', { path: '/test/sample-copy.txt' })
+      ).toBe(false);
+      expect(
+        await callOk(ext, 'exists', { path: '/test/sample-moved.txt' })
+      ).toBe(true);
 
       // Test list
-      const files = await ext.list?.fn({ path: '/test' });
-      expect(files.length).toBeGreaterThanOrEqual(2);
+      const files = await callOk(ext, 'list', { path: '/test' });
+      expect(asList(files).length).toBeGreaterThanOrEqual(2);
 
       // Test find (recursive)
-      const found = await ext.find?.fn({ path: '/test', pattern: '*' });
-      expect(found.length).toBeGreaterThanOrEqual(2);
+      const found = await callOk(ext, 'find', { path: '/test', pattern: '*' });
+      expect(asList(found).length).toBeGreaterThanOrEqual(2);
 
       // Test remove
-      expect(await ext.remove?.fn({ path: '/test/sample.txt' })).toBe(true);
-      expect(await ext.exists?.fn({ path: '/test/sample.txt' })).toBe(false);
+      expect(await callOk(ext, 'remove', { path: '/test/sample.txt' })).toBe(
+        true
+      );
+      expect(await callOk(ext, 'exists', { path: '/test/sample.txt' })).toBe(
+        false
+      );
 
       // Test mkdir (no-op that returns true)
-      expect(await ext.mkdir?.fn({ path: '/test/subdir' })).toBe(true);
+      expect(await callOk(ext, 'mkdir', { path: '/test/subdir' })).toBe(true);
 
       // Test mounts
-      const mounts = await ext.mounts?.fn({});
+      const mounts = await callOk(ext, 'mounts', {});
       expect(mounts).toEqual([
         {
           name: 'test',
@@ -357,9 +402,7 @@ describe('Integration Tests', () => {
   });
 
   describe('AC-7: Unknown Mount Name', () => {
-    it('throws error with mount name for all fs functions', async () => {
-      if (!minioAvailable) return;
-
+    it('returns unknown_mount invalid for all fs functions', async () => {
       const config = createMinIOConfig({
         storage: {
           mode: 'read-write',
@@ -373,49 +416,91 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
       // Test all functions throw for unknown mount
-      await expect(ext.read?.fn({ path: '/unknown/file.txt' })).rejects.toThrow(
-        'unknown mount'
+      await expectInvalid(
+        ext,
+        'read',
+        { path: '/unknown/file.txt' },
+        'INVALID_INPUT',
+        'unknown_mount'
       );
-      await expect(
-        ext.write?.fn({ path: '/unknown/file.txt', content: 'content' })
-      ).rejects.toThrow('unknown mount');
-      await expect(
-        ext.append?.fn({ path: '/unknown/file.txt', content: 'content' })
-      ).rejects.toThrow('unknown mount');
-      await expect(ext.list?.fn({ path: '/unknown' })).rejects.toThrow(
-        'unknown mount'
+      await expectInvalid(
+        ext,
+        'write',
+        { path: '/unknown/file.txt', content: 'content' },
+        'INVALID_INPUT',
+        'unknown_mount'
       );
-      await expect(
-        ext.find?.fn({ path: '/unknown', pattern: '' })
-      ).rejects.toThrow('unknown mount');
-      await expect(
-        ext.exists?.fn({ path: '/unknown/file.txt' })
-      ).rejects.toThrow('unknown mount');
-      await expect(
-        ext.remove?.fn({ path: '/unknown/file.txt' })
-      ).rejects.toThrow('unknown mount');
-      await expect(ext.stat?.fn({ path: '/unknown/file.txt' })).rejects.toThrow(
-        'unknown mount'
+      await expectInvalid(
+        ext,
+        'append',
+        { path: '/unknown/file.txt', content: 'content' },
+        'INVALID_INPUT',
+        'unknown_mount'
       );
-      await expect(ext.mkdir?.fn({ path: '/unknown/dir' })).rejects.toThrow(
-        'unknown mount'
+      await expectInvalid(
+        ext,
+        'list',
+        { path: '/unknown' },
+        'INVALID_INPUT',
+        'unknown_mount'
       );
-      await expect(
-        ext.copy?.fn({ src: '/unknown/src.txt', dest: '/unknown/dest.txt' })
-      ).rejects.toThrow('unknown mount');
-      await expect(
-        ext.move?.fn({ src: '/unknown/src.txt', dest: '/unknown/dest.txt' })
-      ).rejects.toThrow('unknown mount');
+      await expectInvalid(
+        ext,
+        'find',
+        { path: '/unknown', pattern: '' },
+        'INVALID_INPUT',
+        'unknown_mount'
+      );
+      await expectInvalid(
+        ext,
+        'exists',
+        { path: '/unknown/file.txt' },
+        'INVALID_INPUT',
+        'unknown_mount'
+      );
+      await expectInvalid(
+        ext,
+        'remove',
+        { path: '/unknown/file.txt' },
+        'INVALID_INPUT',
+        'unknown_mount'
+      );
+      await expectInvalid(
+        ext,
+        'stat',
+        { path: '/unknown/file.txt' },
+        'INVALID_INPUT',
+        'unknown_mount'
+      );
+      await expectInvalid(
+        ext,
+        'mkdir',
+        { path: '/unknown/dir' },
+        'INVALID_INPUT',
+        'unknown_mount'
+      );
+      await expectInvalid(
+        ext,
+        'copy',
+        { src: '/unknown/src.txt', dest: '/unknown/dest.txt' },
+        'INVALID_INPUT',
+        'unknown_mount'
+      );
+      await expectInvalid(
+        ext,
+        'move',
+        { src: '/unknown/src.txt', dest: '/unknown/dest.txt' },
+        'INVALID_INPUT',
+        'unknown_mount'
+      );
     });
   });
 
   describe('AC-8: Read-Only Mode Enforcement', () => {
-    it('throws error for write operations on read-only mount', async () => {
-      if (!minioAvailable) return;
-
+    it('returns mode_not_permitted invalid for write operations on read-only mount', async () => {
       const config = createMinIOConfig({
         'readonly-mount': {
           mode: 'read',
@@ -424,35 +509,53 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
       // Test all write operations throw
-      await expect(
-        ext.write?.fn({ path: '/readonly-mount/file.txt', content: 'content' })
-      ).rejects.toThrow('read-only');
-      await expect(
-        ext.append?.fn({ path: '/readonly-mount/file.txt', content: 'content' })
-      ).rejects.toThrow('read-only');
-      await expect(
-        ext.remove?.fn({ path: '/readonly-mount/file.txt' })
-      ).rejects.toThrow('read-only');
-      await expect(
-        ext.copy?.fn({
+      await expectInvalid(
+        ext,
+        'write',
+        { path: '/readonly-mount/file.txt', content: 'content' },
+        'INVALID_INPUT',
+        'mode_not_permitted'
+      );
+      await expectInvalid(
+        ext,
+        'append',
+        { path: '/readonly-mount/file.txt', content: 'content' },
+        'INVALID_INPUT',
+        'mode_not_permitted'
+      );
+      await expectInvalid(
+        ext,
+        'remove',
+        { path: '/readonly-mount/file.txt' },
+        'INVALID_INPUT',
+        'mode_not_permitted'
+      );
+      await expectInvalid(
+        ext,
+        'copy',
+        {
           src: '/readonly-mount/src.txt',
           dest: '/readonly-mount/dest.txt',
-        })
-      ).rejects.toThrow('read-only');
-      await expect(
-        ext.move?.fn({
+        },
+        'INVALID_INPUT',
+        'mode_not_permitted'
+      );
+      await expectInvalid(
+        ext,
+        'move',
+        {
           src: '/readonly-mount/src.txt',
           dest: '/readonly-mount/dest.txt',
-        })
-      ).rejects.toThrow('read-only');
+        },
+        'INVALID_INPUT',
+        'mode_not_permitted'
+      );
     });
 
     it('allows read operations on read-only mount', async () => {
-      if (!minioAvailable) return;
-
       // Setup: write file with read-write mount
       const writeConfig = createMinIOConfig({
         setup: {
@@ -462,8 +565,8 @@ describe('Integration Tests', () => {
         },
       });
 
-      const writer = createS3FsExtension(writeConfig);
-      await writer.write?.fn({
+      const writer = open(writeConfig);
+      await callOk(writer, 'write', {
         path: '/setup/data.txt',
         content: 'Read-only test',
       });
@@ -477,22 +580,24 @@ describe('Integration Tests', () => {
         },
       });
 
-      const reader = createS3FsExtension(readConfig);
+      const reader = open(readConfig);
 
       // Read operations should succeed
-      const content = await reader.read?.fn({
+      const content = await callOk(reader, 'read', {
         path: '/readonly-mount/data.txt',
       });
       expect(content).toBe('Read-only test');
 
       expect(
-        await reader.exists?.fn({ path: '/readonly-mount/data.txt' })
+        await callOk(reader, 'exists', { path: '/readonly-mount/data.txt' })
       ).toBe(true);
 
-      const files = await reader.list?.fn({ path: '/readonly-mount' });
+      const files = await callOk(reader, 'list', { path: '/readonly-mount' });
       expect(files).toHaveLength(1);
 
-      const stat = await reader.stat?.fn({ path: '/readonly-mount/data.txt' });
+      const stat = await callOk(reader, 'stat', {
+        path: '/readonly-mount/data.txt',
+      });
       expect(stat).toEqual({
         name: expect.any(String),
         type: 'file',
@@ -503,9 +608,7 @@ describe('Integration Tests', () => {
   });
 
   describe('AC-9, EC-9: File Size Limit Violation', () => {
-    it('throws error when reading file exceeding maxFileSize', async () => {
-      if (!minioAvailable) return;
-
+    it('returns file_too_large invalid when reading file exceeding maxFileSize', async () => {
       // Setup: write large file without limit
       const writeConfig = createMinIOConfig({
         unlimited: {
@@ -515,9 +618,9 @@ describe('Integration Tests', () => {
         },
       });
 
-      const writer = createS3FsExtension(writeConfig);
+      const writer = open(writeConfig);
       const largeContent = 'x'.repeat(2000); // 2KB file
-      await writer.write?.fn({
+      await callOk(writer, 'write', {
         path: '/unlimited/large.txt',
         content: largeContent,
       });
@@ -532,17 +635,19 @@ describe('Integration Tests', () => {
         },
       });
 
-      const reader = createS3FsExtension(readConfig);
+      const reader = open(readConfig);
 
       // Should throw size error
-      await expect(
-        reader.read?.fn({ path: '/limited/large.txt' })
-      ).rejects.toThrow('exceeds limit');
+      await expectInvalid(
+        reader,
+        'read',
+        { path: '/limited/large.txt' },
+        'INVALID_INPUT',
+        'file_too_large'
+      );
     });
 
-    it('throws error when writing file exceeding maxFileSize', async () => {
-      if (!minioAvailable) return;
-
+    it('returns file_too_large invalid when writing file exceeding maxFileSize', async () => {
       const config = createMinIOConfig({
         limited: {
           mode: 'write',
@@ -552,20 +657,22 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
       // Should throw size error
       const largeContent = 'x'.repeat(200);
-      await expect(
-        ext.write?.fn({ path: '/limited/large.txt', content: largeContent })
-      ).rejects.toThrow('exceeds limit');
+      await expectInvalid(
+        ext,
+        'write',
+        { path: '/limited/large.txt', content: largeContent },
+        'INVALID_INPUT',
+        'file_too_large'
+      );
     });
   });
 
   describe('EC-8: File Not Found', () => {
-    it('throws error for read on non-existent file', async () => {
-      if (!minioAvailable) return;
-
+    it('returns NOT_FOUND invalid for read on non-existent file', async () => {
       const config = createMinIOConfig({
         storage: {
           mode: 'read',
@@ -574,16 +681,18 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
-      await expect(
-        ext.read?.fn({ path: '/storage/missing.txt' })
-      ).rejects.toThrow('not found');
+      await expectInvalid(
+        ext,
+        'read',
+        { path: '/storage/missing.txt' },
+        'NOT_FOUND',
+        'object_missing'
+      );
     });
 
     it('returns false for exists on non-existent file', async () => {
-      if (!minioAvailable) return;
-
       const config = createMinIOConfig({
         storage: {
           mode: 'read',
@@ -592,18 +701,16 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
-      expect(await ext.exists?.fn({ path: '/storage/missing.txt' })).toBe(
-        false
-      );
+      expect(
+        await callOk(ext, 'exists', { path: '/storage/missing.txt' })
+      ).toBe(false);
     });
   });
 
   describe('EC-10: Write on Read-Only Mount', () => {
-    it('throws PermissionError for all write operations', async () => {
-      if (!minioAvailable) return;
-
+    it('returns mode_not_permitted invalid for all write operations', async () => {
       const config = createMinIOConfig({
         readonly: {
           mode: 'read',
@@ -612,25 +719,35 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
       // All write operations should throw
-      await expect(
-        ext.write?.fn({ path: '/readonly/test.txt', content: 'content' })
-      ).rejects.toThrow('read-only');
-      await expect(
-        ext.append?.fn({ path: '/readonly/test.txt', content: 'content' })
-      ).rejects.toThrow('read-only');
-      await expect(
-        ext.remove?.fn({ path: '/readonly/test.txt' })
-      ).rejects.toThrow('read-only');
+      await expectInvalid(
+        ext,
+        'write',
+        { path: '/readonly/test.txt', content: 'content' },
+        'INVALID_INPUT',
+        'mode_not_permitted'
+      );
+      await expectInvalid(
+        ext,
+        'append',
+        { path: '/readonly/test.txt', content: 'content' },
+        'INVALID_INPUT',
+        'mode_not_permitted'
+      );
+      await expectInvalid(
+        ext,
+        'remove',
+        { path: '/readonly/test.txt' },
+        'INVALID_INPUT',
+        'mode_not_permitted'
+      );
     });
   });
 
   describe('EC-11: Parent Directory Missing on S3 Write', () => {
     it('succeeds writing to path with non-existent parent directories', async () => {
-      if (!minioAvailable) return;
-
       const config = createMinIOConfig({
         storage: {
           mode: 'write',
@@ -639,12 +756,13 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
       // Write to deeply nested path without creating parent directories
-      await expect(
-        ext.write?.fn({ path: '/storage/a/b/c/d/file.txt', content: 'content' })
-      ).resolves.not.toThrow();
+      await callOk(ext, 'write', {
+        path: '/storage/a/b/c/d/file.txt',
+        content: 'content',
+      });
 
       // Verify file was written
       const readConfig = createMinIOConfig({
@@ -655,8 +773,8 @@ describe('Integration Tests', () => {
         },
       });
 
-      const reader = createS3FsExtension(readConfig);
-      const content = await reader.read?.fn({
+      const reader = open(readConfig);
+      const content = await callOk(reader, 'read', {
         path: '/storage/a/b/c/d/file.txt',
       });
       expect(content).toBe('content');
@@ -665,8 +783,6 @@ describe('Integration Tests', () => {
 
   describe('EC-12: mkdir is No-Op Returning True', () => {
     it('returns true without creating directory marker', async () => {
-      if (!minioAvailable) return;
-
       const config = createMinIOConfig({
         storage: {
           mode: 'read-write',
@@ -675,22 +791,22 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
       // mkdir should return true
-      expect(await ext.mkdir?.fn({ path: '/storage/subdir' })).toBe(true);
-      expect(await ext.mkdir?.fn({ path: '/storage/a/b/c' })).toBe(true);
+      expect(await callOk(ext, 'mkdir', { path: '/storage/subdir' })).toBe(
+        true
+      );
+      expect(await callOk(ext, 'mkdir', { path: '/storage/a/b/c' })).toBe(true);
 
       // No directory markers should be created
-      const files = await ext.list?.fn({ path: '/storage' });
+      const files = await callOk(ext, 'list', { path: '/storage' });
       expect(files).toHaveLength(0);
     });
   });
 
-  describe('EC-13: Unknown Mount Throws MountError', () => {
-    it('includes available mounts in error message', async () => {
-      if (!minioAvailable) return;
-
+  describe('Unknown mount is invalid', () => {
+    it('returns unknown_mount for a path outside configured mounts', async () => {
       const config = createMinIOConfig({
         storage: {
           mode: 'read-write',
@@ -704,16 +820,15 @@ describe('Integration Tests', () => {
         },
       });
 
-      const ext = createS3FsExtension(config);
+      const ext = open(config);
 
-      try {
-        await ext.read?.fn({ path: '/unknown/file.txt' });
-        expect.fail('Should have thrown error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        const message = (error as Error).message;
-        expect(message).toContain('unknown mount');
-      }
+      await expectInvalid(
+        ext,
+        'read',
+        { path: '/unknown/file.txt' },
+        'INVALID_INPUT',
+        'unknown_mount'
+      );
     });
   });
 });

@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { anyTypeValue } from '@rcrsr/rill';
 import {
   extractTemplateVariables,
@@ -13,7 +14,6 @@ import {
   generateResourceTemplateFunctions,
   generateStaticResourceFunctions,
   type McpResourceTemplate,
-  type McpResourceResult,
   type McpResource,
 } from '../../src/resources.js';
 import { makeRuntimeCtx, expectRejectsInvalid } from '../_helpers.js';
@@ -90,12 +90,14 @@ describe('createReadResourceFunction', () => {
         annotations: { description: 'Resource URI to read' },
       },
     ]);
-    expect(func.annotations?.description).toBe('Read an MCP resource by URI');
+    expect(func.annotations?.['description']).toBe(
+      'Read an MCP resource by URI'
+    );
     expect(func.returnType).toEqual(anyTypeValue);
   });
 
   it('calls MCP readResource with provided URI', async () => {
-    const mockResult: McpResourceResult = {
+    const mockResult: ReadResourceResult = {
       contents: [
         {
           uri: 'config://app',
@@ -117,7 +119,7 @@ describe('createReadResourceFunction', () => {
   });
 
   it('returns string for single text content', async () => {
-    const mockResult: McpResourceResult = {
+    const mockResult: ReadResourceResult = {
       contents: [
         {
           uri: 'config://app',
@@ -139,7 +141,7 @@ describe('createReadResourceFunction', () => {
   });
 
   it('returns dict with type/data/mime for single blob content', async () => {
-    const mockResult: McpResourceResult = {
+    const mockResult: ReadResourceResult = {
       contents: [
         {
           uri: 'image://logo',
@@ -165,7 +167,7 @@ describe('createReadResourceFunction', () => {
   });
 
   it('returns empty string for empty contents (BC-6)', async () => {
-    const mockResult: McpResourceResult = {
+    const mockResult: ReadResourceResult = {
       contents: [],
     };
 
@@ -181,7 +183,7 @@ describe('createReadResourceFunction', () => {
   });
 
   it('concatenates multiple text contents with newlines', async () => {
-    const mockResult: McpResourceResult = {
+    const mockResult: ReadResourceResult = {
       contents: [
         { uri: 'resource://1', text: 'first' },
         { uri: 'resource://2', text: 'second' },
@@ -316,7 +318,7 @@ describe('generateResourceTemplateFunctions', () => {
     );
 
     expect(functions).toHaveProperty('resource_table');
-    const func = functions.resource_table!;
+    const func = functions['resource_table']!;
 
     expect(func.params).toEqual([
       {
@@ -326,7 +328,7 @@ describe('generateResourceTemplateFunctions', () => {
         annotations: { description: 'URI template variable: tableName' },
       },
     ]);
-    expect(func.annotations?.description).toBe('Access database table');
+    expect(func.annotations?.['description']).toBe('Access database table');
     expect(func.returnType).toEqual(anyTypeValue);
   });
 
@@ -346,7 +348,7 @@ describe('generateResourceTemplateFunctions', () => {
     );
 
     expect(functions).toHaveProperty('resource_database_row');
-    const func = functions.resource_database_row!;
+    const func = functions['resource_database_row']!;
 
     expect(func.params).toEqual([
       {
@@ -372,7 +374,7 @@ describe('generateResourceTemplateFunctions', () => {
       },
     ];
 
-    const mockResult: McpResourceResult = {
+    const mockResult: ReadResourceResult = {
       contents: [
         {
           uri: 'db://table/users/row/123',
@@ -389,7 +391,7 @@ describe('generateResourceTemplateFunctions', () => {
       30000
     );
 
-    const func = functions.resource_database_row!;
+    const func = functions['resource_database_row']!;
     await func.fn({ tableName: 'users', rowId: '123' }, makeRuntimeCtx());
 
     expect(mockClient.readResource).toHaveBeenCalledWith({
@@ -462,7 +464,7 @@ describe('generateResourceTemplateFunctions', () => {
       30000
     );
 
-    const func = functions.resource_table!;
+    const func = functions['resource_table']!;
 
     await expectRejectsInvalid(
       func.fn({ tableName: 123 }, makeRuntimeCtx()),
@@ -484,7 +486,7 @@ describe('generateResourceTemplateFunctions', () => {
       mockClient,
       100
     );
-    const func = functions.resource_slow_resource!;
+    const func = functions['resource_slow_resource']!;
 
     await expectRejectsInvalid(
       func.fn({ id: 'test' }, makeRuntimeCtx()),
@@ -507,7 +509,7 @@ describe('generateResourceTemplateFunctions', () => {
       30000
     );
 
-    const func = functions.resource_table!;
+    const func = functions['resource_table']!;
 
     await expectRejectsInvalid(
       func.fn({ table: 'users' }, makeRuntimeCtx()),
@@ -525,7 +527,7 @@ describe('generateResourceTemplateFunctions', () => {
       { uriTemplate: 'api://item/{id}', name: 'item' },
     ];
 
-    const mockResult: McpResourceResult = {
+    const mockResult: ReadResourceResult = {
       contents: [{ uri: 'api://item/42', text: 'item data' }],
     };
 
@@ -537,7 +539,7 @@ describe('generateResourceTemplateFunctions', () => {
       30000
     );
 
-    const func = functions.resource_item!;
+    const func = functions['resource_item']!;
 
     // This should throw because we validate string types
     await expectRejectsInvalid(
@@ -557,7 +559,7 @@ describe('generateResourceTemplateFunctions', () => {
       30000
     );
 
-    const func = functions.resource_item!;
+    const func = functions['resource_item']!;
     expect(func.annotations).toBeUndefined();
   });
 });
@@ -599,7 +601,7 @@ describe('generateStaticResourceFunctions', () => {
       { uri: 'config://app', name: 'app_config', description: 'App config' },
     ];
 
-    const mockResult: McpResourceResult = {
+    const mockResult: ReadResourceResult = {
       contents: [{ uri: 'config://app', text: 'value=1' }],
     };
 
@@ -631,7 +633,7 @@ describe('generateStaticResourceFunctions', () => {
     );
     const func = functions['resource_source']!;
 
-    expect(func.annotations?.description).toBe('My data source');
+    expect(func.annotations?.['description']).toBe('My data source');
   });
 
   it('falls back to default description when none provided', () => {
@@ -644,7 +646,7 @@ describe('generateStaticResourceFunctions', () => {
     );
     const func = functions['resource_raw_data']!;
 
-    expect(func.annotations?.description).toMatch(/^Read resource:/);
+    expect(func.annotations?.['description']).toMatch(/^Read resource:/);
   });
 
   it('appends mimeType to description', () => {
@@ -664,7 +666,7 @@ describe('generateStaticResourceFunctions', () => {
     );
     const func = functions['resource_settings']!;
 
-    expect(func.annotations?.description).toContain('application/json');
+    expect(func.annotations?.['description']).toContain('application/json');
   });
 
   it('returns empty record for empty resources array', () => {

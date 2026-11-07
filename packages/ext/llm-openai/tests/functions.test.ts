@@ -14,6 +14,7 @@ import {
   type TypeStructure,
 } from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
+import type { ChatCompletion } from 'openai/resources/chat/completions';
 import type { OpenAIExtensionConfig } from '../src/types.js';
 
 // ============================================================
@@ -46,7 +47,10 @@ function getCallable(
 /**
  * Build a full ChatCompletion object matching OpenAI response shape.
  */
-function createMockFinalCompletion(content: string, model = 'gpt-4-turbo') {
+function createMockFinalCompletion(
+  content: string,
+  model = 'gpt-4-turbo'
+): ChatCompletion {
   return {
     id: 'chatcmpl-test123',
     object: 'chat.completion' as const,
@@ -55,7 +59,8 @@ function createMockFinalCompletion(content: string, model = 'gpt-4-turbo') {
     choices: [
       {
         index: 0,
-        message: { role: 'assistant' as const, content },
+        logprobs: null,
+        message: { role: 'assistant' as const, content, refusal: null },
         finish_reason: 'stop' as const,
       },
     ],
@@ -70,7 +75,7 @@ function createMockFinalCompletion(content: string, model = 'gpt-4-turbo') {
  */
 function createMockStreamRunner(
   deltas: string[],
-  finalCompletion: ReturnType<typeof createMockFinalCompletion>
+  finalCompletion: ChatCompletion
 ) {
   async function* asyncChunks() {
     for (const delta of deltas) {
@@ -472,7 +477,7 @@ describe('message() function', () => {
     // EC-2: Provider API error during stream — thrown when iterating chunks
     it('throws RuntimeError for 401 authentication error during stream iteration', async () => {
       const { APIError } = await import('openai');
-      const apiError = new APIError(401, {}, 'Invalid API key', {});
+      const apiError = new APIError(401, {}, 'Invalid API key', new Headers());
       const runner = createErrorStreamRunner(apiError);
       mockStream.mockReturnValue(runner);
 
@@ -493,7 +498,7 @@ describe('message() function', () => {
 
     it('throws RuntimeError for 429 rate limit error during stream iteration', async () => {
       const { APIError } = await import('openai');
-      const apiError = new APIError(429, {}, 'Rate limit', {});
+      const apiError = new APIError(429, {}, 'Rate limit', new Headers());
       const runner = createErrorStreamRunner(apiError);
       mockStream.mockReturnValue(runner);
 
@@ -535,7 +540,12 @@ describe('message() function', () => {
 
     it('throws RuntimeError for generic API error during stream iteration', async () => {
       const { APIError } = await import('openai');
-      const apiError = new APIError(500, {}, 'Internal server error', {});
+      const apiError = new APIError(
+        500,
+        {},
+        'Internal server error',
+        new Headers()
+      );
       const runner = createErrorStreamRunner(apiError);
       mockStream.mockReturnValue(runner);
 
@@ -557,7 +567,12 @@ describe('message() function', () => {
     // EC-3/AC-16: Provider disconnect mid-stream throws during iteration; resolve returns partial data
     it('throws RuntimeError during iteration on mid-stream disconnect [EC-3]', async () => {
       const { APIError } = await import('openai');
-      const apiError = new APIError(503, {}, 'Service unavailable', {});
+      const apiError = new APIError(
+        503,
+        {},
+        'Service unavailable',
+        new Headers()
+      );
       const runner = createPartialDisconnectRunner('Partial content', apiError);
       mockStream.mockReturnValue(runner);
 
@@ -578,7 +593,12 @@ describe('message() function', () => {
 
     it('resolves with partial data after mid-stream disconnect [AC-16]', async () => {
       const { APIError } = await import('openai');
-      const apiError = new APIError(503, {}, 'Service unavailable', {});
+      const apiError = new APIError(
+        503,
+        {},
+        'Service unavailable',
+        new Headers()
+      );
       const runner = createPartialDisconnectRunner(
         'Partial response text',
         apiError
@@ -613,7 +633,12 @@ describe('message() function', () => {
     // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
     it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
       const { APIError } = await import('openai');
-      const apiError = new APIError(500, {}, 'Internal server error', {});
+      const apiError = new APIError(
+        500,
+        {},
+        'Internal server error',
+        new Headers()
+      );
       const runner = createErrorStreamRunner(apiError);
       mockStream.mockReturnValue(runner);
 
@@ -754,7 +779,7 @@ describe('embed() function', () => {
     it('maps API authentication error (401)', async () => {
       const MockAPIError = (await import('openai')).APIError;
       mockEmbeddingsCreate.mockRejectedValue(
-        new MockAPIError(401, {}, 'Invalid API key', {})
+        new MockAPIError(401, {}, 'Invalid API key', new Headers())
       );
 
       const config: OpenAIExtensionConfig = {
@@ -775,7 +800,7 @@ describe('embed() function', () => {
     it('maps API rate limit error (429)', async () => {
       const MockAPIError = (await import('openai')).APIError;
       mockEmbeddingsCreate.mockRejectedValue(
-        new MockAPIError(429, {}, 'Rate limit exceeded', {})
+        new MockAPIError(429, {}, 'Rate limit exceeded', new Headers())
       );
 
       const config: OpenAIExtensionConfig = {
@@ -831,10 +856,10 @@ describe('embed_batch() function', () => {
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(2);
-      expect(result[0].__rill_vector).toBe(true);
-      expect(result[1].__rill_vector).toBe(true);
-      expect(result[0].model).toBe('text-embedding-3-small');
-      expect(result[1].model).toBe('text-embedding-3-small');
+      expect(result[0]!.__rill_vector).toBe(true);
+      expect(result[1]!.__rill_vector).toBe(true);
+      expect(result[0]!.model).toBe('text-embedding-3-small');
+      expect(result[1]!.model).toBe('text-embedding-3-small');
     });
 
     // AC-24: embed_batch([]) returns empty list
@@ -943,23 +968,29 @@ function makeTool(
   fn: (args: Record<string, RillValue>) => RillValue | Promise<RillValue>,
   options?: {
     description?: string;
-    params?: Array<{ name: string; type: string; description?: string }>;
+    params?: Array<{
+      name: string;
+      type: 'string' | 'number' | 'bool';
+      description?: string;
+    }>;
   }
-): RillValue {
-  const tool = callable(fn);
-  if (options?.description !== undefined) {
-    (tool as Record<string, unknown>)['description'] = options.description;
-  }
-  if (options?.params !== undefined) {
-    (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
-      name: p.name,
-      type: { kind: p.type },
-      defaultValue: undefined,
-      annotations:
-        p.description !== undefined ? { description: p.description } : {},
-    }));
-  }
-  return tool;
+): ApplicationCallable {
+  const base = callable(fn);
+  return {
+    ...base,
+    annotations:
+      options?.description !== undefined
+        ? { description: options.description }
+        : base.annotations,
+    params:
+      options?.params?.map((p) => ({
+        name: p.name,
+        type: { kind: p.type },
+        defaultValue: undefined,
+        annotations:
+          p.description !== undefined ? { description: p.description } : {},
+      })) ?? base.params,
+  };
 }
 
 /**
@@ -969,7 +1000,7 @@ function makeTool(
  */
 function createMockToolLoopRunner(
   textDeltas: string[],
-  finalCompletion: ReturnType<typeof createMockFinalCompletion>
+  finalCompletion: ChatCompletion
 ) {
   const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
 
@@ -1073,8 +1104,10 @@ describe('tool_loop() function', () => {
         choices: [
           {
             index: 0,
+            logprobs: null,
             message: {
               role: 'assistant' as const,
+              refusal: null,
               content: null,
               tool_calls: [
                 {
@@ -1207,7 +1240,12 @@ describe('tool_loop() function', () => {
         choices: [
           {
             index: 0,
-            message: { role: 'assistant' as const, content: 'Final response' },
+            logprobs: null,
+            message: {
+              role: 'assistant' as const,
+              content: 'Final response',
+              refusal: null,
+            },
             finish_reason: 'stop' as const,
           },
         ],
@@ -1262,8 +1300,10 @@ describe('tool_loop() function', () => {
         choices: [
           {
             index: 0,
+            logprobs: null,
             message: {
               role: 'assistant' as const,
+              refusal: null,
               content: null,
               tool_calls: [
                 {
@@ -1312,7 +1352,12 @@ describe('tool_loop() function', () => {
         choices: [
           {
             index: 0,
-            message: { role: 'assistant' as const, content: 'No tools needed' },
+            logprobs: null,
+            message: {
+              role: 'assistant' as const,
+              content: 'No tools needed',
+              refusal: null,
+            },
             finish_reason: 'stop' as const,
           },
         ],
@@ -1360,8 +1405,10 @@ describe('tool_loop() function', () => {
         choices: [
           {
             index: 0,
+            logprobs: null,
             message: {
               role: 'assistant' as const,
+              refusal: null,
               content: null,
               tool_calls: [
                 {
@@ -1389,8 +1436,10 @@ describe('tool_loop() function', () => {
         choices: [
           {
             index: 0,
+            logprobs: null,
             message: {
               role: 'assistant' as const,
+              refusal: null,
               content: 'The weather is sunny',
             },
             finish_reason: 'stop' as const,
@@ -1454,11 +1503,11 @@ describe('tool_loop() function', () => {
         choices: [
           {
             index: 0,
+            logprobs: null,
             message: {
               role: 'assistant' as const,
-              content: null,
-              parsed: { extracted: true },
               refusal: null,
+              content: null,
               tool_calls: [
                 {
                   id: 'call_1',
@@ -1551,10 +1600,7 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test', tools: undefined },
-        ctx
-      );
+      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test' }, ctx);
 
       await expectRejectedHalt(resolveStream(stream), {
         message: 'tools parameter is required',
@@ -1575,8 +1621,10 @@ describe('tool_loop() function', () => {
           choices: [
             {
               index: 0,
+              logprobs: null,
               message: {
                 role: 'assistant' as const,
+                refusal: null,
                 content: null,
                 tool_calls: [
                   {
@@ -1680,8 +1728,10 @@ describe('tool_loop() function', () => {
         choices: [
           {
             index: 0,
+            logprobs: null,
             message: {
               role: 'assistant' as const,
+              refusal: null,
               content: null,
               tool_calls: [
                 {
@@ -1762,8 +1812,10 @@ describe('tool_loop() function', () => {
           choices: [
             {
               index: 0,
+              logprobs: null,
               message: {
                 role: 'assistant' as const,
+                refusal: null,
                 content: null,
                 tool_calls: [
                   {
@@ -1851,6 +1903,7 @@ describe('generate() function', () => {
       choices: [
         {
           index: 0,
+          logprobs: null,
           message: { role: 'assistant' as const, content: jsonContent },
           finish_reason: 'stop' as const,
         },
@@ -1967,7 +2020,8 @@ describe('generate() function', () => {
         ctx
       );
 
-      const callArgs = mockCreate.mock.calls[0][0] as {
+      expect(mockCreate).toHaveBeenCalled();
+      const callArgs = mockCreate.mock.calls[0]![0] as {
         messages: Array<{ role: string; content: string }>;
       };
       const systemMsg = callArgs.messages.find((m) => m.role === 'system');
@@ -1993,7 +2047,8 @@ describe('generate() function', () => {
         ctx
       );
 
-      const callArgs = mockCreate.mock.calls[0][0] as {
+      expect(mockCreate).toHaveBeenCalled();
+      const callArgs = mockCreate.mock.calls[0]![0] as {
         max_completion_tokens: number;
       };
       expect(callArgs.max_completion_tokens).toBe(128);
@@ -2024,7 +2079,8 @@ describe('generate() function', () => {
         ctx
       );
 
-      const callArgs = mockCreate.mock.calls[0][0] as {
+      expect(mockCreate).toHaveBeenCalled();
+      const callArgs = mockCreate.mock.calls[0]![0] as {
         messages: Array<{ role: string; content: string }>;
       };
       const nonSystemMessages = callArgs.messages.filter(
@@ -2067,7 +2123,8 @@ describe('generate() function', () => {
         ctx
       );
 
-      const callArgs = mockCreate.mock.calls[0][0] as {
+      expect(mockCreate).toHaveBeenCalled();
+      const callArgs = mockCreate.mock.calls[0]![0] as {
         messages: Array<{ role: string; content: string }>;
       };
       const systemMsg = callArgs.messages.find((m) => m.role === 'system');
@@ -2094,7 +2151,8 @@ describe('generate() function', () => {
         ctx
       );
 
-      const callArgs = mockCreate.mock.calls[0][0] as {
+      expect(mockCreate).toHaveBeenCalled();
+      const callArgs = mockCreate.mock.calls[0]![0] as {
         response_format: {
           type: string;
           json_schema: { name: string; strict: boolean; schema: unknown };
@@ -2217,7 +2275,7 @@ describe('generate() function', () => {
       mockCreate.mockRejectedValue(
         new (class extends Error {
           status = 429;
-          name = 'APIError';
+          override name = 'APIError';
         })('Rate limit exceeded')
       );
 

@@ -6,7 +6,15 @@
  *         EC-2, EC-3, EC-4, EC-5, EC-6, EC-7, EC-11, EC-12, EC-17, EC-18, EC-19.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   createRuntimeContext,
   getStatus,
@@ -25,7 +33,7 @@ function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
 }
 
 async function expectInvalidWithMessage(
-  promise: Promise<unknown>,
+  promise: RillValue | Promise<RillValue>,
   needle: string
 ): Promise<RillValue> {
   const result = (await promise) as RillValue;
@@ -46,31 +54,28 @@ function getCallable(
 }
 
 /** Build a fetch mock that returns a JSON response with given status. */
-function mockFetchJson(
-  status: number,
-  body: unknown
-): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
+function mockFetchJson(status: number, body: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: vi.fn().mockResolvedValue(body),
-  });
+  } as unknown as Response);
 }
 
 /** Build a fetch mock that rejects with the given error. */
-function mockFetchReject(error: unknown): ReturnType<typeof vi.fn> {
-  return vi.fn().mockRejectedValue(error);
+function mockFetchReject(error: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockRejectedValue(error);
 }
 
 /** Build a fetch mock whose json() rejects with a SyntaxError (non-JSON response). */
-function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
+function mockFetchNonJson(status = 200): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: vi
       .fn()
       .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
-  });
+  } as unknown as Response);
 }
 
 // ============================================================

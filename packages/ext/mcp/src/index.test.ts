@@ -7,14 +7,6 @@ import type {
 } from './index.js';
 
 describe('Package Structure', () => {
-  describe('build configuration', () => {
-    it('exports a valid ES module', () => {
-      // This test verifies the package can be imported
-      // Actual API exports will be tested in subsequent tasks
-      expect(true).toBe(true);
-    });
-  });
-
   describe('type exports', () => {
     it('exports McpExtensionConfig type', () => {
       // Type-only import test - verifies type is exported

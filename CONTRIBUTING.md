@@ -138,6 +138,16 @@ SDK clients are mocked at module level with `vi.mock()`. Tests never make real
 API calls, and a test that needs a live service is an integration test that
 skips gracefully when the service is unavailable.
 
+Test files are type-checked. Each package's `tsconfig.json` includes
+`src/**/*` and `tests/**/*` with `noEmit`, so `pnpm run check:types` and
+type-aware lint fail on a type error in a test file. Fix the mismatch; do not
+exclude the file or suppress the error with `@ts-ignore`.
+
+Integration suites for external services (Redis for `kv-redis`, MinIO for
+`fs-s3`) skip gracefully when the service is unreachable. Set
+`RILL_EXT_REQUIRE_SERVICES=1` to make an unreachable service throw instead of
+skip; CI sets it so these suites cannot silently stop running.
+
 ### Write tests that could fail
 
 A test that passes before your implementation exists is measuring something

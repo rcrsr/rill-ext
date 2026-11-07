@@ -380,9 +380,12 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
     // Mock extractResult to return results based on parsed message content
     vi.mocked(extractResult).mockImplementation((messages) => {
       // Extract call index from message content
-      const msg = messages.find((m) => m.type === 'content');
+      // The fixture emits a non-protocol 'content' message carrying the text
+      const msg = (
+        messages as ReadonlyArray<{ type: string; text?: string }>
+      ).find((m) => m.type === 'content');
       const match = msg?.text?.match(/Response from call (\d+)/);
-      const callNum = match ? parseInt(match[1], 10) : 0;
+      const callNum = match ? parseInt(match[1] ?? '0', 10) : 0;
 
       return {
         result: `Response from call ${callNum}`,

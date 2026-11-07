@@ -65,7 +65,7 @@ function makeTool(
   description = 'A test tool'
 ): RillValue {
   const tool = callable(fn);
-  (tool as Record<string, unknown>)['description'] = description;
+  Object.assign(tool, { description });
   return tool;
 }
 

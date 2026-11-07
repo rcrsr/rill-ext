@@ -151,7 +151,7 @@ describe('SqliteKvConfig', () => {
       };
 
       expect(config.mounts).toBeDefined();
-      expect(config.mounts.user).toBeDefined();
+      expect(config.mounts['user']).toBeDefined();
     });
 
     it('accepts multiple mounts', () => {
@@ -171,8 +171,8 @@ describe('SqliteKvConfig', () => {
       };
 
       expect(Object.keys(config.mounts)).toHaveLength(2);
-      expect(config.mounts.user).toBeDefined();
-      expect(config.mounts.cache).toBeDefined();
+      expect(config.mounts['user']).toBeDefined();
+      expect(config.mounts['cache']).toBeDefined();
     });
 
     it('accepts optional maxStoreSize', () => {

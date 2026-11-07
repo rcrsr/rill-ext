@@ -23,13 +23,17 @@
  * - TTL support for auto-expiring keys
  */
 
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { Redis } from 'ioredis';
 import { isInvalid, getStatus, type RillValue } from '@rcrsr/rill';
 import { createRedisKvExtension } from '../src/factory.js';
 import type { RedisKvExtensionConfig } from '../src/factory.js';
 import { createFileKvExtension as createKvExtension } from '@rcrsr/rill-ext-kv-file';
-import { makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
+import {
+  assertServiceAvailable,
+  makeFactoryCtx,
+  makeRuntimeCtx,
+} from './_setup.js';
 
 /**
  * Extract a named ApplicationCallable from an ExtensionFactoryResult value dict.
@@ -87,18 +91,23 @@ try {
   redisAvailable = false;
 }
 
+assertServiceAvailable('Redis', redisAvailable);
+
 describe.skipIf(!redisAvailable)('Integration Tests', () => {
   // Track created extensions for cleanup
   const extensions: Array<{ dispose?: () => void | Promise<void> }> = [];
 
   beforeEach(async () => {
     // Clean up any test keys from previous runs
-    const cleanup = createRedisKvExtension({
-      url: REDIS_URL,
-      mounts: {
-        test: { mode: 'read-write', prefix: 'test:' },
+    const cleanup = createRedisKvExtension(
+      {
+        url: REDIS_URL,
+        mounts: {
+          test: { mode: 'read-write', prefix: 'test:' },
+        },
       },
-    });
+      makeFactoryCtx()
+    );
     extensions.push(cleanup);
     await getCallable(cleanup, 'clear').fn({ mount: 'test' });
   });
@@ -1004,33 +1013,39 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
   describe('AC-1: Backend swap produces identical output', () => {
     it('produces identical results for same operations on JSON and Redis backends', async () => {
       // JSON file backend configuration
-      const jsonExt = createKvExtension({
-        mounts: {
-          state: {
-            mode: 'read-write',
-            store: '/tmp/rill-test-backend-swap.json',
-            schema: {
-              count: { type: 'number', default: 0 },
-              name: { type: 'string', default: 'Guest' },
+      const jsonExt = createKvExtension(
+        {
+          mounts: {
+            state: {
+              mode: 'read-write',
+              store: '/tmp/rill-test-backend-swap.json',
+              schema: {
+                count: { type: 'number', default: 0 },
+                name: { type: 'string', default: 'Guest' },
+              },
             },
           },
         },
-      });
+        makeFactoryCtx()
+      );
 
       // Redis backend configuration (identical schema)
-      const redisExt = createRedisKvExtension({
-        url: REDIS_URL,
-        mounts: {
-          state: {
-            mode: 'read-write',
-            prefix: 'test:backend-swap:',
-            schema: {
-              count: { type: 'number', default: 0 },
-              name: { type: 'string', default: 'Guest' },
+      const redisExt = createRedisKvExtension(
+        {
+          url: REDIS_URL,
+          mounts: {
+            state: {
+              mode: 'read-write',
+              prefix: 'test:backend-swap:',
+              schema: {
+                count: { type: 'number', default: 0 },
+                name: { type: 'string', default: 'Guest' },
+              },
             },
           },
         },
-      });
+        makeFactoryCtx()
+      );
 
       extensions.push(jsonExt, redisExt);
 
@@ -1087,7 +1102,9 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const redisKeys = await getCallable(redisExt, 'keys').fn({
         mount: 'state',
       });
-      expect(jsonKeys?.sort()).toEqual(redisKeys?.sort());
+      expect((jsonKeys as string[]).sort()).toEqual(
+        (redisKeys as string[]).sort()
+      );
 
       // Test getAll operation
       const jsonAll = await getCallable(jsonExt, 'getAll').fn({
@@ -1103,24 +1120,30 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
     });
 
     it('handles merge operations identically across backends', async () => {
-      const jsonExt = createKvExtension({
-        mounts: {
-          config: {
-            mode: 'read-write',
-            store: '/tmp/rill-test-backend-merge.json',
+      const jsonExt = createKvExtension(
+        {
+          mounts: {
+            config: {
+              mode: 'read-write',
+              store: '/tmp/rill-test-backend-merge.json',
+            },
           },
         },
-      });
+        makeFactoryCtx()
+      );
 
-      const redisExt = createRedisKvExtension({
-        url: REDIS_URL,
-        mounts: {
-          config: {
-            mode: 'read-write',
-            prefix: 'test:backend-merge:',
+      const redisExt = createRedisKvExtension(
+        {
+          url: REDIS_URL,
+          mounts: {
+            config: {
+              mode: 'read-write',
+              prefix: 'test:backend-merge:',
+            },
           },
         },
-      });
+        makeFactoryCtx()
+      );
 
       extensions.push(jsonExt, redisExt);
 
@@ -1216,42 +1239,54 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       const ext = createRedisKvExtension(config, makeFactoryCtx());
       extensions.push(ext);
 
-      // Set initial value
       await getCallable(ext, 'set').fn({
         mount: 'state',
         key: 'counter',
         value: { count: 0 },
       });
 
-      // Create competing client to simulate race condition
       const competingClient = new Redis(REDIS_URL);
+      const originalGet = Reflect.get(Redis.prototype, 'get') as Redis['get'];
+      let competed = false;
+      // One-shot: after the first read (WATCH already issued), a competing
+      // write lands before EXEC, forcing the merge to retry.
+      const getSpy = vi
+        .spyOn(Redis.prototype, 'get')
+        .mockImplementation(async function (
+          this: Redis,
+          ...getArgs: Parameters<Redis['get']>
+        ) {
+          const value = await originalGet.apply(this, getArgs);
+          if (!competed) {
+            competed = true;
+            await competingClient.set(
+              'test:concurrent:counter',
+              JSON.stringify({ count: 99, competitor: true })
+            );
+          }
+          return value;
+        });
 
-      // Start merge operation
-      const mergePromise = getCallable(ext, 'merge').fn({
-        mount: 'state',
-        key: 'counter',
-        partial: { count: 1 },
-      });
+      try {
+        const mergeResult = await getCallable(ext, 'merge').fn({
+          mount: 'state',
+          key: 'counter',
+          partial: { merged: true },
+        });
+        const readsDuringMerge = getSpy.mock.calls.length;
 
-      // Immediately modify the key from competing client (simulates race)
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      await competingClient.set(
-        'test:concurrent:counter',
-        JSON.stringify({ count: 99 })
-      );
+        expect(mergeResult).toBe(true);
+        expect(readsDuringMerge).toBeGreaterThanOrEqual(2);
+      } finally {
+        getSpy.mockRestore();
+        await competingClient.quit();
+      }
 
-      // Merge should retry and eventually succeed or fail gracefully
-      await mergePromise;
-
-      // Verify a valid result (either retry succeeded or error thrown)
       const result = await getCallable(ext, 'get').fn({
         mount: 'state',
         key: 'counter',
       });
-      expect(result).toHaveProperty('count');
-
-      // Cleanup
-      await competingClient.quit();
+      expect(result).toEqual({ count: 99, competitor: true, merged: true });
     });
   });
 
@@ -1452,7 +1487,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
 
       // keys returns schema keys (from clear initialization)
       const keys = await getCallable(ext, 'keys').fn({ mount: 'declared' });
-      expect(keys.sort()).toEqual(['count', 'name']);
+      expect((keys as string[]).sort()).toEqual(['count', 'name']);
 
       // get returns defaults
       const name = await getCallable(ext, 'get').fn({

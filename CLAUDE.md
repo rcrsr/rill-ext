@@ -301,6 +301,8 @@ Mock SDK clients at module level with `vi.mock()`, build contexts with `createRu
 
 - Group tests in nested `describe` blocks, start each `it` name with a verb, and mark a test `async` only when it awaits.
 - Place new tests where the package's existing tests live (`tests/` or co-located in `src/`); a new package uses `tests/`.
+- Test files are type-checked: every package `tsconfig.json` includes `src/**/*` and `tests/**/*` (`noEmit`), so `pnpm run check:types` and type-aware lint fail on a type error in a test. Never exclude test files or silence a real mismatch with `@ts-ignore`.
+- Integration suites for external services (kv-redis, fs-s3) skip gracefully when the service is unreachable. When `RILL_EXT_REQUIRE_SERVICES` is set (CI sets it to `1`), an unreachable service makes the suite throw instead of skipping.
 
 ## Extension Authoring
 

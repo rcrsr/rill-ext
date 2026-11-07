@@ -2,7 +2,7 @@
  * Tests for validateExtraKeys, validateMaxTurns, and RESERVED_KEYS_COMMON
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   RESERVED_KEYS_COMMON,
   validateExtraKeys,
@@ -215,16 +215,19 @@ describe('validateMaxErrors', () => {
 
 describe('LLMProviderConfig type compatibility', () => {
   it('accepts a config with max_turns, max_errors, and extra fields', () => {
-    // This is a compile-time assertion; if TypeScript rejects it, the test file fails to compile.
-    const config: LLMProviderConfig = {
-      api_key: 'test-key',
-      model: 'gpt-4',
-      max_turns: 10,
-      max_errors: 5,
-      extra: { x: 1 },
-    };
-    expect(config.max_turns).toBe(10);
-    expect(config.max_errors).toBe(5);
-    expect(config.extra).toEqual({ x: 1 });
+    // Compile-time assertion: tsc rejects the file if these fields are removed or retyped.
+    expectTypeOf<{
+      api_key: string;
+      model: string;
+      max_turns: number;
+      max_errors: number;
+      extra: Record<string, number>;
+    }>().toExtend<LLMProviderConfig>();
+    expectTypeOf<LLMProviderConfig['max_turns']>().toEqualTypeOf<
+      number | undefined
+    >();
+    expectTypeOf<LLMProviderConfig['max_errors']>().toEqualTypeOf<
+      number | undefined
+    >();
   });
 });

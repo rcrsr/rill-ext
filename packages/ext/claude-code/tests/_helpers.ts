@@ -28,9 +28,9 @@ export function makeRuntimeCtx(): RuntimeContext {
  * Shape of a single host function on the extension value, as seen from tests.
  */
 interface HostFn {
-  fn: (args: Record<string, unknown>, ctx: RuntimeContext | null) => unknown;
-  params: unknown;
-  annotations: unknown;
+  fn: (args: Record<string, RillValue>, ctx: RuntimeContext | null) => unknown;
+  params: Array<{ name: string; type: unknown }>;
+  annotations?: Record<string, unknown> | undefined;
   returnType: unknown;
 }
 

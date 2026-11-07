@@ -153,7 +153,7 @@ async function collectChunks(stream: unknown): Promise<string[]> {
  */
 async function createMockAPIError(status: number, message: string) {
   const { APIError } = await import('@anthropic-ai/sdk');
-  return new APIError(status, {}, message, {});
+  return new APIError(status, {}, message, new Headers());
 }
 
 // Mock the Anthropic SDK at module level
@@ -208,7 +208,7 @@ describe('message() function', () => {
 
   // IR-1/AC-1: message() returns RillStream
   describe('streaming', () => {
-    it('returns RillStream (isRillStream is true)', () => {
+    it('returns RillStream (isRillStream is true)', async () => {
       mockStream.mockReturnValue(createMockStream('Hello from Claude!'));
 
       const config: AnthropicExtensionConfig = {
@@ -219,7 +219,10 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      const result = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
+      const result = await getCallable(ext, 'message').fn(
+        { prompt: 'Hello' },
+        ctx
+      );
 
       expect(isRillStream(result)).toBe(true);
     });

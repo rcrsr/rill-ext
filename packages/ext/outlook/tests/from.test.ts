@@ -3,7 +3,15 @@
  * Covers: AC-3, AC-19, EC-3.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   createRuntimeContext,
   type ApplicationCallable,
@@ -25,15 +33,12 @@ function getCallable(
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
-function mockFetchJson(
-  status: number,
-  body: unknown
-): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
+function mockFetchJson(status: number, body: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: vi.fn().mockResolvedValue(body),
-  });
+  } as unknown as Response);
 }
 
 // ============================================================

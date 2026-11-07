@@ -4,7 +4,15 @@
  * Covers: AC-1, AC-10, AC-15, AC-29, AC-30, AC-34, AC-35, EC-13, EC-14, EC-15, EC-16.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   RuntimeError,
   type ApplicationCallable,
@@ -30,20 +38,24 @@ function getCallable(
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
+/** Partial Response stand-in: tests supply only the members the extension reads. */
+function asResponse(partial: object): Response {
+  return partial as unknown as Response;
+}
+
 /** Build a fetch mock that returns a JSON response with given status. */
-function mockFetchJson(
-  status: number,
-  body: unknown
-): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: vi.fn().mockResolvedValue(body),
-  });
+function mockFetchJson(status: number, body: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue(
+    asResponse({
+      ok: status >= 200 && status < 300,
+      status,
+      json: vi.fn().mockResolvedValue(body),
+    })
+  );
 }
 
 /** Build a probe-success mock that returns { formats: ['html', 'json'] }. */
-function mockProbeSuccess(): ReturnType<typeof vi.fn> {
+function mockProbeSuccess(): Mock<typeof fetch> {
   return mockFetchJson(200, { formats: ['html', 'json'] });
 }
 
@@ -171,13 +183,15 @@ describe('createSearxngExtension', () => {
     });
 
     it('throws RILL-R001 when probe returns non-JSON [EC-15, AC-29]', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: vi
-          .fn()
-          .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
-      });
+      globalThis.fetch = vi.fn<typeof fetch>().mockResolvedValue(
+        asResponse({
+          ok: true,
+          status: 200,
+          json: vi
+            .fn()
+            .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
+        })
+      );
 
       let caught: unknown;
       try {

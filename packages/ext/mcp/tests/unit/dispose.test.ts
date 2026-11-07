@@ -13,8 +13,10 @@ import { createMcpExtension } from '../../src/factory.js';
 import {
   makeFactoryCtx,
   makeRuntimeCtx,
+  getCallable,
   expectRejectsInvalid,
 } from '../_helpers.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { RuntimeContext } from '@rcrsr/rill';
 import type { McpExtensionConfig } from '../../src/types.js';
 
@@ -35,8 +37,8 @@ describe('dispose() functionality', () => {
   describe('BC-5: dispose() idempotent', () => {
     it('allows multiple dispose calls without errors', async () => {
       // Mock successful connection
-      const mockClose = vi.fn().mockResolvedValue(undefined);
-      const mockConnect = vi.fn().mockResolvedValue(undefined);
+      const mockClose = vi.fn().mockResolvedValue();
+      const mockConnect = vi.fn().mockResolvedValue();
 
       vi.spyOn(Client.prototype, 'connect').mockImplementation(mockConnect);
       vi.spyOn(Client.prototype, 'close').mockImplementation(mockClose);
@@ -84,7 +86,7 @@ describe('dispose() functionality', () => {
 
     it('handles cleanup errors gracefully', async () => {
       // Mock connection that fails during cleanup
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'close').mockRejectedValue(
         new Error('cleanup failed')
       );
@@ -117,15 +119,15 @@ describe('dispose() functionality', () => {
 
     it('disposes during active tool call - pending call rejects (BC-5)', async () => {
       // Mock connection with one tool
-      let resolveToolCall: (value: unknown) => void;
-      const toolCallPromise = new Promise((resolve) => {
+      let resolveToolCall: (value: CallToolResult) => void;
+      const toolCallPromise = new Promise<CallToolResult>((resolve) => {
         resolveToolCall = resolve;
       });
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'close').mockImplementation(async () => {
         // Simulate connection close during active call
-        return undefined;
+        return;
       });
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [
@@ -161,10 +163,10 @@ describe('dispose() functionality', () => {
 
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // Start a long-running tool call
-      const toolCallResultPromise = tools.long_running_tool!.fn(
+      const toolCallResultPromise = getCallable(tools, 'long_running_tool').fn(
         {},
         makeRuntimeCtx()
       );
@@ -187,8 +189,8 @@ describe('dispose() functionality', () => {
   describe('IR-1 & IR-2: ExtensionResult with tool functions', () => {
     it('returns ExtensionResult with callable tool functions', async () => {
       // Mock connection with one tool
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
-      vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+      vi.spyOn(Client.prototype, 'close').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [
           {
@@ -227,20 +229,21 @@ describe('dispose() functionality', () => {
 
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // IR-1: Result has dispose function
       expect(result.dispose).toBeDefined();
       expect(typeof result.dispose).toBe('function');
 
       // IR-1: Result has tool function in tools dict
-      expect(tools.test_tool).toBeDefined();
-      expect(typeof tools.test_tool).toBe('object');
-      expect(tools.test_tool.fn).toBeDefined();
-      expect(typeof tools.test_tool.fn).toBe('function');
+      expect(tools['test_tool']).toBeDefined();
+      expect(typeof tools['test_tool']).toBe('object');
+      const testTool = getCallable(tools, 'test_tool');
+      expect(testTool.fn).toBeDefined();
+      expect(typeof testTool.fn).toBe('function');
 
       // IR-2: Tool function is callable
-      const toolResult = await tools.test_tool.fn({ param1: 'value1' }, {
+      const toolResult = await testTool.fn({ param1: 'value1' }, {
         _lifecycle: { connectEmitted: false },
       } as unknown as RuntimeContext);
       expect(toolResult).toBe('success');
@@ -251,8 +254,8 @@ describe('dispose() functionality', () => {
 
     it('generates functions for multiple tools', async () => {
       // Mock connection with multiple tools
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
-      vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+      vi.spyOn(Client.prototype, 'close').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [
           {
@@ -292,12 +295,12 @@ describe('dispose() functionality', () => {
 
       const result = await createMcpExtension(config, makeFactoryCtx());
       const fns = result.value as Record<string, unknown>;
-      const tools = fns.tools as Record<string, unknown>;
+      const tools = fns['tools'] as Record<string, unknown>;
 
       // Verify all three tools are present in tools dict
-      expect(tools.tool_one).toBeDefined();
-      expect(tools.tool_two).toBeDefined();
-      expect(tools.tool_three).toBeDefined();
+      expect(tools['tool_one']).toBeDefined();
+      expect(tools['tool_two']).toBeDefined();
+      expect(tools['tool_three']).toBeDefined();
 
       // Verify dispose exists
       expect(result.dispose).toBeDefined();
@@ -308,8 +311,8 @@ describe('dispose() functionality', () => {
 
     it('returns empty object when no tools available', async () => {
       // Mock connection with no tools
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
-      vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+      vi.spyOn(Client.prototype, 'close').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [],
       });

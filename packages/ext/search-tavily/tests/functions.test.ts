@@ -6,7 +6,15 @@
  * function never throws.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   createRuntimeContext,
   getStatus,
@@ -32,38 +40,43 @@ function getCallable(
 }
 
 async function expectInvalidWithMessage(
-  promise: Promise<unknown>,
+  promise: Promise<RillValue> | RillValue,
   needle: string
 ): Promise<RillValue> {
-  const result = (await promise) as RillValue;
+  const result = await promise;
   expect(isInvalid(result)).toBe(true);
   expect(getStatus(result).message).toContain(needle);
   return result;
 }
 
-function mockFetchJson(
-  status: number,
-  body: unknown
-): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: vi.fn().mockResolvedValue(body),
-  });
+function asResponse(partial: object): Response {
+  return partial as unknown as Response;
 }
 
-function mockFetchReject(error: unknown): ReturnType<typeof vi.fn> {
-  return vi.fn().mockRejectedValue(error);
+function mockFetchJson(status: number, body: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue(
+    asResponse({
+      ok: status >= 200 && status < 300,
+      status,
+      json: vi.fn().mockResolvedValue(body),
+    })
+  );
 }
 
-function mockFetchNonJson(status = 200): ReturnType<typeof vi.fn> {
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: vi
-      .fn()
-      .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
-  });
+function mockFetchReject(error: unknown): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockRejectedValue(error);
+}
+
+function mockFetchNonJson(status = 200): Mock<typeof fetch> {
+  return vi.fn<typeof fetch>().mockResolvedValue(
+    asResponse({
+      ok: status >= 200 && status < 300,
+      status,
+      json: vi
+        .fn()
+        .mockRejectedValue(new SyntaxError('Unexpected token < in JSON')),
+    })
+  );
 }
 
 const VALID_CONFIG = { apiKey: 'tvly-test-key' };
@@ -263,11 +276,13 @@ describe('Tavily extension host functions', () => {
     });
 
     it('maps non-JSON response to unexpected format [EC-6, AC-31]', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
-      });
+      globalThis.fetch = vi.fn<typeof fetch>().mockResolvedValue(
+        asResponse({
+          ok: true,
+          status: 200,
+          json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected token')),
+        })
+      );
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 

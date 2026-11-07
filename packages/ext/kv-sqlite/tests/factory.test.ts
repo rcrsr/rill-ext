@@ -3,7 +3,7 @@
  * Validates configuration, database initialization, WAL mode, and table creation.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -17,6 +17,7 @@ const TEST_DATA_DIR = join(process.cwd(), 'test-data');
 
 // Clean up test databases after each test
 afterEach(() => {
+  vi.restoreAllMocks();
   if (existsSync(TEST_DATA_DIR)) {
     rmSync(TEST_DATA_DIR, { recursive: true, force: true });
   }
@@ -405,7 +406,7 @@ describe('createSqliteKvExtension', () => {
   });
 
   describe('dispose lifecycle', () => {
-    it('closes database connections', () => {
+    it('closes the database connection once on dispose', () => {
       const dbPath = join(TEST_DATA_DIR, 'dispose.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -416,19 +417,20 @@ describe('createSqliteKvExtension', () => {
           },
         },
       };
+      const closeSpy = vi.spyOn(Database.prototype, 'close');
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-
-      // Dispose should close database
+      expect(closeSpy).not.toHaveBeenCalled();
       ext.dispose?.();
 
+      expect(closeSpy).toHaveBeenCalledOnce();
       // Should be able to open database again (not locked)
       const db = new Database(dbPath);
       expect(db.open).toBe(true);
       db.close();
     });
 
-    it('cleans up all mounts on dispose', () => {
+    it('closes each mount database exactly once on dispose', () => {
       const db1Path = join(TEST_DATA_DIR, 'dispose1.db');
       const db2Path = join(TEST_DATA_DIR, 'dispose2.db');
       const config: SqliteKvConfig = {
@@ -445,20 +447,16 @@ describe('createSqliteKvExtension', () => {
           },
         },
       };
+      const closeSpy = vi.spyOn(Database.prototype, 'close');
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
       ext.dispose?.();
 
-      // Both databases should be closable (not locked)
-      const db1 = new Database(db1Path);
-      const db2 = new Database(db2Path);
-      expect(db1.open).toBe(true);
-      expect(db2.open).toBe(true);
-      db1.close();
-      db2.close();
+      expect(closeSpy).toHaveBeenCalledTimes(2);
+      expect(new Set(closeSpy.mock.contexts).size).toBe(2);
     });
 
-    it('handles dispose without error if already disposed', () => {
+    it('closes databases only once when disposed twice', () => {
       const dbPath = join(TEST_DATA_DIR, 'double-dispose.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -469,24 +467,24 @@ describe('createSqliteKvExtension', () => {
           },
         },
       };
+      const closeSpy = vi.spyOn(Database.prototype, 'close');
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
+      ext.dispose?.();
+      ext.dispose?.();
 
-      expect(() => {
-        ext.dispose?.();
-        ext.dispose?.();
-      }).not.toThrow();
+      expect(closeSpy).toHaveBeenCalledOnce();
     });
   });
 
   describe('error handling', () => {
-    it('cleans up databases on initialization error', () => {
+    it('closes opened databases and throws when a later mount fails', () => {
       const db1Path = join(TEST_DATA_DIR, 'cleanup1.db');
       const db2Path = join(TEST_DATA_DIR, 'cleanup2.db');
 
-      // Create a file to block second database creation
+      // Make db2Path a directory so opening it as a database fails
       mkdirSync(TEST_DATA_DIR, { recursive: true });
-      mkdirSync(db2Path); // Make db2Path a directory instead of file
+      mkdirSync(db2Path);
 
       const config: SqliteKvConfig = {
         mounts: {
@@ -502,14 +500,14 @@ describe('createSqliteKvExtension', () => {
           },
         },
       };
+      const closeSpy = vi.spyOn(Database.prototype, 'close');
 
-      expect(() => createSqliteKvExtension(config, makeFactoryCtx())).toThrow();
+      expect(() => createSqliteKvExtension(config, makeFactoryCtx())).toThrow(
+        /Failed to initialize SQLite database for mount "mount2"/
+      );
 
-      // First database should be closed and accessible
-      if (existsSync(db1Path)) {
-        const db = new Database(db1Path);
-        db.close();
-      }
+      // Only the first mount's database was opened; it must be closed once
+      expect(closeSpy).toHaveBeenCalledOnce();
     });
   });
 });

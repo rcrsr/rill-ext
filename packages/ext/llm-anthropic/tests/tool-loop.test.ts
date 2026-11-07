@@ -153,23 +153,29 @@ function makeTool(
   fn: (args: Record<string, RillValue>) => RillValue | Promise<RillValue>,
   options?: {
     description?: string;
-    params?: Array<{ name: string; type: string; description?: string }>;
+    params?: Array<{
+      name: string;
+      type: 'string' | 'number' | 'bool' | 'list' | 'dict';
+      description?: string;
+    }>;
   }
-): RillValue {
-  const tool = callable(fn);
-  if (options?.description !== undefined) {
-    (tool as Record<string, unknown>)['description'] = options.description;
-  }
-  if (options?.params !== undefined) {
-    (tool as Record<string, unknown>)['params'] = options.params.map((p) => ({
-      name: p.name,
-      type: { kind: p.type },
-      defaultValue: undefined,
-      annotations:
-        p.description !== undefined ? { description: p.description } : {},
-    }));
-  }
-  return tool;
+): ApplicationCallable {
+  const base = callable(fn);
+  return {
+    ...base,
+    annotations:
+      options?.description !== undefined
+        ? { description: options.description }
+        : base.annotations,
+    params:
+      options?.params?.map((p) => ({
+        name: p.name,
+        type: { kind: p.type },
+        defaultValue: undefined,
+        annotations:
+          p.description !== undefined ? { description: p.description } : {},
+      })) ?? base.params,
+  };
 }
 
 // ============================================================
@@ -219,7 +225,7 @@ describe('tool_loop() function', () => {
 
   describe('streaming', () => {
     // AC-7: tool_loop() returns RillStream
-    it('returns RillStream (isRillStream is true)', () => {
+    it('returns RillStream (isRillStream is true)', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -236,7 +242,7 @@ describe('tool_loop() function', () => {
         tool: makeTool(() => 'result', { description: 'Tool' }),
       };
 
-      const result = getCallable(ext, 'tool_loop').fn(
+      const result = await getCallable(ext, 'tool_loop').fn(
         { prompt: 'Test', tools, max_turns: 0 },
         ctx
       );
@@ -404,10 +410,11 @@ describe('tool_loop() function', () => {
           )
         );
 
+      let receivedArgs: Record<string, RillValue> | undefined;
       const tools = {
         get_weather: makeTool(
           (args) => {
-            expect(args['location']).toBe('SF');
+            receivedArgs = args;
             return 'Sunny, 72°F';
           },
           {
@@ -440,6 +447,7 @@ describe('tool_loop() function', () => {
       expect(result['stop_reason']).toBe('end_turn');
       expect(result['usage']).toEqual({ input: 15, output: 35 });
       expect(mockStream).toHaveBeenCalledTimes(2);
+      expect(receivedArgs).toEqual({ location: 'SF' });
     });
 
     // AC-26: 0 tool calls returns immediately
@@ -519,8 +527,8 @@ describe('tool_loop() function', () => {
     });
   });
 
-  describe('parallel tool execution', () => {
-    it('executes multiple tool calls concurrently', async () => {
+  describe('multiple tool execution', () => {
+    it('executes multiple tool calls sequentially in response order', async () => {
       const config: AnthropicExtensionConfig = {
         api_key: 'test-key',
         model: 'claude-sonnet-4-5-20250929',
@@ -544,11 +552,13 @@ describe('tool_loop() function', () => {
         );
 
       const executionOrder: string[] = [];
-      const makeConcurrentTool = (name: string) =>
+      const makeOrderedTool = (name: string) =>
         makeTool(
           async () => {
             executionOrder.push(`${name}-start`);
-            await new Promise((resolve) => setTimeout(resolve, 10));
+            // Yield to the event loop so a concurrent runner would interleave
+            await new Promise<void>((resolve) => queueMicrotask(resolve));
+            await new Promise<void>((resolve) => queueMicrotask(resolve));
             executionOrder.push(`${name}-end`);
             return `${name} result`;
           },
@@ -556,9 +566,9 @@ describe('tool_loop() function', () => {
         );
 
       const tools = {
-        tool_a: makeConcurrentTool('A'),
-        tool_b: makeConcurrentTool('B'),
-        tool_c: makeConcurrentTool('C'),
+        tool_a: makeOrderedTool('A'),
+        tool_b: makeOrderedTool('B'),
+        tool_c: makeOrderedTool('C'),
       };
 
       const stream = getCallable(ext, 'tool_loop').fn(
@@ -567,11 +577,15 @@ describe('tool_loop() function', () => {
       );
       await resolveStream(stream);
 
-      // All tools should start before any finish (parallel execution)
-      expect(executionOrder.filter((e) => e.endsWith('-start')).length).toBe(3);
-      expect(executionOrder.indexOf('A-start')).toBeLessThan(
-        executionOrder.indexOf('B-end')
-      );
+      // Each tool finishes before the next starts, in response order
+      expect(executionOrder).toEqual([
+        'A-start',
+        'A-end',
+        'B-start',
+        'B-end',
+        'C-start',
+        'C-end',
+      ]);
     });
   });
 
@@ -826,7 +840,6 @@ describe('tool_loop() function', () => {
       const stream = getCallable(ext, 'tool_loop').fn(
         {
           prompt: 'Test',
-          tools: undefined as unknown as Record<string, unknown>,
           max_turns: 0,
         },
         ctx
