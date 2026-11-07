@@ -2,8 +2,11 @@
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-06
+
 ### Changed
 
+- **rill 0.23 migration:** `@rcrsr/rill` peer and dev ranges move from `~0.21.0` to `~0.23.0`. Extensions at `0.23.x` require rill `0.23.x`; consumers on rill `0.21.x` must stay on extensions `0.21.x`. ([#145](https://github.com/rcrsr/rill-ext/pull/145))
 - **any-cast suppression reason:** Suppression comments now document why `as any` casts are needed. No runtime change. ([#130](https://github.com/rcrsr/rill-ext/pull/130))
 
 ## [0.21.0] - 2026-09-09
