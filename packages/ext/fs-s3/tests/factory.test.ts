@@ -3,7 +3,8 @@
  * Validates configuration, S3 client initialization, and function exports.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { S3Client } from '@aws-sdk/client-s3';
 import {
   getStatus,
   isInvalid,
@@ -326,39 +327,58 @@ describe('createS3FsExtension', () => {
       );
     }
 
-    function callRead(
-      ext: ReturnType<typeof createS3FsExtension>
-    ): Promise<unknown> {
-      const v = ext.value as unknown as Record<
-        string,
-        {
-          fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
-        }
-      >;
-      return v['read']!.fn({ path: 'test/file.txt' }, makeRuntimeCtx());
+    type HostFn = {
+      fn: (args: Record<string, unknown>, ctx: unknown) => Promise<unknown>;
+    };
+
+    async function captureThrown(
+      fn: HostFn['fn']
+    ): Promise<{ resolved: boolean; thrown: unknown }> {
+      try {
+        await fn(
+          { path: 'test/file.txt', src: 'test/a', dest: 'test/b' },
+          makeRuntimeCtx()
+        );
+        return { resolved: true, thrown: undefined };
+      } catch (e) {
+        return { resolved: false, thrown: e };
+      }
     }
 
-    it('halts later calls with #DISPOSED and raw.kind extension_disposed', async () => {
+    it('throws #DISPOSED with raw.kind extension_disposed from every function', async () => {
+      const sendSpy = vi
+        .spyOn(S3Client.prototype, 'send')
+        .mockResolvedValue({} as never);
       const ext = createTestExtension();
+      const fns = ext.value as unknown as Record<string, HostFn>;
+      const names = Object.keys(fns);
+      expect(names).toHaveLength(12);
 
       await expect(ext.dispose?.()).resolves.toBeUndefined();
-      const result = await callRead(ext);
-
-      expect(isInvalid(result as RillValue)).toBe(true);
-      const status = getStatus(result as RillValue);
-      expect(status.code.name).toBe('DISPOSED');
-      expect(status.raw['kind']).toBe('extension_disposed');
+      for (const name of names) {
+        const { resolved, thrown } = await captureThrown(fns[name]!.fn);
+        expect(resolved).toBe(false);
+        expect(isInvalid(thrown as RillValue)).toBe(true);
+        const status = getStatus(thrown as RillValue);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.raw['kind']).toBe('extension_disposed');
+        expect(status.provider).toBe('fs-s3');
+      }
+      expect(sendSpy).not.toHaveBeenCalled();
+      sendSpy.mockRestore();
     });
 
-    it('resolves on repeated dispose and keeps halting calls', async () => {
+    it('resolves on repeated dispose and keeps throwing', async () => {
       const ext = createTestExtension();
+      const fns = ext.value as unknown as Record<string, HostFn>;
 
       await expect(ext.dispose?.()).resolves.toBeUndefined();
       await expect(ext.dispose?.()).resolves.toBeUndefined();
       await expect(ext.dispose?.()).resolves.toBeUndefined();
-      const result = await callRead(ext);
+      const { resolved, thrown } = await captureThrown(fns['read']!.fn);
 
-      expect(getStatus(result as RillValue).code.name).toBe('DISPOSED');
+      expect(resolved).toBe(false);
+      expect(getStatus(thrown as RillValue).code.name).toBe('DISPOSED');
     });
   });
 });

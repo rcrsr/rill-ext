@@ -10,8 +10,8 @@ export function createDisposalState(_provider: string): DisposalState {
 }
 
 /**
- * Return an invalid RillValue (atom `#DISPOSED`) when the extension
- * instance is disposed, otherwise null.
+ * Return an invalid RillValue (atom `#DISPOSED`, raw kind `extension_disposed`) when the extension
+ * instance is disposed, otherwise null. The caller throws a non-null result.
  *
  * @param ctx - Runtime context (provides `invalidate`)
  * @param state - DisposalState to check
@@ -27,7 +27,10 @@ export function checkDisposed(
   return ctx.invalidate(error, {
     code: 'DISPOSED',
     provider,
-    raw: { kind: 'disposed', message: `${provider}: operation cancelled` },
+    raw: {
+      kind: 'extension_disposed',
+      message: `${provider}: operation cancelled`,
+    },
   });
 }
 

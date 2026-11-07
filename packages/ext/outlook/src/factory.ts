@@ -168,10 +168,10 @@ export function createOutlookExtension(
         const invalid = ctx.invalidate(new Error(message), {
           code: 'DISPOSED',
           provider: PROVIDER,
-          raw: { kind: 'disposed', message },
+          raw: { kind: 'extension_disposed', message },
         });
         emitError(message);
-        return invalid;
+        throw invalid;
       }
 
       if (capabilityCheck !== null) {

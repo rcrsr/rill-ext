@@ -23,6 +23,7 @@ import {
   buildRequest,
   executeRequest,
   createSemaphore,
+  failDisposed,
   type InternalFetchConfig,
   type InternalEndpointConfig,
   type EndpointArg,
@@ -190,6 +191,7 @@ export function createFetchExtension(
   // ENDPOINT FUNCTIONS
   // ============================================================
 
+  let disposed = false;
   const functions: Record<string, RillFunction> = {};
 
   for (const [endpointName, endpointConfig] of Object.entries(
@@ -320,6 +322,7 @@ export function createFetchExtension(
   // ============================================================
 
   const dispose = (): void => {
+    disposed = true;
     for (const controller of activeControllers) {
       controller.abort();
     }
@@ -332,7 +335,14 @@ export function createFetchExtension(
 
   const callableDict: Record<string, RillValue> = {};
   for (const [name, def] of Object.entries(functions)) {
-    callableDict[name] = toCallable(def);
+    const guarded: RillFunction = {
+      ...def,
+      fn: (args, ctxLike, location) => {
+        if (disposed) throw failDisposed(ctxLike);
+        return def.fn(args, ctxLike, location);
+      },
+    };
+    callableDict[name] = toCallable(guarded);
   }
 
   return {

@@ -149,3 +149,4 @@ generic atoms. Host scripts match coarsely (`guard #FORBIDDEN`) or finely
 | `copy()` / `move()` across different mounts | `#INVALID_INPUT` | `cross_mount` |
 | Value or file exceeds configured size limit | `#INVALID_INPUT` | `size_limit_exceeded` |
 | Filesystem read or write failure | `#UNAVAILABLE` | `io_error` |
+| Any call after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |

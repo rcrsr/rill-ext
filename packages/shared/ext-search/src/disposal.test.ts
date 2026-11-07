@@ -48,6 +48,7 @@ describe('checkDisposed', () => {
     const status = getStatus(result!);
     expect(status.code.name).toBe('DISPOSED');
     expect(status.message).toBe(`${provider}: operation cancelled`);
+    expect(status.raw['kind']).toBe('extension_disposed');
   });
 });
 

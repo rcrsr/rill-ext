@@ -120,3 +120,4 @@ generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
 | `stdin` provided but command has `stdin: false` | `#INVALID_INPUT` | `stdin_not_supported` |
 | Command exceeded configured timeout | `#TIMEOUT` | `command_timeout` |
 | Cooperative cancellation via `ctx.signal` | `#TIMEOUT` | `request_cancelled` |
+| Any function called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |

@@ -357,7 +357,7 @@ The `{role}` and `{N}` placeholders in EC-23 are filled with the actual rejected
 
 | Failure | Atom | `meta.raw.kind` |
 |---|---|---|
-| Extension disposed before invocation | `#DISPOSED` | `disposed` |
+| Extension disposed before invocation | `#DISPOSED` | `extension_disposed` |
 | Uncaught internal failure during interpolation / role split (EC-17) | `#PROTOCOL` | `closure_failure` |
 
 ## See Also

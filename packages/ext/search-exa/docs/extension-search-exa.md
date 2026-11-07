@@ -213,7 +213,7 @@ generic atoms. Host scripts match coarsely (`guard #QUOTA_EXCEEDED`) or finely
 | Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
 | Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
-| Called after `dispose()` | `#DISPOSED` | `disposed` |
+| Called after `dispose()` | `#DISPOSED` | `extension_disposed` |
 
 ## Events
 

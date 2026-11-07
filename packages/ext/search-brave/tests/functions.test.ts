@@ -32,6 +32,31 @@ function makeFactoryCtx(signal?: AbortSignal): ExtensionFactoryCtx {
   };
 }
 
+/** Run a call and return whatever it throws; fail if it does not throw. */
+async function captureThrown(call: () => unknown): Promise<unknown> {
+  try {
+    await call();
+  } catch (e: unknown) {
+    return e;
+  }
+  throw new Error('expected call to throw');
+}
+
+function expectDisposedThrown(thrown: unknown, provider: string): void {
+  expect(isInvalid(thrown as RillValue)).toBe(true);
+  const status = getStatus(thrown as RillValue);
+  expect(status.code.name).toBe('DISPOSED');
+  expect(status.raw['kind']).toBe('extension_disposed');
+  expect(status.provider).toBe(provider);
+}
+
+async function expectDisposedThrow(
+  call: () => unknown,
+  provider: string
+): Promise<void> {
+  expectDisposedThrown(await captureThrown(call), provider);
+}
+
 async function expectInvalidWithMessage(
   promise: RillValue | Promise<RillValue>,
   needle: string
@@ -393,15 +418,33 @@ describe('Brave extension host functions', () => {
       );
     });
 
-    it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
+    it('throws DISPOSED after dispose', async () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expectInvalidWithMessage(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
-        'brave: operation cancelled'
+      await expectDisposedThrow(
+        () => getCallable(ext, 'search').fn({ query: 'test' }, ctx),
+        'brave'
       );
+    });
+
+    it('throws DISPOSED from every function without calling fetch', async () => {
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
+      const ctx = createRuntimeContext();
+      const fetchMock = mockFetchJson(200, {});
+      globalThis.fetch = fetchMock;
+      await ext.dispose!();
+
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect(names.length).toBeGreaterThan(0);
+      for (const name of names) {
+        await expectDisposedThrow(
+          () => getCallable(ext, name).fn({}, ctx),
+          'brave'
+        );
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 
@@ -586,14 +629,14 @@ describe('Brave extension host functions', () => {
       );
     });
 
-    it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
+    it('throws DISPOSED after dispose', async () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expectInvalidWithMessage(
-        getCallable(ext, 'news').fn({ query: 'test' }, ctx),
-        'brave: operation cancelled'
+      await expectDisposedThrow(
+        () => getCallable(ext, 'news').fn({ query: 'test' }, ctx),
+        'brave'
       );
     });
   });
@@ -905,14 +948,14 @@ describe('Brave extension host functions', () => {
       );
     });
 
-    it('throws operation cancelled after dispose [EC-12, AC-23]', async () => {
+    it('throws DISPOSED after dispose', async () => {
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
       await ext.dispose!();
 
-      await expectInvalidWithMessage(
-        getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
-        'brave: operation cancelled'
+      await expectDisposedThrow(
+        () => getCallable(ext, 'summarize').fn({ query: 'test' }, ctx),
+        'brave'
       );
     });
   });

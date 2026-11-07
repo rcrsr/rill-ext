@@ -44,6 +44,15 @@ const stringListReturn = structureToTypeValue({
 
 const PROVIDER = 'text';
 
+/** Call made after the extension was disposed. */
+function failDisposed(ctx: RuntimeContext): RillValue {
+  return ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
+    code: 'DISPOSED',
+    provider: PROVIDER,
+    raw: { kind: 'extension_disposed' },
+  });
+}
+
 // ============================================================
 // ELLIPSIS PARAM (no default — callers pass "" for none)
 // ============================================================
@@ -77,6 +86,8 @@ export function createTextExtension(
 ): ExtensionFactoryResult {
   // config has no fields; destructure to satisfy noUnusedLocals via void
   void config;
+
+  let disposed = false;
 
   // ----------------------------------------------------------
   // RillFunction definitions
@@ -485,11 +496,20 @@ export function createTextExtension(
 
   const callableDict: Record<string, RillValue> = {};
   for (const [name, def] of Object.entries(fnDict)) {
-    callableDict[name] = toCallable(def);
+    const guarded: RillFunction = {
+      ...def,
+      fn: (args, ctx, location) => {
+        if (disposed) throw failDisposed(ctx);
+        return def.fn(args, ctx, location);
+      },
+    };
+    callableDict[name] = toCallable(guarded);
   }
 
   return {
     value: callableDict as unknown as RillValue,
-    dispose: async (): Promise<void> => {},
+    dispose: async (): Promise<void> => {
+      disposed = true;
+    },
   } satisfies ExtensionFactoryResult;
 }

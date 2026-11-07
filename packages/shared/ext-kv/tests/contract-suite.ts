@@ -39,7 +39,21 @@ function callFn(
   if (callable === undefined) {
     return Promise.reject(new Error(`extension has no function '${name}'`));
   }
-  return Promise.resolve(callable.fn(args, createRuntimeContext()));
+  return Promise.resolve().then(() =>
+    callable.fn(args, createRuntimeContext())
+  );
+}
+
+/** Returns what a call throws or rejects with, or undefined when it resolves. */
+async function captureThrown(
+  call: () => Promise<RillValue>
+): Promise<{ threw: boolean; thrown: unknown }> {
+  try {
+    await call();
+  } catch (e) {
+    return { threw: true, thrown: e };
+  }
+  return { threw: false, thrown: undefined };
 }
 
 function expectInvalid(
@@ -675,6 +689,41 @@ export function describeKvContract(
           'INVALID_INPUT',
           'exceeds size limit'
         );
+      });
+    });
+
+    describe('after dispose', () => {
+      it('throws #DISPOSED from every host function', async () => {
+        const ext = make(state);
+        await ext.dispose?.();
+        const names = Object.keys(ext.value as Record<string, unknown>);
+        expect(names.length).toBeGreaterThan(0);
+
+        for (const name of names) {
+          const { threw, thrown } = await captureThrown(() =>
+            callFn(ext, name, {
+              mount: 'state',
+              key: 'k',
+              value: 'v',
+              partial: { a: 1 },
+              fallback: 'x',
+            })
+          );
+
+          expect(threw).toBe(true);
+          expect(isInvalid(thrown as RillValue)).toBe(true);
+          const status = getStatus(thrown as RillValue);
+          expect(status.code.name).toBe('DISPOSED');
+          expect(status.raw['kind']).toBe('extension_disposed');
+          expect(status.provider).toBe(backend);
+        }
+      });
+
+      it('disposes twice without error', async () => {
+        const ext = make(state);
+        await ext.dispose?.();
+
+        await expect(Promise.resolve(ext.dispose?.())).resolves.toBeUndefined();
       });
     });
   });

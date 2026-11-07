@@ -422,20 +422,31 @@ body
       makeFactoryCtx()
     );
     const dict = asDict(ext.value);
-    const fn = dict['alive']!.fn;
+    const names = Object.keys(dict);
+    const fns = names.map((n) => dict[n]!.fn);
 
     await ext.dispose?.();
 
     const ctx = createRuntimeContext();
-    let caught: unknown;
-    try {
-      await fn({}, ctx);
-    } catch (err) {
-      caught = err;
+    expect(names).toEqual(['alive']);
+    for (const fn of fns) {
+      let caught: unknown;
+      let resolved = false;
+      try {
+        await fn({}, ctx);
+        resolved = true;
+      } catch (err) {
+        caught = err;
+      }
+      // The wrapper throws the invalid RillValue produced by ctx.invalidate.
+      expect(resolved).toBe(false);
+      expect(isInvalid(caught as RillValue)).toBe(true);
+      const status = getStatus(caught as RillValue);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.provider).toBe('prompt-md');
+      expect(status.raw['kind']).toBe('extension_disposed');
+      expect(status.raw['name']).toBe('alive');
     }
-    // The wrapper throws the invalid RillValue produced by ctx.invalidate.
-    expect(isInvalid(caught as RillValue)).toBe(true);
-    expect(getStatus(caught as RillValue).code.name).toBe('DISPOSED');
   });
 });
 

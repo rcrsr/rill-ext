@@ -193,7 +193,7 @@ generic atoms. Host scripts match coarsely (`guard #NOT_FOUND`) or finely
 | Network timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
 | Vector dimension mismatch | `#TYPE_MISMATCH` | `dimension_mismatch` |
 | Collection already exists | `#CONFLICT` | `collection_exists` |
-| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `disposed` |
+| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `extension_disposed` |
 | Other SDK errors | `#UNAVAILABLE` | `sdk_error` |
 
 ## Local Qdrant Setup

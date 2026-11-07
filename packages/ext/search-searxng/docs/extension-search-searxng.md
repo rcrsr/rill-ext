@@ -184,7 +184,7 @@ generic atoms. Host scripts match coarsely (`guard #UNAVAILABLE`) or finely
 | Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
 | Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
 | Unexpected JSON / response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
-| Called after `dispose()` | `#DISPOSED` | `disposed` |
+| Called after `dispose()` | `#DISPOSED` | `extension_disposed` |
 
 ## Events
 

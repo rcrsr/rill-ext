@@ -452,6 +452,45 @@ describe('createFetchExtension', () => {
   });
 
   describe('dispose()', () => {
+    it('throws DISPOSED from every function after dispose', async () => {
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+          },
+          listPosts: { method: 'GET', path: '/posts' },
+        },
+      };
+      const ext = createFetchExtension(config, makeFactoryCtx());
+      await ext.dispose!();
+      await ext.dispose!();
+
+      const names = Object.keys(ext.value as object);
+      expect(names).toEqual(
+        expect.arrayContaining(['getUser', 'listPosts', 'endpoints'])
+      );
+      for (const name of names) {
+        let thrown: unknown;
+        let resolved = false;
+        try {
+          await getCallable(ext, name).fn({ id: '1' }, makeRuntimeCtx());
+          resolved = true;
+        } catch (e) {
+          thrown = e;
+        }
+        expect(resolved).toBe(false);
+        expect(isInvalid(thrown as never)).toBe(true);
+        const status = getStatus(thrown as never);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.provider).toBe('fetch');
+        expect(status.raw['kind']).toBe('extension_disposed');
+      }
+      expect(fetchCallCount).toBe(0);
+    });
+
     it('dispose can be called multiple times without error', () => {
       const config: FetchExtensionConfig = {
         baseUrl: 'https://api.example.com',

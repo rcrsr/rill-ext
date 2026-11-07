@@ -136,3 +136,4 @@ generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
 | Referenced mount does not exist | `#INVALID_INPUT` | `mount_not_found` |
 | JSON store file cannot be parsed | `#UNAVAILABLE` | `store_corrupt` |
 | Filesystem read / write failure | `#UNAVAILABLE` | `io_error` |
+| Any call after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |

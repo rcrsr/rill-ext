@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { isInvalid } from '@rcrsr/rill';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { getStatus, isInvalid, type RillValue } from '@rcrsr/rill';
 import { createExecExtension } from '../src/factory.js';
 import type { ExecExtensionConfig } from '../src/types.js';
 import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
@@ -184,6 +187,46 @@ describe('exec extension factory', () => {
       expect(invalidateSpy.mock.calls[0]![1].raw).toMatchObject({
         kind: 'aborted',
       });
+    });
+
+    it('throws DISPOSED from every function after dispose without spawning', async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'exec-disposed-'));
+      const marker = join(dir, 'marker');
+      try {
+        ext = createExecExtension(
+          {
+            commands: { touch: { binary: 'touch' }, echo: { binary: 'echo' } },
+          },
+          makeFactoryCtx()
+        );
+        const names = Object.keys(ext.value as Record<string, unknown>);
+        expect(names.sort()).toEqual(['commands', 'echo', 'touch']);
+        await ext.dispose!();
+        await ext.dispose!();
+
+        for (const name of names) {
+          let thrown: unknown;
+          let resolved = false;
+          try {
+            await getCallable(ext, name).fn(
+              name === 'touch' ? { args: [marker] } : {},
+              makeRuntimeCtx()
+            );
+            resolved = true;
+          } catch (e) {
+            thrown = e;
+          }
+          expect(resolved).toBe(false);
+          expect(isInvalid(thrown as RillValue)).toBe(true);
+          const status = getStatus(thrown as RillValue);
+          expect(status.code.name).toBe('DISPOSED');
+          expect(status.raw['kind']).toBe('extension_disposed');
+          expect(status.provider).toBe('exec');
+        }
+        expect(existsSync(marker)).toBe(false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
 
     it('disposes cleanly with no in-flight processes', async () => {

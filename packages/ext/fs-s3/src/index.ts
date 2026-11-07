@@ -390,7 +390,7 @@ export function createS3FsExtension(
 
   const read: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -419,7 +419,7 @@ export function createS3FsExtension(
 
   const write: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -448,7 +448,7 @@ export function createS3FsExtension(
 
   const append: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -495,7 +495,7 @@ export function createS3FsExtension(
 
   const list: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -545,7 +545,7 @@ export function createS3FsExtension(
 
   const find: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -591,7 +591,7 @@ export function createS3FsExtension(
 
   const exists: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -615,7 +615,7 @@ export function createS3FsExtension(
 
   const remove: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -648,7 +648,7 @@ export function createS3FsExtension(
 
   const stat: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -674,7 +674,7 @@ export function createS3FsExtension(
 
   const mkdir: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     return true;
@@ -682,7 +682,7 @@ export function createS3FsExtension(
 
   const copy: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const src = parseMountPath(runCtx, args['src'] as string);
     if (!src.ok) return src.invalid;
     const dest = parseMountPath(runCtx, args['dest'] as string);
@@ -735,7 +735,7 @@ export function createS3FsExtension(
 
   const move: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const copied = await copy(args, runtimeCtx);
     if (copied !== true) return copied;
 
@@ -753,7 +753,8 @@ export function createS3FsExtension(
     }
   };
 
-  const mountsList: CallableFn = async () => {
+  const mountsList: CallableFn = async (_args, runtimeCtx) => {
+    if (disposed) throw disposedInvalid(runtimeCtx as RuntimeContext);
     const result: RillValue[] = [];
     for (const [name, mount] of Object.entries(config.mounts)) {
       result.push({

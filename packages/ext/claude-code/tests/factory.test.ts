@@ -4,8 +4,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { structureToTypeValue } from '@rcrsr/rill';
+import {
+  getStatus,
+  isInvalid,
+  structureToTypeValue,
+  type RillValue,
+} from '@rcrsr/rill';
 import { createClaudeCodeExtension } from '../src/factory.js';
+import { PROVIDER } from '../src/errors.js';
+import { spawnClaudeCli } from '../src/process.js';
 import {
   makeFactoryCtx,
   makeRuntimeCtx,
@@ -184,6 +191,86 @@ describe('createClaudeCodeExtension', () => {
     it('dispose completes successfully on clean instance', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       expect(() => ext.dispose?.()).not.toThrow();
+    });
+  });
+
+  describe('post-dispose calls', () => {
+    const ARGS_BY_NAME: Record<string, Record<string, RillValue>> = {
+      prompt: { text: 'hello', options: {} },
+      skill: { name: 'review', args: {} },
+      command: { name: 'build', args: {} },
+    };
+
+    async function captureThrown(
+      fn: (args: Record<string, RillValue>, ctx: never) => unknown,
+      args: Record<string, RillValue>
+    ): Promise<{ resolved: boolean; thrown: unknown }> {
+      try {
+        await fn(args, makeRuntimeCtx() as never);
+        return { resolved: true, thrown: undefined };
+      } catch (e) {
+        return { resolved: false, thrown: e };
+      }
+    }
+
+    async function expectDisposedThrows(
+      ext: ReturnType<typeof createClaudeCodeExtension>
+    ): Promise<void> {
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect(names.sort()).toEqual(Object.keys(ARGS_BY_NAME).sort());
+      const v = extValue(ext) as unknown as Record<
+        string,
+        { fn: (a: Record<string, RillValue>, c: never) => unknown }
+      >;
+      for (const name of names) {
+        const { resolved, thrown } = await captureThrown(
+          v[name]!.fn,
+          ARGS_BY_NAME[name]!
+        );
+        expect(resolved).toBe(false);
+        expect(isInvalid(thrown as RillValue)).toBe(true);
+        const status = getStatus(thrown as RillValue);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.raw['kind']).toBe('extension_disposed');
+        expect(status.provider).toBe(PROVIDER);
+      }
+    }
+
+    beforeEach(() => {
+      vi.mocked(spawnClaudeCli).mockClear();
+    });
+
+    it('throws #DISPOSED from every function after dispose', async () => {
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
+      await ext.dispose?.();
+
+      await expectDisposedThrows(ext);
+      expect(spawnClaudeCli).not.toHaveBeenCalled();
+    });
+
+    it('throws #DISPOSED before validating blank text', async () => {
+      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
+      await ext.dispose?.();
+      const v = extValue(ext);
+
+      const { thrown } = await captureThrown(v.prompt.fn, {
+        text: '',
+        options: {},
+      });
+
+      expect(getStatus(thrown as RillValue).code.name).toBe('DISPOSED');
+    });
+
+    it('throws #DISPOSED after the factory signal aborts', async () => {
+      const controller = new AbortController();
+      const ext = createClaudeCodeExtension(
+        {},
+        { signal: controller.signal, registerErrorCode: () => {} }
+      );
+      controller.abort();
+
+      await expectDisposedThrows(ext);
+      expect(spawnClaudeCli).not.toHaveBeenCalled();
     });
   });
 

@@ -1,8 +1,8 @@
 /**
  * Test suite for search function wrapper factory.
  *
- * Errors and disposal both surface as invalid RillValues; the wrapped
- * function never throws.
+ * Operation errors surface as invalid RillValues; a call after dispose
+ * throws the invalid DISPOSED value.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -29,11 +29,20 @@ function makeCtx(opts?: {
   });
 }
 
+async function captureThrown(call: () => Promise<unknown>): Promise<unknown> {
+  try {
+    await call();
+  } catch (e: unknown) {
+    return e;
+  }
+  throw new Error('expected call to throw');
+}
+
 describe('createSearchFunctionWrapper', () => {
   const provider = 'testsearch';
 
   describe('disposal check', () => {
-    it('returns invalid value when disposed before call', async () => {
+    it('throws invalid DISPOSED value when disposed before call', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
       disposalState.isDisposed = true;
@@ -50,11 +59,12 @@ describe('createSearchFunctionWrapper', () => {
       }));
       const wrappedFn = wrap('search', fn);
 
-      const result = await wrappedFn({}, makeCtx());
-      expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).message).toBe(
-        `${provider}: operation cancelled`
-      );
+      const thrown = await captureThrown(() => wrappedFn({}, makeCtx()));
+      expect(isInvalid(thrown as RillValue)).toBe(true);
+      const status = getStatus(thrown as RillValue);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+      expect(status.message).toBe(`${provider}: operation cancelled`);
       expect(fn).not.toHaveBeenCalled();
     });
   });
@@ -268,10 +278,16 @@ describe('createSearchFunctionWrapper', () => {
         resultCount: 1,
       }));
       disposalState.isDisposed = true;
-      const a = await search({}, makeCtx());
-      const b = await suggest({}, makeCtx());
-      expect(getStatus(a).message).toBe(`${provider}: operation cancelled`);
-      expect(getStatus(b).message).toBe(`${provider}: operation cancelled`);
+      const a = await captureThrown(() => search({}, makeCtx()));
+      const b = await captureThrown(() => suggest({}, makeCtx()));
+      expect(getStatus(a as RillValue).message).toBe(
+        `${provider}: operation cancelled`
+      );
+      expect(getStatus(b as RillValue).message).toBe(
+        `${provider}: operation cancelled`
+      );
+      expect(getStatus(a as RillValue).raw['kind']).toBe('extension_disposed');
+      expect(getStatus(b as RillValue).raw['kind']).toBe('extension_disposed');
     });
   });
 });

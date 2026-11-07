@@ -107,4 +107,68 @@ describe('createLocalFsExtension - factory', () => {
       await expect(fs.stat(overLimitPath)).rejects.toThrow(/ENOENT/);
     });
   });
+
+  describe('after dispose', () => {
+    const captureThrown = async (
+      call: () => unknown
+    ): Promise<{ threw: boolean; thrown: unknown }> => {
+      try {
+        await call();
+      } catch (e) {
+        return { threw: true, thrown: e };
+      }
+      return { threw: false, thrown: undefined };
+    };
+
+    it('throws #DISPOSED with extension_disposed from every function', async () => {
+      const ext = await createLocalFsExtension(
+        { mounts: { workspace: { path: testMount, mode: 'read-write' } } },
+        makeFactoryCtx()
+      );
+      await ext.dispose?.();
+      await ext.dispose?.();
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect(names).toHaveLength(12);
+
+      for (const name of names) {
+        const { threw, thrown } = await captureThrown(() =>
+          getCallable(ext, name).fn(
+            {
+              path: '/workspace/a.txt',
+              content: 'x',
+              from: '/workspace/a.txt',
+              to: '/workspace/b.txt',
+            },
+            makeRuntimeCtx()
+          )
+        );
+
+        expect(threw).toBe(true);
+        expect(isInvalid(thrown as never)).toBe(true);
+        const status = getStatus(thrown as never);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.raw['kind']).toBe('extension_disposed');
+        expect(status.provider).toBe('fs-local');
+      }
+    });
+
+    it('creates no file when write is called after dispose', async () => {
+      const ext = await createLocalFsExtension(
+        { mounts: { workspace: { path: testMount, mode: 'read-write' } } },
+        makeFactoryCtx()
+      );
+      await ext.dispose?.();
+      const target = path.join(testMount, 'late.txt');
+
+      const { threw } = await captureThrown(() =>
+        getCallable(ext, 'write').fn(
+          { path: '/workspace/late.txt', content: 'x' },
+          makeRuntimeCtx()
+        )
+      );
+
+      expect(threw).toBe(true);
+      await expect(fs.stat(target)).rejects.toThrow(/ENOENT/);
+    });
+  });
 });

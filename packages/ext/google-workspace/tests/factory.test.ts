@@ -29,6 +29,31 @@ async function disposeExt(ext: ExtensionFactoryResult): Promise<void> {
   await ext.dispose();
 }
 
+const PROVIDER = 'google-workspace';
+
+/** Run a call and return what it threw; fails the test if it resolved. */
+async function captureThrown(call: () => unknown): Promise<RillValue> {
+  let thrown: unknown;
+  let threw = false;
+  try {
+    await call();
+  } catch (e) {
+    threw = true;
+    thrown = e;
+  }
+  expect(threw).toBe(true);
+  return thrown as RillValue;
+}
+
+function expectDisposedThrow(thrown: RillValue): void {
+  expect(isInvalid(thrown)).toBe(true);
+  const status = getStatus(thrown);
+  expect(status.code.name).toBe('DISPOSED');
+  expect(status.provider).toBe(PROVIDER);
+  expect(status.raw['kind']).toBe('extension_disposed');
+  expect(status.message).toBe('google: operation cancelled');
+}
+
 function getCallable(
   ext: { value: unknown },
   name: string
@@ -159,27 +184,26 @@ describe('createGoogleWorkspaceExtension', () => {
       );
       const ctx = createRuntimeContext();
       await disposeExt(ext);
-      const caught = (await getCallable(ext, 'gmail_search').fn(
-        { query: 'hello' },
-        ctx
-      )) as RillValue;
-      expect(isInvalid(caught)).toBe(true);
-      expect(getStatus(caught).code.name).toBe('DISPOSED');
-      expect(getStatus(caught).message).toBe('google: operation cancelled');
+      const thrown = await captureThrown(() =>
+        getCallable(ext, 'gmail_search').fn({ query: 'hello' }, ctx)
+      );
+      expectDisposedThrow(thrown);
     });
 
-    it('all 17 callables emit #DISPOSED after dispose', async () => {
+    it('all 17 callables throw #DISPOSED after dispose', async () => {
       const ext = createGoogleWorkspaceExtension(
         ALL_CAPS_CONFIG,
         makeFactoryCtx()
       );
       const ctx = createRuntimeContext();
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect([...names].sort()).toEqual([...EXPECTED_CALLABLE_NAMES].sort());
       await disposeExt(ext);
-      for (const name of EXPECTED_CALLABLE_NAMES) {
-        const caught = (await getCallable(ext, name).fn({}, ctx)) as RillValue;
-        expect(isInvalid(caught)).toBe(true);
-        expect(getStatus(caught).code.name).toBe('DISPOSED');
-        expect(getStatus(caught).message).toBe('google: operation cancelled');
+      for (const name of names) {
+        const thrown = await captureThrown(() =>
+          getCallable(ext, name).fn({}, ctx)
+        );
+        expectDisposedThrow(thrown);
       }
     });
   });
@@ -266,6 +290,7 @@ describe('createGoogleWorkspaceExtension', () => {
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('DISPOSED');
       expect(getStatus(result).message).toBe('google: operation cancelled');
+      expect(getStatus(result).raw['kind']).toBe('extension_disposed');
     });
 
     it('multiple concurrent in-flight calls all resolve to #DISPOSED on dispose (BC-5)', async () => {
@@ -317,6 +342,7 @@ describe('createGoogleWorkspaceExtension', () => {
           const value = result.value as RillValue;
           expect(isInvalid(value)).toBe(true);
           expect(getStatus(value).code.name).toBe('DISPOSED');
+          expect(getStatus(value).raw['kind']).toBe('extension_disposed');
         }
       }
     });
@@ -333,7 +359,7 @@ describe('createGoogleWorkspaceExtension', () => {
       globalThis.fetch = originalFetch;
     });
 
-    it('emits #DISPOSED without calling fetch again after a prior successful call', async () => {
+    it('throws #DISPOSED without calling fetch again after a prior successful call', async () => {
       globalThis.fetch = vi.fn(() =>
         Promise.resolve(
           new Response(JSON.stringify({ messages: [] }), {
@@ -356,13 +382,10 @@ describe('createGoogleWorkspaceExtension', () => {
 
       await expect(disposeExt(ext)).resolves.toBeUndefined();
 
-      const caught = (await getCallable(ext, 'gmail_search').fn(
-        { query: 'after-dispose' },
-        ctx
-      )) as RillValue;
-      expect(isInvalid(caught)).toBe(true);
-      expect(getStatus(caught).code.name).toBe('DISPOSED');
-      expect(getStatus(caught).message).toBe('google: operation cancelled');
+      const thrown = await captureThrown(() =>
+        getCallable(ext, 'gmail_search').fn({ query: 'after-dispose' }, ctx)
+      );
+      expectDisposedThrow(thrown);
 
       // Only the pre-dispose call reached fetch
       expect(vi.mocked(globalThis.fetch).mock.calls).toHaveLength(1);

@@ -2333,7 +2333,11 @@ describe('executeToolLoop tool halt propagation', () => {
   it('rejects with a DISPOSED halt and emits a terminal tool_result event', async () => {
     const disposedValue = createRuntimeContext().invalidate(
       new Error('disposed'),
-      { code: 'DISPOSED', provider: 'test', raw: { kind: 'disposed' } }
+      {
+        code: 'DISPOSED',
+        provider: 'test',
+        raw: { kind: 'extension_disposed' },
+      }
     );
     const halt = new RuntimeHaltSignal(disposedValue, false);
     const toolFn = vi.fn((): RillValue => {

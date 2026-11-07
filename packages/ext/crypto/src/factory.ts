@@ -22,6 +22,14 @@ import type { CryptoExtensionConfig } from './types.js';
 const stringReturn = structureToTypeValue({ kind: 'string' });
 const PROVIDER = 'crypto';
 
+function failDisposed(ctx: RuntimeContext): RillValue {
+  return ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
+    code: 'DISPOSED',
+    provider: PROVIDER,
+    raw: { kind: 'extension_disposed' },
+  });
+}
+
 /**
  * Creates a crypto extension with hashing and random generation.
  *
@@ -33,6 +41,8 @@ export function createCryptoExtension(
 ): ExtensionFactoryResult {
   const defaultAlgorithm = config.defaultAlgorithm ?? 'sha256';
   const hmacKey = config.hmacKey;
+
+  let disposed = false;
 
   const supportedAlgorithms = new Set(crypto.getHashes());
 
@@ -181,11 +191,17 @@ export function createCryptoExtension(
 
   const callableDict: Record<string, RillValue> = {};
   for (const [name, def] of Object.entries(fnDict)) {
-    callableDict[name] = toCallable(def);
+    const guarded: CallableFn = (args, ctx, location) => {
+      if (disposed) throw failDisposed(ctx);
+      return def.fn(args, ctx, location);
+    };
+    callableDict[name] = toCallable({ ...def, fn: guarded });
   }
 
   return {
     value: callableDict as unknown as RillValue,
-    dispose: async (): Promise<void> => {},
+    dispose: async (): Promise<void> => {
+      disposed = true;
+    },
   } satisfies ExtensionFactoryResult;
 }

@@ -437,6 +437,9 @@ All functions emit failures as invalid `RillValue`s carrying rill core's
 generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
 (`guard #INVALID_INPUT && raw.kind == 'non_string_input'`).
 
+After `dispose()`, every function throws `#DISPOSED` with
+`raw.kind: 'extension_disposed'` instead of returning a value.
+
 ```rill
 $text.truncate($body, $max, ellipsis: "...")
   | guard #INVALID_INPUT { log("invalid argument") }

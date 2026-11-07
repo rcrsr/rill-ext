@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { getStatus } from '@rcrsr/rill';
+import { getStatus, isInvalid } from '@rcrsr/rill';
 import { createDatetimeExtension } from '../src/factory.js';
 import type { DatetimeExtensionConfig } from '../src/types.js';
 import { makeFactoryCtx, makeRuntimeCtx, fnOf } from './_setup.js';
@@ -85,26 +85,44 @@ describe('datetime extension factory', () => {
     });
   });
 
-  // ============================================================
-  // AC-E4 / EC-4: Function call after dispose returns invalid value
-  // ============================================================
-
   describe('post-dispose function calls', () => {
-    it.each([
-      { name: 'iso', args: { dt: 0, zone: 'UTC' } },
-      { name: 'zones', args: {} },
-      { name: 'format', args: { dt: 0, pattern: 'YYYY-MM-DD' } },
-    ])(
-      'returns invalid value with message "datetime: operation cancelled" when $name is called after dispose',
-      async ({ name, args }) => {
-        const ext = mk();
-        await ext.dispose!();
+    const KEYS = ['iso', 'date', 'time', 'offset', 'zones', 'format', 'parse'];
 
-        const result = await fnOf(ext, name).fn(args, makeRuntimeCtx());
-        const status = getStatus(result);
-        expect(status.code.name).toBe('INVALID_INPUT');
-        expect(status.message).toMatch(/datetime: operation cancelled/);
+    async function captureThrown(call: () => unknown): Promise<{
+      threw: boolean;
+      thrown: unknown;
+    }> {
+      try {
+        await call();
+      } catch (e) {
+        return { threw: true, thrown: e };
       }
-    );
+      return { threw: false, thrown: undefined };
+    }
+
+    it('exposes exactly the 7 expected keys', () => {
+      expect(Object.keys(mk().value as Record<string, unknown>).sort()).toEqual(
+        [...KEYS].sort()
+      );
+    });
+
+    it('throws DISPOSED with extension_disposed for every function', async () => {
+      const ext = mk();
+      await ext.dispose!();
+      const names = Object.keys(ext.value as Record<string, unknown>);
+      expect(names.length).toBe(7);
+
+      for (const name of names) {
+        const { threw, thrown } = await captureThrown(() =>
+          fnOf(ext, name).fn({}, makeRuntimeCtx())
+        );
+        expect(threw, `${name} should throw`).toBe(true);
+        expect(isInvalid(thrown as never), `${name} invalid`).toBe(true);
+        const status = getStatus(thrown as never);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.provider).toBe('datetime');
+        expect(status.raw).toMatchObject({ kind: 'extension_disposed' });
+      }
+    });
   });
 });

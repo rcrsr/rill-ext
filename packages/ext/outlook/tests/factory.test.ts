@@ -101,23 +101,32 @@ const INVALID_CONFIGS: {
   },
 ];
 
-const POST_DISPOSE_CASES: {
-  fn: string;
-  config: OutlookConfig;
-  args: Record<string, RillValue>;
-}[] = [
-  { fn: 'inbox', config: BEARER_CONFIG, args: { top: 10 } },
+const POST_DISPOSE_CASES: { fn: string; args: Record<string, RillValue> }[] = [
+  { fn: 'inbox', args: { top: 10 } },
+  { fn: 'from', args: { address: 'a@b.com' } },
+  { fn: 'search', args: { query: 'q' } },
+  { fn: 'read', args: { message_id: 'm1' } },
+  { fn: 'send', args: { to: ['a@b.com'], subject: 'Hi', body: 'Hello' } },
+  { fn: 'draft', args: { to: ['a@b.com'], subject: 'Hi', body: 'Hello' } },
+  { fn: 'reply', args: { message_id: 'm1', body: 'Hello' } },
+  { fn: 'flag', args: { message_id: 'm1' } },
+  { fn: 'events', args: { start: 0, end: 1000 } },
+  { fn: 'today', args: {} },
+  { fn: 'free_busy', args: { start: 0, end: 1000, attendees: ['a@b.com'] } },
   {
-    fn: 'send',
-    config: {
-      auth: { type: 'bearer', token: 'tok' },
-      capabilities: { mail: { send: true } },
-    },
-    args: { to: ['a@b.com'], subject: 'Hi', body: 'Hello' },
+    fn: 'create_event',
+    args: { title: 'T', start: 0, end: 1000, options: {} },
   },
-  { fn: 'events', config: BEARER_CONFIG, args: { start: 0, end: 1000 } },
-  { fn: 'today', config: BEARER_CONFIG, args: {} },
 ];
+
+async function captureThrown(call: () => unknown): Promise<unknown> {
+  try {
+    await call();
+  } catch (e) {
+    return e;
+  }
+  return undefined;
+}
 
 // ============================================================
 // TESTS
@@ -397,17 +406,42 @@ describe('createOutlookExtension', () => {
       await expect(ext.dispose!()).resolves.toBeUndefined();
     });
 
+    it('lists every host function in the post-dispose cases', () => {
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
+      expect(POST_DISPOSE_CASES.map((c) => c.fn).sort()).toEqual(
+        Object.keys(ext.value as Record<string, unknown>).sort()
+      );
+    });
+
     it.each(POST_DISPOSE_CASES)(
-      'emits #DISPOSED for $fn after dispose',
-      async ({ config, fn, args }) => {
-        const ext = createOutlookExtension(config, makeFactoryCtx());
+      'throws #DISPOSED for $fn after dispose',
+      async ({ fn, args }) => {
+        const fetchSpy = vi.fn<typeof fetch>();
+        globalThis.fetch = fetchSpy;
+        const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
         const ctx = createRuntimeContext();
+        const onLogEvent = vi.fn<(event: unknown) => void>();
+        ctx.callbacks.onLogEvent = onLogEvent;
         await ext.dispose!();
 
-        const result = (await getCallable(ext, fn).fn(args, ctx)) as RillValue;
-        expect(isInvalid(result)).toBe(true);
-        expect(getStatus(result).code.name).toBe('DISPOSED');
-        expect(getStatus(result).message).toBe('outlook: operation cancelled');
+        const thrown = await captureThrown(() =>
+          getCallable(ext, fn).fn(args, ctx)
+        );
+
+        expect(thrown).toBeDefined();
+        expect(isInvalid(thrown as RillValue)).toBe(true);
+        const status = getStatus(thrown as RillValue);
+        expect(status.code.name).toBe('DISPOSED');
+        expect(status.provider).toBe('outlook');
+        expect(status.raw['kind']).toBe('extension_disposed');
+        expect(status.message).toBe('outlook: operation cancelled');
+        expect(onLogEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            event: 'outlook:error',
+            subsystem: 'extension:outlook',
+          })
+        );
+        expect(fetchSpy).not.toHaveBeenCalled();
       }
     );
   });

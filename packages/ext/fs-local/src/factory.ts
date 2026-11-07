@@ -32,6 +32,13 @@ import {
 
 const PROVIDER = 'fs-local';
 
+const failDisposed = (ctx: RuntimeContext): RillValue =>
+  ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
+    code: 'DISPOSED',
+    provider: PROVIDER,
+    raw: { kind: 'extension_disposed' },
+  });
+
 /**
  * Creates a local filesystem extension with sandboxed operations.
  *
@@ -49,6 +56,8 @@ export async function createLocalFsExtension(
       'fs-local extension requires at least one mount in configuration'
     );
   }
+
+  let disposed = false;
 
   // Apply defaults
   const maxFileSize = config.maxFileSize ?? 10485760; // 10MB
@@ -99,6 +108,7 @@ export async function createLocalFsExtension(
 
   const read: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -126,6 +136,7 @@ export async function createLocalFsExtension(
 
   const write: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -156,6 +167,7 @@ export async function createLocalFsExtension(
 
   const append: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -211,6 +223,7 @@ export async function createLocalFsExtension(
 
   const list: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: dirPath } = parsed as {
@@ -247,6 +260,7 @@ export async function createLocalFsExtension(
 
   const find: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: searchBase } = parsed as {
@@ -305,6 +319,7 @@ export async function createLocalFsExtension(
 
   const exists: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return false;
     const { mountName, relativePath: filePath } = parsed as {
@@ -325,6 +340,7 @@ export async function createLocalFsExtension(
 
   const remove: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -362,6 +378,7 @@ export async function createLocalFsExtension(
 
   const stat: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -400,6 +417,7 @@ export async function createLocalFsExtension(
    */
   const mkdir: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: dirPath } = parsed as {
@@ -529,6 +547,7 @@ export async function createLocalFsExtension(
 
   const copy: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const srcParsed = parseMountPath(args['src'] as string, mounts, runCtx);
     if (isInvalid(srcParsed as RillValue)) return srcParsed as RillValue;
     const { mountName: srcMountName, relativePath: srcPath } = srcParsed as {
@@ -606,6 +625,7 @@ export async function createLocalFsExtension(
 
   const move: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
+    if (disposed) throw failDisposed(runCtx);
     const srcParsed = parseMountPath(args['src'] as string, mounts, runCtx);
     if (isInvalid(srcParsed as RillValue)) return srcParsed as RillValue;
     const { mountName: srcMountName, relativePath: srcPath } = srcParsed as {
@@ -676,7 +696,8 @@ export async function createLocalFsExtension(
     }
   };
 
-  const mountsList: CallableFn = async () => {
+  const mountsList: CallableFn = async (_args, ctxIn) => {
+    if (disposed) throw failDisposed(ctxIn as RuntimeContext);
     const result: RillValue[] = [];
 
     for (const [name, mount] of Object.entries(mounts)) {
@@ -926,7 +947,7 @@ export async function createLocalFsExtension(
   } satisfies FsExtensionContract;
 
   const dispose = async (): Promise<void> => {
-    // No external resources to release for local filesystem
+    disposed = true;
   };
 
   return {

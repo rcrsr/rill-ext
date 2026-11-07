@@ -45,6 +45,12 @@ describe('checkDisposed', () => {
     const result = checkDisposed(ctx, state, provider);
     expect(getStatus(result!).code.name).toBe('DISPOSED');
   });
+
+  it('emits extension_disposed raw kind', () => {
+    const state = { isDisposed: true };
+    const result = checkDisposed(ctx, state, provider);
+    expect(getStatus(result!).raw['kind']).toBe('extension_disposed');
+  });
 });
 
 describe('dispose', () => {

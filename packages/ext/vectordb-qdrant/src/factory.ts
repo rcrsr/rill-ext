@@ -108,7 +108,7 @@ export function createQdrantExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const id = args['id'] as string;
         const vector = args['vector'] as RillVector;
@@ -141,7 +141,7 @@ export function createQdrantExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const items = args['items'] as Array<Record<string, RillValue>>;
 
@@ -220,7 +220,7 @@ export function createQdrantExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const vector = args['vector'] as RillVector;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
@@ -289,7 +289,7 @@ export function createQdrantExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const id = args['id'] as string;
 
@@ -347,7 +347,7 @@ export function createQdrantExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const id = args['id'] as string;
         return withEventEmission(ctx, PROVIDER, 'delete', { id }, async () => {
@@ -373,7 +373,7 @@ export function createQdrantExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const ids = args['ids'] as Array<string>;
 
@@ -421,7 +421,7 @@ export function createQdrantExtension(
       fn: async (_args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         return withEventEmission(ctx, PROVIDER, 'count', {}, async () => {
           const response = await client.getCollection(factoryCollection);
@@ -448,7 +448,7 @@ export function createQdrantExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const name = args['name'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
@@ -489,7 +489,7 @@ export function createQdrantExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const name = args['name'] as string;
         return withEventEmission(
@@ -518,7 +518,7 @@ export function createQdrantExtension(
       fn: async (_args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         return withEventEmission(
           ctx,
@@ -543,7 +543,7 @@ export function createQdrantExtension(
       fn: async (_args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         return withEventEmission(
           ctx,

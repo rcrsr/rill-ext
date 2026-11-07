@@ -23,6 +23,39 @@ function getCallable(
   return (ext.value as Record<string, ApplicationCallable>)[name]!;
 }
 
+/**
+ * Call every host function on a disposed extension and assert each one throws
+ * an invalid #DISPOSED value with raw kind extension_disposed, without
+ * reaching the vendor SDK client.
+ */
+async function expectAllDisposedThrows(
+  ext: { value: unknown },
+  ctx: ReturnType<typeof createRuntimeContext>,
+  sdkMocks: ReturnType<typeof vi.fn>[]
+): Promise<void> {
+  const names = Object.keys(ext.value as Record<string, unknown>);
+  expect(names.length).toBeGreaterThan(0);
+  for (const name of names) {
+    let thrown: unknown;
+    let resolved = false;
+    try {
+      await getCallable(ext, name).fn({}, ctx);
+      resolved = true;
+    } catch (e) {
+      thrown = e;
+    }
+    expect(resolved, `${name} resolved after dispose`).toBe(false);
+    expect(isInvalid(thrown as RillValue), `${name} throws invalid`).toBe(true);
+    const status = getStatus(thrown as RillValue);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+    expect(status.provider).toBe('pinecone');
+  }
+  for (const mock of sdkMocks) {
+    expect(mock).not.toHaveBeenCalled();
+  }
+}
+
 async function expectInvalidWithMessage(
   promise: Promise<RillValue>,
   needle: string,
@@ -942,22 +975,21 @@ describe('Error handling contracts', () => {
     );
   });
 
-  it('post-dispose call produces "operation cancelled" (EC-8, AC-19)', async () => {
+  it('throws #DISPOSED from every host function after dispose', async () => {
+    vi.clearAllMocks();
     await ext.dispose!();
 
-    const queryVector = createVector(
-      new Float32Array([0.1, 0.2, 0.3, 0.4]),
-      'test'
-    );
-
-    await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn(
-        { vector: queryVector, options: {} },
-        ctx
-      ) as Promise<RillValue>,
-      'pinecone: operation cancelled',
-      'DISPOSED'
-    );
+    await expectAllDisposedThrows(ext, ctx, [
+      mockUpsert,
+      mockQuery,
+      mockFetch,
+      mockDeleteOne,
+      mockDescribeIndexStats,
+      mockDescribeIndex,
+      mockCreateIndex,
+      mockDeleteIndex,
+      mockListIndexes,
+    ]);
   });
 
   it('unknown errors produce "pinecone: <message>" (EC-9)', async () => {
@@ -1096,20 +1128,19 @@ describe('Request cancellation', () => {
       mockUpsert.mock.calls.length
     );
 
-    // New operations should fail after dispose
-    const queryVector = createVector(
-      new Float32Array([0.1, 0.2, 0.3, 0.4]),
-      'test'
-    );
-    await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn(
-        { vector: queryVector, options: {} },
-        ctx
-      ) as Promise<RillValue>,
-      'pinecone: operation cancelled',
-      'DISPOSED'
-    );
-    expect(mockQuery).not.toHaveBeenCalled();
+    // New operations throw after dispose without reaching the SDK
+    vi.clearAllMocks();
+    await expectAllDisposedThrows(ext, ctx, [
+      mockUpsert,
+      mockQuery,
+      mockFetch,
+      mockDeleteOne,
+      mockDescribeIndexStats,
+      mockDescribeIndex,
+      mockCreateIndex,
+      mockDeleteIndex,
+      mockListIndexes,
+    ]);
   });
 });
 

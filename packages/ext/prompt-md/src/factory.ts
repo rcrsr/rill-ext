@@ -137,7 +137,7 @@ export async function createPromptMdExtension(
           {
             code: 'DISPOSED',
             provider: 'prompt-md',
-            raw: { kind: 'disposed', name },
+            raw: { kind: 'extension_disposed', name },
           }
         ) as unknown as RillValue;
       }

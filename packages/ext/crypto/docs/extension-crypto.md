@@ -118,6 +118,7 @@ generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
 | `hmac()` called without `hmacKey` in config | `#INVALID_INPUT` | `missing_hmac_key` |
 | `random()` called with non-integer or negative `bytes` | `#INVALID_INPUT` | `invalid_bytes` |
 | `random()` called with `bytes` greater than 1 MB | `#INVALID_INPUT` | `bytes_too_large` |
+| Any function called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
 
 ## Supported Algorithms
 

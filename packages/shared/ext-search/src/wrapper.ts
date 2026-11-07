@@ -1,8 +1,8 @@
 /**
  * Function wrapper factory for search extensions.
  * Combines disposal check, in-flight tracking, timing, event emission,
- * and error mapping. Errors and disposal both surface as invalid
- * RillValues via `ctx.invalidate`; the wrapped function never throws.
+ * and error mapping. Operation errors surface as invalid RillValues via
+ * `ctx.invalidate`; a call after dispose throws the `#DISPOSED` invalid value.
  *
  * Emits rill-core generic atoms (`#TIMEOUT`, `#DISPOSED`, `#UNAVAILABLE`,
  * etc.) directly. No per-extension atom registration required.
@@ -43,7 +43,8 @@ export type WrapFunction = (
 
 /**
  * Create a function wrapper that adds disposal check, in-flight tracking,
- * timing, event emission, and error mapping.
+ * timing, event emission, and error mapping. The disposal check throws
+ * before any work starts; all other failures are returned.
  *
  * @param provider - Extension provider name (e.g., "exa", "tavily")
  * @param disposalState - DisposalState to check before operations
@@ -61,7 +62,7 @@ export function createSearchFunctionWrapper(
     ): Promise<RillValue> => {
       const disposedResult = checkDisposed(ctx, disposalState, provider);
       if (disposedResult !== null) {
-        return disposedResult;
+        throw disposedResult;
       }
 
       const controller = new AbortController();

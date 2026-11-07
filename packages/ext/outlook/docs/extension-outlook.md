@@ -450,7 +450,7 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 | Cooperative cancellation via `ctx.signal` | `#TIMEOUT` | `request_cancelled` |
 | Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
-| Called after `dispose()` | `#DISPOSED` | `disposed` |
+| Called after `dispose()` | `#DISPOSED` | `extension_disposed` |
 | Other Graph API / unknown failure | `#UNAVAILABLE` | `unknown_error` |
 
 ## Events

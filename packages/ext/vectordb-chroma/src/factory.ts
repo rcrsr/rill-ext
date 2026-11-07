@@ -111,7 +111,7 @@ export function createChromaExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -157,7 +157,7 @@ export function createChromaExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -260,7 +260,7 @@ export function createChromaExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -323,7 +323,7 @@ export function createChromaExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -399,7 +399,7 @@ export function createChromaExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -435,7 +435,7 @@ export function createChromaExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -497,7 +497,7 @@ export function createChromaExtension(
       fn: async (_args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -535,7 +535,7 @@ export function createChromaExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -577,7 +577,7 @@ export function createChromaExtension(
       fn: async (args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -609,7 +609,7 @@ export function createChromaExtension(
       fn: async (_args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {
@@ -637,7 +637,7 @@ export function createChromaExtension(
       fn: async (_args, ctxLike): Promise<RillValue> => {
         const ctx = ctxLike as RuntimeContext;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
-        if (disposed !== null) return disposed;
+        if (disposed !== null) throw disposed;
 
         const startTime = Date.now();
         try {

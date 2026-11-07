@@ -196,7 +196,7 @@ export function createSqliteKvExtension(
 
   const get: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mount = getMountDb(mountName);
@@ -231,7 +231,7 @@ export function createSqliteKvExtension(
 
   const get_or: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const fallback = args['fallback'] as RillValue;
@@ -252,7 +252,7 @@ export function createSqliteKvExtension(
 
   const set: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const value = args['value'] as RillValue;
@@ -346,7 +346,7 @@ export function createSqliteKvExtension(
 
   const merge: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const partial = args['partial'] as Record<string, RillValue>;
@@ -439,7 +439,7 @@ export function createSqliteKvExtension(
 
   const deleteKey: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mount = getMountDb(mountName);
@@ -462,7 +462,7 @@ export function createSqliteKvExtension(
 
   const keys: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mount = getMountDb(mountName);
     if (!mount) return unknownMount(runCtx, mountName);
@@ -480,7 +480,7 @@ export function createSqliteKvExtension(
 
   const has: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mount = getMountDb(mountName);
@@ -499,7 +499,7 @@ export function createSqliteKvExtension(
 
   const clear: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mount = getMountDb(mountName);
     if (!mount) return unknownMount(runCtx, mountName);
@@ -528,7 +528,7 @@ export function createSqliteKvExtension(
 
   const getAll: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) return disposedInvalid(runCtx);
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mount = getMountDb(mountName);
     if (!mount) return unknownMount(runCtx, mountName);
@@ -550,6 +550,7 @@ export function createSqliteKvExtension(
 
   const schema: CallableFn = (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
+    if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mount = getMountDb(mountName);
     if (!mount) return unknownMount(runCtx, mountName);
@@ -568,7 +569,8 @@ export function createSqliteKvExtension(
     return result;
   };
 
-  const mountsList: CallableFn = () => {
+  const mountsList: CallableFn = (_args, runtimeCtx) => {
+    if (disposed) throw disposedInvalid(runtimeCtx as RuntimeContext);
     const result: RillValue[] = [];
     for (const [name, mountConfig] of Object.entries(config.mounts)) {
       result.push({
