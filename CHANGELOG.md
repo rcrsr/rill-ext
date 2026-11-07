@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **mcp dispose:** host functions halt with `#DISPOSED` after `dispose()`, and calls it cancels report `#DISPOSED` ([#139](https://github.com/rcrsr/rill-ext/issues/139)). ([#148](https://github.com/rcrsr/rill-ext/pull/148))
 - **Post-dispose calls throw:** every extension's host functions throw `#DISPOSED` with `raw.kind` `extension_disposed` after `dispose()`. exec, fetch, kv-file, claude-code, fs-local, crypto and text gain the guard, and the wrong kind is fixed elsewhere ([#149](https://github.com/rcrsr/rill-ext/issues/149)). ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+- **In-flight dispose:** cancelled calls report `#DISPOSED` in claude-code, llm-openai, llm-gemini and fs-s3 ([#151](https://github.com/rcrsr/rill-ext/issues/151)). ([#153](https://github.com/rcrsr/rill-ext/pull/153))
 
 ## [0.23.0] - 2026-11-06
 

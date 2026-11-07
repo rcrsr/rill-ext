@@ -7,6 +7,10 @@
 - **Test suite trust:** Tests are type-checked and assert unconditionally; no runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 
+### Fixed
+
+- **In-flight dispose:** cancelled requests throw #DISPOSED (extension_disposed) instead of #TIMEOUT. ([#153](https://github.com/rcrsr/rill-ext/pull/153))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

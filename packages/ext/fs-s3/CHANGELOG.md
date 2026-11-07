@@ -10,6 +10,7 @@
 ### Fixed
 
 - **Post-dispose calls throw:** Host functions throw `#DISPOSED` after `dispose()` instead of returning it; use `guard`. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+- **In-flight dispose:** A request cancelled by `dispose()` now returns `#DISPOSED` (`extension_disposed`) instead of `#UNAVAILABLE` or `#TIMEOUT`. ([#153](https://github.com/rcrsr/rill-ext/pull/153))
 
 ## [0.23.0] - 2026-11-06
 
