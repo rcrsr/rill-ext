@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Test suite trust:** type-checks test files, fixes false-pass tests, and runs kv-redis and fs-s3 integration suites in CI. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

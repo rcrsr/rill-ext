@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Test suite trust:** Tests are type-checked; dispose-during-upsert_batch asserts the settled result and #DISPOSED. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

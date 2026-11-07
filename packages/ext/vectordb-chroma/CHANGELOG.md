@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Test suite trust:** Type-level tests are now type-checked, and the dispose-during-batch test asserts the settled result and #DISPOSED. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

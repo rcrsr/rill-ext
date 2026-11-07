@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Test suite trust:** Test files are type-checked and their type errors fixed. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed
