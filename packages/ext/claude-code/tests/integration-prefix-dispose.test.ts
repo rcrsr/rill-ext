@@ -9,7 +9,12 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { makeFactoryCtx, extValue } from './_helpers.js';
 import type { IPty } from 'node-pty';
-import { createRuntimeContext, getStatus, isInvalid } from '@rcrsr/rill';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  RuntimeHaltSignal,
+} from '@rcrsr/rill';
 import { SpawnError } from '../src/errors.js';
 
 // ============================================================
@@ -775,7 +780,7 @@ describe('In-flight call cancelled by dispose', () => {
     expect(status.provider).toBe('claude-code');
   });
 
-  it('keeps UNAVAILABLE with exit_nonzero when a non-zero exit resolves after dispose', async () => {
+  it('ignores non-request_cancelled exit errors when the extension is disposed', async () => {
     const { disposeFn } = await startCancellable(
       () =>
         new SpawnError('exit_nonzero', 'exited with code 1', { exit_code: 1 })
@@ -794,5 +799,68 @@ describe('In-flight call cancelled by dispose', () => {
     expect(status.code.name).toBe('UNAVAILABLE');
     expect(status.raw['kind']).toBe('exit_nonzero');
     expect(status.provider).toBe('claude-code');
+  });
+
+  async function drainChunks(stream: unknown): Promise<unknown[]> {
+    type Step = {
+      done: boolean;
+      value?: unknown;
+      next: { fn: (args: object, ctx: null) => Promise<unknown> };
+    };
+    const chunks: unknown[] = [];
+    let current = stream as Step;
+    while (!current.done) {
+      current = (await current.next.fn({}, null)) as Step;
+      if (!current.done && current.value !== undefined) {
+        chunks.push(current.value);
+      }
+    }
+    return chunks;
+  }
+
+  it('throws DISPOSED from chunks when extension dispose cancels the call', async () => {
+    await startCancellable(cancelled);
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
+    const stream = extValue(ext).prompt.fn(
+      { text: 'Test', options: {} },
+      createRuntimeContext()
+    );
+
+    await ext.dispose!();
+
+    const thrown: unknown = await drainChunks(stream).then(
+      () => {},
+      (error: unknown) => error
+    );
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+
+  it('emits no error chunk or event when the stream is disposed by its consumer', async () => {
+    await startCancellable(cancelled);
+    const events: Array<{ event?: unknown }> = [];
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
+    const stream = extValue(ext).prompt.fn(
+      { text: 'Test', options: {} },
+      createRuntimeContext({
+        callbacks: {
+          onLog: vi.fn(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
+        },
+      })
+    );
+
+    (
+      stream as { __rill_stream_dispose?: () => void }
+    ).__rill_stream_dispose?.();
+
+    const chunks = await drainChunks(stream);
+    await resolveStream(stream);
+    expect(chunks).toEqual([]);
+    expect(events.map((e) => e.event)).not.toContain('claude-code:error');
   });
 });

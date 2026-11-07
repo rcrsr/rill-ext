@@ -176,6 +176,11 @@ function createPtyStream(
   // surface as an [error] chunk plus a captured `exitError`. resolve() turns
   // any captured error into an invalid RillValue.
   let exitError: unknown;
+  // Set when a request_cancelled exit was caused by the stream's own dispose
+  // while the extension stays alive; such cancels emit no error chunk or event.
+  let consumerCancelled = false;
+  // Set when the cancel came from extension dispose(); chunks() throws #DISPOSED.
+  let cancelledByExtensionDispose = false;
 
   const exitPromise = spawn.exitCode.then(
     () => {
@@ -188,7 +193,12 @@ function createPtyStream(
       done = true;
       exitError = error;
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      lineBuffer.push(`[error] ${errorMessage}`);
+      if (error instanceof SpawnError && error.kind === 'request_cancelled') {
+        cancelledByExtensionDispose = isExtensionDisposed();
+        consumerCancelled = !cancelledByExtensionDispose;
+      } else {
+        lineBuffer.push(`[error] ${errorMessage}`);
+      }
       wake();
     }
   );
@@ -211,6 +221,7 @@ function createPtyStream(
     }
 
     await exitPromise;
+    if (cancelledByExtensionDispose) throw failDisposed(ctx);
   }
 
   const retTypeStructure = {
@@ -246,12 +257,15 @@ function createPtyStream(
     // `mapSpawnError` so the host script sees a precise generic atom rather
     // than a thrown plain Error.
     if (exitError !== undefined) {
-      emitExtensionEvent(ctx, {
-        event: 'claude-code:error',
-        subsystem: 'extension:claude-code',
-        error: exitError instanceof Error ? exitError.message : 'Unknown error',
-        duration: 0,
-      });
+      if (!consumerCancelled) {
+        emitExtensionEvent(ctx, {
+          event: 'claude-code:error',
+          subsystem: 'extension:claude-code',
+          error:
+            exitError instanceof Error ? exitError.message : 'Unknown error',
+          duration: 0,
+        });
+      }
       tracker.disposers.delete(spawn.dispose);
       spawn.dispose();
       // Only the abort caused by extension dispose() reports DISPOSED; every

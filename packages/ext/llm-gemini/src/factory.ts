@@ -535,13 +535,37 @@ export function createGeminiExtension(
     }
   }
 
+  function isDisposedHalt(error: unknown): boolean {
+    return (
+      error instanceof RuntimeHaltSignal &&
+      getStatus(error.value).raw?.['kind'] === 'extension_disposed'
+    );
+  }
+
+  // True for errors an aborted request produces (fetch AbortError, or the
+  // shared tool loop's #TIMEOUT halt wrapping an abort or its own cancellation),
+  // as opposed to API, auth or rate-limit failures.
+  function isAbortShaped(error: unknown): boolean {
+    if (error instanceof RuntimeHaltSignal) {
+      const kind = getStatus(error.value).raw?.['kind'];
+      return kind === 'tool_loop_cancelled' || kind === 'request_timeout';
+    }
+    // The shared tool loop wraps provider errors without a detector in a
+    // RuntimeError carrying the original error as context.cause.
+    if (error instanceof RuntimeError) {
+      return isAbortShaped(error.context?.['cause']);
+    }
+    return error instanceof Error && error.name === 'AbortError';
+  }
+
   // Single failure classifier: a request cancelled by dispose() reports
-  // #DISPOSED; otherwise rill errors pass through and vendor errors map.
+  // #DISPOSED; an error that happened before dispose keeps its class, so rill
+  // errors pass through and vendor errors map.
   function classifyError(
     ctx: RuntimeContext,
     error: unknown
   ): RuntimeError | RuntimeHaltSignal {
-    if (!abortController) {
+    if (!abortController && isAbortShaped(error)) {
       return haltInvalid(
         ctx,
         'DISPOSED',
@@ -1239,7 +1263,11 @@ export function createGeminiExtension(
           await loopPromise;
 
           if (streamError) {
-            if (accumulatedTextDeltas.length > 0) {
+            // #DISPOSED outranks the partial-output result.
+            if (
+              accumulatedTextDeltas.length > 0 &&
+              !isDisposedHalt(streamError)
+            ) {
               const partialContent = accumulatedTextDeltas.join('');
               emitExtensionEvent(ctx as RuntimeContext, {
                 event: 'gemini:error',

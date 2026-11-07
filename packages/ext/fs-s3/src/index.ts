@@ -253,10 +253,10 @@ export function createS3FsExtension(
 
   /**
    * Maps a failed S3 call. A failure after dispose() is the cancelled
-   * in-flight request, so it reports #DISPOSED instead of the raw cause.
+   * in-flight request, so it throws the #DISPOSED halt instead of the raw cause.
    */
   function mapError(runCtx: RuntimeContext, error: unknown): RillValue {
-    if (disposed) return disposedInvalid(runCtx).value;
+    if (disposed) throw disposedInvalid(runCtx);
     return mapS3Error(runCtx, error);
   }
 

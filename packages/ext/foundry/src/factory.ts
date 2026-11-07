@@ -280,6 +280,61 @@ export async function createFoundryExtension(
   }
 
   // ============================================================
+  // CANCELLATION CLASSIFIER
+  // ============================================================
+
+  // True for errors an aborted request produces (fetch AbortError, or the
+  // shared tool loop's halt or RuntimeError wrapping an abort or its own
+  // cancellation), as opposed to API, auth or rate-limit failures.
+  function isAbortShaped(error: unknown): boolean {
+    if (error instanceof RuntimeHaltSignal) {
+      const kind = getStatus(error.value).raw?.['kind'];
+      return kind === 'tool_loop_cancelled' || kind === 'request_timeout';
+    }
+    if (error instanceof RuntimeError) {
+      return isAbortShaped(error.context?.['cause']);
+    }
+    return (
+      error instanceof Error &&
+      (error.name === 'AbortError' ||
+        error.constructor.name === 'APIUserAbortError')
+    );
+  }
+
+  /**
+   * Returns the #DISPOSED halt when dispose() cancelled the call, otherwise
+   * undefined. An error that happened before dispose keeps its own class.
+   */
+  function cancelledByDispose(
+    ctx: RuntimeContext,
+    error: unknown
+  ): RuntimeHaltSignal | undefined {
+    if (abortController || !isAbortShaped(error)) return undefined;
+    return haltInvalid(
+      ctx,
+      'DISPOSED',
+      'extension_disposed',
+      'foundry: extension disposed'
+    );
+  }
+
+  // Single failure classifier for host-function catch blocks.
+  function classifyError(
+    ctx: RuntimeContext,
+    error: unknown
+  ): RuntimeError | RuntimeHaltSignal {
+    return (
+      cancelledByDispose(ctx, error) ??
+      (error instanceof RuntimeHaltSignal || error instanceof RuntimeError
+        ? error
+        : new RuntimeHaltSignal(
+            mapProviderError(ctx, 'Foundry', error, detectFoundryError),
+            true
+          ))
+    );
+  }
+
+  // ============================================================
   // DISPOSE
   // ============================================================
 
@@ -365,15 +420,18 @@ export async function createFoundryExtension(
 
         const apiMessages = messagesToOpenAI(inputMessages);
 
-        const runner = client.chat.completions.stream({
-          model: factoryModel!,
-          max_completion_tokens: maxTokens,
-          messages: apiMessages,
-          stream_options: { include_usage: true },
-          ...(factoryTemperature !== undefined
-            ? { temperature: factoryTemperature }
-            : {}),
-        });
+        const runner = client.chat.completions.stream(
+          {
+            model: factoryModel!,
+            max_completion_tokens: maxTokens,
+            messages: apiMessages,
+            stream_options: { include_usage: true },
+            ...(factoryTemperature !== undefined
+              ? { temperature: factoryTemperature }
+              : {}),
+          },
+          { signal: abortController!.signal }
+        );
 
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
@@ -384,6 +442,8 @@ export async function createFoundryExtension(
               }
             }
           } catch (error: unknown) {
+            const cancelled = cancelledByDispose(ctx as RuntimeContext, error);
+            if (cancelled) throw cancelled;
             if (error instanceof RuntimeHaltSignal) throw error;
             throwProviderHalt(
               ctx as RuntimeContext,
@@ -428,19 +488,10 @@ export async function createFoundryExtension(
             return result as unknown as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
-            const rillError: RuntimeError | RuntimeHaltSignal =
-              error instanceof RuntimeHaltSignal ||
-              error instanceof RuntimeError
-                ? error
-                : new RuntimeHaltSignal(
-                    mapProviderError(
-                      ctx as RuntimeContext,
-                      'Foundry',
-                      error,
-                      detectFoundryError
-                    ),
-                    true
-                  );
+            const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
+              ctx as RuntimeContext,
+              error
+            );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'foundry:message:error',
               subsystem: 'extension:foundry',
@@ -533,11 +584,14 @@ export async function createFoundryExtension(
           validateEmbedText(text.trim());
           validateEmbedModel(factoryEmbedModel);
 
-          const response = await client.embeddings.create({
-            model: factoryEmbedModel,
-            input: text,
-            encoding_format: 'float',
-          });
+          const response = await client.embeddings.create(
+            {
+              model: factoryEmbedModel,
+              input: text,
+              encoding_format: 'float',
+            },
+            { signal: abortController!.signal }
+          );
 
           const embeddingData = response.data[0]?.embedding;
           if (!embeddingData || embeddingData.length === 0) {
@@ -564,18 +618,10 @@ export async function createFoundryExtension(
           return vector as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeHaltSignal || error instanceof RuntimeError
-              ? error
-              : new RuntimeHaltSignal(
-                  mapProviderError(
-                    ctx as RuntimeContext,
-                    'Foundry',
-                    error,
-                    detectFoundryError
-                  ),
-                  true
-                );
+          const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
+            ctx as RuntimeContext,
+            error
+          );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
@@ -614,11 +660,14 @@ export async function createFoundryExtension(
 
           const stringTexts = validateEmbedBatch(texts);
 
-          const response = await client.embeddings.create({
-            model: factoryEmbedModel,
-            input: stringTexts,
-            encoding_format: 'float',
-          });
+          const response = await client.embeddings.create(
+            {
+              model: factoryEmbedModel,
+              input: stringTexts,
+              encoding_format: 'float',
+            },
+            { signal: abortController!.signal }
+          );
 
           const vectors: RillValue[] = [];
           for (const embeddingItem of response.data) {
@@ -653,18 +702,10 @@ export async function createFoundryExtension(
           return vectors as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeHaltSignal || error instanceof RuntimeError
-              ? error
-              : new RuntimeHaltSignal(
-                  mapProviderError(
-                    ctx as RuntimeContext,
-                    'Foundry',
-                    error,
-                    detectFoundryError
-                  ),
-                  true
-                );
+          const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
+            ctx as RuntimeContext,
+            error
+          );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
@@ -1096,7 +1137,10 @@ export async function createFoundryExtension(
           maxTurns,
           ctx,
           yieldChunk,
-          toolLoopAbortController.signal
+          AbortSignal.any([
+            abortController!.signal,
+            toolLoopAbortController.signal,
+          ])
         );
 
         async function* chunks(): AsyncGenerator<RillValue> {
@@ -1106,6 +1150,8 @@ export async function createFoundryExtension(
               yield chunk;
             }
           } catch (error: unknown) {
+            const cancelled = cancelledByDispose(ctx as RuntimeContext, error);
+            if (cancelled) throw cancelled;
             if (error instanceof RuntimeHaltSignal) throw error;
             throwProviderHalt(
               ctx as RuntimeContext,
@@ -1178,19 +1224,10 @@ export async function createFoundryExtension(
             return result as unknown as RillValue;
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
-            const rillError: RuntimeError | RuntimeHaltSignal =
-              error instanceof RuntimeHaltSignal ||
-              error instanceof RuntimeError
-                ? error
-                : new RuntimeHaltSignal(
-                    mapProviderError(
-                      ctx as RuntimeContext,
-                      'Foundry',
-                      error,
-                      detectFoundryError
-                    ),
-                    true
-                  );
+            const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
+              ctx as RuntimeContext,
+              error
+            );
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'foundry:error',
               subsystem: 'extension:foundry',
@@ -1389,7 +1426,9 @@ export async function createFoundryExtension(
             apiParams.temperature = factoryTemperature;
           }
 
-          const response = await client.chat.completions.create(apiParams);
+          const response = await client.chat.completions.create(apiParams, {
+            signal: abortController!.signal,
+          });
 
           const raw = response.choices[0]?.message?.content ?? '';
 
@@ -1435,18 +1474,10 @@ export async function createFoundryExtension(
           return result as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeHaltSignal || error instanceof RuntimeError
-              ? error
-              : new RuntimeHaltSignal(
-                  mapProviderError(
-                    ctx as RuntimeContext,
-                    'Foundry',
-                    error,
-                    detectFoundryError
-                  ),
-                  true
-                );
+          const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
+            ctx as RuntimeContext,
+            error
+          );
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'foundry:error',
             subsystem: 'extension:foundry',

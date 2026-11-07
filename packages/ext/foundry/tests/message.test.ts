@@ -280,6 +280,9 @@ describe('message() function', () => {
         messages: expect.arrayContaining([
           expect.objectContaining({ role: 'user', content: 'What is 2+2?' }),
         ]),
+      }),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal) as AbortSignal,
       })
     );
   });
@@ -314,6 +317,9 @@ describe('message() function', () => {
           }),
           expect.objectContaining({ role: 'user', content: 'Hi' }),
         ],
+      }),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal) as AbortSignal,
       })
     );
   });

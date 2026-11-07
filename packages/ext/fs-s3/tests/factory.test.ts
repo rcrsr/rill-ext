@@ -415,7 +415,12 @@ describe('createS3FsExtension', () => {
       async function statusOfInFlight(
         name: 'read' | 'append',
         disposeFirst: boolean
-      ): Promise<{ code: string; kind: unknown; provider: unknown }> {
+      ): Promise<{
+        code: string;
+        kind: unknown;
+        provider: unknown;
+        thrown: boolean;
+      }> {
         const { spy, rejectWith } = deferredSend();
         try {
           const ext = createTestExtension();
@@ -427,26 +432,36 @@ describe('createS3FsExtension', () => {
           await Promise.resolve();
           if (disposeFirst) await ext.dispose?.();
           rejectWith(new Error('socket hang up'));
-          const result = (await pending) as RillValue;
+          let result: RillValue;
+          let thrown = false;
+          try {
+            result = (await pending) as RillValue;
+          } catch (error: unknown) {
+            if (!(error instanceof RuntimeHaltSignal)) throw error;
+            result = error.value;
+            thrown = true;
+          }
           expect(isInvalid(result)).toBe(true);
           const status = getStatus(result);
           return {
             code: status.code.name,
             kind: status.raw['kind'],
             provider: status.provider,
+            thrown,
           };
         } finally {
           spy.mockRestore();
         }
       }
 
-      it('returns #DISPOSED when read fails after dispose', async () => {
+      it('throws #DISPOSED when read fails after dispose', async () => {
         const status = await statusOfInFlight('read', true);
 
         expect(status).toEqual({
           code: 'DISPOSED',
           kind: 'extension_disposed',
           provider: 'fs-s3',
+          thrown: true,
         });
       });
 
@@ -454,9 +469,10 @@ describe('createS3FsExtension', () => {
         const status = await statusOfInFlight('read', false);
 
         expect(status.code).toBe('UNAVAILABLE');
+        expect(status.thrown).toBe(false);
       });
 
-      it('returns #DISPOSED when append NoSuchKey bypass hits a socket error after dispose', async () => {
+      it('throws #DISPOSED when append NoSuchKey bypass hits a socket error after dispose', async () => {
         const noSuchKey = Object.assign(new Error('missing'), {
           name: 'NoSuchKey',
         });
@@ -481,9 +497,13 @@ describe('createS3FsExtension', () => {
           await vi.waitFor(() => expect(calls).toBe(2));
           await ext.dispose?.();
           rejectPut(new Error('socket hang up'));
-          const result = (await pending) as RillValue;
+          const thrown: unknown = await pending.then(
+            () => {},
+            (error: unknown) => error
+          );
 
-          const status = getStatus(result);
+          expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+          const status = getStatus((thrown as RuntimeHaltSignal).value);
           expect(status.code.name).toBe('DISPOSED');
           expect(status.raw['kind']).toBe('extension_disposed');
         } finally {

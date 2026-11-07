@@ -94,6 +94,9 @@ export function spawnClaudeCli(
     resolveExit = resolve;
     rejectExit = reject;
   });
+  // dispose() rejects this promise; callers still observe the rejection on the
+  // original promise, this only prevents an unhandled rejection without a handler.
+  exitCode.catch(() => {});
 
   // Spawn process
   let ptyProcess: pty.IPty;

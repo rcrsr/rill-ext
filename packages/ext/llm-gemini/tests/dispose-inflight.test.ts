@@ -166,4 +166,66 @@ describe('in-flight calls cancelled by dispose()', () => {
       expectDisposedHalt(await pending);
     });
   });
+
+  describe('tool_loop() with accumulated output', () => {
+    it('throws DISPOSED instead of a partial result when dispose aborts after text deltas', async () => {
+      mockGenerateContentStream.mockImplementation(
+        (params: { config: { abortSignal: AbortSignal } }) =>
+          (async function* () {
+            yield { text: 'partial' };
+            await waitForAbort(params.config.abortSignal);
+          })()
+      );
+      const ext = createGeminiExtension({
+        api_key: 'test-key',
+        model: 'gemini-2.0-flash',
+      });
+      const ctx = createRuntimeContext();
+      const tools = { tool: callable(vi.fn()) };
+
+      const stream = await getCallable(ext, 'tool_loop').fn(
+        { prompt: 'hello', tools },
+        ctx
+      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
+      const resolved = (
+        stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+      )
+        .__rill_stream_resolve()
+        .catch((error: unknown) => error);
+      await ext.dispose!();
+
+      expectDisposedHalt(await resolved);
+    });
+  });
+
+  describe('error observed after dispose', () => {
+    it('keeps the original atom when a non-abort error settles after dispose', async () => {
+      let rejectRequest: (error: unknown) => void = () => {};
+      mockEmbedContent.mockImplementation(
+        () =>
+          new Promise<never>((_resolve, reject) => {
+            rejectRequest = reject;
+          })
+      );
+      const ext = createGeminiExtension({
+        api_key: 'test-key',
+        model: 'gemini-2.0-flash',
+        embed_model: 'text-embedding-004',
+      });
+      const ctx = createRuntimeContext();
+
+      const pending = Promise.resolve(
+        getCallable(ext, 'embed').fn({ text: 'hello' }, ctx)
+      ).catch((error: unknown) => error);
+      await ext.dispose!();
+      rejectRequest(new Error('rate limit exceeded (429)'));
+
+      const thrown = await pending;
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expectHalt(thrown, { code: 'RATE_LIMIT', provider: 'gemini' });
+    });
+  });
 });

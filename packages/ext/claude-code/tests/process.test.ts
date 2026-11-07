@@ -309,7 +309,7 @@ describe('Process Manager', () => {
       expect(mockPty.kill).toHaveBeenCalledTimes(1);
     });
 
-    it('does not throw when dispose is called multiple times', async () => {
+    it('rejects exitCode once when dispose is called multiple times', async () => {
       // EC-16: Idempotent cleanup
       const mockPty = createMockPty();
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);

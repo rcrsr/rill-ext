@@ -10,6 +10,7 @@ import {
   RuntimeHaltSignal,
   type ApplicationCallable,
 } from '@rcrsr/rill';
+import { APIError } from 'openai';
 import { createOpenAIExtension } from '../src/factory.js';
 
 const mockStream = vi.fn();
@@ -167,6 +168,45 @@ describe('dispose() with in-flight requests', () => {
       await ext.dispose?.();
 
       expectDisposedHalt(await settled);
+    });
+  });
+
+  describe('error observed after dispose', () => {
+    it('keeps the original atom when a non-abort error settles after dispose', async () => {
+      let rejectRequest: (error: unknown) => void = () => {};
+      mockStream.mockImplementation(() => {
+        const runner = {
+          on: vi.fn(() => runner),
+          finalChatCompletion: vi.fn(
+            () =>
+              new Promise<never>((_resolve, reject) => {
+                rejectRequest = reject;
+              })
+          ),
+          abort: vi.fn(),
+        };
+        return runner;
+      });
+      const ext = createOpenAIExtension(CONFIG);
+      const stream = getCallable(ext, 'message').fn(
+        { prompt: 'Hello' },
+        createRuntimeContext()
+      );
+      const settled = settleRejection(resolveStream(stream));
+
+      await ext.dispose?.();
+      rejectRequest(
+        new (APIError as unknown as new (
+          status: number,
+          error: unknown,
+          message: string
+        ) => Error)(429, undefined, 'rate limited')
+      );
+
+      const thrown = await settled;
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
+      expect((status.code as { name: string }).name).toBe('RATE_LIMIT');
     });
   });
 

@@ -173,6 +173,9 @@ describe('generate() function', () => {
           response_format: expect.objectContaining({
             type: 'json_schema',
           }),
+        }),
+        expect.objectContaining({
+          signal: expect.any(AbortSignal) as AbortSignal,
         })
       );
     });
