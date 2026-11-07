@@ -164,6 +164,8 @@ settings:
 
 overrides:
   dts-bundle-generator>typescript: 6.0.3
+  openai>undici: ^7.30.2
+  '@qdrant/js-client-rest>undici': ^7.30.2
 
 importers:
 
@@ -310,7 +312,7 @@ importers:
     dependencies:
       openai:
         specifier: ^7.52.0
-        version: 7.52.0(@aws-sdk/credential-provider-node@3.972.93)(@smithy/signature-v4@5.7.5)(google-auth-library@10.6.2)(undici@7.29.1)(zod@4.6.7)
+        version: 7.52.0(@aws-sdk/credential-provider-node@3.972.93)(@smithy/signature-v4@5.7.5)(google-auth-library@10.6.2)(undici@7.30.2)(zod@4.6.7)
     devDependencies:
       '@azure/identity':
         specifier: ^4.14.1
@@ -556,7 +558,7 @@ importers:
     dependencies:
       openai:
         specifier: ^7.52.0
-        version: 7.52.0(@aws-sdk/credential-provider-node@3.972.93)(@smithy/signature-v4@5.7.5)(google-auth-library@10.6.2)(undici@7.29.1)(zod@4.6.7)
+        version: 7.52.0(@aws-sdk/credential-provider-node@3.972.93)(@smithy/signature-v4@5.7.5)(google-auth-library@10.6.2)(undici@7.30.2)(zod@4.6.7)
     devDependencies:
       '@rcrsr/rill':
         specifier: ~0.23.0
@@ -655,7 +657,7 @@ importers:
         version: 9.5.1
       openai:
         specifier: ^7.52.0
-        version: 7.52.0(@aws-sdk/credential-provider-node@3.972.93)(@smithy/signature-v4@5.7.5)(google-auth-library@10.6.2)(undici@7.29.1)(zod@4.6.7)
+        version: 7.52.0(@aws-sdk/credential-provider-node@3.972.93)(@smithy/signature-v4@5.7.5)(google-auth-library@10.6.2)(undici@7.30.2)(zod@4.6.7)
       tsup:
         specifier: ^9.0.0
         version: 9.0.0(jiti@2.7.0)(postcss@8.5.8)(typescript@7.0.2)(yaml@2.9.1)
@@ -2548,6 +2550,11 @@ packages:
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
+    peerDependencies:
+      ajv: ^8.0.0
+    peerDependenciesMeta:
+      ajv:
+        optional: true
 
   ajv@8.18.0:
     resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
@@ -3321,7 +3328,7 @@ packages:
       '@smithy/hash-node': '>=4.3.0 <5'
       '@smithy/signature-v4': '>=5.4.0 <6'
       google-auth-library: '>=9.15.1 <12'
-      undici: '>=5 <9'
+      undici: ^7.30.2
       ws: ^8.21.0
       zod: ^3.25 || ^4.0
     peerDependenciesMeta:
@@ -3703,8 +3710,8 @@ packages:
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
-  undici@7.29.1:
-    resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
+  undici@7.30.2:
+    resolution: {integrity: sha512-mLyPQnHwUxaM/rideoK/+KL8DaAJLRl4aBCfmX444aCSLnIaomqPLtNRe2jdCYcsk5wZzXrDIQC8ZeYNRAYyIA==}
     engines: {node: '>=20.18.1'}
 
   unpipe@1.0.0:
@@ -4653,7 +4660,7 @@ snapshots:
     dependencies:
       '@qdrant/openapi-typescript-fetch': 1.2.6
       typescript: 7.0.2
-      undici: 7.29.1
+      undici: 7.30.2
 
   '@qdrant/openapi-typescript-fetch@1.2.6': {}
 
@@ -5785,12 +5792,12 @@ snapshots:
       powershell-utils: 0.2.1
       wsl-utils: 1.0.1
 
-  openai@7.52.0(@aws-sdk/credential-provider-node@3.972.93)(@smithy/signature-v4@5.7.5)(google-auth-library@10.6.2)(undici@7.29.1)(zod@4.6.7):
+  openai@7.52.0(@aws-sdk/credential-provider-node@3.972.93)(@smithy/signature-v4@5.7.5)(google-auth-library@10.6.2)(undici@7.30.2)(zod@4.6.7):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.93
       '@smithy/signature-v4': 5.7.5
       google-auth-library: 10.6.2
-      undici: 7.29.1
+      undici: 7.30.2
       zod: 4.6.7
 
   oxc-parser@0.155.0:
@@ -6283,7 +6290,7 @@ snapshots:
 
   undici-types@8.9.0: {}
 
-  undici@7.29.1: {}
+  undici@7.30.2: {}
 
   unpipe@1.0.0: {}
 

@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc --build",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint --config ../../../.oxlintrc.json src/",
+    "lint": "oxlint --type-aware --config ../../../.oxlintrc.json src/",
     "check": "pnpm run build && pnpm run lint"
   },
   "peerDependencies": {
