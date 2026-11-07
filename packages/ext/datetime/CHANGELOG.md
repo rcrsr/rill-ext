@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
+
 ### Removed
 
 - **Test suite trust:** Removed the opt-in perf benchmark file, whose timing bound was unreliable on shared runners. ([#147](https://github.com/rcrsr/rill-ext/pull/147))

@@ -5,6 +5,7 @@
 ### Changed
 
 - **Test suite trust:** Tests are type-checked; Redis integration tests run in CI and fail when Redis is unreachable. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
+- **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, tightens weak or misnamed assertions, and runs the shared KV contract suite against Redis. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 
 ## [0.23.0] - 2026-11-06
 
