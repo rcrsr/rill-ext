@@ -6,6 +6,10 @@
 
 - **Test suite trust:** Test files are type-checked and their type errors fixed. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 
+### Fixed
+
+- **Post-dispose calls:** Calls after `dispose()` throw `#DISPOSED` (`raw.kind` `extension_disposed`) instead of returning a value. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

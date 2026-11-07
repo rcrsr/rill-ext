@@ -7,6 +7,10 @@
 - **Test suite trust:** Test files are type-checked and assertions run unconditionally; no runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 
+### Fixed
+
+- **Post-dispose docs:** Docs state post-dispose calls throw `#DISPOSED` with `raw.kind` `extension_disposed`. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

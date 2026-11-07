@@ -7,6 +7,10 @@
 - **Test suite trust:** Tests are type-checked; time_range tests assert month and year values reach the request URL. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 
+### Fixed
+
+- **Post-dispose calls throw:** Calls after `dispose()` throw `#DISPOSED` with `raw.kind` `extension_disposed` instead of returning a value. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed

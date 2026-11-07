@@ -7,6 +7,10 @@
 - **Test suite trust:** Tests are type-checked; the size-limit test covers both sides without writing 10 MB to disk. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 
+### Fixed
+
+- **post-dispose calls throw:** After `dispose()`, calls throw `#DISPOSED` (`raw.kind` `extension_disposed`) instead of touching the mount. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed
