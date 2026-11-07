@@ -15,7 +15,13 @@ import {
   structureToTypeValue,
 } from '@rcrsr/rill';
 import type { McpLifecycleState } from './types.js';
-import { failDisposed, failTool, failTimeout, mapMcpError } from './errors.js';
+import {
+  failDisposed,
+  isDisposed,
+  failTool,
+  failTimeout,
+  mapMcpError,
+} from './errors.js';
 
 function describeError(error: unknown): string {
   if (isInvalid(error as RillValue)) {
@@ -191,7 +197,7 @@ function generateToolFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
-    if (lifecycleState.disposed === true) {
+    if (isDisposed(lifecycleState)) {
       throw failDisposed(ctx);
     }
 
@@ -247,6 +253,9 @@ function generateToolFunction(
 
       return parseToolResult(result);
     } catch (error) {
+      if (isDisposed(lifecycleState)) {
+        throw failDisposed(ctx);
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',

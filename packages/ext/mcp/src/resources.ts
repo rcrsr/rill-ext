@@ -15,7 +15,13 @@ import {
   isInvalid,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
-import { failDisposed, failInput, failTimeout, mapMcpError } from './errors.js';
+import {
+  failDisposed,
+  isDisposed,
+  failInput,
+  failTimeout,
+  mapMcpError,
+} from './errors.js';
 import { sanitizeNames } from './naming.js';
 import { parseResourceContent } from './parsing.js';
 import type { McpLifecycleState } from './types.js';
@@ -156,7 +162,7 @@ export function createReadResourceFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
-    if (lifecycleState.disposed === true) {
+    if (isDisposed(lifecycleState)) {
       throw failDisposed(ctx);
     }
 
@@ -197,6 +203,9 @@ export function createReadResourceFunction(
 
       return parseResourceContent(result);
     } catch (error) {
+      if (isDisposed(lifecycleState)) {
+        throw failDisposed(ctx);
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
@@ -260,7 +269,7 @@ function createStaticResourceFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
-    if (lifecycleState.disposed === true) {
+    if (isDisposed(lifecycleState)) {
       throw failDisposed(ctx);
     }
 
@@ -293,6 +302,9 @@ function createStaticResourceFunction(
 
       return parseResourceContent(result);
     } catch (error) {
+      if (isDisposed(lifecycleState)) {
+        throw failDisposed(ctx);
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
@@ -399,7 +411,7 @@ function createResourceTemplateFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
-    if (lifecycleState.disposed === true) {
+    if (isDisposed(lifecycleState)) {
       throw failDisposed(ctx);
     }
 
@@ -450,6 +462,9 @@ function createResourceTemplateFunction(
 
       return parseResourceContent(result);
     } catch (error) {
+      if (isDisposed(lifecycleState)) {
+        throw failDisposed(ctx);
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',

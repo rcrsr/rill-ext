@@ -2,7 +2,7 @@
  * Integration tests for dispose and connection lifecycle.
  *
  * Coverage:
- * - BC-5: Dispose during active call - kills process, pending call rejects
+ * - BC-5: Dispose during active call - kills process, pending call rejects with #DISPOSED
  * - BC-5: Idempotent dispose - second call is no-op
  * - BC-5: Calls after dispose halt with #DISPOSED
  *
@@ -46,7 +46,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
   });
 
   describe('BC-5: Dispose during active tool call', () => {
-    it('kills connection and pending call rejects with connection lost error', async () => {
+    it('kills connection and pending call rejects with DISPOSED', async () => {
       // Mock a tool that simulates a long-running operation
       let toolCallController: {
         resolve: (value: unknown) => void;
@@ -110,8 +110,10 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       // Immediately dispose while the tool call is pending
       await extension.dispose?.();
 
-      // The pending tool call should reject with connection lost error
-      await expectRejectsInvalid(toolCallPromise, 'connection lost');
+      // The pending tool call reports the disposal, not the transport error
+      const pendingError = await expectRejectsInvalid(toolCallPromise);
+      expect(getStatus(pendingError).code.name).toBe('DISPOSED');
+      expect(getStatus(pendingError).raw['kind']).toBe('extension_disposed');
     });
 
     it('handles disposal with multiple pending calls', async () => {
@@ -182,9 +184,11 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       // Dispose while both calls are pending
       await extension.dispose?.();
 
-      // Both pending calls should reject
-      await expectRejectsInvalid(call1, 'connection lost');
-      await expectRejectsInvalid(call2, 'connection lost');
+      // Both pending calls report the disposal
+      for (const call of [call1, call2]) {
+        const error = await expectRejectsInvalid(call);
+        expect(getStatus(error).code.name).toBe('DISPOSED');
+      }
     });
   });
 

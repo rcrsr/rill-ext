@@ -16,7 +16,13 @@ import {
   structureToTypeValue,
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
-import { failDisposed, failInput, failTimeout, mapMcpError } from './errors.js';
+import {
+  failDisposed,
+  isDisposed,
+  failInput,
+  failTimeout,
+  mapMcpError,
+} from './errors.js';
 import { sanitizeNames } from './naming.js';
 import type { McpLifecycleState } from './types.js';
 
@@ -175,7 +181,7 @@ function createPromptFunction(
     ctxLike: unknown
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
-    if (lifecycleState.disposed === true) {
+    if (isDisposed(lifecycleState)) {
       throw failDisposed(ctx);
     }
 
@@ -240,6 +246,9 @@ function createPromptFunction(
 
       return parsePromptMessages(result);
     } catch (error) {
+      if (isDisposed(lifecycleState)) {
+        throw failDisposed(ctx);
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',

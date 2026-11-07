@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { emitExtensionEvent, getStatus } from '@rcrsr/rill';
-import type { RillFunction, RuntimeContext } from '@rcrsr/rill';
+import type { RillFunction, RillValue, RuntimeContext } from '@rcrsr/rill';
 import { generateToolFunctions, type McpTool } from '../../src/tools.js';
 import { expectRejectsInvalid, makeRuntimeCtx } from '../_helpers.js';
 import {
@@ -800,7 +800,7 @@ describe('mcp:error event', () => {
 // ============================================================
 
 describe('disposed guard', () => {
-  function createDisposedHarness(): {
+  function createDisposedHarness(disposed = true): {
     client: {
       callTool: ReturnType<typeof vi.fn>;
       readResource: ReturnType<typeof vi.fn>;
@@ -817,7 +817,7 @@ describe('disposed guard', () => {
       readResource: vi.fn(),
       getPrompt: vi.fn(),
     };
-    const lifecycleState = { connectEmitted: false, disposed: true };
+    const lifecycleState = { connectEmitted: false, disposed };
     const sdkClient = client as unknown as Client;
 
     const tools = generateToolFunctions(
@@ -933,5 +933,43 @@ describe('disposed guard', () => {
     );
 
     expect(getStatus(caught).code.name).toBe('DISPOSED');
+  });
+
+  describe.each(CLOSURE_NAMES)('%s closure with a call in flight', (name) => {
+    function runInFlight(disposeFirst: boolean): Promise<RillValue> {
+      const harness = createDisposedHarness(false);
+      let rejectCall: (reason: Error) => void = () => {};
+      const pending = new Promise<never>((_, reject) => {
+        rejectCall = reject;
+      });
+      harness.client.callTool.mockReturnValue(pending);
+      harness.client.readResource.mockReturnValue(pending);
+      harness.client.getPrompt.mockReturnValue(pending);
+      const closure = harness.closures[name]!;
+
+      const call = closure.fn(closure.args as never, createMockContext());
+      if (disposeFirst) harness.lifecycleState.disposed = true;
+      rejectCall(new Error('MCP error -32000: Connection closed'));
+
+      return expectRejectsInvalid(call);
+    }
+
+    it('reports DISPOSED when dispose closes the connection', async () => {
+      const status = getStatus(await runInFlight(true));
+
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+      expect(emitExtensionEvent).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ event: 'mcp:error' })
+      );
+    });
+
+    it('reports connection_lost when the transport drops without dispose', async () => {
+      const status = getStatus(await runInFlight(false));
+
+      expect(status.code.name).toBe('UNAVAILABLE');
+      expect(status.raw['kind']).toBe('connection_lost');
+    });
   });
 });

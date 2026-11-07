@@ -117,7 +117,7 @@ describe('dispose() functionality', () => {
       await expect(result.dispose?.()).resolves.toBeUndefined();
     });
 
-    it('rejects pending call as connection lost and halts later calls after dispose (BC-5)', async () => {
+    it('rejects pending call and later calls with DISPOSED after dispose (BC-5)', async () => {
       let rejectToolCall: (reason: Error) => void = () => {};
       const toolCallPromise = new Promise<CallToolResult>((_, reject) => {
         rejectToolCall = reject;
@@ -188,9 +188,9 @@ describe('dispose() functionality', () => {
       await settledTracker;
       expect(settled).toBe(true);
       const pendingStatus = getStatus(pendingError);
-      expect(pendingStatus.code.name).toBe('UNAVAILABLE');
+      expect(pendingStatus.code.name).toBe('DISPOSED');
       expect((pendingStatus.raw as { kind?: unknown }).kind).toBe(
-        'connection_lost'
+        'extension_disposed'
       );
 
       const lateError = await expectRejectsInvalid(
