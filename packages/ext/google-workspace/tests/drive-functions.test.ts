@@ -12,7 +12,7 @@ import {
   getStatus,
   type RillValue,
 } from '@rcrsr/rill';
-import { makeFactoryCtx } from './_helpers.js';
+import { makeFactoryCtx, expectCombinedFetchSignal } from './_helpers.js';
 import { createGoogleWorkspaceExtension } from '../src/factory.js';
 
 // ============================================================
@@ -273,7 +273,10 @@ describe('drive_list success cases', () => {
     );
 
     expect(onLogEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'google:drive:list' })
+      expect.objectContaining({
+        event: 'google:drive:list',
+        subsystem: 'extension:google-workspace',
+      })
     );
     const call = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
     expect(typeof call['duration']).toBe('number');
@@ -355,7 +358,10 @@ describe('drive_upload success cases', () => {
     );
 
     expect(onLogEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'google:drive:upload' })
+      expect.objectContaining({
+        event: 'google:drive:upload',
+        subsystem: 'extension:google-workspace',
+      })
     );
     const call = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
     expect(typeof call['duration']).toBe('number');
@@ -781,133 +787,40 @@ describe('EC-10: invalid role for drive_share', () => {
 });
 
 // ============================================================
-// HTTP error mapping [EC-14, EC-15, EC-17, EC-18]
-// ============================================================
-
-// ============================================================
-// Integration depth: AC-13 subsystem field verification
-// ============================================================
-
-describe('AC-13: drive events include subsystem field', () => {
-  it('drive_list emits event with subsystem extension:google-workspace [AC-13]', async () => {
-    const ext = createGoogleWorkspaceExtension(
-      DRIVE_ALL_CONFIG,
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
-    ctx.callbacks.onLogEvent = onLogEvent;
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () => Promise.resolve({ files: [] }),
-    }) as typeof fetch;
-
-    await getCallable(ext, 'drive_list').fn(
-      {} as Record<string, import('@rcrsr/rill').RillValue>,
-      ctx
-    );
-
-    expect(onLogEvent).toHaveBeenCalledOnce();
-    const payload = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
-    expect(payload['event']).toBe('google:drive:list');
-    expect(payload['subsystem']).toBe('extension:google-workspace');
-    expect(typeof payload['duration']).toBe('number');
-  });
-
-  it('drive_upload emits event with subsystem extension:google-workspace [AC-13]', async () => {
-    const ext = createGoogleWorkspaceExtension(
-      DRIVE_ALL_CONFIG,
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
-    ctx.callbacks.onLogEvent = onLogEvent;
-
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: () =>
-        Promise.resolve({ id: 'u1', name: 'f.txt', mimeType: 'text/plain' }),
-    }) as typeof fetch;
-
-    await getCallable(ext, 'drive_upload').fn(
-      { content: BASE64_100, filename: 'f.txt' } as Record<
-        string,
-        import('@rcrsr/rill').RillValue
-      >,
-      ctx
-    );
-
-    const payload = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
-    expect(payload['subsystem']).toBe('extension:google-workspace');
-  });
-});
-
-// ============================================================
 // Integration depth: AC-11 AbortSignal verification
 // ============================================================
 
-describe('AC-11: drive callables pass AbortSignal to fetch', () => {
-  it('drive_download passes a combined AbortSignal instance [AC-11]', async () => {
-    let capturedSignal: AbortSignal | undefined;
-
-    globalThis.fetch = vi
-      .fn()
-      .mockImplementation((_url: unknown, init: RequestInit) => {
-        capturedSignal = init.signal as AbortSignal;
-        const emptyBuf = new ArrayBuffer(0);
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          arrayBuffer: () => Promise.resolve(emptyBuf),
-        });
-      }) as typeof fetch;
-
+describe('AC-11: drive callables pass a combined signal to fetch', () => {
+  it('drive_download passes fetch a signal combining dispose abort and a 30s timeout', async () => {
     const ext = createGoogleWorkspaceExtension(
       DRIVE_ALL_CONFIG,
       makeFactoryCtx()
     );
-    const ctx = createRuntimeContext();
 
-    await getCallable(ext, 'drive_download').fn(
-      { file_id: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
-      ctx
+    await expectCombinedFetchSignal(
+      ext,
+      getCallable(ext, 'drive_download'),
+      { file_id: 'f1' },
+      {
+        ok: true,
+        status: 200,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      }
     );
-
-    // AC-11: signal must be an AbortSignal instance (combined controller + 30s timeout)
-    expect(capturedSignal).toBeInstanceOf(AbortSignal);
-    expect(capturedSignal!.aborted).toBe(false);
   });
 
-  it('drive_list passes a combined AbortSignal instance [AC-11]', async () => {
-    let capturedSignal: AbortSignal | undefined;
-
-    globalThis.fetch = vi
-      .fn()
-      .mockImplementation((_url: unknown, init: RequestInit) => {
-        capturedSignal = init.signal as AbortSignal;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () => Promise.resolve({ files: [] }),
-        });
-      }) as typeof fetch;
-
+  it('drive_list passes fetch a signal combining dispose abort and a 30s timeout', async () => {
     const ext = createGoogleWorkspaceExtension(
       DRIVE_ALL_CONFIG,
       makeFactoryCtx()
     );
-    const ctx = createRuntimeContext();
 
-    await getCallable(ext, 'drive_list').fn(
-      {} as Record<string, import('@rcrsr/rill').RillValue>,
-      ctx
+    await expectCombinedFetchSignal(
+      ext,
+      getCallable(ext, 'drive_list'),
+      {},
+      { ok: true, status: 200, json: () => Promise.resolve({ files: [] }) }
     );
-
-    expect(capturedSignal).toBeInstanceOf(AbortSignal);
-    expect(capturedSignal!.aborted).toBe(false);
   });
 });
 

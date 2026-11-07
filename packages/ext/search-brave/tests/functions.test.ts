@@ -155,19 +155,6 @@ describe('Brave extension host functions', () => {
   // ============================================================
 
   describe('search()', () => {
-    it('returns web results dict [AC-2]', async () => {
-      globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'search').fn(
-        { query: 'TypeScript tutorials' },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(result['web']).toBeDefined();
-    });
-
     it('returns result count from web.results [AC-2]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());

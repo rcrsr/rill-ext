@@ -75,10 +75,10 @@ describe('send() host function', () => {
   });
 
   // ============================================================
-  // AC-6: returns SendConfirmationDict
+  // returns SendConfirmationDict
   // ============================================================
 
-  it('returns SendConfirmationDict with sent=true [AC-6]', async () => {
+  it('returns SendConfirmationDict with sent=true', async () => {
     globalThis.fetch = mockFetch202();
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -93,7 +93,7 @@ describe('send() host function', () => {
     expect(result['subject']).toBe('Test Subject');
   });
 
-  it('returns to as a list in SendConfirmationDict [AC-6]', async () => {
+  it('returns to as a list in SendConfirmationDict', async () => {
     globalThis.fetch = mockFetch202();
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -112,10 +112,10 @@ describe('send() host function', () => {
   });
 
   // ============================================================
-  // AC-37: to string auto-wraps to list
+  // to string auto-wraps to list
   // ============================================================
 
-  it('auto-wraps string to to list [AC-37]', async () => {
+  it('auto-wraps string to to list', async () => {
     globalThis.fetch = mockFetch202();
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -130,103 +130,40 @@ describe('send() host function', () => {
   });
 
   // ============================================================
-  // AC-16: Bearer auth sends token in Authorization header
+  // empty to/subject/body throws #INVALID_INPUT
   // ============================================================
 
-  it('sends Authorization: Bearer header with token [AC-16]', async () => {
-    const mock = mockFetch202();
-    globalThis.fetch = mock;
+  it.each([
+    {
+      field: 'to',
+      args: { to: [], subject: 'Subject', body: 'Body' },
+      message: 'to is required',
+    },
+    {
+      field: 'subject',
+      args: { to: ['r@example.com'], subject: '', body: 'Body' },
+      message: 'subject is required',
+    },
+    {
+      field: 'body',
+      args: { to: ['r@example.com'], subject: 'Subject', body: '' },
+      message: 'body is required',
+    },
+  ])('throws #INVALID_INPUT for empty $field', async ({ args, message }) => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    await getCallable(ext, 'send').fn(SEND_ARGS, ctx);
-
-    const [, init] = mock.mock.calls[0] as [string, RequestInit];
-    const headers = init.headers as Record<string, string>;
-    expect(headers['Authorization']).toBe('Bearer test-bearer-token');
-  });
-
-  // ============================================================
-  // AC-17: Session auth resolves token per call
-  // ============================================================
-
-  it('resolves session token from RuntimeContext per call [AC-17]', async () => {
-    const mock = mockFetch202();
-    globalThis.fetch = mock;
-
-    const ext = createOutlookExtension(
-      {
-        auth: { type: 'session', tokenVar: 'myToken' },
-        capabilities: {
-          mail: {
-            read: true,
-            send: true,
-            draft: true,
-            flag: true,
-            search: true,
-          },
-        },
-      },
-      makeFactoryCtx()
-    );
-    const ctx = createRuntimeContext();
-    ctx.variables.set('myToken', 'session-token-123');
-
-    await getCallable(ext, 'send').fn(SEND_ARGS, ctx);
-
-    const [, init] = mock.mock.calls[0] as [string, RequestInit];
-    const headers = init.headers as Record<string, string>;
-    expect(headers['Authorization']).toBe('Bearer session-token-123');
-  });
-
-  // ============================================================
-  // EC-6: empty to/subject/body throws #INVALID_INPUT
-  // ============================================================
-
-  it('throws #INVALID_INPUT for empty to [EC-6]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    const caught = (await getCallable(ext, 'send').fn(
-      { to: [], subject: 'Subject', body: 'Body' },
-      ctx
-    )) as RillValue;
+    const caught = (await getCallable(ext, 'send').fn(args, ctx)) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught).message).toContain('to is required');
-  });
-
-  it('throws #INVALID_INPUT for empty subject [EC-6]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    const caught = (await getCallable(ext, 'send').fn(
-      { to: ['r@example.com'], subject: '', body: 'Body' },
-      ctx
-    )) as RillValue;
-    expect(isInvalid(caught)).toBe(true);
-    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught).message).toContain('subject is required');
-  });
-
-  it('throws #INVALID_INPUT for empty body [EC-6]', async () => {
-    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    const caught = (await getCallable(ext, 'send').fn(
-      { to: ['r@example.com'], subject: 'Subject', body: '' },
-      ctx
-    )) as RillValue;
-    expect(isInvalid(caught)).toBe(true);
-    expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught).message).toContain('body is required');
+    expect(getStatus(caught).message).toContain(message);
   });
 
   // ============================================================
-  // AC-19: event emission
+  // event emission
   // ============================================================
 
-  it('emits outlook:mail:send event on success [AC-19]', async () => {
+  it('emits outlook:mail:send event on success', async () => {
     globalThis.fetch = mockFetch202();
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();

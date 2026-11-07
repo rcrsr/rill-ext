@@ -9,164 +9,93 @@ import { validateConfig, mergeCapabilities } from '../src/config.js';
 import type { GoogleWorkspaceConfig } from '../src/types.js';
 
 // ============================================================
-// validateConfig — EC-1: Missing / empty auth fields
+// validateConfig
 // ============================================================
 
+const PLACEHOLDER_PRIVATE_KEY =
+  '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n';
+
+const BEARER_AUTH = { type: 'bearer', token: 'tok' } as const;
+
 describe('validateConfig', () => {
-  describe('EC-1: missing or empty auth', () => {
-    it('throws RILL-R001 when auth is missing', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+  describe('rejects invalid config with RILL-R001', () => {
+    const invalidCases: readonly {
+      readonly label: string;
+      readonly config: GoogleWorkspaceConfig;
+      readonly message: string;
+    }[] = [
+      // EC-1: missing or empty auth
+      {
+        label: 'auth is missing',
+        config: {
           auth: undefined as unknown as GoogleWorkspaceConfig['auth'],
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe('google: auth is required');
-    });
-
-    it('throws RILL-R001 when bearer token is empty', () => {
-      let caught: unknown;
-      try {
-        validateConfig({ auth: { type: 'bearer', token: '' } });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: auth.token is required'
-      );
-    });
-
-    it('throws RILL-R001 when session tokenVar is empty', () => {
-      let caught: unknown;
-      try {
-        validateConfig({ auth: { type: 'session', tokenVar: '' } });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: auth.tokenVar is required'
-      );
-    });
-
-    it('throws RILL-R001 when oauth-refresh client_id is empty', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+        },
+        message: 'google: auth is required',
+      },
+      {
+        label: 'bearer token is empty',
+        config: { auth: { type: 'bearer', token: '' } },
+        message: 'google: auth.token is required',
+      },
+      {
+        label: 'session tokenVar is empty',
+        config: { auth: { type: 'session', tokenVar: '' } },
+        message: 'google: auth.tokenVar is required',
+      },
+      {
+        label: 'oauth-refresh client_id is empty',
+        config: {
           auth: {
             type: 'oauth-refresh',
             client_id: '',
             client_secret: 'csec',
             refresh_token: 'rtok',
           },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: auth.client_id is required'
-      );
-    });
-
-    it('throws RILL-R001 when oauth-refresh client_secret is empty', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+        },
+        message: 'google: auth.client_id is required',
+      },
+      {
+        label: 'oauth-refresh client_secret is empty',
+        config: {
           auth: {
             type: 'oauth-refresh',
             client_id: 'cid',
             client_secret: '',
             refresh_token: 'rtok',
           },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: auth.client_secret is required'
-      );
-    });
-
-    it('throws RILL-R001 when oauth-refresh refresh_token is empty', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+        },
+        message: 'google: auth.client_secret is required',
+      },
+      {
+        label: 'oauth-refresh refresh_token is empty',
+        config: {
           auth: {
             type: 'oauth-refresh',
             client_id: 'cid',
             client_secret: 'csec',
             refresh_token: '',
           },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: auth.refresh_token is required'
-      );
-    });
-  });
-
-  // ============================================================
-  // EC-2: Invalid auth.type
-  // ============================================================
-
-  describe('EC-2: invalid auth.type', () => {
-    it('throws RILL-R001 for unsupported auth type', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+        },
+        message: 'google: auth.refresh_token is required',
+      },
+      // EC-2: invalid auth.type
+      {
+        label: 'auth.type is unsupported',
+        config: {
           auth: { type: 'oauth2' as unknown as 'bearer', token: 'tok' },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        "google: auth.type must be 'bearer', 'session', 'service-account', or 'oauth-refresh'"
-      );
-    });
-  });
-
-  // ============================================================
-  // EC-3: Malformed service-account keyJson
-  // ============================================================
-
-  describe('EC-3: malformed auth.keyJson', () => {
-    it('throws RILL-R001 when keyJson is not valid JSON', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
-          auth: { type: 'service-account', keyJson: 'not-json' },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: auth.keyJson is invalid: not valid JSON'
-      );
-    });
-
-    it('throws RILL-R001 when keyJson is missing client_email', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+        },
+        message:
+          "google: auth.type must be 'bearer', 'session', 'service-account', or 'oauth-refresh'",
+      },
+      // EC-3: malformed service-account keyJson
+      {
+        label: 'keyJson is not valid JSON',
+        config: { auth: { type: 'service-account', keyJson: 'not-json' } },
+        message: 'google: auth.keyJson is invalid: not valid JSON',
+      },
+      {
+        label: 'keyJson is missing client_email',
+        config: {
           auth: {
             type: 'service-account',
             keyJson: JSON.stringify({
@@ -174,21 +103,28 @@ describe('validateConfig', () => {
               token_uri: 'https://oauth2.googleapis.com/token',
             }),
           },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        "google: auth.keyJson is invalid: missing field 'client_email'"
-      );
-    });
-
-    it('throws RILL-R001 when keyJson is missing private_key', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+        },
+        message:
+          "google: auth.keyJson is invalid: missing field 'client_email'",
+      },
+      {
+        label: 'keyJson has empty client_email',
+        config: {
+          auth: {
+            type: 'service-account',
+            keyJson: JSON.stringify({
+              client_email: '',
+              private_key: PLACEHOLDER_PRIVATE_KEY,
+              token_uri: 'https://oauth2.googleapis.com/token',
+            }),
+          },
+        },
+        message:
+          "google: auth.keyJson is invalid: missing field 'client_email'",
+      },
+      {
+        label: 'keyJson is missing private_key',
+        config: {
           auth: {
             type: 'service-account',
             keyJson: JSON.stringify({
@@ -196,228 +132,136 @@ describe('validateConfig', () => {
               token_uri: 'https://oauth2.googleapis.com/token',
             }),
           },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        "google: auth.keyJson is invalid: missing field 'private_key'"
-      );
-    });
-
-    it('throws RILL-R001 when keyJson is missing token_uri', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
+        },
+        message: "google: auth.keyJson is invalid: missing field 'private_key'",
+      },
+      {
+        label: 'keyJson is missing token_uri',
+        config: {
           auth: {
             type: 'service-account',
             keyJson: JSON.stringify({
               client_email: 'sa@project.iam.gserviceaccount.com',
-              private_key:
-                '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
+              private_key: PLACEHOLDER_PRIVATE_KEY,
             }),
           },
-        });
+        },
+        message: "google: auth.keyJson is invalid: missing field 'token_uri'",
+      },
+      // EC-4: service config boundary violations
+      {
+        label: 'gmail.maxResults is 0 (below minimum)',
+        config: { auth: BEARER_AUTH, gmail: { maxResults: 0 } },
+        message: 'google: gmail.maxResults must be 1-500',
+      },
+      {
+        label: 'gmail.maxResults is 501 (above maximum)',
+        config: { auth: BEARER_AUTH, gmail: { maxResults: 501 } },
+        message: 'google: gmail.maxResults must be 1-500',
+      },
+      {
+        label: 'drive.maxUploadBytes is 0',
+        config: { auth: BEARER_AUTH, drive: { maxUploadBytes: 0 } },
+        message: 'google: drive.maxUploadBytes must be positive',
+      },
+      {
+        label: 'drive.maxUploadBytes is negative',
+        config: { auth: BEARER_AUTH, drive: { maxUploadBytes: -1 } },
+        message: 'google: drive.maxUploadBytes must be positive',
+      },
+      {
+        label: 'drive.allowedFolderIds is an empty array',
+        config: { auth: BEARER_AUTH, drive: { allowedFolderIds: [] } },
+        message: 'google: drive.allowedFolderIds must be non-empty',
+      },
+    ];
+
+    it.each(invalidCases)('throws when $label', ({ config, message }) => {
+      let caught: unknown;
+      try {
+        validateConfig(config);
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(RuntimeError);
       expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        "google: auth.keyJson is invalid: missing field 'token_uri'"
-      );
+      expect((caught as RuntimeError).message).toBe(message);
     });
   });
 
-  // ============================================================
-  // EC-4: Service config boundary violations
-  // ============================================================
-
-  describe('EC-4: service config boundaries', () => {
-    it('throws RILL-R001 when gmail.maxResults is 0 (below minimum)', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          gmail: { maxResults: 0 },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: gmail.maxResults must be 1-500'
-      );
-    });
-
-    it('throws RILL-R001 when gmail.maxResults is 501 (above maximum)', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          gmail: { maxResults: 501 },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: gmail.maxResults must be 1-500'
-      );
-    });
-
-    it('throws RILL-R001 when drive.maxUploadBytes is 0', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          drive: { maxUploadBytes: 0 },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: drive.maxUploadBytes must be positive'
-      );
-    });
-
-    it('throws RILL-R001 when drive.maxUploadBytes is negative', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          drive: { maxUploadBytes: -1 },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: drive.maxUploadBytes must be positive'
-      );
-    });
-
-    it('throws RILL-R001 when drive.allowedFolderIds is empty array', () => {
-      let caught: unknown;
-      try {
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          drive: { allowedFolderIds: [] },
-        });
-      } catch (e) {
-        caught = e;
-      }
-      expect(caught).toBeInstanceOf(RuntimeError);
-      expect((caught as RuntimeError).errorId).toBe('RILL-R001');
-      expect((caught as RuntimeError).message).toBe(
-        'google: drive.allowedFolderIds must be non-empty'
-      );
-    });
-  });
-
-  // ============================================================
-  // Valid configs accepted
-  // ============================================================
-
-  describe('valid configs', () => {
-    it('accepts a fully valid bearer config', () => {
-      expect(() =>
-        validateConfig({ auth: { type: 'bearer', token: 'valid-token' } })
-      ).not.toThrow();
-    });
-
-    it('accepts a fully valid session config', () => {
-      expect(() =>
-        validateConfig({ auth: { type: 'session', tokenVar: 'MY_TOKEN_VAR' } })
-      ).not.toThrow();
-    });
-
-    it('accepts a fully valid service-account config', () => {
-      const keyJson = JSON.stringify({
-        client_email: 'sa@project.iam.gserviceaccount.com',
-        private_key:
-          '-----BEGIN PRIVATE KEY-----\nplaceholder\n-----END PRIVATE KEY-----\n',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      });
-      expect(() =>
-        validateConfig({ auth: { type: 'service-account', keyJson } })
-      ).not.toThrow();
-    });
-
-    it('accepts a fully valid oauth-refresh config', () => {
-      expect(() =>
-        validateConfig({
+  describe('accepts valid config', () => {
+    const validCases: readonly {
+      readonly label: string;
+      readonly config: GoogleWorkspaceConfig;
+    }[] = [
+      {
+        label: 'a fully valid bearer config',
+        config: { auth: { type: 'bearer', token: 'valid-token' } },
+      },
+      {
+        label: 'a fully valid session config',
+        config: { auth: { type: 'session', tokenVar: 'MY_TOKEN_VAR' } },
+      },
+      {
+        label: 'a fully valid service-account config',
+        config: {
+          auth: {
+            type: 'service-account',
+            keyJson: JSON.stringify({
+              client_email: 'sa@project.iam.gserviceaccount.com',
+              private_key: PLACEHOLDER_PRIVATE_KEY,
+              token_uri: 'https://oauth2.googleapis.com/token',
+            }),
+          },
+        },
+      },
+      {
+        label: 'a fully valid oauth-refresh config',
+        config: {
           auth: {
             type: 'oauth-refresh',
             client_id: 'my-client-id.apps.googleusercontent.com',
             client_secret: 'GOCSPX-abc123',
             refresh_token: '1//refresh-token-value',
           },
-        })
-      ).not.toThrow();
-    });
-
-    it('accepts bearer config with gmail.maxResults at boundary 1', () => {
-      expect(() =>
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          gmail: { maxResults: 1 },
-        })
-      ).not.toThrow();
-    });
-
-    it('accepts bearer config with gmail.maxResults at boundary 500', () => {
-      expect(() =>
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          gmail: { maxResults: 500 },
-        })
-      ).not.toThrow();
-    });
-
-    it('accepts bearer config with drive.maxUploadBytes = 1', () => {
-      expect(() =>
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          drive: { maxUploadBytes: 1 },
-        })
-      ).not.toThrow();
-    });
-
-    it('accepts bearer config with non-empty allowedFolderIds', () => {
-      expect(() =>
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
+        },
+      },
+      {
+        label: 'gmail.maxResults at boundary 1',
+        config: { auth: BEARER_AUTH, gmail: { maxResults: 1 } },
+      },
+      {
+        label: 'gmail.maxResults at boundary 500',
+        config: { auth: BEARER_AUTH, gmail: { maxResults: 500 } },
+      },
+      {
+        label: 'drive.maxUploadBytes = 1',
+        config: { auth: BEARER_AUTH, drive: { maxUploadBytes: 1 } },
+      },
+      {
+        label: 'non-empty drive.allowedFolderIds',
+        config: {
+          auth: BEARER_AUTH,
           drive: { allowedFolderIds: ['folder-id-1'] },
-        })
-      ).not.toThrow();
-    });
-
-    // BC-9: undefined allowedLabels is accepted
-    it('accepts config when gmail.allowedLabels is undefined (BC-9)', () => {
-      expect(() =>
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
-          gmail: { allowedLabels: undefined },
-        })
-      ).not.toThrow();
-    });
-
-    // BC-10: non-empty allowedLabels is accepted (enforcement is in 3.1)
-    it('accepts config when gmail.allowedLabels is non-empty (BC-10)', () => {
-      expect(() =>
-        validateConfig({
-          auth: { type: 'bearer', token: 'tok' },
+        },
+      },
+      // BC-9: undefined allowedLabels is accepted
+      {
+        label: 'undefined gmail.allowedLabels',
+        config: { auth: BEARER_AUTH, gmail: { allowedLabels: undefined } },
+      },
+      // BC-10: non-empty allowedLabels is accepted (enforcement is in the gmail functions)
+      {
+        label: 'non-empty gmail.allowedLabels',
+        config: {
+          auth: BEARER_AUTH,
           gmail: { allowedLabels: ['INBOX', 'SENT'] },
-        })
-      ).not.toThrow();
+        },
+      },
+    ];
+
+    it.each(validCases)('accepts $label', ({ config }) => {
+      expect(() => validateConfig(config)).not.toThrow();
     });
   });
 });
@@ -428,58 +272,41 @@ describe('validateConfig', () => {
 
 describe('mergeCapabilities', () => {
   describe('defaults when no partial provided', () => {
-    it('applies gmail defaults: read, search, draft, label = true', () => {
-      const caps = mergeCapabilities();
-      expect(caps.gmail.read).toBe(true);
-      expect(caps.gmail.search).toBe(true);
-      expect(caps.gmail.draft).toBe(true);
-      expect(caps.gmail.label).toBe(true);
-    });
-
-    it('applies gmail defaults: send, reply, modify = false', () => {
-      const caps = mergeCapabilities();
-      expect(caps.gmail.send).toBe(false);
-      expect(caps.gmail.reply).toBe(false);
-      expect(caps.gmail.modify).toBe(false);
-    });
-
-    it('applies drive defaults: read, list, download = true', () => {
-      const caps = mergeCapabilities();
-      expect(caps.drive.read).toBe(true);
-      expect(caps.drive.list).toBe(true);
-      expect(caps.drive.download).toBe(true);
-    });
-
-    it('applies drive defaults: upload, share, delete = false', () => {
-      const caps = mergeCapabilities();
-      expect(caps.drive.upload).toBe(false);
-      expect(caps.drive.share).toBe(false);
-      expect(caps.drive.delete).toBe(false);
-    });
-
-    it('applies calendar defaults: read, freeBusy = true', () => {
-      const caps = mergeCapabilities();
-      expect(caps.calendar.read).toBe(true);
-      expect(caps.calendar.freeBusy).toBe(true);
-    });
-
-    it('applies calendar defaults: create, update, delete = false', () => {
-      const caps = mergeCapabilities();
-      expect(caps.calendar.create).toBe(false);
-      expect(caps.calendar.update).toBe(false);
-      expect(caps.calendar.delete).toBe(false);
+    it('applies the documented default flag for every capability', () => {
+      expect(mergeCapabilities()).toEqual({
+        gmail: {
+          read: true,
+          search: true,
+          draft: true,
+          label: true,
+          send: false,
+          reply: false,
+          modify: false,
+        },
+        drive: {
+          read: true,
+          list: true,
+          download: true,
+          upload: false,
+          share: false,
+          delete: false,
+        },
+        calendar: {
+          read: true,
+          freeBusy: true,
+          create: false,
+          update: false,
+          delete: false,
+        },
+      });
     });
   });
 
   describe('partial override merges without destroying unrelated defaults', () => {
-    it('enabling gmail.send preserves gmail.read default true', () => {
+    it('enabling gmail.send preserves all other gmail defaults, including read', () => {
       const caps = mergeCapabilities({ gmail: { send: true } });
       expect(caps.gmail.send).toBe(true);
       expect(caps.gmail.read).toBe(true);
-    });
-
-    it('enabling gmail.send preserves all other gmail defaults', () => {
-      const caps = mergeCapabilities({ gmail: { send: true } });
       expect(caps.gmail.search).toBe(true);
       expect(caps.gmail.draft).toBe(true);
       expect(caps.gmail.label).toBe(true);

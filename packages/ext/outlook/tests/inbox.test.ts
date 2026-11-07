@@ -85,36 +85,10 @@ describe('inbox() host function', () => {
   });
 
   // ============================================================
-  // AC-2: returns MailMessageDict list with 9 fields
+  // returns MailMessageDict list with 9 fields
   // ============================================================
 
-  describe('returns MailMessageDict list [AC-2]', () => {
-    it('returns messages array with 9-field MailMessageDict objects', async () => {
-      globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
-      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'inbox').fn({}, ctx)) as Record<
-        string,
-        unknown
-      >;
-      const messages = result['messages'] as Record<string, unknown>[];
-
-      expect(Array.isArray(messages)).toBe(true);
-      expect(messages).toHaveLength(1);
-
-      const msg = messages[0]!;
-      expect(msg).toHaveProperty('id');
-      expect(msg).toHaveProperty('subject');
-      expect(msg).toHaveProperty('preview');
-      expect(msg).toHaveProperty('from');
-      expect(msg).toHaveProperty('to');
-      expect(msg).toHaveProperty('date');
-      expect(msg).toHaveProperty('unread');
-      expect(msg).toHaveProperty('flagged');
-      expect(msg).toHaveProperty('has_attachments');
-    });
-
+  describe('returns MailMessageDict list', () => {
     it('normalizes field values from Graph response', async () => {
       globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
@@ -139,10 +113,10 @@ describe('inbox() host function', () => {
   });
 
   // ============================================================
-  // AC-33: empty inbox returns empty list
+  // empty inbox returns empty list
   // ============================================================
 
-  it('returns empty messages array when inbox is empty [AC-33]', async () => {
+  it('maps an empty Graph value list to empty messages', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -158,10 +132,10 @@ describe('inbox() host function', () => {
   });
 
   // ============================================================
-  // AC-31: top=0 returns empty list
+  // top=0 returns empty list
   // ============================================================
 
-  it('uses maxResults when top=0 is passed [AC-31]', async () => {
+  it('uses maxResults when top=0 is passed', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
@@ -174,10 +148,10 @@ describe('inbox() host function', () => {
   });
 
   // ============================================================
-  // AC-32: result count capped at maxResults
+  // result count capped at maxResults
   // ============================================================
 
-  it('caps top at configured maxResults [AC-32]', async () => {
+  it('caps top at configured maxResults', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(
@@ -226,10 +200,10 @@ describe('inbox() host function', () => {
   });
 
   // ============================================================
-  // AC-16: Bearer auth sends token in Authorization header
+  // Bearer auth sends token in Authorization header
   // ============================================================
 
-  it('sends Authorization: Bearer header with token [AC-16]', async () => {
+  it('sends Authorization: Bearer header with token', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
@@ -243,10 +217,10 @@ describe('inbox() host function', () => {
   });
 
   // ============================================================
-  // AC-17: Session auth resolves token per call
+  // Session auth resolves token per call
   // ============================================================
 
-  it('resolves session token from RuntimeContext per call [AC-17]', async () => {
+  it('resolves session token from RuntimeContext per call', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
 
@@ -276,10 +250,10 @@ describe('inbox() host function', () => {
   });
 
   // ============================================================
-  // AC-18: Shared mailbox uses /users/{mailbox}/ endpoint
+  // Shared mailbox uses /users/{mailbox}/ endpoint
   // ============================================================
 
-  it('uses /users/{mailbox}/ path for shared mailbox [AC-18]', async () => {
+  it('uses /users/{mailbox}/ path for shared mailbox', async () => {
     const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
     globalThis.fetch = mockFetch;
 
@@ -311,10 +285,10 @@ describe('inbox() host function', () => {
   });
 
   // ============================================================
-  // AC-19: Event emission
+  // Event emission
   // ============================================================
 
-  it('emits outlook:mail:read event on success [AC-19]', async () => {
+  it('emits outlook:mail:read event on success', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -336,7 +310,7 @@ describe('inbox() host function', () => {
   // ============================================================
 
   describe('folder allowlist enforcement', () => {
-    it('uses mailFolders/{folder}/messages path when folder is in allowlist [AC-22]', async () => {
+    it('uses mailFolders/{folder}/messages path when folder is in allowlist', async () => {
       const mockFetch = mockFetchJson(200, GRAPH_EMPTY_LIST);
       globalThis.fetch = mockFetch;
       const ext = createOutlookExtension(
@@ -354,7 +328,7 @@ describe('inbox() host function', () => {
       expect(url).toContain('mailFolders/sent/messages');
     });
 
-    it('emits #FORBIDDEN when folder is not in allowlist [EC-4]', async () => {
+    it('emits #FORBIDDEN when folder is not in allowlist', async () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
@@ -415,7 +389,7 @@ describe('read() host function', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns single MailMessageDict by message_id [AC-5]', async () => {
+  it('returns single MailMessageDict by message_id', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
@@ -447,7 +421,7 @@ describe('read() host function', () => {
     expect(url).toContain('messages/msg-001');
   });
 
-  it('throws #INVALID_INPUT for empty message_id [EC-3]', async () => {
+  it('throws #INVALID_INPUT for empty message_id', async () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
@@ -460,7 +434,7 @@ describe('read() host function', () => {
     expect(getStatus(caught).message).toContain('message_id is required');
   });
 
-  it('emits outlook:mail:read event on success [AC-19]', async () => {
+  it('emits outlook:mail:read event on success', async () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();

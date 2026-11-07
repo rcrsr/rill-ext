@@ -9,34 +9,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { createClaudeCodeExtension } from '../src/factory.js';
 import { makeFactoryCtx, extValue } from './_helpers.js';
 import type { IPty } from 'node-pty';
-import { createRuntimeContext, structureToTypeValue } from '@rcrsr/rill';
-import type { ClaudeCodeResult } from '../src/types.js';
-
-const EXPECTED_RETURN_TYPE = structureToTypeValue({
-  kind: 'stream',
-  chunk: { kind: 'string' },
-  ret: {
-    kind: 'dict',
-    fields: {
-      result: { type: { kind: 'string' } },
-      tokens: {
-        type: {
-          kind: 'dict',
-          fields: {
-            prompt: { type: { kind: 'number' } },
-            cache_write_5m: { type: { kind: 'number' } },
-            cache_write_1h: { type: { kind: 'number' } },
-            cache_read: { type: { kind: 'number' } },
-            output: { type: { kind: 'number' } },
-          },
-        },
-      },
-      cost: { type: { kind: 'number' } },
-      exit_code: { type: { kind: 'number' } },
-      duration: { type: { kind: 'number' } },
-    },
-  },
-});
+import { createRuntimeContext } from '@rcrsr/rill';
 
 // ============================================================
 // MOCKS
@@ -85,116 +58,6 @@ async function resolveStream<T = Record<string, unknown>>(
     stream as { __rill_stream_resolve: () => Promise<T> }
   ).__rill_stream_resolve();
 }
-
-// ============================================================
-// IR-1: Factory result has correct value shape
-// ============================================================
-
-describe('IR-1: Factory result has correct value shape', () => {
-  it('ext.value contains prompt, skill, command functions', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const v = extValue(ext);
-
-    // Verify all three function names exist in value dict
-    expect(v['prompt']).toBeDefined();
-    expect(v['skill']).toBeDefined();
-    expect(v['command']).toBeDefined();
-  });
-
-  it('dispose is on factory result, not inside value dict', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const v = extValue(ext);
-
-    // Verify dispose is on ext, not on ext.value
-    expect(ext.dispose).toBeDefined();
-    expect(typeof ext.dispose).toBe('function');
-    expect(
-      (v as unknown as Record<string, unknown>)['dispose']
-    ).toBeUndefined();
-  });
-
-  it('preserves function definitions on ext.value', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const v = extValue(ext);
-
-    // Verify function definitions are intact
-    const promptDef = v['prompt'];
-    expect(promptDef.params).toHaveLength(2);
-    expect(promptDef.params[0]?.name).toBe('text');
-    expect(promptDef.params[0]?.type).toEqual({ kind: 'string' });
-    expect(promptDef.params[1]?.name).toBe('options');
-    expect(promptDef.params[1]?.type).toEqual({
-      kind: 'dict',
-      fields: { timeout: { type: { kind: 'number' }, defaultValue: 0 } },
-    });
-    expect(promptDef.fn).toBeInstanceOf(Function);
-    expect(promptDef.annotations?.['description']).toBeTruthy();
-    expect(promptDef.returnType).toEqual(EXPECTED_RETURN_TYPE);
-  });
-
-  it('allows functions in ext.value to be called via runtime context', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-    const { extractResult } = await import('../src/result.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    // Setup mocks
-    vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
-    });
-
-    vi.mocked(extractResult).mockReturnValue({
-      result: 'Success',
-      tokens: {
-        prompt: 10,
-        cache_write_5m: 0,
-        cache_write_1h: 0,
-        cache_read: 0,
-        output: 5,
-      },
-      cost: 0.001,
-      exit_code: 0,
-      duration: 100,
-    });
-
-    vi.mocked(spawnClaudeCli).mockReturnValue({
-      ptyProcess: {
-        onData: vi.fn(),
-        onExit: vi.fn(),
-        write: vi.fn(),
-        kill: vi.fn(),
-      } as unknown as IPty,
-      exitCode: Promise.resolve(0),
-      dispose: vi.fn(),
-    });
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const v = extValue(ext);
-    const ctx = createRuntimeContext();
-
-    // Call function via ext.value — fn() returns RillStream synchronously
-    const stream = v['prompt'].fn({ text: 'Test prompt', options: {} }, ctx);
-
-    // Resolve stream to get final result
-    const result = await resolveStream<ClaudeCodeResult>(stream);
-
-    // Verify execution succeeded
-    expect(result).toBeDefined();
-    expect(result.exit_code).toBe(0);
-  });
-});
 
 // ============================================================
 // IR-5: dispose terminates active child processes
@@ -352,81 +215,6 @@ describe('IR-5: dispose terminates active child processes', () => {
 // ============================================================
 
 describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
-  it('allows multiple dispose calls without errors', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-
-    // Call dispose multiple times
-    expect(() => ext.dispose!()).not.toThrow();
-    expect(() => ext.dispose!()).not.toThrow();
-    expect(() => ext.dispose!()).not.toThrow();
-  });
-
-  it('does not call process dispose multiple times', async () => {
-    const which = await import('which');
-    const { spawnClaudeCli } = await import('../src/process.js');
-    const { createStreamParser } = await import('../src/stream-parser.js');
-    const { extractResult } = await import('../src/result.js');
-
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const disposeFn = vi.fn();
-
-    vi.mocked(spawnClaudeCli).mockReturnValue({
-      ptyProcess: {
-        onData: vi.fn(),
-        onExit: vi.fn(),
-        write: vi.fn(),
-        kill: vi.fn(),
-      } as unknown as IPty,
-      exitCode: new Promise(() => {
-        // Never resolves
-      }),
-      dispose: disposeFn,
-    });
-
-    vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
-    });
-
-    vi.mocked(extractResult).mockReturnValue({
-      result: 'Test',
-      tokens: {
-        prompt: 5,
-        cache_write_5m: 0,
-        cache_write_1h: 0,
-        cache_read: 0,
-        output: 3,
-      },
-      cost: 0.001,
-      exit_code: 0,
-      duration: 100,
-    });
-
-    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-
-    // Start process — fn() returns RillStream synchronously
-    const stream = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
-
-    // Wait briefly
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // Call extension dispose multiple times
-    ext.dispose!();
-    ext.dispose!();
-    ext.dispose!();
-
-    // Verify process dispose called only once (idempotent)
-    expect(disposeFn).toHaveBeenCalledTimes(1);
-
-    // Cleanup
-    resolveStream(stream).catch(() => {});
-  });
-
   it('clears active process tracker after first dispose', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
@@ -730,32 +518,6 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
 // ============================================================
 
 describe('IR-1: Factory creation is idempotent', () => {
-  it('allows multiple factory calls with same config', async () => {
-    const which = await import('which');
-    vi.mocked(which.default.sync).mockReturnValue('claude');
-
-    const config = { binaryPath: 'claude', defaultTimeout: 1800000 };
-
-    // Create multiple instances
-    const ext1 = createClaudeCodeExtension(config, makeFactoryCtx());
-    const ext2 = createClaudeCodeExtension(config, makeFactoryCtx());
-    const ext3 = createClaudeCodeExtension(config, makeFactoryCtx());
-
-    // Verify all created successfully
-    expect(extValue(ext1).prompt).toBeDefined();
-    expect(extValue(ext2).prompt).toBeDefined();
-    expect(extValue(ext3).prompt).toBeDefined();
-
-    // Verify each has own dispose function
-    expect(ext1.dispose).toBeDefined();
-    expect(ext2.dispose).toBeDefined();
-    expect(ext3.dispose).toBeDefined();
-
-    // Verify dispose functions are independent
-    expect(ext1.dispose).not.toBe(ext2.dispose);
-    expect(ext2.dispose).not.toBe(ext3.dispose);
-  });
-
   it('creates independent instances that do not share state', async () => {
     const which = await import('which');
     const { spawnClaudeCli } = await import('../src/process.js');
@@ -851,30 +613,64 @@ describe('IR-1: Factory creation is idempotent', () => {
     );
   });
 
-  it('creates instances with different configs independently', async () => {
+  it('applies each instance defaultTimeout independently', async () => {
     const which = await import('which');
+    const { spawnClaudeCli } = await import('../src/process.js');
+    const { createStreamParser } = await import('../src/stream-parser.js');
+    const { extractResult } = await import('../src/result.js');
+
     vi.mocked(which.default.sync).mockReturnValue('claude');
+    vi.mocked(createStreamParser).mockReturnValue({
+      processChunk: vi.fn(),
+      flush: vi.fn(),
+    });
+    vi.mocked(extractResult).mockReturnValue({
+      result: 'Test',
+      tokens: {
+        prompt: 5,
+        cache_write_5m: 0,
+        cache_write_1h: 0,
+        cache_read: 0,
+        output: 3,
+      },
+      cost: 0.001,
+      exit_code: 0,
+      duration: 100,
+    });
+    vi.mocked(spawnClaudeCli).mockImplementation(() => ({
+      ptyProcess: {
+        onData: vi.fn(),
+        onExit: vi.fn(),
+        write: vi.fn(),
+        kill: vi.fn(),
+      } as unknown as IPty,
+      exitCode: Promise.resolve(0),
+      dispose: vi.fn(),
+    }));
 
-    const ext1 = createClaudeCodeExtension(
-      { defaultTimeout: 10000 },
-      makeFactoryCtx()
-    );
-    const ext2 = createClaudeCodeExtension(
-      { defaultTimeout: 20000 },
-      makeFactoryCtx()
-    );
-    const ext3 = createClaudeCodeExtension(
-      { defaultTimeout: 30000 },
-      makeFactoryCtx()
-    );
+    const timeouts = [10000, 20000, 30000];
+    const ctx = createRuntimeContext();
 
-    // Verify all created with different configs
-    expect(extValue(ext1).prompt).toBeDefined();
-    expect(extValue(ext2).prompt).toBeDefined();
-    expect(extValue(ext3).prompt).toBeDefined();
+    for (const [i, defaultTimeout] of timeouts.entries()) {
+      const ext = createClaudeCodeExtension(
+        { defaultTimeout },
+        makeFactoryCtx()
+      );
+      const stream = extValue(ext).prompt.fn(
+        { text: `Prompt ${i}`, options: {} },
+        ctx
+      );
+      await resolveStream(stream);
+    }
 
-    // Verify independence
-    expect(ext1.dispose).not.toBe(ext2.dispose);
-    expect(ext2.dispose).not.toBe(ext3.dispose);
+    expect(
+      vi
+        .mocked(spawnClaudeCli)
+        .mock.calls.map(([text, opts]) => [text, opts?.timeoutMs])
+    ).toEqual([
+      ['Prompt 0', 10000],
+      ['Prompt 1', 20000],
+      ['Prompt 2', 30000],
+    ]);
   });
 });

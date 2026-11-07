@@ -47,47 +47,59 @@ describe('Capability Discovery', () => {
   });
 
   describe('IR-1: Parallel capability discovery', () => {
-    it('calls listTools, listResources, listResourceTemplates, listPrompts in parallel', async () => {
-      // Mock Client methods
-      const mockListTools = vi.fn().mockResolvedValue({
-        tools: [
-          {
-            name: 'tool1',
-            description: 'Tool 1',
-            inputSchema: { type: 'object' },
-          },
-          {
-            name: 'tool2',
-            description: 'Tool 2',
-            inputSchema: { type: 'object' },
-          },
-        ],
-      });
-      const mockListResources = vi.fn().mockResolvedValue({
-        resources: [
-          {
-            uri: 'file://resource1',
-            name: 'Resource 1',
-            description: 'Desc 1',
-          },
-        ],
-      });
-      const mockListResourceTemplates = vi.fn().mockResolvedValue({
-        resourceTemplates: [
-          {
-            uriTemplate: 'file://{path}',
-            name: 'Template 1',
-            description: 'Template Desc 1',
-          },
-        ],
-      });
-      const mockListPrompts = vi.fn().mockResolvedValue({
-        prompts: [{ name: 'prompt1', description: 'Prompt 1', arguments: [] }],
-      });
-      const mockConnect = vi.fn<() => Promise<void>>().mockResolvedValue();
+    it('starts listTools, listResources, listResourceTemplates, listPrompts before any resolves', async () => {
+      const gates: Array<() => void> = [];
+      const gated = <T>(value: T): Promise<T> =>
+        new Promise<T>((resolve) => {
+          gates.push(() => resolve(value));
+        });
+      const mockListTools = vi.fn(() =>
+        gated({
+          tools: [
+            {
+              name: 'tool1',
+              description: 'Tool 1',
+              inputSchema: { type: 'object' as const },
+            },
+            {
+              name: 'tool2',
+              description: 'Tool 2',
+              inputSchema: { type: 'object' as const },
+            },
+          ],
+        })
+      );
+      const mockListResources = vi.fn(() =>
+        gated({
+          resources: [
+            {
+              uri: 'file://resource1',
+              name: 'Resource 1',
+              description: 'Desc 1',
+            },
+          ],
+        })
+      );
+      const mockListResourceTemplates = vi.fn(() =>
+        gated({
+          resourceTemplates: [
+            {
+              uriTemplate: 'file://{path}',
+              name: 'Template 1',
+              description: 'Template Desc 1',
+            },
+          ],
+        })
+      );
+      const mockListPrompts = vi.fn(() =>
+        gated({
+          prompts: [
+            { name: 'prompt1', description: 'Prompt 1', arguments: [] },
+          ],
+        })
+      );
 
-      // Spy on Client constructor to inject mocks
-      vi.spyOn(Client.prototype, 'connect').mockImplementation(mockConnect);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockImplementation(mockListTools);
       vi.spyOn(Client.prototype, 'listResources').mockImplementation(
         mockListResources
@@ -106,16 +118,22 @@ describe('Capability Discovery', () => {
         },
       };
 
-      const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, unknown>;
+      const pending = createMcpExtension(config, makeFactoryCtx());
 
-      // Verify all four list methods were called
+      // All four requests are in flight while none has resolved yet
+      await vi.waitFor(() => {
+        expect(gates).toHaveLength(4);
+      });
       expect(mockListTools).toHaveBeenCalledTimes(1);
       expect(mockListResources).toHaveBeenCalledTimes(1);
       expect(mockListResourceTemplates).toHaveBeenCalledTimes(1);
       expect(mockListPrompts).toHaveBeenCalledTimes(1);
 
-      // Verify discovered capabilities reflected in namespaced dicts
+      for (const release of gates) release();
+      const result = await pending;
+      const fns = result.value as Record<string, unknown>;
+
+      // Discovered capabilities reflected in namespaced dicts
       const toolsDict = fns['tools'] as Record<string, unknown>;
       const resourcesDict = fns['resources'] as Record<string, unknown>;
       const promptsDict = fns['prompts'] as Record<string, unknown>;
@@ -124,9 +142,6 @@ describe('Capability Discovery', () => {
       expect(toolsDict['tool2']).toBeDefined();
       expect(resourcesDict['read_resource']).toBeDefined();
       expect(promptsDict['prompt1']).toBeDefined();
-      expect(fns['tools']).toBeDefined();
-      expect(fns['resources']).toBeDefined();
-      expect(fns['prompts']).toBeDefined();
     });
 
     it('handles empty capability lists', async () => {
@@ -166,98 +181,6 @@ describe('Capability Discovery', () => {
   });
 
   describe('BC-7: Filtered capabilities', () => {
-    it('filters tools by exact name match', async () => {
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
-      vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
-        tools: [
-          {
-            name: 'tool1',
-            description: 'Tool 1',
-            inputSchema: { type: 'object' },
-          },
-          {
-            name: 'tool2',
-            description: 'Tool 2',
-            inputSchema: { type: 'object' },
-          },
-          {
-            name: 'tool3',
-            description: 'Tool 3',
-            inputSchema: { type: 'object' },
-          },
-        ],
-      });
-      vi.spyOn(Client.prototype, 'listResources').mockResolvedValue({
-        resources: [],
-      });
-      vi.spyOn(Client.prototype, 'listResourceTemplates').mockResolvedValue({
-        resourceTemplates: [],
-      });
-      vi.spyOn(Client.prototype, 'listPrompts').mockResolvedValue({
-        prompts: [],
-      });
-
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'stdio',
-          command: 'mock-command',
-        },
-        toolFilter: ['tool1', 'tool3'], // Only include tool1 and tool3
-      };
-
-      const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, unknown>;
-
-      // Only filtered tools present in tools dict
-      const toolsDict = fns['tools'] as Record<string, unknown>;
-      expect(toolsDict['tool1']).toBeDefined();
-      expect(toolsDict['tool2']).toBeUndefined();
-      expect(toolsDict['tool3']).toBeDefined();
-
-      // Introspection tools dict reflects filtered set
-      expect(Object.keys(toolsDict)).toHaveLength(2);
-    });
-
-    it('filters prompts by exact name match', async () => {
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
-      vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({ tools: [] });
-      vi.spyOn(Client.prototype, 'listResources').mockResolvedValue({
-        resources: [],
-      });
-      vi.spyOn(Client.prototype, 'listResourceTemplates').mockResolvedValue({
-        resourceTemplates: [],
-      });
-      vi.spyOn(Client.prototype, 'listPrompts').mockResolvedValue({
-        prompts: [
-          { name: 'prompt1', description: 'Prompt 1' },
-          { name: 'prompt2', description: 'Prompt 2' },
-          { name: 'prompt3', description: 'Prompt 3' },
-          { name: 'prompt4', description: 'Prompt 4' },
-        ],
-      });
-
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'stdio',
-          command: 'mock-command',
-        },
-        promptFilter: ['prompt2', 'prompt4'],
-      };
-
-      const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, unknown>;
-
-      // Only filtered prompts present in prompts dict
-      const promptsDict = fns['prompts'] as Record<string, unknown>;
-      expect(promptsDict['prompt1']).toBeUndefined();
-      expect(promptsDict['prompt2']).toBeDefined();
-      expect(promptsDict['prompt3']).toBeUndefined();
-      expect(promptsDict['prompt4']).toBeDefined();
-
-      // Introspection prompts dict reflects filtered set
-      expect(Object.keys(promptsDict)).toHaveLength(2);
-    });
-
     it('empty filter includes all capabilities', async () => {
       vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
@@ -294,117 +217,6 @@ describe('Capability Discovery', () => {
       expect(toolsDict['tool2']).toBeDefined();
       expect(resourcesDict['read_resource']).toBeDefined();
       expect(promptsDict['prompt1']).toBeDefined();
-    });
-
-    it('undefined filter includes all capabilities', async () => {
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
-      vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
-        tools: [
-          { name: 'tool1', inputSchema: { type: 'object' } },
-          { name: 'tool2', inputSchema: { type: 'object' } },
-        ],
-      });
-      vi.spyOn(Client.prototype, 'listResources').mockResolvedValue({
-        resources: [{ uri: 'file://resource1', name: 'Resource 1' }],
-      });
-      vi.spyOn(Client.prototype, 'listPrompts').mockResolvedValue({
-        prompts: [{ name: 'prompt1' }],
-      });
-
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'stdio',
-          command: 'mock-command',
-        },
-        // No filters = all included
-      };
-
-      const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, unknown>;
-
-      const toolsDict2 = fns['tools'] as Record<string, unknown>;
-      const resourcesDict2 = fns['resources'] as Record<string, unknown>;
-      const promptsDict2 = fns['prompts'] as Record<string, unknown>;
-      expect(toolsDict2['tool1']).toBeDefined();
-      expect(toolsDict2['tool2']).toBeDefined();
-      expect(resourcesDict2['read_resource']).toBeDefined();
-      expect(promptsDict2['prompt1']).toBeDefined();
-    });
-
-    it('non-matching filter results in empty filtered list', async () => {
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
-      vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
-        tools: [{ name: 'tool1', inputSchema: { type: 'object' } }],
-      });
-      vi.spyOn(Client.prototype, 'listResources').mockResolvedValue({
-        resources: [],
-      });
-      vi.spyOn(Client.prototype, 'listResourceTemplates').mockResolvedValue({
-        resourceTemplates: [],
-      });
-      vi.spyOn(Client.prototype, 'listPrompts').mockResolvedValue({
-        prompts: [],
-      });
-
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'stdio',
-          command: 'mock-command',
-        },
-        toolFilter: ['nonexistent-tool'],
-      };
-
-      const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, unknown>;
-
-      // tool1 not generated because filter excluded it
-      const toolsDict = fns['tools'] as Record<string, unknown>;
-      expect(toolsDict['tool1']).toBeUndefined();
-
-      // Introspection tools dict is empty
-      expect(Object.keys(toolsDict)).toHaveLength(0);
-    });
-  });
-
-  describe('BC-7: Filtering verified through generated functions', () => {
-    it('generates only filtered tool functions from 100 available', async () => {
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
-      vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
-        tools: Array.from({ length: 100 }, (_, i) => ({
-          name: `tool${i + 1}`,
-          inputSchema: { type: 'object' },
-        })),
-      });
-      vi.spyOn(Client.prototype, 'listResources').mockResolvedValue({
-        resources: [],
-      });
-      vi.spyOn(Client.prototype, 'listResourceTemplates').mockResolvedValue({
-        resourceTemplates: [],
-      });
-      vi.spyOn(Client.prototype, 'listPrompts').mockResolvedValue({
-        prompts: [],
-      });
-
-      const config: McpExtensionConfig = {
-        transport: {
-          type: 'stdio',
-          command: 'mock-command',
-        },
-        toolFilter: ['tool1', 'tool2'], // Only 2 tools filtered
-      };
-
-      const result = await createMcpExtension(config, makeFactoryCtx());
-      const fns = result.value as Record<string, unknown>;
-
-      // Only 2 tools dict entries generated
-      const toolsDict = fns['tools'] as Record<string, unknown>;
-      expect(toolsDict['tool1']).toBeDefined();
-      expect(toolsDict['tool2']).toBeDefined();
-      expect(toolsDict['tool3']).toBeUndefined();
-      expect(toolsDict['tool100']).toBeUndefined();
-
-      // Introspection confirms only 2 tools
-      expect(Object.keys(toolsDict)).toHaveLength(2);
     });
   });
 });

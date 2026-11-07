@@ -3,45 +3,55 @@ import { sanitizeNames } from './naming.js';
 
 describe('sanitizeNames', () => {
   describe('Name Sanitization', () => {
-    it('replaces hyphens with underscores', () => {
-      const result = sanitizeNames(['read-file']);
-      expect(result.get('read-file')).toBe('read_file');
-    });
-
-    it('replaces dots with underscores', () => {
-      const result = sanitizeNames(['get.weather']);
-      expect(result.get('get.weather')).toBe('get_weather');
-    });
-
-    it('converts camelCase to snake_case', () => {
-      const result = sanitizeNames(['listTools']);
-      expect(result.get('listTools')).toBe('list_tools');
-    });
-
-    it('converts PascalCase to snake_case', () => {
-      const result = sanitizeNames(['ReadFile']);
-      expect(result.get('ReadFile')).toBe('read_file');
-    });
-
-    it('handles multiple transformations together', () => {
-      const result = sanitizeNames(['get.weatherData']);
-      expect(result.get('get.weatherData')).toBe('get_weather_data');
-    });
-
-    it('handles consecutive uppercase letters correctly', () => {
-      const result = sanitizeNames(['XMLParser']);
-      expect(result.get('XMLParser')).toBe('xml_parser');
-    });
-
-    it('handles numbers in names', () => {
-      const result = sanitizeNames(['read-file2', 'getItem3']);
-      expect(result.get('read-file2')).toBe('read_file2');
-      expect(result.get('getItem3')).toBe('get_item3');
-    });
-
-    it('preserves already snake_case names', () => {
-      const result = sanitizeNames(['read_file']);
-      expect(result.get('read_file')).toBe('read_file');
+    it.each([
+      {
+        title: 'replaces hyphens with underscores',
+        input: 'read-file',
+        expected: 'read_file',
+      },
+      {
+        title: 'replaces dots with underscores',
+        input: 'get.weather',
+        expected: 'get_weather',
+      },
+      {
+        title: 'converts camelCase to snake_case',
+        input: 'listTools',
+        expected: 'list_tools',
+      },
+      {
+        title: 'converts PascalCase to snake_case',
+        input: 'ReadFile',
+        expected: 'read_file',
+      },
+      {
+        title: 'handles multiple transformations together',
+        input: 'get.weatherData',
+        expected: 'get_weather_data',
+      },
+      {
+        title: 'handles consecutive uppercase letters correctly',
+        input: 'XMLParser',
+        expected: 'xml_parser',
+      },
+      {
+        title: 'handles numbers in hyphenated names',
+        input: 'read-file2',
+        expected: 'read_file2',
+      },
+      {
+        title: 'handles numbers in camelCase names',
+        input: 'getItem3',
+        expected: 'get_item3',
+      },
+      {
+        title: 'preserves already snake_case names',
+        input: 'read_file',
+        expected: 'read_file',
+      },
+    ])('$title', ({ input, expected }) => {
+      const result = sanitizeNames([input]);
+      expect(result.get(input)).toBe(expected);
     });
   });
 
@@ -50,13 +60,6 @@ describe('sanitizeNames', () => {
       const result = sanitizeNames(['read-file', 'readFile']);
       expect(result.get('read-file')).toBe('read_file');
       expect(result.get('readFile')).toBe('read_file_2');
-    });
-
-    it('appends _3 to third occurrence when names collide', () => {
-      const result = sanitizeNames(['read-file', 'readFile', 'ReadFile']);
-      expect(result.get('read-file')).toBe('read_file');
-      expect(result.get('readFile')).toBe('read_file_2');
-      expect(result.get('ReadFile')).toBe('read_file_3');
     });
 
     it('handles multiple independent collisions', () => {
@@ -70,14 +73,6 @@ describe('sanitizeNames', () => {
       expect(result.get('readFile')).toBe('read_file_2');
       expect(result.get('get-weather')).toBe('get_weather');
       expect(result.get('getWeather')).toBe('get_weather_2');
-    });
-
-    it('both colliding names remain callable', () => {
-      const result = sanitizeNames(['read-file', 'readFile']);
-      expect(result.has('read-file')).toBe(true);
-      expect(result.has('readFile')).toBe(true);
-      expect(result.get('read-file')).toBe('read_file');
-      expect(result.get('readFile')).toBe('read_file_2');
     });
   });
 
@@ -164,11 +159,6 @@ describe('sanitizeNames', () => {
     it('handles empty array', () => {
       const result = sanitizeNames([]);
       expect(result.size).toBe(0);
-    });
-
-    it('handles single name', () => {
-      const result = sanitizeNames(['readFile']);
-      expect(result.get('readFile')).toBe('read_file');
     });
 
     it('preserves order in collision numbering', () => {

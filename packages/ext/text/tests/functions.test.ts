@@ -95,7 +95,9 @@ describe('extract_content', () => {
     const text = result as string;
     expect(text).toContain('Main Article');
     expect(text).toContain('main article content');
-    expect(text).not.toContain('<nav>');
+    expect(text).not.toContain('nav');
+    expect(text).not.toContain('Home');
+    expect(text).not.toContain('About');
   });
 
   it('AC-42: HTML with no <article> or <main> falls back to body content', async () => {

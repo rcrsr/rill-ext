@@ -182,22 +182,6 @@ describe('ground() host function', () => {
   // --------------------------------------------------------
 
   describe('returns { answer, citations } [AC-10]', () => {
-    it('returns a dict with answer and citations fields [AC-10]', async () => {
-      mockResponsesCreate.mockResolvedValue(ONE_CITATION_RESPONSE);
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithGrounding());
-      const ctx = createRuntimeContext();
-
-      const result = (await getHostFn(ext, 'ground').fn(
-        { query: 'What is Azure?' },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect('answer' in result).toBe(true);
-      expect('citations' in result).toBe(true);
-    });
-
     it('answer is the response output_text string [AC-10]', async () => {
       mockResponsesCreate.mockResolvedValue(ONE_CITATION_RESPONSE);
 
@@ -211,21 +195,6 @@ describe('ground() host function', () => {
       )) as Record<string, unknown>;
 
       expect(result['answer']).toBe('Azure is a cloud platform.');
-    });
-
-    it('citations is a list of dicts [AC-10]', async () => {
-      mockResponsesCreate.mockResolvedValue(ONE_CITATION_RESPONSE);
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithGrounding());
-      const ctx = createRuntimeContext();
-
-      const result = (await getHostFn(ext, 'ground').fn(
-        { query: 'What is Azure?' },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(Array.isArray(result['citations'])).toBe(true);
     });
 
     it('each citation has url and title fields [AC-10]', async () => {
@@ -375,36 +344,19 @@ describe('ground() host function', () => {
   // --------------------------------------------------------
 
   describe('grounding not configured [AC-20, EC-9]', () => {
-    it('halts with #UNAVAILABLE when grounding config absent [AC-20, EC-9]', async () => {
+    it('halts with #UNAVAILABLE and does not call responses.create when grounding config absent', async () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithoutGrounding());
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
         getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
-        { code: 'UNAVAILABLE', provider: 'foundry' }
+        {
+          code: 'UNAVAILABLE',
+          provider: 'foundry',
+          message: 'foundry: grounding connection not configured',
+        }
       );
-    });
-
-    it('error message is "foundry: grounding connection not configured" [EC-9]', async () => {
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithoutGrounding());
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
-        { message: 'foundry: grounding connection not configured' }
-      );
-    });
-
-    it('responses.create is not called when grounding not configured [AC-20]', async () => {
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithoutGrounding());
-      const ctx = createRuntimeContext();
-
-      await expect(
-        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx)
-      ).rejects.toThrow();
 
       expect(mockResponsesCreate).not.toHaveBeenCalled();
     });
@@ -484,20 +436,7 @@ describe('ground() host function', () => {
   // --------------------------------------------------------
 
   describe('error mapping', () => {
-    it('wraps unexpected error as halt via mapProviderError', async () => {
-      mockResponsesCreate.mockRejectedValue(new Error('Network failure'));
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithGrounding());
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
-        { provider: 'foundry' }
-      );
-    });
-
-    it('error message includes original error message', async () => {
+    it('wraps unexpected error as halt carrying provider and original message', async () => {
       mockResponsesCreate.mockRejectedValue(new Error('Connection refused'));
 
       const { createFoundryExtension } = await import('../src/factory.js');
@@ -506,7 +445,7 @@ describe('ground() host function', () => {
 
       await expectRejectedHalt(
         getHostFn(ext, 'ground').fn({ query: 'test' }, ctx),
-        { message: 'Connection refused' }
+        { provider: 'foundry', message: 'Connection refused' }
       );
     });
   });

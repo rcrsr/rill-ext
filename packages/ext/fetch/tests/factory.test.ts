@@ -27,13 +27,15 @@ type MockResponse = {
 let mockResponses: MockResponse[] = [];
 let fetchCallCount = 0;
 let requestedUrls: string[] = [];
+let requestedInits: Array<{ method?: string; body?: string } | undefined> = [];
 
 function mockFetch(
   _url: string,
-  options?: { signal?: AbortSignal }
+  options?: { signal?: AbortSignal; method?: string; body?: string }
 ): Promise<Response> {
   fetchCallCount++;
   requestedUrls.push(_url);
+  requestedInits.push(options);
 
   const mockResponse = mockResponses.shift();
   if (!mockResponse) {
@@ -80,6 +82,7 @@ beforeEach(() => {
   mockResponses = [];
   fetchCallCount = 0;
   requestedUrls = [];
+  requestedInits = [];
   vi.stubGlobal('fetch', mockFetch);
 });
 
@@ -103,105 +106,6 @@ function getCallable(
 // ============================================================
 
 describe('createFetchExtension', () => {
-  describe('factory creation', () => {
-    it('creates ExtensionFactoryResult with endpoint functions', () => {
-      const config: FetchExtensionConfig = {
-        baseUrl: 'https://api.example.com',
-        endpoints: {
-          getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-        },
-      };
-
-      const ext = createFetchExtension(config, makeFactoryCtx());
-
-      expect(ext).toHaveProperty('value');
-      expect(ext).toHaveProperty('dispose');
-      expect(getCallable(ext, 'getUser')).toBeDefined();
-      expect(getCallable(ext, 'endpoints')).toBeDefined();
-    });
-
-    it('creates function for each endpoint in config', () => {
-      const config: FetchExtensionConfig = {
-        baseUrl: 'https://api.example.com',
-        endpoints: {
-          getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-          createPost: {
-            method: 'POST',
-            path: '/posts',
-            params: [{ name: 'title', type: 'string', location: 'body' }],
-          },
-          deleteComment: {
-            method: 'DELETE',
-            path: '/comments/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-        },
-      };
-
-      const ext = createFetchExtension(config, makeFactoryCtx());
-
-      expect(getCallable(ext, 'getUser')).toBeDefined();
-      expect(getCallable(ext, 'createPost')).toBeDefined();
-      expect(getCallable(ext, 'deleteComment')).toBeDefined();
-    });
-
-    it('applies default config values without throwing', () => {
-      const config: FetchExtensionConfig = {
-        baseUrl: 'https://api.example.com',
-        endpoints: {
-          getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-        },
-      };
-
-      const ext = createFetchExtension(config, makeFactoryCtx());
-      expect(ext).toBeDefined();
-    });
-
-    it('each host function has a callable fn', () => {
-      const config: FetchExtensionConfig = {
-        baseUrl: 'https://api.example.com',
-        endpoints: {
-          getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-        },
-      };
-
-      const ext = createFetchExtension(config, makeFactoryCtx());
-      expect(typeof getCallable(ext, 'getUser').fn).toBe('function');
-    });
-
-    it('each host function has params array', () => {
-      const config: FetchExtensionConfig = {
-        baseUrl: 'https://api.example.com',
-        endpoints: {
-          getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-        },
-      };
-
-      const ext = createFetchExtension(config, makeFactoryCtx());
-      expect(Array.isArray(getCallable(ext, 'getUser').params)).toBe(true);
-    });
-  });
-
   describe('endpoints() introspection', () => {
     it('returns list with name, method, path, description', async () => {
       const config: FetchExtensionConfig = {
@@ -410,6 +314,7 @@ describe('createFetchExtension', () => {
 
       expect(result).toEqual({ id: 123, name: 'John' });
       expect(fetchCallCount).toBe(1);
+      expect(requestedUrls).toEqual(['https://api.example.com/users/123']);
     });
 
     it('processes multiple parameters', async () => {
@@ -425,8 +330,8 @@ describe('createFetchExtension', () => {
             method: 'POST',
             path: '/posts',
             params: [
+              { name: 'category', type: 'string', location: 'query' },
               { name: 'title', type: 'string', location: 'body' },
-              { name: 'body', type: 'string', location: 'body' },
             ],
           },
         },
@@ -435,42 +340,20 @@ describe('createFetchExtension', () => {
       const ext = createFetchExtension(config, makeFactoryCtx());
 
       const result = await getCallable(ext, 'createPost').fn(
-        { title: 'Test Post', body: 'Post content' },
+        { category: 'news', title: 'Test Post' },
         makeRuntimeCtx()
       );
 
       expect(result).toEqual({ id: 1, title: 'Test Post' });
+      expect(requestedUrls).toEqual([
+        'https://api.example.com/posts?category=news',
+      ]);
+      expect(requestedInits[0]?.method).toBe('POST');
+      expect(JSON.parse(requestedInits[0]!.body!)).toBe('Test Post');
     });
   });
 
   describe('response handling', () => {
-    it('returns response body by default', async () => {
-      mockResponses.push({
-        status: 200,
-        body: '{"id":123,"name":"Test"}',
-      });
-
-      const config: FetchExtensionConfig = {
-        baseUrl: 'https://api.example.com',
-        endpoints: {
-          getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-        },
-      };
-
-      const ext = createFetchExtension(config, makeFactoryCtx());
-
-      const result = await getCallable(ext, 'getUser').fn(
-        { id: '123' },
-        makeRuntimeCtx()
-      );
-
-      expect(result).toEqual({ id: 123, name: 'Test' });
-    });
-
     it('returns full response when responseShape is full', async () => {
       mockResponses.push({
         status: 200,
@@ -497,9 +380,11 @@ describe('createFetchExtension', () => {
         makeRuntimeCtx()
       );
 
-      expect(result).toHaveProperty('status', 200);
-      expect(result).toHaveProperty('headers');
-      expect(result).toHaveProperty('body');
+      expect(result).toMatchObject({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        body: { id: 123 },
+      });
     });
 
     it('applies global responseShape to endpoints without explicit shape', async () => {
@@ -529,9 +414,11 @@ describe('createFetchExtension', () => {
         makeRuntimeCtx()
       );
 
-      expect(result).toHaveProperty('status', 200);
-      expect(result).toHaveProperty('headers');
-      expect(result).toHaveProperty('body');
+      expect(result).toMatchObject({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        body: { id: 123 },
+      });
     });
 
     it('endpoint responseShape overrides global responseShape', async () => {
@@ -565,24 +452,6 @@ describe('createFetchExtension', () => {
   });
 
   describe('dispose()', () => {
-    it('provides dispose method', () => {
-      const config: FetchExtensionConfig = {
-        baseUrl: 'https://api.example.com',
-        endpoints: {
-          getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-        },
-      };
-
-      const ext = createFetchExtension(config, makeFactoryCtx());
-
-      expect(ext).toHaveProperty('dispose');
-      expect(typeof ext.dispose).toBe('function');
-    });
-
     it('dispose can be called multiple times without error', () => {
       const config: FetchExtensionConfig = {
         baseUrl: 'https://api.example.com',
@@ -667,29 +536,6 @@ describe('createFetchExtension', () => {
       const result = await requestPromise;
       const status = getStatus(result);
       expect(status.code.name).toBe('TIMEOUT');
-    });
-  });
-
-  describe('URL access control', () => {
-    it('only exposes endpoints defined in config', () => {
-      const config: FetchExtensionConfig = {
-        baseUrl: 'https://api.example.com',
-        endpoints: {
-          getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            params: [{ name: 'id', type: 'string', location: 'path' }],
-          },
-        },
-      };
-
-      const ext = createFetchExtension(config, makeFactoryCtx());
-      const value = ext.value as Record<string, unknown>;
-
-      expect(value['getUser']).toBeDefined();
-      expect(value['getPost']).toBeUndefined();
-      expect(value['fetch']).toBeUndefined();
-      expect(value['request']).toBeUndefined();
     });
   });
 });

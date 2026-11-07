@@ -10,28 +10,6 @@ export interface VectorExtensionConfig {
 }
 
 /**
- * Result shape returned by batch operation executor.
- */
-export interface BatchResult {
-  /**
-   * Number of operations that succeeded.
-   */
-  readonly succeeded: number;
-
-  /**
-   * Error message for failed operations.
-   * Absent when all operations succeed.
-   */
-  readonly failed?: string;
-
-  /**
-   * Detailed error information.
-   * Absent when all operations succeed.
-   */
-  readonly error?: string;
-}
-
-/**
  * Mutable state object tracking disposal lifecycle.
  */
 export interface DisposalState {
@@ -41,8 +19,3 @@ export interface DisposalState {
    */
   isDisposed: boolean;
 }
-
-/**
- * Standard distance metric string union.
- */
-export type DistanceMetric = 'cosine' | 'euclidean' | 'dot';

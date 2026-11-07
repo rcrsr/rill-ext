@@ -3,14 +3,63 @@
  * Validates config validation and lifecycle management
  */
 
-import { describe, it, expect, expectTypeOf } from 'vitest';
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from 'vitest';
+import { expectThrowHalt } from './_halt-helpers.js';
+import {
+  createRuntimeContext,
+  getStatus,
+  type ApplicationCallable,
+  type RuntimeHaltSignal,
+} from '@rcrsr/rill';
 import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/index.js';
 import type { LLMExtensionConfig } from '../src/index.js';
 
-// ============================================================
-// VALIDATION TESTS
-// ============================================================
+const mockStream = vi.fn();
+
+vi.mock('openai', () => {
+  class MockAPIError extends Error {
+    status: number | undefined;
+    constructor(
+      status: number | undefined,
+      _error: unknown,
+      message: string,
+      _headers: unknown
+    ) {
+      super(message);
+      this.status = status;
+      this.name = 'APIError';
+    }
+  }
+
+  return {
+    default: class MockOpenAI {
+      chat = {
+        completions: {
+          create: vi.fn(),
+          stream: mockStream,
+        },
+      };
+      embeddings = {
+        create: vi.fn(),
+      };
+      static APIError = MockAPIError;
+    },
+    APIError: MockAPIError,
+  };
+});
+
+const VALID_CONFIG: OpenAIExtensionConfig = {
+  api_key: 'test-key',
+  model: 'gpt-4-turbo',
+};
+
+const PROMPT_PARAM = {
+  name: 'prompt',
+  type: { kind: 'any' },
+  defaultValue: undefined,
+  annotations: { description: 'String or list of message dicts' },
+};
 
 describe('createOpenAIExtension', () => {
   describe('barrel types', () => {
@@ -20,321 +69,210 @@ describe('createOpenAIExtension', () => {
   });
 
   describe('configuration validation', () => {
-    // EC-1: Missing api_key
-    it('throws when api_key is missing', () => {
-      const config = {
-        model: 'gpt-4-turbo',
-      } as OpenAIExtensionConfig;
-
-      expect(() => createOpenAIExtension(config)).toThrow(
-        'api_key is required'
-      );
+    it.each([
+      {
+        label: 'api_key is missing',
+        config: { model: 'gpt-4-turbo' },
+        message: 'api_key is required',
+      },
+      {
+        label: 'api_key is empty',
+        config: { api_key: '', model: 'gpt-4-turbo' },
+        message: 'api_key cannot be empty',
+      },
+      {
+        label: 'model is missing',
+        config: { api_key: 'test-key' },
+        message: 'model is required',
+      },
+      {
+        label: 'model is empty',
+        config: { api_key: 'test-key', model: '' },
+        message: 'model is required',
+      },
+      {
+        label: 'temperature is below 0',
+        config: { ...VALID_CONFIG, temperature: -0.1 },
+        message: 'temperature must be between 0 and 2',
+      },
+      {
+        label: 'temperature is above 2',
+        config: { ...VALID_CONFIG, temperature: 2.1 },
+        message: 'temperature must be between 0 and 2',
+      },
+    ] satisfies Array<{
+      label: string;
+      config: Partial<OpenAIExtensionConfig>;
+      message: string;
+    }>)('throws when $label', ({ config, message }) => {
+      expect(() =>
+        createOpenAIExtension(config as OpenAIExtensionConfig)
+      ).toThrow(message);
     });
 
-    // EC-3: Empty api_key
-    it('throws when api_key is empty', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: '',
-        model: 'gpt-4-turbo',
-      };
-
-      expect(() => createOpenAIExtension(config)).toThrow(
-        'api_key cannot be empty'
-      );
-    });
-
-    // EC-2: Missing model
-    it('throws when model is missing', () => {
-      const config = {
-        api_key: 'test-key',
-      } as OpenAIExtensionConfig;
-
-      expect(() => createOpenAIExtension(config)).toThrow('model is required');
-    });
-
-    // EC-2: Empty model
-    it('throws when model is empty', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: '',
-      };
-
-      expect(() => createOpenAIExtension(config)).toThrow('model is required');
-    });
-
-    // EC-4: Invalid temperature (below range)
-    it('throws when temperature is below 0', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        temperature: -0.1,
-      };
-
-      expect(() => createOpenAIExtension(config)).toThrow(
-        'temperature must be between 0 and 2'
-      );
-    });
-
-    // EC-4: Invalid temperature (above range)
-    it('throws when temperature is above 2', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        temperature: 2.1,
-      };
-
-      expect(() => createOpenAIExtension(config)).toThrow(
-        'temperature must be between 0 and 2'
-      );
-    });
-
-    // Valid temperature at lower bound
-    it('accepts temperature of 0', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        temperature: 0.0,
-      };
-
-      expect(() => createOpenAIExtension(config)).not.toThrow();
-    });
-
-    // Valid temperature at upper bound
-    it('accepts temperature of 2', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        temperature: 2.0,
-      };
-
-      expect(() => createOpenAIExtension(config)).not.toThrow();
-    });
-
-    // Valid temperature in middle of range
-    it('accepts temperature of 0.7', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        temperature: 0.7,
-      };
-
-      expect(() => createOpenAIExtension(config)).not.toThrow();
-    });
-
-    // Omitted temperature (should be valid)
-    it('accepts omitted temperature', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      expect(() => createOpenAIExtension(config)).not.toThrow();
-    });
+    it.each([
+      {
+        label: 'temperature of 0',
+        config: { ...VALID_CONFIG, temperature: 0 },
+      },
+      {
+        label: 'temperature of 2',
+        config: { ...VALID_CONFIG, temperature: 2 },
+      },
+      {
+        label: 'temperature of 0.7',
+        config: { ...VALID_CONFIG, temperature: 0.7 },
+      },
+      { label: 'omitted temperature', config: VALID_CONFIG },
+    ] satisfies Array<{ label: string; config: OpenAIExtensionConfig }>)(
+      'accepts $label',
+      ({ config }) => {
+        expect(() => createOpenAIExtension(config)).not.toThrow();
+      }
+    );
   });
 
-  // AC-1: Factory returns ExtensionFactoryResult with 6 callables
   describe('extension result structure', () => {
-    it('returns object with 6 function definitions', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const result = createOpenAIExtension(config);
-      const value = result.value as Record<string, unknown>;
-
-      // Verify all 5 functions exist in the value dict
-      expect(value['message']).toBeDefined();
-      expect(value['embed']).toBeDefined();
-      expect(value['embed_batch']).toBeDefined();
-      expect(value['tool_loop']).toBeDefined();
-      expect(value['generate']).toBeDefined();
-
-      // Verify dispose exists on the factory result
-      expect(result.dispose).toBeDefined();
-    });
-
-    it('message callable has correct structure', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const result = createOpenAIExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['message']).toMatchObject({
-        params: [
-          {
-            name: 'prompt',
-            type: { kind: 'any' },
-            defaultValue: undefined,
-            annotations: { description: 'String or list of message dicts' },
-          },
-        ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'stream' },
-      });
-    });
-
-    it('embed callable has correct structure', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const result = createOpenAIExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['embed']).toMatchObject({
-        params: [
-          {
-            name: 'text',
-            type: { kind: 'string' },
-            defaultValue: undefined,
-            annotations: {},
-          },
-        ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'vector' },
-      });
-    });
-
-    it('embed_batch callable has correct structure', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const result = createOpenAIExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['embed_batch']).toMatchObject({
-        params: [
-          {
-            name: 'texts',
-            type: { kind: 'list' },
-            defaultValue: undefined,
-            annotations: {},
-          },
-        ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'list' },
-      });
-    });
-
-    it('tool_loop callable has correct structure', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const result = createOpenAIExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['tool_loop']).toMatchObject({
-        params: [
-          {
-            name: 'prompt',
-            type: { kind: 'any' },
-            defaultValue: undefined,
-            annotations: { description: 'String or list of message dicts' },
-          },
-          {
-            name: 'tools',
-            type: { kind: 'dict', valueType: { kind: 'closure' } },
-            defaultValue: undefined,
-            annotations: {},
-          },
-          {
-            name: 'max_turns',
-            type: { kind: 'number' },
-            defaultValue: 0,
-            annotations: {},
-          },
-        ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'stream' },
-      });
-    });
-
-    it('generate callable has correct structure', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const result = createOpenAIExtension(config);
-      const value = result.value as Record<string, Record<string, unknown>>;
-
-      expect(value['generate']).toMatchObject({
-        params: [
-          {
-            name: 'prompt',
-            type: { kind: 'any' },
-            defaultValue: undefined,
-            annotations: { description: 'String or list of message dicts' },
-          },
-          {
-            name: 'schema',
-            type: { kind: 'type' },
-            defaultValue: undefined,
-            annotations: {
-              description: 'Type expression for structured output schema',
+    it.each([
+      {
+        name: 'message',
+        expected: {
+          params: [PROMPT_PARAM],
+          fn: expect.any(Function),
+          annotations: { description: expect.any(String) },
+          returnType: { typeName: 'stream' },
+        },
+      },
+      {
+        name: 'embed',
+        expected: {
+          params: [
+            {
+              name: 'text',
+              type: { kind: 'string' },
+              defaultValue: undefined,
+              annotations: {},
             },
-          },
-        ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
-        returnType: { typeName: 'dict' },
-      });
+          ],
+          fn: expect.any(Function),
+          annotations: { description: expect.any(String) },
+          returnType: { typeName: 'vector' },
+        },
+      },
+      {
+        name: 'embed_batch',
+        expected: {
+          params: [
+            {
+              name: 'texts',
+              type: { kind: 'list' },
+              defaultValue: undefined,
+              annotations: {},
+            },
+          ],
+          fn: expect.any(Function),
+          annotations: { description: expect.any(String) },
+          returnType: { typeName: 'list' },
+        },
+      },
+      {
+        name: 'tool_loop',
+        expected: {
+          params: [
+            PROMPT_PARAM,
+            {
+              name: 'tools',
+              type: { kind: 'dict', valueType: { kind: 'closure' } },
+              defaultValue: undefined,
+              annotations: {},
+            },
+            {
+              name: 'max_turns',
+              type: { kind: 'number' },
+              defaultValue: 0,
+              annotations: {},
+            },
+          ],
+          fn: expect.any(Function),
+          annotations: { description: expect.any(String) },
+          returnType: { typeName: 'stream' },
+        },
+      },
+      {
+        name: 'generate',
+        expected: {
+          params: [
+            PROMPT_PARAM,
+            {
+              name: 'schema',
+              type: { kind: 'type' },
+              defaultValue: undefined,
+              annotations: {
+                description: 'Type expression for structured output schema',
+              },
+            },
+          ],
+          fn: expect.any(Function),
+          annotations: { description: expect.any(String) },
+          returnType: { typeName: 'dict' },
+        },
+      },
+    ])('exposes $name callable with its declared structure', (row) => {
+      const result = createOpenAIExtension(VALID_CONFIG);
+      const value = result.value as Record<string, Record<string, unknown>>;
+
+      expect(value[row.name]).toMatchObject(row.expected);
     });
   });
 
-  // AC-28: dispose() called twice does not throw
   describe('dispose lifecycle', () => {
-    it('dispose can be called successfully', async () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const result = createOpenAIExtension(config);
-
-      await expect(result.dispose?.()).resolves.not.toThrow();
+    beforeEach(() => {
+      mockStream.mockReset();
     });
 
-    it('dispose can be called multiple times (idempotent)', async () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
+    it('resolves when called multiple times (idempotent)', async () => {
+      const result = createOpenAIExtension(VALID_CONFIG);
 
-      const result = createOpenAIExtension(config);
-
-      // Call dispose twice - AC-28 (idempotent)
-      await expect(result.dispose?.()).resolves.not.toThrow();
-      await expect(result.dispose?.()).resolves.not.toThrow();
+      await expect(result.dispose?.()).resolves.toBeUndefined();
+      await expect(result.dispose?.()).resolves.toBeUndefined();
     });
-  });
 
-  // IR-11: AbortController cancellation test
-  describe('AbortController cleanup', () => {
-    it('initializes AbortController for request cancellation', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
+    it('halts later calls with DISPOSED and extension_disposed after dispose', async () => {
+      const result = createOpenAIExtension(VALID_CONFIG);
+      const message = (result.value as Record<string, ApplicationCallable>)[
+        'message'
+      ]!;
 
-      const result = createOpenAIExtension(config);
+      await result.dispose?.();
 
-      // Verify extension was created successfully
-      expect(result).toBeDefined();
-      expect(result.dispose).toBeDefined();
+      const thrown = expectThrowHalt(
+        () => message.fn({ prompt: 'Hello' }, createRuntimeContext()),
+        { code: 'DISPOSED', provider: 'openai' }
+      );
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
+      expect((status.raw as Record<string, unknown>)['kind']).toBe(
+        'extension_disposed'
+      );
+    });
+
+    it('aborts the signal of an in-flight request on dispose', async () => {
+      mockStream.mockReturnValue({
+        [Symbol.asyncIterator]: async function* () {},
+        finalChatCompletion: vi.fn(),
+        abort: vi.fn(),
+      });
+      const result = createOpenAIExtension(VALID_CONFIG);
+      const message = (result.value as Record<string, ApplicationCallable>)[
+        'message'
+      ]!;
+
+      void message.fn({ prompt: 'Hello' }, createRuntimeContext());
+      const options = mockStream.mock.calls[0]![1] as { signal: AbortSignal };
+      expect(options.signal.aborted).toBe(false);
+
+      await result.dispose?.();
+
+      expect(options.signal.aborted).toBe(true);
     });
   });
 });

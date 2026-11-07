@@ -5,11 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  createRuntimeContext,
-  isRillStream,
-  type ApplicationCallable,
-} from '@rcrsr/rill';
+import { createRuntimeContext, type ApplicationCallable } from '@rcrsr/rill';
 import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 import { expectRejectedHalt, expectThrowHalt } from './_halt-helpers.js';
@@ -208,25 +204,6 @@ describe('message() function', () => {
 
   // IR-1/AC-1: message() returns RillStream
   describe('streaming', () => {
-    it('returns RillStream (isRillStream is true)', async () => {
-      mockStream.mockReturnValue(createMockStream('Hello from Claude!'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const result = await getCallable(ext, 'message').fn(
-        { prompt: 'Hello' },
-        ctx
-      );
-
-      expect(isRillStream(result)).toBe(true);
-    });
-
     // IR-1/AC-3: Iterating message() stream yields string text delta chunks
     it('yields string text delta chunks when iterated', async () => {
       mockStream.mockReturnValue(createMockStream('Hello from Claude!'));
@@ -277,34 +254,12 @@ describe('message() function', () => {
       expect(Array.isArray(messages)).toBe(true);
       expect(messages[0]!.role).toBe('user');
       expect(messages[messages.length - 1]!.role).toBe('assistant');
+      // content field removed from the resolution dict
+      expect(Object.keys(result)).not.toContain('content');
     });
   });
 
   describe('success cases', () => {
-    // AC-2: message("prompt") resolution returns dict with required fields
-    it('returns dict with model, usage, stop_reason, id, messages', async () => {
-      mockStream.mockReturnValue(createMockStream('Hello from Claude!'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
-      const result = await resolveStream(stream);
-
-      expect(result).toBeDefined();
-      expect(extractLastAssistantText(result)).toBe('Hello from Claude!');
-      expect(result['model']).toBe('claude-sonnet-4-5-20250929');
-      expect(result['usage']).toEqual({ input: 10, output: 20 });
-      expect(result['stop_reason']).toBe('end_turn');
-      expect(result['id']).toBe('msg_test123');
-      expect(Array.isArray(result['messages'])).toBe(true);
-    });
-
     it('sends correct parameters to Anthropic stream API', () => {
       mockStream.mockReturnValue(createMockStream('Response'));
 
@@ -328,49 +283,6 @@ describe('message() function', () => {
         messages: [{ role: 'user', content: 'What is 2+2?' }],
       });
     });
-
-    it('uses default max_tokens when not specified', () => {
-      mockStream.mockReturnValue(createMockStream('Response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          max_tokens: 4096,
-        })
-      );
-    });
-
-    it('accepts list of message dicts as prompt (multi-turn)', async () => {
-      mockStream.mockReturnValue(createMockStream('Response'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const conversationHistory = [
-        { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' },
-        { role: 'user', content: 'How are you?' },
-      ];
-
-      // message() now accepts list of {role, content} dicts (content-sugar format)
-      expect(() =>
-        getCallable(ext, 'message').fn({ prompt: conversationHistory }, ctx)
-      ).not.toThrow();
-    });
   });
 
   describe('error cases', () => {
@@ -384,138 +296,66 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      expectThrowHalt(() =>
-        getCallable(ext, 'message').fn({ prompt: '' }, ctx)
+      expectThrowHalt(
+        () => getCallable(ext, 'message').fn({ prompt: '' }, ctx),
+        {
+          code: 'INVALID_INPUT',
+          message: 'prompt string cannot be empty',
+        }
       );
       expect(mockStream).not.toHaveBeenCalled();
     });
 
-    it('throws RuntimeError with RILL-R005 for empty prompt text', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      expectThrowHalt(
-        () => getCallable(ext, 'message').fn({ prompt: '' }, ctx),
-        { message: 'prompt string cannot be empty' }
-      );
-    });
-
-    it('throws RuntimeError for whitespace-only prompt', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      expectThrowHalt(
-        () => getCallable(ext, 'message').fn({ prompt: '   \n\t  ' }, ctx),
-        { message: 'prompt string cannot be empty' }
-      );
-    });
-
-    // EC-2: Provider API error during stream resolution → RuntimeError RILL-R005
-    it('maps 429 rate limit error from resolve() correctly', async () => {
-      const mockError = await createMockAPIError(429, 'Rate limit exceeded');
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(resolveStream(stream), {
+    it.each([
+      {
+        label: 'HTTP 429',
+        makeError: () => createMockAPIError(429, 'Rate limit exceeded'),
+        code: 'RATE_LIMIT',
         message: 'Anthropic API error (HTTP 429): Rate limit exceeded',
-      });
-    });
-
-    it('maps 401 auth error from resolve() correctly', async () => {
-      const mockError = await createMockAPIError(401, 'Invalid API key');
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(resolveStream(stream), {
+      },
+      {
+        label: 'HTTP 401',
+        makeError: () => createMockAPIError(401, 'Invalid API key'),
+        code: 'AUTH',
         message: 'Anthropic API error (HTTP 401): Invalid API key',
-      });
-    });
-
-    it('maps timeout error from resolve() correctly', async () => {
-      const mockError = new Error('Request timeout');
-      mockError.name = 'AbortError';
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(resolveStream(stream), {
+      },
+      {
+        label: 'abort timeout',
+        makeError: () =>
+          Promise.resolve(
+            Object.assign(new Error('Request timeout'), { name: 'AbortError' })
+          ),
+        code: 'TIMEOUT',
         message: 'Anthropic error: Request timeout',
-      });
-    });
-
-    it('maps 500 error from resolve() correctly', async () => {
-      const mockError = await createMockAPIError(500, 'Internal server error');
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(resolveStream(stream), {
+      },
+      {
+        label: 'HTTP 500',
+        makeError: () => createMockAPIError(500, 'Internal server error'),
+        code: 'UNAVAILABLE',
         message: 'Anthropic API error (HTTP 500): Internal server error',
-      });
-    });
-
-    it('maps unknown error from resolve() correctly', async () => {
-      const mockError = { unknown: 'error' };
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(resolveStream(stream), {
+      },
+      {
+        label: 'unknown error',
+        makeError: () => Promise.resolve({ unknown: 'error' }),
+        code: 'UNAVAILABLE',
         message: 'Anthropic error: Unknown error',
-      });
-    });
+      },
+    ])(
+      'maps $label from resolve() to #$code',
+      async ({ makeError, code, message }) => {
+        mockStream.mockReturnValue(createErrorStream(await makeError()));
+
+        const ext = createAnthropicExtension({
+          api_key: 'test-key',
+          model: 'claude-sonnet-4-5-20250929',
+        });
+        const ctx = createRuntimeContext();
+
+        const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
+
+        await expectRejectedHalt(resolveStream(stream), { code, message });
+      }
+    );
 
     // EC-3/AC-16: Provider disconnect mid-stream yields error during iteration; stream resolves with partial data
     it('throws RuntimeError during iteration on mid-stream disconnect [EC-3]', async () => {
@@ -558,24 +398,6 @@ describe('message() function', () => {
       const result = await resolveStream(stream);
       expect(extractLastAssistantText(result)).toBe('Partial content');
       expect(result['model']).toBe('claude-sonnet-4-5-20250929');
-    });
-
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
-    it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
-      const mockError = await createMockAPIError(500, 'Internal server error');
-      mockStream.mockReturnValue(createErrorStream(mockError));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(resolveStream(stream));
     });
   });
 });
@@ -640,57 +462,6 @@ describe('embed() function', () => {
       );
     });
   });
-
-  describe('function metadata', () => {
-    it('has correct params definition', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        embed_model: 'voyager-3-large',
-      };
-
-      const ext = createAnthropicExtension(config);
-
-      expect(getCallable(ext, 'embed').params).toEqual([
-        {
-          name: 'text',
-          type: { kind: 'string' },
-          defaultValue: undefined,
-          annotations: {},
-        },
-      ]);
-    });
-
-    it('has correct description', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        embed_model: 'voyager-3-large',
-      };
-
-      const ext = createAnthropicExtension(config);
-
-      expect(getCallable(ext, 'embed').annotations?.['description']).toBe(
-        'Generate embedding vector for text'
-      );
-    });
-
-    it('has correct return type', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        embed_model: 'voyager-3-large',
-      };
-
-      const ext = createAnthropicExtension(config);
-
-      expect(getCallable(ext, 'embed').returnType).toEqual({
-        __rill_type: true,
-        typeName: 'vector',
-        structure: { kind: 'vector' },
-      });
-    });
-  });
 });
 
 // ============================================================
@@ -700,169 +471,6 @@ describe('embed() function', () => {
 describe('boundary conditions', () => {
   beforeEach(() => {
     mockStream.mockReset();
-  });
-
-  // AC-13: resolveStream(message()) returns dict with expected fields
-  describe('AC-13: resolveStream(message()) returns expected dict shape', () => {
-    it('resolution dict has model, usage, stop_reason, id, messages fields', async () => {
-      mockStream.mockReturnValue(createMockStream('Hello from Claude!'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
-      const result = await resolveStream(stream);
-
-      // content field removed; text in messages[last].parts[i].text
-      expect(extractLastAssistantText(result)).toBe('Hello from Claude!');
-      expect(result['model']).toBe('claude-sonnet-4-5-20250929');
-      expect(result['usage']).toEqual({ input: 10, output: 20 });
-      expect(result['stop_reason']).toBe('end_turn');
-      expect(result['id']).toBe('msg_test123');
-      expect(Array.isArray(result['messages'])).toBe(true);
-
-      // Exact shape: only these 5 keys (content removed)
-      const keys = Object.keys(result);
-      expect(keys).not.toContain('content');
-      expect(keys).toContain('model');
-      expect(keys).toContain('usage');
-      expect(keys).toContain('stop_reason');
-      expect(keys).toContain('id');
-      expect(keys).toContain('messages');
-    });
-  });
-
-  // AC-15: First chunk arrives within 500ms (mock timing test)
-  describe('AC-15: first chunk from message() arrives within 500ms', () => {
-    it('first chunk is emitted before 500ms deadline using mock timing', async () => {
-      mockStream.mockReturnValue(
-        createMockStream('Streaming response content')
-      );
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const before = Date.now();
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
-
-      // Advance to first chunk via next()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const firstStep = await (stream as any).next.fn({}, null);
-      const after = Date.now();
-
-      // First chunk must arrive within 500ms window
-      expect(after - before).toBeLessThan(500);
-      // And it must actually contain a string value (not done)
-      expect(firstStep.done).toBe(false);
-      expect(typeof firstStep.value).toBe('string');
-    });
-  });
-
-  // AC-22: Second iteration of a consumed stream halts runtime
-  describe('AC-22: second iteration of consumed stream throws RILL-R002', () => {
-    it('calling next() on the done step of a fully-consumed stream throws RILL-R002', async () => {
-      mockStream.mockReturnValue(createMockStream('Test content'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
-
-      // Navigate to the done step manually (without using collectChunks which discards the done step)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let current: any = stream;
-      while (!current.done) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        current = await (current.next as any).fn({}, null);
-      }
-
-      // current is the done step; calling its next() throws RILL-R002 synchronously
-      // (the done step's callable is a sync function that throws, not async)
-      expect(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        () => (current.next as any).fn({}, null)
-      ).toThrow(/#RILL_R002: Stream already consumed; cannot re-iterate/);
-    });
-
-    it('calling next() on the initial stream step after it was consumed throws RILL-R002', async () => {
-      mockStream.mockReturnValue(createMockStream('Test'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
-
-      // First call to next() succeeds and marks the root step as consumed
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (stream as any).next.fn({}, null);
-
-      // Second call to next() on the same initial step throws RILL-R002
-      await expect(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (stream as any).next.fn({}, null)
-      ).rejects.toThrow(
-        /#RILL_R002: Stream already consumed; cannot re-iterate/
-      );
-    });
-  });
-
-  // AC-23: ()  resolution followed by iteration attempt throws RILL-R002
-  describe('AC-23: after resolution, iteration attempt throws RILL-R002', () => {
-    it('calling next() after resolveStream() on an unstarted stream throws RILL-R002', async () => {
-      mockStream.mockReturnValue(createMockStream('Test'));
-
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-      };
-
-      const ext = createAnthropicExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
-
-      // Resolve the stream directly (without iterating chunks)
-      await resolveStream(stream);
-
-      // After resolve, the underlying iterator is exhausted — next() on the root step still throws RILL-R002
-      // because the root next callable is not consumed by resolveStream, but calling it on an
-      // already-exhausted iterator advances correctly. However, the runtime enforces single-use
-      // on the stream step's .next callable, so calling .next() twice throws RILL-R002.
-      // First call to .next() on original stream step (root):
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const step1 = await (stream as any).next.fn({}, null);
-
-      // Second call to original stream's .next() throws because it's stale
-      await expect(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (stream as any).next.fn({}, null)
-      ).rejects.toThrow(
-        /#RILL_R002: Stream already consumed; cannot re-iterate/
-      );
-
-      // Also: once exhausted, calling next on done step throws RILL-R002
-      void step1; // used for exhaustion path verification
-    });
   });
 
   // AC-24: Stream with 0 chunks resolves to valid dict
@@ -1065,57 +673,6 @@ describe('embed_batch() function', () => {
         getCallable(ext, 'embed_batch').fn({ texts: ['text1', 'text2'] }, ctx),
         { message: 'Anthropic: embeddings API not available' }
       );
-    });
-  });
-
-  describe('function metadata', () => {
-    it('has correct params definition', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        embed_model: 'voyager-3-large',
-      };
-
-      const ext = createAnthropicExtension(config);
-
-      expect(getCallable(ext, 'embed_batch').params).toEqual([
-        {
-          name: 'texts',
-          type: { kind: 'list' },
-          defaultValue: undefined,
-          annotations: {},
-        },
-      ]);
-    });
-
-    it('has correct description', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        embed_model: 'voyager-3-large',
-      };
-
-      const ext = createAnthropicExtension(config);
-
-      expect(getCallable(ext, 'embed_batch').annotations?.['description']).toBe(
-        'Generate embedding vectors for multiple texts'
-      );
-    });
-
-    it('has correct return type', () => {
-      const config: AnthropicExtensionConfig = {
-        api_key: 'test-key',
-        model: 'claude-sonnet-4-5-20250929',
-        embed_model: 'voyager-3-large',
-      };
-
-      const ext = createAnthropicExtension(config);
-
-      expect(getCallable(ext, 'embed_batch').returnType).toEqual({
-        __rill_type: true,
-        typeName: 'list',
-        structure: { kind: 'list', element: { kind: 'vector' } },
-      });
     });
   });
 });

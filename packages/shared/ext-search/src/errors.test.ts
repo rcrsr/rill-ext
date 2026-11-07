@@ -107,7 +107,7 @@ describe('mapSearchError', () => {
 
   it('prefixes provider name in messages', () => {
     const result = mapSearchError(ctx, 'my-provider', new Error('test'));
-    expect(statusOf(result).message).toContain('my-provider');
+    expect(statusOf(result).message).toBe('my-provider: test');
   });
 });
 
@@ -127,7 +127,9 @@ describe('mapProviderSearchError', () => {
 
   it('does not apply exa override to other providers at 402', () => {
     const result = mapProviderSearchError(ctx, 'tavily', 402, {});
-    expect(statusOf(result).message).not.toBe('exa: credits depleted');
+    expect(statusOf(result).code.name).toBe('QUOTA_EXCEEDED');
+    expect(statusOf(result).message).toBe('tavily: quota exceeded');
+    expect(statusOf(result).raw['kind']).toBe('quota_exceeded');
   });
 
   it('maps tavily 432 to QUOTA_EXCEEDED with plan_limit_exceeded kind', () => {

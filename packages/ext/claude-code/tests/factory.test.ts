@@ -60,33 +60,6 @@ vi.mock('../src/process.js', () => ({
 
 describe('createClaudeCodeExtension', () => {
   describe('factory return value', () => {
-    it('returns ExtensionResult with prompt, skill, command functions', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = extValue(ext);
-
-      // IR-1: Returns ExtensionResult with host functions
-      expect(v).toHaveProperty('prompt');
-      expect(v).toHaveProperty('skill');
-      expect(v).toHaveProperty('command');
-      expect(ext).toHaveProperty('dispose');
-
-      // Verify host function structure
-      expect(v.prompt).toHaveProperty('params');
-      expect(v.prompt).toHaveProperty('fn');
-      expect(v.prompt).toHaveProperty('annotations');
-      expect(v.prompt).toHaveProperty('returnType');
-
-      expect(v.skill).toHaveProperty('params');
-      expect(v.skill).toHaveProperty('fn');
-      expect(v.skill).toHaveProperty('annotations');
-      expect(v.skill).toHaveProperty('returnType');
-
-      expect(v.command).toHaveProperty('params');
-      expect(v.command).toHaveProperty('fn');
-      expect(v.command).toHaveProperty('annotations');
-      expect(v.command).toHaveProperty('returnType');
-    });
-
     it('creates prompt function with correct parameter signature', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const v = extValue(ext);
@@ -158,72 +131,6 @@ describe('createClaudeCodeExtension', () => {
       ]);
       expect(v.command.returnType).toEqual(EXPECTED_RETURN_TYPE);
     });
-
-    it('validates prompt text before processing', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = extValue(ext);
-      const ctx = makeRuntimeCtx();
-
-      // Validation throws an invalid RillValue carrying #INVALID_INPUT (AC-10)
-      expectInvalidThrow(
-        () => v.prompt.fn({ text: '', options: {} }, ctx),
-        'INVALID_INPUT',
-        'prompt text cannot be empty'
-      );
-      expectInvalidThrow(
-        () => v.skill.fn({ name: '', args: {} }, ctx),
-        'INVALID_INPUT',
-        'skill name cannot be empty'
-      );
-      expectInvalidThrow(
-        () => v.command.fn({ name: '', args: {} }, ctx),
-        'INVALID_INPUT',
-        'command name cannot be empty'
-      );
-    });
-  });
-
-  describe('config validation', () => {
-    it('uses default binaryPath when not provided', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      expect(ext).toBeDefined();
-    });
-
-    it('uses default timeout when not provided', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      expect(ext).toBeDefined();
-    });
-
-    it('accepts valid binaryPath', () => {
-      const ext = createClaudeCodeExtension(
-        {
-          binaryPath: '/usr/bin/claude',
-        },
-        makeFactoryCtx()
-      );
-      expect(ext).toBeDefined();
-    });
-
-    it('accepts valid timeout', () => {
-      const ext = createClaudeCodeExtension(
-        {
-          defaultTimeout: 60000,
-        },
-        makeFactoryCtx()
-      );
-      expect(ext).toBeDefined();
-    });
-
-    it('accepts both config options', () => {
-      const ext = createClaudeCodeExtension(
-        {
-          binaryPath: '/usr/bin/claude',
-          defaultTimeout: 60000,
-        },
-        makeFactoryCtx()
-      );
-      expect(ext).toBeDefined();
-    });
   });
 
   describe('binaryPath validation (EC-1)', () => {
@@ -235,66 +142,34 @@ describe('createClaudeCodeExtension', () => {
         )
       ).toThrow('claude binary not found');
     });
+  });
 
-    it('validates binaryPath eagerly at factory creation', () => {
-      // Should throw immediately, not during function call
+  describe('timeout validation', () => {
+    it.each([
+      { label: 'negative', timeout: -1 },
+      { label: 'negative large', timeout: -5000 },
+      { label: 'zero', timeout: 0 },
+      { label: 'decimal', timeout: 2500.75 },
+      { label: 'fractional millisecond', timeout: 10000.1 },
+      { label: 'just above max', timeout: 3600001 },
+      { label: 'far above max', timeout: 5000000 },
+    ])('throws for $label timeout $timeout', ({ timeout }) => {
       expect(() =>
-        createClaudeCodeExtension(
-          { binaryPath: 'invalid-binary' },
-          makeFactoryCtx()
-        )
-      ).toThrow('claude binary not found');
+        createClaudeCodeExtension({ defaultTimeout: timeout }, makeFactoryCtx())
+      ).toThrow('Invalid timeout: must be positive integer, max 3600000');
+    });
+
+    it.each([
+      { label: 'lower boundary', timeout: 1 },
+      { label: 'upper boundary', timeout: 3600000 },
+    ])('accepts $label timeout $timeout', ({ timeout }) => {
+      expect(() =>
+        createClaudeCodeExtension({ defaultTimeout: timeout }, makeFactoryCtx())
+      ).not.toThrow();
     });
   });
 
-  describe('timeout validation (EC-2)', () => {
-    it('throws Error for negative timeout', () => {
-      expect(() =>
-        createClaudeCodeExtension({ defaultTimeout: -1 }, makeFactoryCtx())
-      ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-    });
-
-    it('throws Error for zero timeout', () => {
-      expect(() =>
-        createClaudeCodeExtension({ defaultTimeout: 0 }, makeFactoryCtx())
-      ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-    });
-
-    it('throws Error for non-integer timeout', () => {
-      expect(() =>
-        createClaudeCodeExtension({ defaultTimeout: 30000.5 }, makeFactoryCtx())
-      ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-    });
-
-    it('throws Error for timeout exceeding 3600000', () => {
-      expect(() =>
-        createClaudeCodeExtension({ defaultTimeout: 3600001 }, makeFactoryCtx())
-      ).toThrow('Invalid timeout: must be positive integer, max 3600000');
-    });
-
-    it('accepts timeout at boundary (3600000)', () => {
-      const ext = createClaudeCodeExtension(
-        { defaultTimeout: 3600000 },
-        makeFactoryCtx()
-      );
-      expect(ext).toBeDefined();
-    });
-
-    it('accepts timeout at lower boundary (1)', () => {
-      const ext = createClaudeCodeExtension(
-        { defaultTimeout: 1 },
-        makeFactoryCtx()
-      );
-      expect(ext).toBeDefined();
-    });
-  });
-
-  describe('dispose function (IR-5)', () => {
-    it('provides dispose function', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      expect(ext.dispose).toBeInstanceOf(Function);
-    });
-
+  describe('dispose function', () => {
     it('dispose is idempotent (multiple calls safe)', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
 
@@ -333,93 +208,48 @@ describe('createClaudeCodeExtension', () => {
   });
 
   describe('default values', () => {
-    it('uses default binaryPath "claude" when omitted', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      expect(ext).toBeDefined();
-    });
-
-    it('uses default timeout 30000 when omitted', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      expect(ext).toBeDefined();
-    });
-
-    it('handles empty config object', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      expect(ext).toBeDefined();
-      expect(extValue(ext).prompt).toBeDefined();
-      expect(extValue(ext).skill).toBeDefined();
-      expect(extValue(ext).command).toBeDefined();
-      expect(ext.dispose).toBeDefined();
-    });
-
     it('handles undefined config', () => {
-      const ext = createClaudeCodeExtension(undefined, makeFactoryCtx());
-      expect(ext).toBeDefined();
+      expect(() =>
+        createClaudeCodeExtension(undefined, makeFactoryCtx())
+      ).not.toThrow();
     });
   });
 
-  describe('empty string validation', () => {
-    it('invalidates with #INVALID_INPUT for empty prompt text (EC-3)', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = extValue(ext);
-      const ctx = makeRuntimeCtx();
+  describe('empty input validation', () => {
+    const BLANK_INPUTS = [
+      { label: 'empty string', value: '' },
+      { label: 'spaces', value: '   ' },
+      { label: 'tabs and newlines', value: '\t\n  ' },
+    ];
+    const CASES = BLANK_INPUTS.flatMap(({ label, value }) => [
+      {
+        fn: 'prompt' as const,
+        label,
+        args: { text: value, options: {} },
+        message: 'prompt text cannot be empty',
+      },
+      {
+        fn: 'skill' as const,
+        label,
+        args: { name: value, args: {} },
+        message: 'skill name cannot be empty',
+      },
+      {
+        fn: 'command' as const,
+        label,
+        args: { name: value, args: {} },
+        message: 'command name cannot be empty',
+      },
+    ]);
 
-      expectInvalidThrow(
-        () => v.prompt.fn({ text: '', options: {} }, ctx),
-        'INVALID_INPUT',
-        'prompt text cannot be empty'
-      );
-      expectInvalidThrow(
-        () => v.prompt.fn({ text: '   ', options: {} }, ctx),
-        'INVALID_INPUT',
-        'prompt text cannot be empty'
-      );
-    });
+    it.each(CASES)(
+      'invalidates $fn with #INVALID_INPUT for $label',
+      ({ fn, args, message }) => {
+        const v = extValue(createClaudeCodeExtension({}, makeFactoryCtx()));
+        const ctx = makeRuntimeCtx();
 
-    it('invalidates with #INVALID_INPUT for empty skill name (EC-10)', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = extValue(ext);
-      const ctx = makeRuntimeCtx();
-
-      expectInvalidThrow(
-        () => v.skill.fn({ name: '', args: {} }, ctx),
-        'INVALID_INPUT',
-        'skill name cannot be empty'
-      );
-      expectInvalidThrow(
-        () => v.skill.fn({ name: '   ', args: {} }, ctx),
-        'INVALID_INPUT',
-        'skill name cannot be empty'
-      );
-    });
-
-    it('invalidates with #INVALID_INPUT for empty command name (EC-13)', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = extValue(ext);
-      const ctx = makeRuntimeCtx();
-
-      expectInvalidThrow(
-        () => v.command.fn({ name: '', args: {} }, ctx),
-        'INVALID_INPUT',
-        'command name cannot be empty'
-      );
-      expectInvalidThrow(
-        () => v.command.fn({ name: '   ', args: {} }, ctx),
-        'INVALID_INPUT',
-        'command name cannot be empty'
-      );
-    });
-  });
-
-  describe('event emission (AC-17-20)', () => {
-    it('functions have event emission structure in place', () => {
-      const ext = createClaudeCodeExtension({}, makeFactoryCtx());
-      const v = extValue(ext);
-
-      // Functions are defined and can be called (event emission tested in integration tests)
-      expect(v.prompt.fn).toBeInstanceOf(Function);
-      expect(v.skill.fn).toBeInstanceOf(Function);
-      expect(v.command.fn).toBeInstanceOf(Function);
-    });
+        expectInvalidThrow(() => v[fn].fn(args, ctx), 'INVALID_INPUT', message);
+      }
+    );
   });
 });

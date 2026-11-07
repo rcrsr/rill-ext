@@ -106,7 +106,7 @@ describe('createIntrospectionDicts', () => {
       expect(toolCallable['params']).toEqual(toolParams);
     });
 
-    it('does not set params key on callable when tool has no params', () => {
+    it('sets params to an empty array when tool has no params', () => {
       // Arrange
       const toolFunctions: Record<string, RillFunction> = {
         no_params: makeRillFn('No params tool'),
@@ -118,16 +118,7 @@ describe('createIntrospectionDicts', () => {
 
       // Assert
       const toolCallable = result['no_params'] as Record<string, unknown>;
-      // Typed zero-param callable: params is empty array (not undefined)
       expect(toolCallable['params']).toEqual([]);
-    });
-
-    it('returns empty dict for zero tools [BC-1]', () => {
-      // Arrange & Act
-      const dicts = createIntrospectionDicts({}, {}, {});
-
-      // Assert
-      expect(Object.keys(dicts.tools)).toHaveLength(0);
     });
   });
 
@@ -167,14 +158,6 @@ describe('createIntrospectionDicts', () => {
       const annotations = c['annotations'] as Record<string, unknown>;
       expect(annotations['description']).toBe('Read a resource by URI');
     });
-
-    it('returns empty dict for zero resource functions [BC-1]', () => {
-      // Arrange & Act
-      const dicts = createIntrospectionDicts({}, {}, {});
-
-      // Assert
-      expect(Object.keys(dicts.resources)).toHaveLength(0);
-    });
   });
 
   describe('prompts', () => {
@@ -210,26 +193,22 @@ describe('createIntrospectionDicts', () => {
       const annotations = c['annotations'] as Record<string, unknown>;
       expect(annotations['description']).toBe('Greeting prompt');
     });
-
-    it('returns empty dict for zero prompt functions [BC-1]', () => {
-      // Arrange & Act
-      const dicts = createIntrospectionDicts({}, {}, {});
-
-      // Assert
-      expect(Object.keys(dicts.prompts)).toHaveLength(0);
-    });
   });
 
   describe('static data (factory time)', () => {
-    it('tools dict is the same reference across accesses (static)', () => {
+    it('captures data at factory time, not mutation time', () => {
       // Arrange
       const toolFunctions: Record<string, RillFunction> = {
-        echo: makeRillFn('Echo tool'),
+        tool1: makeRillFn('First'),
       };
       const dicts = createIntrospectionDicts(toolFunctions, {}, {});
 
-      // Act & Assert - same reference (built once at factory time)
-      expect(dicts.tools).toBe(dicts.tools);
+      // Act - modify source after dict creation
+      toolFunctions['tool2'] = makeRillFn('Second');
+
+      // Assert - dict still contains only the original data
+      const tools = dicts.tools as Record<string, unknown>;
+      expect(Object.keys(tools)).toEqual(['tool1']);
     });
   });
 

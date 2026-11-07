@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import { RuntimeError } from '@rcrsr/rill';
 import {
   RESERVED_KEYS_COMMON,
   validateExtraKeys,
@@ -11,23 +12,19 @@ import {
 } from '../src/extra.js';
 import type { LLMProviderConfig } from '../src/types.js';
 
-// ============================================================
-// RESERVED_KEYS_COMMON
-// ============================================================
+function expectConfigError(fn: () => unknown, message: string): void {
+  let thrown: unknown;
+  try {
+    fn();
+  } catch (e) {
+    thrown = e;
+  }
+  expect(thrown).toBeInstanceOf(RuntimeError);
+  expect((thrown as RuntimeError).errorId).toBe('RILL-R001');
+  expect((thrown as RuntimeError).message).toContain(message);
+}
 
-describe('RESERVED_KEYS_COMMON', () => {
-  it('contains exactly the 7 specified keys in order', () => {
-    expect(RESERVED_KEYS_COMMON).toEqual([
-      'messages',
-      'model',
-      'system',
-      'temperature',
-      'max_tokens',
-      'stream',
-      'response_format',
-    ]);
-  });
-});
+const POSITIVE_INTEGER_MESSAGE = 'must be a positive integer or undefined.';
 
 // ============================================================
 // validateExtraKeys
@@ -43,67 +40,42 @@ describe('validateExtraKeys', () => {
   });
 
   describe('EC-20: non-plain-object extra', () => {
-    it('throws RILL-R001 with "must be a dict" for null', () => {
-      expect(() => validateExtraKeys(null, RESERVED_KEYS_COMMON)).toThrow(
-        /must be a dict/
-      );
-    });
-
-    it('throws RILL-R001 with "must be a dict" for an array', () => {
-      expect(() => validateExtraKeys([], RESERVED_KEYS_COMMON)).toThrow(
-        /must be a dict/
-      );
-    });
-
-    it('throws RILL-R001 with "must be a dict" for a string', () => {
-      expect(() => validateExtraKeys('string', RESERVED_KEYS_COMMON)).toThrow(
-        /must be a dict/
-      );
-    });
-
-    it('throws RILL-R001 with "must be a dict" for a number', () => {
-      expect(() => validateExtraKeys(42, RESERVED_KEYS_COMMON)).toThrow(
-        /must be a dict/
+    it.each([
+      { label: 'null', value: null },
+      { label: 'an array', value: [] },
+      { label: 'a string', value: 'string' },
+      { label: 'a number', value: 42 },
+    ])('throws RILL-R001 with "must be a dict" for $label', ({ value }) => {
+      expectConfigError(
+        () => validateExtraKeys(value, RESERVED_KEYS_COMMON),
+        "Factory config 'extra' must be a dict."
       );
     });
   });
 
   describe('EC-19: reserved key collision', () => {
-    it("throws RILL-R001 listing 'model' when extra contains 'model'", () => {
-      expect(() =>
-        validateExtraKeys({ model: 'x' }, RESERVED_KEYS_COMMON)
-      ).toThrow(/'model'/);
-    });
-
-    it("throws RILL-R001 listing 'temperature' when extra contains 'temperature'", () => {
-      expect(() =>
-        validateExtraKeys({ temperature: 0.5 }, RESERVED_KEYS_COMMON)
-      ).toThrow(/'temperature'/);
-    });
-
-    it("throws RILL-R001 listing both 'model' and 'stream' (sorted) for multiple collisions", () => {
-      const fn = () =>
-        validateExtraKeys(
-          { model: 'x', stream: true, foo: 1 },
-          RESERVED_KEYS_COMMON
+    it.each([
+      { key: 'model', extra: { model: 'x' } },
+      { key: 'temperature', extra: { temperature: 0.5 } },
+    ])(
+      "throws RILL-R001 listing '$key' when extra contains it",
+      ({ key, extra }) => {
+        expectConfigError(
+          () => validateExtraKeys(extra, RESERVED_KEYS_COMMON),
+          `reserved key(s): '${key}'.`
         );
-      expect(fn).toThrow(/'model'/);
-      expect(fn).toThrow(/'stream'/);
-    });
-
-    it('lists colliding keys in sorted order', () => {
-      let caught: Error | undefined;
-      try {
-        validateExtraKeys(
-          { stream: true, model: 'x', foo: 1 },
-          RESERVED_KEYS_COMMON
-        );
-      } catch (e) {
-        caught = e as Error;
       }
-      expect(caught).toBeDefined();
-      // 'model' sorts before 'stream'
-      expect(caught?.message).toMatch(/'model'.*'stream'/);
+    );
+
+    it('throws RILL-R001 listing colliding keys in sorted order', () => {
+      expectConfigError(
+        () =>
+          validateExtraKeys(
+            { stream: true, model: 'x', foo: 1 },
+            RESERVED_KEYS_COMMON
+          ),
+        "reserved key(s): 'model', 'stream'."
+      );
     });
   });
 
@@ -132,41 +104,33 @@ describe('validateMaxTurns', () => {
   });
 
   describe('valid positive integers', () => {
-    it('returns without throwing for a positive integer like 5 (IR-8)', () => {
-      expect(() => validateMaxTurns(5)).not.toThrow();
-    });
-
-    it('returns without throwing for 1', () => {
-      expect(() => validateMaxTurns(1)).not.toThrow();
-    });
+    it.each([{ value: 5 }, { value: 1 }])(
+      'returns without throwing for $value',
+      ({ value }) => {
+        expect(() => validateMaxTurns(value)).not.toThrow();
+      }
+    );
   });
 
   describe('EC-21: sentinel value 0', () => {
     it('throws RILL-R001 with sentinel-reserved message for 0', () => {
-      expect(() => validateMaxTurns(0)).toThrow(
-        /sentinel value 0 is reserved for per-call override semantics/
+      expectConfigError(
+        () => validateMaxTurns(0),
+        "Factory config 'max_turns' must be a positive integer or undefined; sentinel value 0 is reserved for per-call override semantics."
       );
     });
   });
 
   describe('EC-22: negative or non-integer', () => {
-    it('throws RILL-R001 with positive-integer message for -1', () => {
-      expect(() => validateMaxTurns(-1)).toThrow(
-        /must be a positive integer or undefined/
-      );
-    });
-
-    it('throws RILL-R001 with positive-integer message for a float like 2.5', () => {
-      expect(() => validateMaxTurns(2.5)).toThrow(
-        /must be a positive integer or undefined/
-      );
-    });
-
-    it('throws for a negative float', () => {
-      expect(() => validateMaxTurns(-0.5)).toThrow(
-        /must be a positive integer or undefined/
-      );
-    });
+    it.each([{ value: -1 }, { value: 2.5 }, { value: -0.5 }])(
+      'throws RILL-R001 with positive-integer message for $value',
+      ({ value }) => {
+        expectConfigError(
+          () => validateMaxTurns(value),
+          `Factory config 'max_turns' ${POSITIVE_INTEGER_MESSAGE}`
+        );
+      }
+    );
   });
 });
 
@@ -184,28 +148,13 @@ describe('validateMaxErrors', () => {
     expect(() => validateMaxErrors(1)).not.toThrow();
   });
 
-  it('throws RILL-R001 for 0', () => {
-    expect(() => validateMaxErrors(0)).toThrow(
-      /must be a positive integer or undefined/
-    );
-  });
-
-  it('throws RILL-R001 for a negative integer', () => {
-    expect(() => validateMaxErrors(-1)).toThrow(
-      /must be a positive integer or undefined/
-    );
-  });
-
-  it('throws RILL-R001 for a non-integer number', () => {
-    expect(() => validateMaxErrors(2.5)).toThrow(
-      /must be a positive integer or undefined/
-    );
-  });
-
-  it('throws RILL-R001 for a non-number value', () => {
-    expect(() => validateMaxErrors('3')).toThrow(
-      /must be a positive integer or undefined/
-    );
+  it.each([
+    { label: '0', value: 0 },
+    { label: 'a negative integer', value: -1 },
+    { label: 'a non-integer number', value: 2.5 },
+    { label: 'a non-number value', value: '3' },
+  ])('throws RILL-R001 for $label', ({ value }) => {
+    expectConfigError(() => validateMaxErrors(value), POSITIVE_INTEGER_MESSAGE);
   });
 });
 

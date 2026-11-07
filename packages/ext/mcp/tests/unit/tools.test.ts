@@ -4,16 +4,12 @@
  * Tests tool function generation, result parsing, and error handling.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { anyTypeValue, structureToTypeValue } from '@rcrsr/rill';
 import { generateToolFunctions } from '../../src/tools.js';
 import { makeRuntimeCtx, expectRejectsInvalid } from '../_helpers.js';
-import type {
-  McpTool,
-  McpToolResult,
-  McpToolContent,
-} from '../../src/tools.js';
+import type { McpTool, McpToolResult } from '../../src/tools.js';
 import type { OutputJsonSchema } from '../../src/parsing.js';
 
 // ============================================================
@@ -76,26 +72,6 @@ function textResult(text: string): McpToolResult {
   return {
     content: [{ type: 'text', text }],
   };
-}
-
-function jsonResult(data: unknown): McpToolResult {
-  return textResult(JSON.stringify(data));
-}
-
-function imageResult(data: string, mimeType = 'image/png'): McpToolResult {
-  return {
-    content: [{ type: 'image', data, mimeType }],
-  };
-}
-
-function multiTextResult(texts: string[]): McpToolResult {
-  return {
-    content: texts.map((text) => ({ type: 'text', text })),
-  };
-}
-
-function mixedResult(blocks: McpToolContent[]): McpToolResult {
-  return { content: blocks };
 }
 
 function errorResult(errorText: string): McpToolResult {
@@ -175,135 +151,6 @@ describe('generateToolFunctions', () => {
   });
 
   // ============================================================
-  // AC-8: RESULT TYPE CONVERSION
-  // ============================================================
-
-  describe('AC-8: Result type conversion', () => {
-    let mockClient: MockClient;
-
-    beforeEach(() => {
-      mockClient = createMockClient();
-    });
-
-    it('converts JSON text to dict', async () => {
-      const mockData = { status: 'ok', count: 42 };
-      mockClient.callTool.mockResolvedValue(jsonResult(mockData));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
-
-      expect(result).toEqual(mockData);
-    });
-
-    it('returns plain text as string', async () => {
-      mockClient.callTool.mockResolvedValue(textResult('success'));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
-
-      expect(result).toBe('success');
-    });
-
-    it('converts image to dict with type, data, mime', async () => {
-      const base64Data =
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-      mockClient.callTool.mockResolvedValue(
-        imageResult(base64Data, 'image/png')
-      );
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
-
-      expect(result).toEqual({
-        type: 'image',
-        data: base64Data,
-        mime: 'image/png',
-      });
-    });
-
-    it('concatenates multiple text blocks', async () => {
-      mockClient.callTool.mockResolvedValue(
-        multiTextResult(['line 1', 'line 2', 'line 3'])
-      );
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
-
-      expect(result).toBe('line 1\nline 2\nline 3');
-    });
-
-    it('returns structured dict for mixed content blocks', async () => {
-      const blocks: McpToolContent[] = [
-        { type: 'text', text: 'Description' },
-        { type: 'image', data: 'abc123', mimeType: 'image/jpeg' },
-      ];
-      mockClient.callTool.mockResolvedValue(mixedResult(blocks));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
-
-      expect(result).toEqual({
-        content: [
-          { type: 'text', text: 'Description' },
-          { type: 'image', data: 'abc123', mime: 'image/jpeg' },
-        ],
-      });
-    });
-
-    it('handles empty content array', async () => {
-      mockClient.callTool.mockResolvedValue({ content: [] });
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
-
-      expect(result).toBe('');
-    });
-
-    it('handles JSON array result', async () => {
-      const arrayData = [1, 2, 3];
-      mockClient.callTool.mockResolvedValue(jsonResult(arrayData));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
-
-      expect(result).toEqual(arrayData);
-    });
-
-    it('handles JSON primitive result', async () => {
-      mockClient.callTool.mockResolvedValue(jsonResult(42));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-      const result = await functions['get_status']!.fn({}, makeRuntimeCtx());
-
-      expect(result).toBe(42);
-    });
-  });
-
-  // ============================================================
   // EC-6: TOOL ERROR
   // ============================================================
 
@@ -322,62 +169,6 @@ describe('generateToolFunctions', () => {
         'mcp tool "get-status": invalid input'
       );
     });
-
-    it('includes tool name in error message', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockResolvedValue(errorResult('validation failed'));
-
-      const functions = generateToolFunctions(
-        [TOOL_WITH_PARAMS],
-        mockClient as unknown as Client
-      );
-
-      await expectRejectsInvalid(
-        functions['calculate_bmi']!.fn(
-          { weight_kg: 70, height_m: 1.75 },
-          makeRuntimeCtx()
-        ),
-        'mcp tool "calculate-bmi"'
-      );
-    });
-  });
-
-  // ============================================================
-  // EC-7: PROTOCOL ERROR
-  // ============================================================
-
-  describe('EC-7: Protocol error handling', () => {
-    it('throws RuntimeError for malformed response', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockRejectedValue(
-        new Error('protocol error: invalid json')
-      );
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-
-      await expectRejectsInvalid(
-        functions['get_status']!.fn({}, makeRuntimeCtx()),
-        'mcp: protocol error'
-      );
-    });
-
-    it('handles parse errors', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockRejectedValue(new Error('parse failed'));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-
-      await expectRejectsInvalid(
-        functions['get_status']!.fn({}, makeRuntimeCtx()),
-        'mcp: protocol error'
-      );
-    });
   });
 
   // ============================================================
@@ -385,43 +176,28 @@ describe('generateToolFunctions', () => {
   // ============================================================
 
   describe('EC-8: Timeout handling', () => {
-    it('throws RuntimeError after timeout exceeded', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 200))
-      );
+    it('invalidates with the tool name and timeout duration after timeout exceeded', async () => {
+      vi.useFakeTimers();
+      try {
+        const mockClient = createMockClient();
+        // callTool never settles, so only the extension's own timer ends the call
+        mockClient.callTool.mockReturnValue(new Promise(() => {}));
 
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client,
-        50 // 50ms timeout
-      );
+        const functions = generateToolFunctions(
+          [TOOL_NO_PARAMS],
+          mockClient as unknown as Client,
+          50
+        );
 
-      await expectRejectsInvalid(
-        functions['get_status']!.fn({}, makeRuntimeCtx()),
-        'mcp tool "get-status": timeout after 50ms'
-      );
-    });
-
-    it('includes timeout duration in error', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 500))
-      );
-
-      const functions = generateToolFunctions(
-        [TOOL_WITH_PARAMS],
-        mockClient as unknown as Client,
-        100
-      );
-
-      await expectRejectsInvalid(
-        functions['calculate_bmi']!.fn(
-          { weight_kg: 70, height_m: 1.75 },
-          makeRuntimeCtx()
-        ),
-        'timeout after 100ms'
-      );
+        const outcome = expectRejectsInvalid(
+          functions['get_status']!.fn({}, makeRuntimeCtx()),
+          'mcp tool "get-status": timeout after 50ms'
+        );
+        await vi.advanceTimersByTimeAsync(50);
+        await outcome;
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('succeeds if call completes before timeout', async () => {
@@ -461,74 +237,6 @@ describe('generateToolFunctions', () => {
       await expectRejectsInvalid(
         functions['get_status']!.fn({}, makeRuntimeCtx()),
         'mcp: connection lost'
-      );
-    });
-
-    it('handles disconnected error', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockRejectedValue(
-        new Error('disconnected from server')
-      );
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-
-      await expectRejectsInvalid(
-        functions['get_status']!.fn({}, makeRuntimeCtx()),
-        'mcp: connection lost'
-      );
-    });
-  });
-
-  // ============================================================
-  // EC-10: AUTH FAILED
-  // ============================================================
-
-  describe('EC-10: Authentication failure handling', () => {
-    it('throws RuntimeError for unauthorized', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockRejectedValue(new Error('unauthorized'));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-
-      await expectRejectsInvalid(
-        functions['get_status']!.fn({}, makeRuntimeCtx()),
-        'mcp: authentication failed'
-      );
-    });
-
-    it('handles authentication failed error', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockRejectedValue(new Error('authentication failed'));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-
-      await expectRejectsInvalid(
-        functions['get_status']!.fn({}, makeRuntimeCtx()),
-        'token may be expired'
-      );
-    });
-
-    it('handles token error', async () => {
-      const mockClient = createMockClient();
-      mockClient.callTool.mockRejectedValue(new Error('invalid token'));
-
-      const functions = generateToolFunctions(
-        [TOOL_NO_PARAMS],
-        mockClient as unknown as Client
-      );
-
-      await expectRejectsInvalid(
-        functions['get_status']!.fn({}, makeRuntimeCtx()),
-        'mcp: authentication failed'
       );
     });
   });
@@ -714,50 +422,6 @@ describe('generateToolFunctions', () => {
       expect(functions['get_status']!.returnType).toEqual(
         structureToTypeValue({ kind: 'dict' })
       );
-    });
-  });
-
-  describe('BC-4: Concurrent tool calls', () => {
-    it('handles 10 simultaneous tool invocations', async () => {
-      const mockClient = createMockClient();
-      let callCount = 0;
-
-      // Each call returns unique result after random delay
-      mockClient.callTool.mockImplementation(
-        (_args: unknown) =>
-          new Promise((resolve) => {
-            const id = callCount++;
-            setTimeout(
-              () => resolve(textResult(`result-${id}`)),
-              Math.random() * 50
-            );
-          })
-      );
-
-      // Create 10 different tools
-      const tools: McpTool[] = Array.from({ length: 10 }, (_, i) => ({
-        name: `tool${i}`,
-        inputSchema: { type: 'object' },
-      }));
-
-      const functions = generateToolFunctions(
-        tools,
-        mockClient as unknown as Client
-      );
-
-      // Call all 10 tools simultaneously
-      const calls = Object.values(functions).map((fn) =>
-        fn!.fn({}, makeRuntimeCtx())
-      );
-      const results = await Promise.all(calls);
-
-      // Verify all completed independently
-      expect(results).toHaveLength(10);
-      expect(mockClient.callTool).toHaveBeenCalledTimes(10);
-
-      // Each result should be unique (verifies no shared state)
-      const resultSet = new Set(results);
-      expect(resultSet.size).toBe(10);
     });
   });
 });

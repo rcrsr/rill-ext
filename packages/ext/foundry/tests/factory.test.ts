@@ -153,14 +153,6 @@ describe('createFoundryExtension', () => {
       });
     });
 
-    // Valid auth types accepted
-    it('accepts api-key auth type', async () => {
-      const createFoundryExtension = await importFactory();
-      await expect(
-        createFoundryExtension(validConfig())
-      ).resolves.toBeDefined();
-    });
-
     it('does not throw auth.type error for entra auth type', async () => {
       const createFoundryExtension = await importFactory();
       const config: FoundryConfig = {
@@ -193,7 +185,7 @@ describe('createFoundryExtension', () => {
 
   describe('extension result structure', () => {
     // AC-1: Factory returns 9 host functions + dispose
-    it('returns 10 host functions and dispose (AC-1)', async () => {
+    it('returns 9 host functions and dispose', async () => {
       const createFoundryExtension = await importFactory();
       const ext = await createFoundryExtension(validConfig());
 
@@ -313,36 +305,6 @@ describe('createFoundryExtension', () => {
       generate: ['prompt', 'schema', 'options'],
     };
 
-    it('exports all 5 LLM contract function names (AC-14)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      const value = ext.value as Record<string, unknown>;
-
-      for (const key of LLM_CONTRACT_KEYS) {
-        expect(
-          value[key],
-          `expected LLM contract key '${key}' to exist`
-        ).toBeDefined();
-      }
-    });
-
-    it('each LLM function has fn and params properties (AC-14)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      const value = ext.value as Record<string, unknown>;
-
-      for (const key of LLM_CONTRACT_KEYS) {
-        const entry = value[key] as Record<string, unknown>;
-        expect(typeof entry['fn'], `${key}.fn must be a function`).toBe(
-          'function'
-        );
-        expect(
-          Array.isArray(entry['params']),
-          `${key}.params must be an array`
-        ).toBe(true);
-      }
-    });
-
     it('param names match llm-openai contract positions (AC-14)', async () => {
       const createFoundryExtension = await importFactory();
       const ext = await createFoundryExtension(validConfig());
@@ -376,166 +338,65 @@ describe('createFoundryExtension', () => {
     });
 
     // AC-27 / EC-16: All functions halt after dispose
-    it('message() halts after dispose (AC-27, EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
+    const DISPOSED_CASES: Array<{
+      name: string;
+      args: Record<string, unknown>;
+      sync: boolean;
+    }> = [
+      { name: 'message', args: { prompt: 'hello' }, sync: true },
+      { name: 'embed', args: { text: 'hello' }, sync: false },
+      { name: 'usage', args: {}, sync: true },
+      {
+        name: 'shield',
+        args: { text: 'hello', documents: [] },
+        sync: false,
+      },
+      { name: 'ground', args: { query: 'test query' }, sync: false },
+      {
+        name: 'search',
+        args: { query: 'test query', options: {} },
+        sync: false,
+      },
+      {
+        name: 'embed_batch',
+        args: { texts: ['hello', 'world'] },
+        sync: false,
+      },
+      {
+        name: 'tool_loop',
+        args: { prompt: 'hello', tools: {}, options: {} },
+        sync: true,
+      },
+      {
+        name: 'generate',
+        args: { prompt: 'hello', schema: undefined, options: {} },
+        sync: false,
+      },
+    ];
 
-      const value = getHostFns(ext);
-      const messageFn = value['message']!;
-      const ctx = createRuntimeContext();
+    it.each(DISPOSED_CASES)(
+      'halts $name() after dispose',
+      async ({ name, args, sync }) => {
+        const createFoundryExtension = await importFactory();
+        const ext = await createFoundryExtension(validConfig());
+        await ext.dispose?.();
 
-      expectThrowHalt(() => messageFn.fn({ prompt: 'hello' }, ctx), {
-        code: 'DISPOSED',
-        message: 'foundry: extension disposed',
-      });
-    });
-
-    it('embed() halts after dispose (EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = getHostFns(ext);
-      const embedFn = value['embed']!;
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        embedFn.fn({ text: 'hello' }, ctx) as Promise<unknown>,
-        {
+        const fn = getHostFns(ext)[name]!;
+        const ctx = createRuntimeContext();
+        const expected = {
           code: 'DISPOSED',
           message: 'foundry: extension disposed',
+        };
+
+        if (sync) {
+          expectThrowHalt(() => fn.fn(args, ctx), expected);
+        } else {
+          await expectRejectedHalt(
+            fn.fn(args, ctx) as Promise<unknown>,
+            expected
+          );
         }
-      );
-    });
-
-    it('usage() halts after dispose (EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = getHostFns(ext);
-      const usageFn = value['usage']!;
-      const ctx = createRuntimeContext();
-
-      expectThrowHalt(() => usageFn.fn({}, ctx), {
-        code: 'DISPOSED',
-        message: 'foundry: extension disposed',
-      });
-    });
-
-    it('shield() halts after dispose (AC-27, EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = getHostFns(ext);
-      const shieldFn = value['shield']!;
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        shieldFn.fn({ text: 'hello', documents: [] }, ctx) as Promise<unknown>,
-        {
-          code: 'DISPOSED',
-          message: 'foundry: extension disposed',
-        }
-      );
-    });
-
-    it('ground() halts after dispose (AC-27, EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = getHostFns(ext);
-      const groundFn = value['ground']!;
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        groundFn.fn({ query: 'test query' }, ctx) as Promise<unknown>,
-        {
-          code: 'DISPOSED',
-          message: 'foundry: extension disposed',
-        }
-      );
-    });
-
-    it('search() halts after dispose (AC-27, EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = getHostFns(ext);
-      const searchFn = value['search']!;
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        searchFn.fn(
-          { query: 'test query', options: {} },
-          ctx
-        ) as Promise<unknown>,
-        {
-          code: 'DISPOSED',
-          message: 'foundry: extension disposed',
-        }
-      );
-    });
-
-    it('embed_batch() halts after dispose (AC-27, EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = getHostFns(ext);
-      const embedBatchFn = value['embed_batch']!;
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        embedBatchFn.fn({ texts: ['hello', 'world'] }, ctx) as Promise<unknown>,
-        {
-          code: 'DISPOSED',
-          message: 'foundry: extension disposed',
-        }
-      );
-    });
-
-    it('tool_loop() halts after dispose (AC-27, EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = getHostFns(ext);
-      const toolLoopFn = value['tool_loop']!;
-      const ctx = createRuntimeContext();
-
-      expectThrowHalt(
-        () => toolLoopFn.fn({ prompt: 'hello', tools: {}, options: {} }, ctx),
-        {
-          code: 'DISPOSED',
-          message: 'foundry: extension disposed',
-        }
-      );
-    });
-
-    it('generate() halts after dispose (AC-27, EC-16)', async () => {
-      const createFoundryExtension = await importFactory();
-      const ext = await createFoundryExtension(validConfig());
-      await ext.dispose?.();
-
-      const value = getHostFns(ext);
-      const generateFn = value['generate']!;
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        generateFn.fn(
-          { prompt: 'hello', schema: undefined, options: {} },
-          ctx
-        ) as Promise<unknown>,
-        {
-          code: 'DISPOSED',
-          message: 'foundry: extension disposed',
-        }
-      );
-    });
+      }
+    );
   });
 });

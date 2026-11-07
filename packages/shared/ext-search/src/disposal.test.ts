@@ -41,21 +41,13 @@ describe('checkDisposed', () => {
     expect(checkDisposed(ctx, state, provider)).toBeNull();
   });
 
-  it('returns invalid RillValue when disposed', () => {
+  it('returns invalid DISPOSED value naming the provider when disposed', () => {
     const state = { isDisposed: true };
     const result = checkDisposed(ctx, state, provider);
     expect(result).not.toBeNull();
     const status = getStatus(result!);
     expect(status.code.name).toBe('DISPOSED');
     expect(status.message).toBe(`${provider}: operation cancelled`);
-  });
-
-  it('includes provider name in disposed message', () => {
-    const state = { isDisposed: true };
-    const result = checkDisposed(ctx, state, 'my-search-ext');
-    expect(getStatus(result!).message).toBe(
-      'my-search-ext: operation cancelled'
-    );
   });
 });
 
@@ -108,15 +100,5 @@ describe('dispose', () => {
     await dispose(state, cleanup);
     expect(warnSpy).toHaveBeenCalledWith('Cleanup failed: Unknown error');
     warnSpy.mockRestore();
-  });
-
-  it('checkDisposed returns invalid value after dispose', async () => {
-    const ctx = makeCtx();
-    const provider = 'testsearch';
-    const state = createDisposalState();
-    await dispose(state);
-    const result = checkDisposed(ctx, state, provider);
-    expect(result).not.toBeNull();
-    expect(getStatus(result!).message).toBe(`${provider}: operation cancelled`);
   });
 });

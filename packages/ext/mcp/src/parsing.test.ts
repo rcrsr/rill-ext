@@ -5,7 +5,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   mapJsonSchemaTypeToRillType,
-  getDefaultValueForType,
   sanitizeParameterName,
   generateParametersFromSchema,
   jsonSchemaPropertyToRillParam,
@@ -17,98 +16,55 @@ import {
 
 describe('mapJsonSchemaTypeToRillType', () => {
   describe('Type Mapping', () => {
-    it('maps string to string', () => {
-      const property: JsonSchemaProperty = { type: 'string' };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('string');
-    });
-
-    it('maps integer to number', () => {
-      const property: JsonSchemaProperty = { type: 'integer' };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('number');
-    });
-
-    it('maps number to number', () => {
-      const property: JsonSchemaProperty = { type: 'number' };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('number');
-    });
-
-    it('maps boolean to bool', () => {
-      const property: JsonSchemaProperty = { type: 'boolean' };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('bool');
-    });
-
-    it('maps object to dict', () => {
-      const property: JsonSchemaProperty = { type: 'object' };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('dict');
-    });
-
-    it('maps array to list', () => {
-      const property: JsonSchemaProperty = { type: 'array' };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('list');
-    });
-
-    it('maps enum to string', () => {
-      const property: JsonSchemaProperty = {
-        type: 'string',
-        enum: ['option1', 'option2'],
-      };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('string');
-    });
-
-    it('maps oneOf to string', () => {
-      const property: JsonSchemaProperty = {
-        oneOf: [{ type: 'string' }, { type: 'number' }],
-      };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('string');
-    });
-
-    it('maps anyOf to string', () => {
-      const property: JsonSchemaProperty = {
-        anyOf: [{ type: 'string' }, { type: 'number' }],
-      };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('string');
-    });
-
-    it('maps missing type to dict', () => {
-      const property: JsonSchemaProperty = {};
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('dict');
-    });
-
-    it('maps unknown type to dict', () => {
-      const property: JsonSchemaProperty = { type: undefined };
-      expect(mapJsonSchemaTypeToRillType(property)).toBe('dict');
-    });
-  });
-});
-
-describe('getDefaultValueForType', () => {
-  describe('Default Values', () => {
-    it('returns empty string for string type', () => {
-      expect(getDefaultValueForType('string')).toBe('');
-    });
-
-    it('returns 0 for number type', () => {
-      expect(getDefaultValueForType('number')).toBe(0);
-    });
-
-    it('returns false for bool type', () => {
-      expect(getDefaultValueForType('bool')).toBe(false);
-    });
-
-    it('returns empty array for list type', () => {
-      expect(getDefaultValueForType('list')).toEqual([]);
-    });
-
-    it('returns empty object for dict type', () => {
-      expect(getDefaultValueForType('dict')).toEqual({});
-    });
-
-    it('returns empty array for vector type', () => {
-      expect(getDefaultValueForType('vector')).toEqual([]);
-    });
-
-    it('returns empty object for any type', () => {
-      expect(getDefaultValueForType('any')).toEqual({});
+    it.each<{ title: string; property: JsonSchemaProperty; expected: string }>([
+      {
+        title: 'maps string to string',
+        property: { type: 'string' },
+        expected: 'string',
+      },
+      {
+        title: 'maps integer to number',
+        property: { type: 'integer' },
+        expected: 'number',
+      },
+      {
+        title: 'maps number to number',
+        property: { type: 'number' },
+        expected: 'number',
+      },
+      {
+        title: 'maps boolean to bool',
+        property: { type: 'boolean' },
+        expected: 'bool',
+      },
+      {
+        title: 'maps object to dict',
+        property: { type: 'object' },
+        expected: 'dict',
+      },
+      {
+        title: 'maps array to list',
+        property: { type: 'array' },
+        expected: 'list',
+      },
+      {
+        title: 'maps enum to string',
+        property: { type: 'string', enum: ['option1', 'option2'] },
+        expected: 'string',
+      },
+      {
+        title: 'maps oneOf to string',
+        property: { oneOf: [{ type: 'string' }, { type: 'number' }] },
+        expected: 'string',
+      },
+      {
+        title: 'maps anyOf to string',
+        property: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+        expected: 'string',
+      },
+      { title: 'maps missing type to dict', property: {}, expected: 'dict' },
+    ])('$title', ({ property, expected }) => {
+      expect(mapJsonSchemaTypeToRillType(property)).toBe(expected);
     });
   });
 });
@@ -182,37 +138,51 @@ describe('jsonSchemaPropertyToRillParam', () => {
     });
   });
 
-  it('maps number property to p.num', () => {
-    const param = jsonSchemaPropertyToRillParam('score', { type: 'number' });
-    expect(param.type).toEqual({ kind: 'number' });
-  });
-
-  it('maps boolean property to p.bool', () => {
-    const param = jsonSchemaPropertyToRillParam('enabled', { type: 'boolean' });
-    expect(param.type).toEqual({ kind: 'bool' });
-  });
-
-  it('maps object property to p.dict', () => {
-    const param = jsonSchemaPropertyToRillParam('config', { type: 'object' });
-    expect(param.type).toEqual({ kind: 'dict' });
-  });
-
-  it('maps array property to p.list', () => {
-    const param = jsonSchemaPropertyToRillParam('items', { type: 'array' });
-    expect(param.type).toEqual({ kind: 'list' });
-  });
-
-  it('maps enum to p.str', () => {
-    const param = jsonSchemaPropertyToRillParam('status', {
-      type: 'string',
-      enum: ['a', 'b'],
-    });
-    expect(param.type).toEqual({ kind: 'string' });
-  });
-
-  it('maps missing type to p.dict', () => {
-    const param = jsonSchemaPropertyToRillParam('data', {});
-    expect(param.type).toEqual({ kind: 'dict' });
+  it.each<{
+    title: string;
+    name: string;
+    property: JsonSchemaProperty;
+    kind: string;
+  }>([
+    {
+      title: 'maps number property to p.num',
+      name: 'score',
+      property: { type: 'number' },
+      kind: 'number',
+    },
+    {
+      title: 'maps boolean property to p.bool',
+      name: 'enabled',
+      property: { type: 'boolean' },
+      kind: 'bool',
+    },
+    {
+      title: 'maps object property to p.dict',
+      name: 'config',
+      property: { type: 'object' },
+      kind: 'dict',
+    },
+    {
+      title: 'maps array property to p.list',
+      name: 'items',
+      property: { type: 'array' },
+      kind: 'list',
+    },
+    {
+      title: 'maps enum to p.str',
+      name: 'status',
+      property: { type: 'string', enum: ['a', 'b'] },
+      kind: 'string',
+    },
+    {
+      title: 'maps missing type to p.dict',
+      name: 'data',
+      property: {},
+      kind: 'dict',
+    },
+  ])('$title', ({ name, property, kind }) => {
+    const param = jsonSchemaPropertyToRillParam(name, property);
+    expect(param.type).toEqual({ kind });
   });
 
   it('omits description from annotations when absent', () => {
@@ -273,23 +243,6 @@ describe('generateParametersFromSchema', () => {
       for (const param of params) {
         expect(param.defaultValue).toBeUndefined();
       }
-    });
-
-    it('sets defaultValue to undefined for all parameters', () => {
-      const schema: JsonSchema = {
-        type: 'object',
-        properties: {
-          required_param: { type: 'string' },
-          optional_param: { type: 'string' },
-        },
-        required: ['required_param'],
-      };
-
-      const params = generateParametersFromSchema(schema);
-
-      expect(params).toHaveLength(2);
-      expect(params[0]!.defaultValue).toBeUndefined();
-      expect(params[1]!.defaultValue).toBeUndefined();
     });
 
     it('preserves Object.entries iteration order', () => {
@@ -365,14 +318,6 @@ describe('generateParametersFromSchema', () => {
 
       expect(params).toEqual([]);
     });
-
-    it('returns empty array for schema with no properties key', () => {
-      const schema: JsonSchema = {};
-
-      const params = generateParametersFromSchema(schema);
-
-      expect(params).toEqual([]);
-    });
   });
 
   describe('edge cases', () => {
@@ -385,63 +330,6 @@ describe('generateParametersFromSchema', () => {
       const params = generateParametersFromSchema(schema);
 
       expect(params).toEqual([]);
-    });
-
-    it('handles enum types as string params', () => {
-      const schema: JsonSchema = {
-        type: 'object',
-        properties: {
-          status: { type: 'string', enum: ['active', 'inactive'] },
-        },
-      };
-
-      const params = generateParametersFromSchema(schema);
-
-      expect(params).toHaveLength(1);
-      expect(params[0]!.type).toEqual({ kind: 'string' });
-    });
-
-    it('handles oneOf types as string params', () => {
-      const schema: JsonSchema = {
-        type: 'object',
-        properties: {
-          value: { oneOf: [{ type: 'string' }, { type: 'number' }] },
-        },
-      };
-
-      const params = generateParametersFromSchema(schema);
-
-      expect(params).toHaveLength(1);
-      expect(params[0]!.type).toEqual({ kind: 'string' });
-    });
-
-    it('handles anyOf types as string params', () => {
-      const schema: JsonSchema = {
-        type: 'object',
-        properties: {
-          value: { anyOf: [{ type: 'string' }, { type: 'number' }] },
-        },
-      };
-
-      const params = generateParametersFromSchema(schema);
-
-      expect(params).toHaveLength(1);
-      expect(params[0]!.type).toEqual({ kind: 'string' });
-    });
-
-    it('handles missing type in property as dict param', () => {
-      const schema: JsonSchema = {
-        type: 'object',
-        properties: {
-          value: { description: 'A value' },
-        },
-      };
-
-      const params = generateParametersFromSchema(schema);
-
-      expect(params).toHaveLength(1);
-      expect(params[0]!.type).toEqual({ kind: 'dict' });
-      expect(params[0]!.annotations).toEqual({ description: 'A value' });
     });
   });
 });

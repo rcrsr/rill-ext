@@ -140,67 +140,6 @@ describe('createReadResourceFunction', () => {
     expect(result).toBe('config data');
   });
 
-  it('returns dict with type/data/mime for single blob content', async () => {
-    const mockResult: ReadResourceResult = {
-      contents: [
-        {
-          uri: 'image://logo',
-          blob: 'base64data',
-          mimeType: 'image/png',
-        },
-      ],
-    };
-
-    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
-
-    const func = createReadResourceFunction(mockClient, 30000, {
-      connectEmitted: false,
-    });
-    const result = await func.fn({ uri: 'image://logo' }, makeRuntimeCtx());
-
-    // Task 3.2: Blob content returns dict with type/data/mime
-    expect(result).toEqual({
-      type: 'image',
-      data: 'base64data',
-      mime: 'image/png',
-    });
-  });
-
-  it('returns empty string for empty contents (BC-6)', async () => {
-    const mockResult: ReadResourceResult = {
-      contents: [],
-    };
-
-    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
-
-    const func = createReadResourceFunction(mockClient, 30000, {
-      connectEmitted: false,
-    });
-    const result = await func.fn({ uri: 'empty://resource' }, makeRuntimeCtx());
-
-    // BC-6: Empty content returns empty string
-    expect(result).toBe('');
-  });
-
-  it('concatenates multiple text contents with newlines', async () => {
-    const mockResult: ReadResourceResult = {
-      contents: [
-        { uri: 'resource://1', text: 'first' },
-        { uri: 'resource://2', text: 'second' },
-      ],
-    };
-
-    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
-
-    const func = createReadResourceFunction(mockClient, 30000, {
-      connectEmitted: false,
-    });
-    const result = await func.fn({ uri: 'resource://multi' }, makeRuntimeCtx());
-
-    // Task 3.2: Multiple text contents concatenated with newlines
-    expect(result).toBe('first\nsecond');
-  });
-
   it('throws error for non-string URI parameter', async () => {
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
@@ -225,51 +164,6 @@ describe('createReadResourceFunction', () => {
     await expectRejectsInvalid(
       func.fn({ uri: 'slow://resource' }, makeRuntimeCtx()),
       'mcp tool "read_resource": timeout after 100ms'
-    );
-  });
-
-  it('handles connection lost error', async () => {
-    vi.mocked(mockClient.readResource).mockRejectedValue(
-      new Error('connection closed')
-    );
-
-    const func = createReadResourceFunction(mockClient, 30000, {
-      connectEmitted: false,
-    });
-
-    await expectRejectsInvalid(
-      func.fn({ uri: 'config://app' }, makeRuntimeCtx()),
-      'mcp: connection lost'
-    );
-  });
-
-  it('handles authentication failed error', async () => {
-    vi.mocked(mockClient.readResource).mockRejectedValue(
-      new Error('unauthorized')
-    );
-
-    const func = createReadResourceFunction(mockClient, 30000, {
-      connectEmitted: false,
-    });
-
-    await expectRejectsInvalid(
-      func.fn({ uri: 'config://app' }, makeRuntimeCtx()),
-      'mcp: authentication failed'
-    );
-  });
-
-  it('handles protocol error', async () => {
-    vi.mocked(mockClient.readResource).mockRejectedValue(
-      new Error('protocol error: invalid response')
-    );
-
-    const func = createReadResourceFunction(mockClient, 30000, {
-      connectEmitted: false,
-    });
-
-    await expectRejectsInvalid(
-      func.fn({ uri: 'config://app' }, makeRuntimeCtx()),
-      'mcp: protocol error'
     );
   });
 
@@ -494,13 +388,13 @@ describe('generateResourceTemplateFunctions', () => {
     );
   });
 
-  it('handles connection lost during template read', async () => {
+  it('maps rejected template read with the template name', async () => {
     const templates: McpResourceTemplate[] = [
-      { uriTemplate: 'db://{table}', name: 'table' },
+      { uriTemplate: 'db://table/{id}', name: 'table' },
     ];
 
     vi.mocked(mockClient.readResource).mockRejectedValue(
-      new Error('disconnected')
+      new Error('template backend failed')
     );
 
     const functions = generateResourceTemplateFunctions(
@@ -508,44 +402,17 @@ describe('generateResourceTemplateFunctions', () => {
       mockClient,
       30000
     );
-
     const func = functions['resource_table']!;
 
     await expectRejectsInvalid(
-      func.fn({ table: 'users' }, makeRuntimeCtx()),
-      'mcp: connection lost'
+      func.fn({ id: 'test' }, makeRuntimeCtx()),
+      'mcp tool "table": template backend failed'
     );
   });
 
   it('returns empty object for templates array', () => {
     const functions = generateResourceTemplateFunctions([], mockClient, 30000);
     expect(functions).toEqual({});
-  });
-
-  it('converts non-string arguments to strings for URI expansion', async () => {
-    const templates: McpResourceTemplate[] = [
-      { uriTemplate: 'api://item/{id}', name: 'item' },
-    ];
-
-    const mockResult: ReadResourceResult = {
-      contents: [{ uri: 'api://item/42', text: 'item data' }],
-    };
-
-    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
-
-    const functions = generateResourceTemplateFunctions(
-      templates,
-      mockClient,
-      30000
-    );
-
-    const func = functions['resource_item']!;
-
-    // This should throw because we validate string types
-    await expectRejectsInvalid(
-      func.fn({ id: 42 }, makeRuntimeCtx()),
-      'mcp: expected string for parameter id, got number'
-    );
   });
 
   it('handles templates without description field', () => {

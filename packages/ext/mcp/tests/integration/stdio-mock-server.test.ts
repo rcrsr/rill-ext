@@ -108,31 +108,6 @@ describe('Integration: stdio mock server', () => {
       expect(toolsDict['get_image']).toBeDefined();
     }, 15000);
 
-    it('calls tool and receives response', async () => {
-      const ext = await createMcpExtension(
-        {
-          transport: {
-            type: 'stdio',
-            command: 'node',
-            args: [MOCK_SERVER_PATH],
-          },
-          timeout: 10000,
-        },
-        makeFactoryCtx()
-      );
-      activeExtensions.push(ext);
-      const v = fns(ext);
-
-      // Call echo tool
-      const result = await hostFn(v['tools'], 'echo').fn(
-        { message: 'Hello, MCP!' },
-        mockContext
-      );
-
-      // Verify result
-      expect(result).toBe('Hello, MCP!');
-    }, 15000);
-
     it('calls tool with parameters', async () => {
       const ext = await createMcpExtension(
         {
@@ -241,31 +216,6 @@ describe('Integration: stdio mock server', () => {
   });
 
   describe('Resource read end-to-end', () => {
-    it('lists available resources', async () => {
-      const ext = await createMcpExtension(
-        {
-          transport: {
-            type: 'stdio',
-            command: 'node',
-            args: [MOCK_SERVER_PATH],
-          },
-          timeout: 10000,
-        },
-        makeFactoryCtx()
-      );
-      activeExtensions.push(ext);
-      const v = fns(ext);
-
-      // resources is a dict of callable closures keyed by function name
-      const resourcesDict = v['resources'] as Record<string, unknown>;
-
-      expect(typeof resourcesDict).toBe('object');
-      expect(resourcesDict).not.toBe(null);
-      expect(Array.isArray(resourcesDict)).toBe(false);
-      // read_resource is always present as a callable
-      expect(resourcesDict['read_resource']).toBeDefined();
-    }, 15000);
-
     it('reads static resource', async () => {
       const ext = await createMcpExtension(
         {

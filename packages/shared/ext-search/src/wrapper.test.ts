@@ -15,7 +15,7 @@ import {
 } from '@rcrsr/rill';
 import { createSearchFunctionWrapper } from './wrapper.js';
 import { createDisposalState } from './disposal.js';
-import { createInFlightState } from './request.js';
+import { createInFlightState, abortAll } from './request.js';
 
 // Pre-registered generic atoms for use in shared tests.
 
@@ -197,7 +197,7 @@ describe('createSearchFunctionWrapper', () => {
   });
 
   describe('error mapping', () => {
-    it('maps TypeError to connection_failed invalid value', async () => {
+    it('maps an abort of the in-flight request to TIMEOUT request timeout', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
       const wrap = createSearchFunctionWrapper(
@@ -205,30 +205,26 @@ describe('createSearchFunctionWrapper', () => {
         disposalState,
         inFlightState
       );
-      const wrappedFn = wrap('search', async () => {
-        throw new TypeError('Failed to fetch');
-      });
-      const result = await wrappedFn({}, makeCtx());
-      expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).message).toBe(`${provider}: connection failed`);
-    });
+      const wrappedFn = wrap(
+        'search',
+        (_args, _ctx, signal) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          })
+      );
 
-    it('maps AbortError name to TIMEOUT', async () => {
-      const disposalState = createDisposalState();
-      const inFlightState = createInFlightState();
-      const wrap = createSearchFunctionWrapper(
-        provider,
-        disposalState,
-        inFlightState
-      );
-      const wrappedFn = wrap('search', async () => {
-        const err = new Error('Aborted');
-        err.name = 'AbortError';
-        throw err;
-      });
-      const result = await wrappedFn({}, makeCtx());
+      const pending = wrappedFn({}, makeCtx());
+      abortAll(inFlightState);
+      const result = await pending;
+
+      expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('TIMEOUT');
       expect(getStatus(result).message).toBe(`${provider}: request timeout`);
+      expect(inFlightState.controllers.size).toBe(0);
     });
   });
 

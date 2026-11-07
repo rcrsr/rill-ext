@@ -1,18 +1,8 @@
 /**
  * generate() function tests
- * Covers remaining AC/EC items not tested in functions.test.ts
- *
- * Already covered in functions.test.ts:
- *   AC-6, AC-7, AC-8, AC-9, AC-10, AC-11, AC-12
- *   AC-18/EC-3, AC-25/EC-3, AC-19/EC-4, AC-21/EC-5
- *   AC-22/EC-5, AC-27/EC-6, AC-33, AC-35
- *
- * This file adds:
- *   AC-1: data field contains schema-matching keys
- *   AC-19/EC-4: no HTTP call when unsupported type (mockCreate not called)
- *   AC-23/EC-5: parse error is RuntimeError instance with RILL-R005 code
- *   AC-24/EC-5: parse failure returns no partial dict (rejects, does not resolve)
- *   AC-27/EC-6: openai:error event emitted on provider API error
+ * Covers generate() data shape, parse-failure handling, provider error
+ * mapping, and reasoning_content extraction. Request-wire assertions live in
+ * functions.test.ts.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -148,10 +138,6 @@ describe('generate() function', () => {
     kind: 'dict',
     fields: { x: { type: { kind: 'number' } } },
   });
-  const SCORE_SCHEMA = typeVal({
-    kind: 'dict',
-    fields: { score: { type: { kind: 'number' } } },
-  });
 
   beforeEach(() => {
     mockCreate.mockReset();
@@ -182,47 +168,10 @@ describe('generate() function', () => {
       expect(data['age']).toBe(30);
       expect(Object.keys(data).sort()).toEqual(['age', 'name']);
     });
-
-    // AC-1: data field is the parsed object, not the raw string
-    it('returns data as parsed object, not raw string', async () => {
-      mockCreate.mockResolvedValue(createGenerateMockResponse('{"score":99}'));
-
-      const ext = createOpenAIExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'generate').fn(
-        { prompt: 'rate something', schema: SCORE_SCHEMA, options: {} },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(typeof result['data']).toBe('object');
-      expect(result['data']).not.toBe('{"score":99}');
-    });
   });
 
   describe('error cases', () => {
-    // AC-23/EC-5: parse error is a RuntimeError instance
-    it('throws a RuntimeError instance when response is not valid JSON', async () => {
-      mockCreate.mockResolvedValue(createGenerateMockResponse('not json'));
-
-      const ext = createOpenAIExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      let thrown: unknown;
-      try {
-        await getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} },
-          ctx
-        );
-      } catch (err) {
-        thrown = err;
-      }
-
-      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
-    });
-
-    // AC-23/EC-5: parse error has RILL-R005 error code
-    it('parse error RuntimeError has RILL-R005 code', async () => {
+    it('maps invalid JSON response to a PROTOCOL halt', async () => {
       mockCreate.mockResolvedValue(createGenerateMockResponse('{broken'));
 
       const ext = createOpenAIExtension(baseConfig);
@@ -277,22 +226,6 @@ describe('generate() function', () => {
       );
     });
 
-    // AC-24/EC-5: parse failure returns no partial dict (promise rejects, not resolves)
-    it('rejects rather than resolving with partial data on parse failure', async () => {
-      mockCreate.mockResolvedValue(createGenerateMockResponse('not json'));
-
-      const ext = createOpenAIExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      // Must reject, never resolve to a value
-      await expectRejectedHalt(
-        getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} },
-          ctx
-        )
-      );
-    });
-
     // EC-4: missing schema arg throws RILL-R005
     it('throws RILL-R005 when called without schema argument', async () => {
       const ext = createOpenAIExtension(baseConfig);
@@ -309,7 +242,7 @@ describe('generate() function', () => {
     });
 
     // AC-27/EC-6: provider API error emits openai:error event
-    it('emits openai:error event when provider API returns an error', async () => {
+    it('maps provider API error and emits openai:error event', async () => {
       const { APIError } = await import('openai');
       mockCreate.mockRejectedValue(
         new APIError(429, {}, 'Rate limit exceeded', new Headers())
@@ -330,7 +263,11 @@ describe('generate() function', () => {
         getCallable(ext, 'generate').fn(
           { prompt: 'prompt', schema: NUMBER_SCHEMA, options: {} },
           ctx
-        )
+        ),
+        {
+          code: 'RATE_LIMIT',
+          message: 'OpenAI API error (HTTP 429): Rate limit exceeded',
+        }
       );
 
       const errorEvent = events.find((e) => e['event'] === 'openai:error');

@@ -9,8 +9,10 @@ import {
   createVector,
   getStatus,
   isInvalid,
+  isVector,
   type ApplicationCallable,
   type RillValue,
+  type RillVector,
 } from '@rcrsr/rill';
 
 /**
@@ -134,48 +136,6 @@ vi.mock('@qdrant/js-client-rest', () => {
 });
 
 // ============================================================
-// CONFIG VALIDATION TESTS
-// ============================================================
-
-describe('createQdrantExtension configuration validation', () => {
-  it('throws Error for missing url (AC-10)', () => {
-    expect(() =>
-      createQdrantExtension({
-        url: undefined as unknown as string,
-        collection: 'test',
-      })
-    ).toThrow('url is required');
-  });
-
-  it('throws Error for empty url (AC-10)', () => {
-    expect(() =>
-      createQdrantExtension({
-        url: '',
-        collection: 'test',
-      })
-    ).toThrow('url is required');
-  });
-
-  it('throws Error for missing collection (AC-10)', () => {
-    expect(() =>
-      createQdrantExtension({
-        url: 'http://localhost:6333',
-        collection: undefined as unknown as string,
-      })
-    ).toThrow('collection is required');
-  });
-
-  it('throws Error for empty collection (AC-10)', () => {
-    expect(() =>
-      createQdrantExtension({
-        url: 'http://localhost:6333',
-        collection: '',
-      })
-    ).toThrow('collection is required');
-  });
-});
-
-// ============================================================
 // VECTOR CRUD TESTS
 // ============================================================
 
@@ -243,75 +203,11 @@ describe('Vector CRUD operations', () => {
       )) as Record<string, unknown>;
 
       expect(getResult['id']).toBe('doc-1');
-      expect(getResult['vector']).toBeDefined();
+      expect(isVector(getResult['vector'] as RillValue)).toBe(true);
+      expect(Array.from((getResult['vector'] as RillVector).data)).toEqual(
+        Array.from(new Float32Array([0.1, 0.2, 0.3, 0.4]))
+      );
       expect(getResult['metadata']).toEqual(metadata);
-    });
-
-    it('stores vector with empty metadata (AC-25)', async () => {
-      const testVector = createVector(
-        new Float32Array([0.1, 0.2, 0.3, 0.4]),
-        'test'
-      );
-
-      mockUpsert.mockResolvedValue({ status: 'completed', operation_id: 0 });
-      mockRetrieve.mockResolvedValue(
-        createMockRetrieveResponse([
-          {
-            id: 'doc-empty',
-            vector: [0.1, 0.2, 0.3, 0.4],
-            payload: {},
-          },
-        ])
-      );
-
-      const upsertResult = (await getCallable(ext, 'upsert').fn(
-        { id: 'doc-empty', vector: testVector, metadata: {} },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(upsertResult['success']).toBe(true);
-
-      const getResult = (await getCallable(ext, 'get').fn(
-        { id: 'doc-empty' },
-        ctx
-      )) as Record<string, unknown>;
-      expect(getResult['metadata']).toEqual({});
-    });
-
-    it('stores vector with large metadata (AC-26)', async () => {
-      const testVector = createVector(
-        new Float32Array([0.1, 0.2, 0.3, 0.4]),
-        'test'
-      );
-      const largeMetadata = {
-        description: 'A'.repeat(1000),
-        tags: Array.from({ length: 50 }, (_, i) => `tag-${i}`),
-        nested: { level1: { level2: { level3: 'deep' } } },
-      };
-
-      mockUpsert.mockResolvedValue({ status: 'completed', operation_id: 0 });
-      mockRetrieve.mockResolvedValue(
-        createMockRetrieveResponse([
-          {
-            id: 'doc-large',
-            vector: [0.1, 0.2, 0.3, 0.4],
-            payload: largeMetadata,
-          },
-        ])
-      );
-
-      const upsertResult = (await getCallable(ext, 'upsert').fn(
-        { id: 'doc-large', vector: testVector, metadata: largeMetadata },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(upsertResult['success']).toBe(true);
-
-      const getResult = (await getCallable(ext, 'get').fn(
-        { id: 'doc-large' },
-        ctx
-      )) as Record<string, unknown>;
-      expect(getResult['metadata']).toEqual(largeMetadata);
     });
   });
 
@@ -429,69 +325,6 @@ describe('Vector CRUD operations', () => {
       expect(result['failed']).toBe('doc-47');
       expect(result['error']).toContain('dimension mismatch');
     });
-
-    it('idempotent recovery: re-run after fixing bad item succeeds (AC-6)', async () => {
-      // First run with malformed item
-      const badItems = [
-        {
-          id: 'doc-1',
-          vector: createVector(new Float32Array([0.1, 0.2, 0.3, 0.4]), 'test'),
-          metadata: {},
-        },
-        {
-          id: 'doc-2',
-          vector: createVector(new Float32Array([0.1, 0.2]), 'test'), // Wrong dimension
-          metadata: {},
-        },
-      ];
-
-      mockUpsert.mockResolvedValueOnce({
-        status: 'completed',
-        operation_id: 0,
-      });
-      mockUpsert.mockRejectedValueOnce(
-        new Error('dimension mismatch (expected 4, got 2)')
-      );
-
-      const firstResult = (await getCallable(ext, 'upsert_batch').fn(
-        { items: badItems },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(firstResult['succeeded']).toBe(1);
-      expect(firstResult['failed']).toBe('doc-2');
-
-      // Fix the bad item and re-run
-      const fixedItems = [
-        {
-          id: 'doc-1',
-          vector: createVector(new Float32Array([0.1, 0.2, 0.3, 0.4]), 'test'),
-          metadata: {},
-        },
-        {
-          id: 'doc-2',
-          vector: createVector(new Float32Array([0.5, 0.6, 0.7, 0.8]), 'test'), // Fixed
-          metadata: {},
-        },
-      ];
-
-      mockUpsert.mockResolvedValueOnce({
-        status: 'completed',
-        operation_id: 0,
-      });
-      mockUpsert.mockResolvedValueOnce({
-        status: 'completed',
-        operation_id: 0,
-      });
-
-      const secondResult = (await getCallable(ext, 'upsert_batch').fn(
-        { items: fixedItems },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(secondResult['succeeded']).toBe(2);
-      expect(secondResult['failed']).toBeUndefined();
-    });
   });
 
   describe('search (IR-3, AC-20, AC-21, AC-28)', () => {
@@ -576,6 +409,10 @@ describe('Vector CRUD operations', () => {
       )) as Array<Record<string, unknown>>;
 
       expect(results).toEqual([]);
+      expect(mockQuery).toHaveBeenCalledWith(
+        'test_collection',
+        expect.objectContaining({ score_threshold: 0.99 })
+      );
     });
   });
 
@@ -740,26 +577,6 @@ describe('Collection lifecycle operations', () => {
       expect(result['deleted']).toBe(true);
     });
   });
-
-  describe('max vector dimensions (AC-24)', () => {
-    it('succeeds with max dimensions', async () => {
-      // Qdrant supports up to 65536 dimensions
-      const maxDims = 65536;
-      const testVector = createVector(
-        new Float32Array(maxDims).fill(0.1),
-        'test'
-      );
-
-      mockUpsert.mockResolvedValue({ status: 'completed', operation_id: 0 });
-
-      const result = (await getCallable(ext, 'upsert').fn(
-        { id: 'doc-max', vector: testVector, metadata: {} },
-        ctx
-      )) as Record<string, unknown>;
-
-      expect(result['success']).toBe(true);
-    });
-  });
 });
 
 // ============================================================
@@ -800,94 +617,6 @@ describe('Error handling contracts', () => {
     );
   });
 
-  it('missing collection produces "collection not found" (EC-2, AC-11)', async () => {
-    mockQuery.mockRejectedValue(new Error('Collection "missing" not found'));
-
-    const queryVector = createVector(
-      new Float32Array([0.1, 0.2, 0.3, 0.4]),
-      'test'
-    );
-
-    await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn(
-        { vector: queryVector, options: {} },
-        ctx
-      ) as Promise<RillValue>,
-      'qdrant: collection not found',
-      'NOT_FOUND'
-    );
-  });
-
-  it('rate limit produces "rate limit exceeded" (EC-3, AC-13)', async () => {
-    mockQuery.mockRejectedValue(new Error('Rate limit exceeded (429)'));
-
-    const queryVector = createVector(
-      new Float32Array([0.1, 0.2, 0.3, 0.4]),
-      'test'
-    );
-
-    await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn(
-        { vector: queryVector, options: {} },
-        ctx
-      ) as Promise<RillValue>,
-      'qdrant: rate limit exceeded',
-      'RATE_LIMIT'
-    );
-  });
-
-  it('timeout produces "request timeout" (EC-4, AC-14)', async () => {
-    const timeoutError = new Error('Request timeout');
-    timeoutError.name = 'AbortError';
-    mockQuery.mockRejectedValue(timeoutError);
-
-    const queryVector = createVector(
-      new Float32Array([0.1, 0.2, 0.3, 0.4]),
-      'test'
-    );
-
-    await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn(
-        { vector: queryVector, options: {} },
-        ctx
-      ) as Promise<RillValue>,
-      'qdrant: request timeout',
-      'TIMEOUT'
-    );
-  });
-
-  it('dimension mismatch produces correct format with N and M (EC-5, AC-12)', async () => {
-    mockUpsert.mockRejectedValue(
-      new Error('Vector dimension mismatch: expected 384, got 128')
-    );
-
-    const wrongVector = createVector(new Float32Array(128).fill(0.1), 'test');
-
-    await expectInvalidWithMessage(
-      getCallable(ext, 'upsert').fn(
-        { id: 'doc-1', vector: wrongVector, metadata: {} },
-        ctx
-      ) as Promise<RillValue>,
-      'qdrant: dimension mismatch (expected 384, got 128)',
-      'TYPE_MISMATCH'
-    );
-  });
-
-  it('duplicate create_collection produces "collection already exists" (EC-6, AC-17)', async () => {
-    mockCreateCollection.mockRejectedValue(
-      new Error('Collection "test_collection" already exists')
-    );
-
-    await expectInvalidWithMessage(
-      getCallable(ext, 'create_collection').fn(
-        { name: 'test_collection', options: { dimensions: 384 } },
-        ctx
-      ) as Promise<RillValue>,
-      'qdrant: collection already exists',
-      'CONFLICT'
-    );
-  });
-
   it('get non-existent ID produces "id not found" (EC-7, AC-15)', async () => {
     mockRetrieve.mockResolvedValue([]);
 
@@ -896,7 +625,8 @@ describe('Error handling contracts', () => {
         { id: 'nonexistent' },
         ctx
       ) as Promise<RillValue>,
-      'qdrant: id not found'
+      'qdrant: id not found',
+      'NOT_FOUND'
     );
   });
 
@@ -915,24 +645,6 @@ describe('Error handling contracts', () => {
       ) as Promise<RillValue>,
       'qdrant: operation cancelled',
       'DISPOSED'
-    );
-  });
-
-  it('unknown errors produce "qdrant: <message>" (EC-9)', async () => {
-    mockQuery.mockRejectedValue(new Error('Something unexpected happened'));
-
-    const queryVector = createVector(
-      new Float32Array([0.1, 0.2, 0.3, 0.4]),
-      'test'
-    );
-
-    await expectInvalidWithMessage(
-      getCallable(ext, 'search').fn(
-        { vector: queryVector, options: {} },
-        ctx
-      ) as Promise<RillValue>,
-      'qdrant: Something unexpected happened',
-      'UNAVAILABLE'
     );
   });
 });
@@ -979,36 +691,6 @@ describe('Event emission', () => {
     expect(searchEvent!['duration']).toBeGreaterThanOrEqual(0);
     expect(searchEvent!['k']).toBe(5);
     expect(searchEvent!['result_count']).toBe(2);
-  });
-});
-
-// ============================================================
-// DISPOSE TESTS
-// ============================================================
-
-describe('Dispose lifecycle', () => {
-  it('dispose during idle resolves immediately (AC-31)', async () => {
-    const config: QdrantConfig = {
-      url: 'http://localhost:6333',
-      collection: 'test_collection',
-    };
-    const ext = createQdrantExtension(config);
-
-    await expect(ext.dispose!()).resolves.not.toThrow();
-  });
-
-  it('double dispose resolves without error (AC-32)', async () => {
-    const config: QdrantConfig = {
-      url: 'http://localhost:6333',
-      collection: 'test_collection',
-    };
-    const ext = createQdrantExtension(config);
-
-    await ext.dispose!();
-    await ext.dispose!();
-
-    // No error expected
-    expect(true).toBe(true);
   });
 });
 

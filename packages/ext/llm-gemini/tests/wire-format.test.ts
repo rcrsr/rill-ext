@@ -108,61 +108,6 @@ describe('Gemini wire-format translation', () => {
   });
 
   // ──────────────────────────────────────────────────────────
-  // Role rename: assistant → model
-  // ──────────────────────────────────────────────────────────
-
-  describe('assistant↔model role rename', () => {
-    it('sends role:model on the wire for a canonical assistant turn (NFR-UNIFY-2)', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const prompt = [
-        { role: 'user', parts: [{ type: 'text', text: 'hello' }] },
-        { role: 'assistant', parts: [{ type: 'text', text: 'hi' }] },
-        { role: 'user', parts: [{ type: 'text', text: 'thanks' }] },
-      ];
-
-      const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
-      await collectStream(stream, ctx);
-
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
-        string,
-        unknown
-      >;
-      const contents = call['contents'] as Array<{
-        role: string;
-        parts: unknown[];
-      }>;
-
-      // Canonical assistant turn must appear as 'model' on the wire
-      expect(contents[1]!.role).toBe('model');
-    });
-
-    it('keeps user role unchanged on the wire', async () => {
-      const ext = createGeminiExtension(BASE_CONFIG);
-      const ctx = createRuntimeContext();
-
-      const prompt = [
-        { role: 'user', parts: [{ type: 'text', text: 'hello' }] },
-        { role: 'assistant', parts: [{ type: 'text', text: 'hi' }] },
-        { role: 'user', parts: [{ type: 'text', text: 'thanks' }] },
-      ];
-
-      const stream = await getCallable(ext, 'message').fn({ prompt }, ctx);
-      await collectStream(stream, ctx);
-
-      const call = mockGenerateContentStream.mock.calls[0]![0] as Record<
-        string,
-        unknown
-      >;
-      const contents = call['contents'] as Array<{ role: string }>;
-
-      expect(contents[0]!.role).toBe('user');
-      expect(contents[2]!.role).toBe('user');
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────
   // AC-3: system turn → systemInstruction parameter
   // ──────────────────────────────────────────────────────────
 

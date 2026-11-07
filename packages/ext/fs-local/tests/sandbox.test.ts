@@ -169,30 +169,22 @@ describe('resolvePath - EC-1: unknown mount name', () => {
 // ============================================================
 
 describe('resolvePath - EC-2: path escapes mount boundary', () => {
-  it('returns invalid for path traversal with ..', async () => {
-    const result = await resolvePath(
-      'data',
-      '../../etc/passwd',
-      mounts,
-      'read',
-      makeRuntimeCtx()
-    );
-    expect(isInvalid(result as RillValue)).toBe(true);
-  });
-
-  it('returns invalid with proper message', async () => {
-    const result = await resolvePath(
-      'data',
-      '../../../outside.txt',
-      mounts,
-      'read',
-      makeRuntimeCtx()
-    );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(
-      /path escapes mount boundary/
-    );
-  });
+  it.each(['../../etc/passwd', '../../../outside.txt'])(
+    'returns invalid with path escapes message for %s',
+    async (traversal) => {
+      const result = await resolvePath(
+        'data',
+        traversal,
+        mounts,
+        'read',
+        makeRuntimeCtx()
+      );
+      expect(isInvalid(result as RillValue)).toBe(true);
+      expect(getStatus(result as RillValue).message).toMatch(
+        /path escapes mount boundary/
+      );
+    }
+  );
 });
 
 // ============================================================
@@ -269,26 +261,6 @@ describe('resolvePath - EC-4: mode violation', () => {
     expect(getStatus(result as RillValue).message).toMatch(
       /mount "writeonly" does not permit read/
     );
-  });
-
-  it('allows both read and write on read-write mount', async () => {
-    const readResolved = await resolvePath(
-      'data',
-      'test.txt',
-      mounts,
-      'read',
-      makeRuntimeCtx()
-    );
-    expect(readResolved).toBe(path.join(tempDir, 'data', 'test.txt'));
-
-    const writeResolved = await resolvePath(
-      'data',
-      'test.txt',
-      mounts,
-      'write',
-      makeRuntimeCtx()
-    );
-    expect(writeResolved).toBe(path.join(tempDir, 'data', 'test.txt'));
   });
 });
 

@@ -53,33 +53,6 @@ describe('time::format', () => {
 
       expect(result).toBe('1970-01-01 00:00:00.000');
     });
-
-    it('formats epoch year component as 1970', async () => {
-      const ext = mk();
-      const result = await getFormatFn(ext)(
-        { dt: DT_EPOCH, pattern: 'YYYY' },
-        makeRuntimeCtx()
-      );
-      expect(result).toBe('1970');
-    });
-
-    it('formats epoch month component as 01', async () => {
-      const ext = mk();
-      const result = await getFormatFn(ext)(
-        { dt: DT_EPOCH, pattern: 'MM' },
-        makeRuntimeCtx()
-      );
-      expect(result).toBe('01');
-    });
-
-    it('formats epoch milliseconds component as 000', async () => {
-      const ext = mk();
-      const result = await getFormatFn(ext)(
-        { dt: DT_EPOCH, pattern: 'SSS' },
-        makeRuntimeCtx()
-      );
-      expect(result).toBe('000');
-    });
   });
 
   describe('AC-B3: literal-only pattern', () => {
@@ -94,7 +67,7 @@ describe('time::format', () => {
   });
 
   describe('AC-E2: unknown format token', () => {
-    it('returns invalid value with R001 for pattern XXXX', async () => {
+    it('returns invalid value naming the unknown token for pattern XXXX', async () => {
       const ext = mk();
       const result = await getFormatFn(ext)(
         { dt: DT_2026_03_13, pattern: 'XXXX' },
@@ -102,15 +75,6 @@ describe('time::format', () => {
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
-    });
-
-    it('includes the unknown token in the error message', async () => {
-      const ext = mk();
-      const result = await getFormatFn(ext)(
-        { dt: DT_2026_03_13, pattern: 'XXXX' },
-        makeRuntimeCtx()
-      );
-      const status = getStatus(result);
       expect(status.message).toMatch(/XXXX/);
     });
 
@@ -197,17 +161,6 @@ describe('time::parse', () => {
       const expectedEpochMs = Date.UTC(2026, 2, 13, 0, 0, 0, 0);
       expect(result).toBe(expectedEpochMs);
     });
-
-    it('parses date-only and result matches new Date(...).toISOString() midnight', async () => {
-      const ext = mk();
-      const result = await getParseFn(ext)(
-        { str: '2026-03-13', pattern: 'YYYY-MM-DD' },
-        makeRuntimeCtx()
-      );
-
-      const d = new Date(result as number);
-      expect(d.toISOString()).toBe('2026-03-13T00:00:00.000Z');
-    });
   });
 
   describe('AC-8: format/parse round-trip', () => {
@@ -224,21 +177,6 @@ describe('time::parse', () => {
       );
 
       expect(parsed).toBe(DT_2026_03_13);
-    });
-
-    it('round-trips epoch datetime with full pattern', async () => {
-      const ext = mk();
-      const pattern = 'YYYY-MM-DD HH:mm:ss.SSS';
-      const formatted = await getFormatFn(ext)(
-        { dt: DT_EPOCH, pattern },
-        makeRuntimeCtx()
-      );
-      const parsed = await getParseFn(ext)(
-        { str: formatted, pattern },
-        makeRuntimeCtx()
-      );
-
-      expect(parsed).toBe(DT_EPOCH);
     });
 
     it('round-trips date-only pattern', async () => {
@@ -290,7 +228,7 @@ describe('time::parse', () => {
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
-      expect(status.message).toMatch(/Z/);
+      expect(status.message).toBe('unknown format token: "Z"');
     });
   });
 
@@ -353,7 +291,7 @@ describe('time::parse', () => {
   });
 
   describe('AC-E3: input mismatch', () => {
-    it('returns invalid for "abc" with pattern YYYY-MM-DD', async () => {
+    it('returns invalid naming input and pattern for "abc" with pattern YYYY-MM-DD', async () => {
       const ext = mk();
       const result = await getParseFn(ext)(
         { str: 'abc', pattern: 'YYYY-MM-DD' },
@@ -361,15 +299,6 @@ describe('time::parse', () => {
       );
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
-    });
-
-    it('includes both input string and pattern in the error message', async () => {
-      const ext = mk();
-      const result = await getParseFn(ext)(
-        { str: 'abc', pattern: 'YYYY-MM-DD' },
-        makeRuntimeCtx()
-      );
-      const status = getStatus(result);
       expect(status.message).toMatch(/abc/);
       expect(status.message).toMatch(/YYYY-MM-DD/);
     });
@@ -407,25 +336,5 @@ describe('time::parse', () => {
       expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/expected string/);
     });
-  });
-});
-
-describe('AC-NF4: rill-compatible return types', () => {
-  it('time::format returns typeof string', async () => {
-    const ext = mk();
-    const result = await getFormatFn(ext)(
-      { dt: Date.parse('2026-01-01T00:00:00Z'), pattern: 'YYYY-MM-DD' },
-      makeRuntimeCtx()
-    );
-    expect(typeof result).toBe('string');
-  });
-
-  it('time::parse returns typeof number (epoch ms datetime)', async () => {
-    const ext = mk();
-    const result = await getParseFn(ext)(
-      { str: '2026-01-01', pattern: 'YYYY-MM-DD' },
-      makeRuntimeCtx()
-    );
-    expect(typeof result).toBe('number');
   });
 });

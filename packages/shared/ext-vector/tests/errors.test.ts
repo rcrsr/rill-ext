@@ -59,6 +59,17 @@ describe('mapVectorError', () => {
       expect(status.message).toBe(`${provider}: collection not found`);
     });
 
+    it('maps quoted collection name with "not found"', () => {
+      const result = mapVectorError(
+        ctx,
+        provider,
+        new Error('Collection "missing" not found')
+      );
+      const status = statusOf(result);
+      expect(status.code.name).toBe('NOT_FOUND');
+      expect(status.message).toBe(`${provider}: collection not found`);
+    });
+
     it('matches case-insensitively', () => {
       const result = mapVectorError(
         ctx,
@@ -131,6 +142,19 @@ describe('mapVectorError', () => {
       expect(status.code.name).toBe('TYPE_MISMATCH');
       expect(status.message).toBe(
         `${provider}: dimension mismatch (expected 384, got 512)`
+      );
+    });
+
+    it('extracts dimensions from "expected X, got Y" comma format', () => {
+      const result = mapVectorError(
+        ctx,
+        provider,
+        new Error('Vector dimension mismatch: expected 384, got 128')
+      );
+      const status = statusOf(result);
+      expect(status.code.name).toBe('TYPE_MISMATCH');
+      expect(status.message).toBe(
+        `${provider}: dimension mismatch (expected 384, got 128)`
       );
     });
 

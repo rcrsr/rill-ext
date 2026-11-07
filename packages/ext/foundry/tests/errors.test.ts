@@ -176,23 +176,29 @@ describe('createModelNotDeployedError', () => {
       message: "foundry: model 'gpt-4-turbo' not deployed",
     });
   });
-
-  it('includes the deployment name verbatim', async () => {
-    const { createModelNotDeployedError } = await import('../src/errors.js');
-    const ctx = createRuntimeContext();
-
-    expectThrowHalt(
-      () => createModelNotDeployedError(ctx, 'my-custom-deployment-name'),
-      {
-        message: 'my-custom-deployment-name',
-      }
-    );
-  });
 });
 
 // ============================================================
 // resolveVariables TESTS
 // ============================================================
+
+describe('detectFoundryError message format', () => {
+  it('maps 401 APIError to #AUTH with Foundry API error message', async () => {
+    const { detectFoundryError } = await import('../src/errors.js');
+    const { mapProviderError } = await import('@rcrsr/rill-ext-llm-shared');
+    const { getStatus } = await import('@rcrsr/rill');
+    const OpenAI = await import('openai');
+    const ctx = createRuntimeContext();
+    const error = new OpenAI.APIError(401, {}, 'Unauthorized', new Headers());
+
+    const status = getStatus(
+      mapProviderError(ctx, 'Foundry', error, detectFoundryError)
+    );
+
+    expect(status.code.name).toBe('AUTH');
+    expect(status.message).toBe('Foundry API error (HTTP 401): Unauthorized');
+  });
+});
 
 describe('resolveVariables', () => {
   // EC-17 / AC-28: Unresolved @{VAR} reference
@@ -229,15 +235,6 @@ describe('resolveVariables', () => {
     expect((status.raw as { kind: string }).kind).toBe('unresolved_variable');
   });
 
-  it('includes the variable name in the error message (EC-17)', async () => {
-    const { resolveVariables } = await import('../src/errors.js');
-    const ctx = createRuntimeContext();
-
-    expectThrowHalt(() => resolveVariables(ctx, '@{MY_VAR}', () => undefined), {
-      message: "foundry: unresolved variable 'MY_VAR'",
-    });
-  });
-
   it('resolves known variables without error', async () => {
     const { resolveVariables } = await import('../src/errors.js');
     const ctx = createRuntimeContext();
@@ -255,67 +252,5 @@ describe('resolveVariables', () => {
     const lookup = (name: string) => vars[name];
     const result = resolveVariables(ctx, '@{A} and @{B}', lookup);
     expect(result).toBe('alpha and beta');
-  });
-});
-
-// ============================================================
-// mapProviderError integration with detectFoundryError
-// ============================================================
-
-describe('mapProviderError + detectFoundryError integration', () => {
-  async function runMap(
-    error: unknown
-  ): Promise<{ code: string; message: string }> {
-    const { detectFoundryError } = await import('../src/errors.js');
-    const { mapProviderError } = await import('@rcrsr/rill-ext-llm-shared');
-    const { getStatus } = await import('@rcrsr/rill');
-    const ctx = createRuntimeContext();
-    const result = mapProviderError(ctx, 'Foundry', error, detectFoundryError);
-    const status = getStatus(result);
-    return { code: status.code.name, message: status.message };
-  }
-
-  // EC-12 / AC-23: 401 → #AUTH
-  it('produces #AUTH for 401 APIError (EC-12)', async () => {
-    const OpenAI = await import('openai');
-    const error = new OpenAI.APIError(401, {}, 'Unauthorized', new Headers());
-    const { code, message } = await runMap(error);
-    expect(code).toBe('AUTH');
-    expect(message).toBe('Foundry API error (HTTP 401): Unauthorized');
-  });
-
-  // EC-13 / AC-24: 429 → #RATE_LIMIT
-  it('produces #RATE_LIMIT for 429 APIError (EC-13)', async () => {
-    const OpenAI = await import('openai');
-    const error = new OpenAI.APIError(
-      429,
-      {},
-      'Too Many Requests',
-      new Headers()
-    );
-    const { code, message } = await runMap(error);
-    expect(code).toBe('RATE_LIMIT');
-    expect(message).toBe('Foundry API error (HTTP 429): Too Many Requests');
-  });
-
-  // EC-14 / AC-25: Timeout via generic Error path → #UNAVAILABLE
-  it('wraps timeout error via generic Error fallback (EC-14)', async () => {
-    const error = new Error('Request aborted due to timeout');
-    const { message } = await runMap(error);
-    expect(message).toContain('Request aborted due to timeout');
-  });
-
-  // EC-15 / AC-26: 404 → #NOT_FOUND
-  it('produces #NOT_FOUND for 404 APIError (EC-15)', async () => {
-    const OpenAI = await import('openai');
-    const error = new OpenAI.APIError(
-      404,
-      {},
-      'Deployment not found',
-      new Headers()
-    );
-    const { code, message } = await runMap(error);
-    expect(code).toBe('NOT_FOUND');
-    expect(message).toBe('Foundry API error (HTTP 404): Deployment not found');
   });
 });

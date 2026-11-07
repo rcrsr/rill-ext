@@ -309,89 +309,27 @@ describe('generate() function', () => {
         parts: [{ text: 'final prompt' }],
       });
     });
-
-    // AC-12: factory system config is always applied
-    it('uses factory system as systemInstruction', async () => {
-      mockGenerateContent.mockResolvedValue(
-        createGenerateMockResponse('{"value":1}')
-      );
-
-      const configWithSystem: GeminiExtensionConfig = {
-        ...baseConfig,
-        system: 'Factory default system.',
-      };
-
-      const ext = createGeminiExtension(configWithSystem);
-      const ctx = createRuntimeContext();
-
-      await getCallable(ext, 'generate').fn(
-        {
-          prompt: 'prompt',
-          schema: typeVal({
-            kind: 'dict',
-            fields: { value: { type: { kind: 'number' } } },
-          }),
-        },
-        ctx
-      );
-
-      expect(mockGenerateContent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            systemInstruction: 'Factory default system.',
-          }),
-        })
-      );
-    });
   });
 
   describe('error cases', () => {
-    // AC-18/EC-3: Missing schema throws RILL-R005
-    it('throws RILL-R005 with "generate requires a type expression as schema" when schema is absent', async () => {
+    // Missing schema halts before any API call
+    it('halts with INVALID_INPUT and makes no API call when schema is absent', async () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
       await expectRejectedHalt(
         getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx),
-        { message: 'generate requires a type expression as schema' }
-      );
-    });
-
-    // AC-18/EC-3: Missing schema throws RuntimeError
-    it('throws a RuntimeError instance when schema is absent', async () => {
-      const ext = createGeminiExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      let thrown: unknown;
-      try {
-        await getCallable(ext, 'generate').fn(
-          { prompt: 'prompt', options: {} },
-          ctx
-        );
-      } catch (err) {
-        thrown = err;
-      }
-
-      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
-      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
-        'INVALID_INPUT'
-      );
-    });
-
-    // AC-25/EC-3: No HTTP call when schema is missing
-    it('makes no API call when schema option is absent', async () => {
-      const ext = createGeminiExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx)
+        {
+          code: 'INVALID_INPUT',
+          message: 'generate requires a type expression as schema',
+        }
       );
 
       expect(mockGenerateContent).not.toHaveBeenCalled();
     });
 
-    // AC-19/EC-4: Unsupported type throws RILL-R005 before HTTP
-    it('throws RILL-R005 for unsupported schema type before making any API call', async () => {
+    // Unsupported schema type throws before any API call
+    it('throws for unsupported schema type before making any API call', async () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext();
 
@@ -413,8 +351,8 @@ describe('generate() function', () => {
       expect(mockGenerateContent).not.toHaveBeenCalled();
     });
 
-    // AC-21/EC-5: "not json" response throws RILL-R005
-    it('throws RILL-R005 when response text is not valid JSON', async () => {
+    // Non-JSON response halts with PROTOCOL
+    it('halts when response text is not valid JSON', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('not json')
       );
@@ -434,7 +372,10 @@ describe('generate() function', () => {
           },
           ctx
         ),
-        { message: 'generate: failed to parse response JSON:' }
+        {
+          code: 'PROTOCOL',
+          message: 'generate: failed to parse response JSON:',
+        }
       );
     });
 
@@ -472,8 +413,8 @@ describe('generate() function', () => {
       );
     });
 
-    // AC-23/EC-5: Parse error is RuntimeError with RILL-R005
-    it('throws a RuntimeError with RILL-R005 code when response parse fails', async () => {
+    // Parse failure halts with PROTOCOL
+    it('halts with PROTOCOL when response parse fails', async () => {
       mockGenerateContent.mockResolvedValue(
         createGenerateMockResponse('{broken')
       );
@@ -501,30 +442,6 @@ describe('generate() function', () => {
       expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
       expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
         'PROTOCOL'
-      );
-    });
-
-    // AC-24/EC-5: Parse failure returns no partial dict
-    it('rejects rather than resolving with partial data on parse failure', async () => {
-      mockGenerateContent.mockResolvedValue(
-        createGenerateMockResponse('not json')
-      );
-
-      const ext = createGeminiExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'generate').fn(
-          {
-            prompt: 'prompt',
-            schema: typeVal({
-              kind: 'dict',
-              fields: { x: { type: { kind: 'number' } } },
-            }),
-            options: {},
-          },
-          ctx
-        )
       );
     });
 
@@ -560,7 +477,11 @@ describe('generate() function', () => {
       );
 
       const errorEvent = events.find((e) => e['event'] === 'gemini:error');
-      expect(errorEvent).toBeDefined();
+      expect(events).toHaveLength(1);
+      expect(errorEvent).toMatchObject({
+        event: 'gemini:error',
+        subsystem: 'extension:gemini',
+      });
       expect(typeof errorEvent?.['error']).toBe('string');
       expect(typeof errorEvent?.['duration']).toBe('number');
     });
@@ -598,44 +519,6 @@ describe('generate() function', () => {
       });
       expect(typeof events[0]?.['duration']).toBe('number');
       expect(events[0]?.['duration']).toBeGreaterThanOrEqual(0);
-    });
-
-    // AC-35: Failure emits gemini:error (provider API rejection)
-    it('emits gemini:error event on failure', async () => {
-      mockGenerateContent.mockRejectedValue(new Error('network error'));
-
-      const events: Array<Record<string, unknown>> = [];
-      const ext = createGeminiExtension(baseConfig);
-      const ctx = createRuntimeContext({
-        callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => {
-            events.push(event);
-          },
-        },
-      });
-
-      await expectRejectedHalt(
-        getCallable(ext, 'generate').fn(
-          {
-            prompt: 'prompt',
-            schema: typeVal({
-              kind: 'dict',
-              fields: { x: { type: { kind: 'number' } } },
-            }),
-            options: {},
-          },
-          ctx
-        )
-      );
-
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
-        event: 'gemini:error',
-        subsystem: 'extension:gemini',
-      });
-      expect(typeof events[0]?.['error']).toBe('string');
-      expect(typeof events[0]?.['duration']).toBe('number');
     });
 
     // AC-35/EC-3: Validation-path RuntimeError also emits gemini:error

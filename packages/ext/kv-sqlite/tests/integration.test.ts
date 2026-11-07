@@ -1,6 +1,6 @@
 /**
  * Integration tests for SQLite kv contract functions.
- * Tests acceptance criteria for concurrent access, performance, and error conditions.
+ * Tests multi-connection access, mount errors, read-only enforcement, and size limits.
  */
 
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
@@ -63,9 +63,9 @@ afterEach(() => {
 });
 
 describe('Integration Tests', () => {
-  describe('AC-1: Backend Swap Without Script Changes', () => {
-    it('executes identical operations with same results', () => {
-      const dbPath = join(TEST_DATA_DIR, 'swap-test.db');
+  describe('multiple connections to one database file', () => {
+    it('reads the same value through 10 separately opened connections', () => {
+      const dbPath = join(TEST_DATA_DIR, 'multi-reads.db');
       const config: SqliteKvConfig = {
         mounts: {
           state: {
@@ -76,76 +76,6 @@ describe('Integration Tests', () => {
         },
       };
 
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-
-      // Perform series of operations
-      getCallable(ext, 'set').fn({
-        mount: 'state',
-        key: 'phase',
-        value: 'active',
-      });
-      getCallable(ext, 'set').fn({ mount: 'state', key: 'count', value: 42 });
-      getCallable(ext, 'set').fn({
-        mount: 'state',
-        key: 'config',
-        value: { enabled: true, timeout: 5000 },
-      });
-
-      // Verify results
-      expect(getCallable(ext, 'get').fn({ mount: 'state', key: 'phase' })).toBe(
-        'active'
-      );
-      expect(getCallable(ext, 'get').fn({ mount: 'state', key: 'count' })).toBe(
-        42
-      );
-      expect(
-        getCallable(ext, 'get').fn({ mount: 'state', key: 'config' })
-      ).toEqual({
-        enabled: true,
-        timeout: 5000,
-      });
-
-      // Verify collection operations
-      const keys = getCallable(ext, 'keys').fn({ mount: 'state' });
-      expect(keys).toHaveLength(3);
-      expect(keys).toContain('phase');
-      expect(keys).toContain('count');
-      expect(keys).toContain('config');
-
-      // Verify has operation
-      expect(getCallable(ext, 'has').fn({ mount: 'state', key: 'phase' })).toBe(
-        true
-      );
-      expect(
-        getCallable(ext, 'has').fn({ mount: 'state', key: 'missing' })
-      ).toBe(false);
-
-      // Verify getAll operation
-      const allEntries = getCallable(ext, 'getAll').fn({ mount: 'state' });
-      expect(allEntries).toEqual({
-        phase: 'active',
-        count: 42,
-        config: { enabled: true, timeout: 5000 },
-      });
-
-      ext.dispose?.();
-    });
-  });
-
-  describe('AC-2: SQLite Concurrent Reader Safety', () => {
-    it('completes 10 concurrent reads without errors', async () => {
-      const dbPath = join(TEST_DATA_DIR, 'concurrent-reads.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          state: {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'state_kv',
-          },
-        },
-      };
-
-      // Setup: populate database with test data
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
       getCallable(ext, 'set').fn({
         mount: 'state',
@@ -154,8 +84,7 @@ describe('Integration Tests', () => {
       });
       ext.dispose?.();
 
-      // Execute 10 concurrent reads
-      const readPromises = Array.from({ length: 10 }, async () => {
+      const results = Array.from({ length: 10 }, () => {
         const reader = createSqliteKvExtension(config, makeFactoryCtx());
         const value = getCallable(reader, 'get').fn({
           mount: 'state',
@@ -165,82 +94,11 @@ describe('Integration Tests', () => {
         return value;
       });
 
-      const results = await Promise.all(readPromises);
-
-      // All reads should succeed with same value
-      expect(results).toHaveLength(10);
-      results.forEach((result) => {
-        expect(result).toBe('test-value');
-      });
+      expect(results).toEqual(Array.from({ length: 10 }, () => 'test-value'));
     });
-
-    // Concurrent reads across multiple processes are not covered here:
-    // multi-process testing requires complex setup for ESM imports. AC-2 is
-    // adequately covered by the in-process concurrent read test above, and
-    // SQLite WAL mode enables concurrent readers across processes.
   });
 
-  describe('AC-6: Performance Under Load', () => {
-    it('completes reads in under 10ms p95 with 100K keys', () => {
-      const dbPath = join(TEST_DATA_DIR, 'performance.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          state: {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'state_kv',
-            maxEntries: 150000, // Allow for 100K entries
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-
-      // Seed database with 100K entries
-      console.log('Seeding 100K entries...');
-      for (let i = 0; i < 100000; i++) {
-        getCallable(ext, 'set').fn({
-          mount: 'state',
-          key: `key-${i}`,
-          value: `value-${i}`,
-        });
-
-        if (i % 10000 === 0) {
-          console.log(`  Seeded ${i} entries...`);
-        }
-      }
-      console.log('Seeding complete');
-
-      // Perform 1000 random reads and measure latency
-      const latencies: number[] = [];
-      const iterations = 1000;
-
-      for (let i = 0; i < iterations; i++) {
-        const randomKey = `key-${Math.floor(Math.random() * 100000)}`;
-        const start = performance.now();
-        getCallable(ext, 'get').fn({ mount: 'state', key: randomKey });
-        const end = performance.now();
-        latencies.push(end - start);
-      }
-
-      // Calculate p95 latency
-      latencies.sort((a, b) => a - b);
-      const p95Index = Math.floor(iterations * 0.95);
-      const p95Latency = latencies[p95Index];
-
-      console.log(`P95 latency: ${p95Latency?.toFixed(2)}ms`);
-      console.log(
-        `Median latency: ${latencies[Math.floor(iterations / 2)]?.toFixed(2)}ms`
-      );
-
-      // Assert p95 < 10ms
-      expect(p95Latency).toBeLessThan(10);
-
-      ext.dispose?.();
-    }, 60000); // 60 second timeout for performance test
-  });
-
-  describe('AC-7: Unknown Mount Name', () => {
+  describe('Unknown Mount Name', () => {
     it('throws error with mount name for all kv functions', () => {
       const dbPath = join(TEST_DATA_DIR, 'unknown-mount.db');
       const config: SqliteKvConfig = {
@@ -340,7 +198,7 @@ describe('Integration Tests', () => {
     });
   });
 
-  describe('AC-8: Read-Only Mode Enforcement', () => {
+  describe('Read-Only Mode Enforcement', () => {
     it('throws PermissionError for write operations on read-only mount', () => {
       const dbPath = join(TEST_DATA_DIR, 'readonly.db');
       const config: SqliteKvConfig = {
@@ -433,69 +291,7 @@ describe('Integration Tests', () => {
     });
   });
 
-  describe('AC-11: Empty Mount Operations', () => {
-    it('returns empty list for keys() on empty mount', () => {
-      const dbPath = join(TEST_DATA_DIR, 'empty-keys.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          'empty-mount': {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'empty_kv',
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-
-      const result = getCallable(ext, 'keys').fn({ mount: 'empty-mount' });
-      expect(result).toEqual([]);
-
-      ext.dispose?.();
-    });
-
-    it('returns empty dict for getAll() on empty mount', () => {
-      const dbPath = join(TEST_DATA_DIR, 'empty-getall.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          'empty-mount': {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'empty_kv',
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-
-      const result = getCallable(ext, 'getAll').fn({ mount: 'empty-mount' });
-      expect(result).toEqual({});
-
-      ext.dispose?.();
-    });
-
-    it('returns empty list for schema() on empty open-mode mount', () => {
-      const dbPath = join(TEST_DATA_DIR, 'empty-schema.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          'empty-mount': {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'empty_kv',
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-
-      const result = getCallable(ext, 'schema').fn({ mount: 'empty-mount' });
-      expect(result).toEqual([]);
-
-      ext.dispose?.();
-    });
-  });
-
-  describe('AC-12: Maximum Value Size Boundary', () => {
+  describe('Maximum Value Size Boundary', () => {
     it('succeeds when value is exactly at size limit', () => {
       const dbPath = join(TEST_DATA_DIR, 'size-exact.db');
       const sizeLimit = 102400; // 100KB
@@ -597,9 +393,9 @@ describe('Integration Tests', () => {
     });
   });
 
-  describe('AC-13: Concurrent Write Safety', () => {
-    it('completes 5 concurrent writes without corruption', async () => {
-      const dbPath = join(TEST_DATA_DIR, 'concurrent-writes.db');
+  describe('sequential writes through separate connections', () => {
+    it('keeps the last written value after 5 writes to the same key', () => {
+      const dbPath = join(TEST_DATA_DIR, 'sequential-writes.db');
       const config: SqliteKvConfig = {
         mounts: {
           shared: {
@@ -610,8 +406,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      // Execute 5 concurrent writes to same key
-      const writePromises = Array.from({ length: 5 }, async (_, index) => {
+      for (let index = 0; index < 5; index++) {
         const writer = createSqliteKvExtension(config, makeFactoryCtx());
         getCallable(writer, 'set').fn({
           mount: 'shared',
@@ -619,31 +414,21 @@ describe('Integration Tests', () => {
           value: index,
         });
         writer.dispose?.();
-      });
+      }
 
-      await Promise.all(writePromises);
-
-      // Verify database integrity: last writer wins
       const reader = createSqliteKvExtension(config, makeFactoryCtx());
-      const value = getCallable(reader, 'get').fn({
-        mount: 'shared',
-        key: 'counter',
-      });
-
-      // Value should be one of the written values (0-4)
-      expect(value).toBeGreaterThanOrEqual(0);
-      expect(value).toBeLessThan(5);
-
-      // Verify database is not corrupted
-      expect(() =>
-        getCallable(reader, 'keys').fn({ mount: 'shared' })
-      ).not.toThrow();
+      expect(
+        getCallable(reader, 'get').fn({ mount: 'shared', key: 'counter' })
+      ).toBe(4);
+      expect(getCallable(reader, 'keys').fn({ mount: 'shared' })).toEqual([
+        'counter',
+      ]);
 
       reader.dispose?.();
     });
 
-    it('handles concurrent writes to different keys', async () => {
-      const dbPath = join(TEST_DATA_DIR, 'concurrent-different-keys.db');
+    it('persists writes to 5 different keys', () => {
+      const dbPath = join(TEST_DATA_DIR, 'sequential-different-keys.db');
       const config: SqliteKvConfig = {
         mounts: {
           shared: {
@@ -654,8 +439,7 @@ describe('Integration Tests', () => {
         },
       };
 
-      // Execute 5 concurrent writes to different keys
-      const writePromises = Array.from({ length: 5 }, async (_, index) => {
+      for (let index = 0; index < 5; index++) {
         const writer = createSqliteKvExtension(config, makeFactoryCtx());
         getCallable(writer, 'set').fn({
           mount: 'shared',
@@ -663,11 +447,8 @@ describe('Integration Tests', () => {
           value: `value-${index}`,
         });
         writer.dispose?.();
-      });
+      }
 
-      await Promise.all(writePromises);
-
-      // Verify all writes succeeded
       const reader = createSqliteKvExtension(config, makeFactoryCtx());
       const keys = getCallable(reader, 'keys').fn({ mount: 'shared' });
 
@@ -683,96 +464,35 @@ describe('Integration Tests', () => {
     });
   });
 
-  describe('EC-5: Merge Error Contracts', () => {
-    it('throws TypeError when merging into non-dict value', () => {
-      const dbPath = join(TEST_DATA_DIR, 'merge-error.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          test: {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'merge_kv',
+  describe('Merge Error Contracts', () => {
+    it.each([
+      { type: 'string', key: 'name', value: 'Alice', partial: { age: 30 } },
+      { type: 'number', key: 'count', value: 42, partial: { increment: 1 } },
+      { type: 'list', key: 'items', value: [1, 2, 3], partial: { extra: 4 } },
+    ])(
+      'throws when merging into $type value',
+      ({ type, key, value, partial }) => {
+        const dbPath = join(TEST_DATA_DIR, `merge-${type}.db`);
+        const config: SqliteKvConfig = {
+          mounts: {
+            test: {
+              mode: 'read-write',
+              database: dbPath,
+              table: 'merge_kv',
+            },
           },
-        },
-      };
+        };
 
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
+        const ext = createSqliteKvExtension(config, makeFactoryCtx());
 
-      // Set non-dict value
-      getCallable(ext, 'set').fn({
-        mount: 'test',
-        key: 'name',
-        value: 'Alice',
-      });
+        getCallable(ext, 'set').fn({ mount: 'test', key, value });
 
-      // Attempt to merge should throw
-      expect(() =>
-        getCallable(ext, 'merge').fn({
-          mount: 'test',
-          key: 'name',
-          partial: { age: 30 },
-        })
-      ).toThrow('non-dict');
+        expect(() =>
+          getCallable(ext, 'merge').fn({ mount: 'test', key, partial })
+        ).toThrow('non-dict');
 
-      ext.dispose?.();
-    });
-
-    it('throws TypeError when merging into number value', () => {
-      const dbPath = join(TEST_DATA_DIR, 'merge-number.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          test: {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'merge_kv',
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-
-      getCallable(ext, 'set').fn({ mount: 'test', key: 'count', value: 42 });
-
-      expect(() =>
-        getCallable(ext, 'merge').fn({
-          mount: 'test',
-          key: 'count',
-          partial: { increment: 1 },
-        })
-      ).toThrow('non-dict');
-
-      ext.dispose?.();
-    });
-
-    it('throws TypeError when merging into list value', () => {
-      const dbPath = join(TEST_DATA_DIR, 'merge-list.db');
-      const config: SqliteKvConfig = {
-        mounts: {
-          test: {
-            mode: 'read-write',
-            database: dbPath,
-            table: 'merge_kv',
-          },
-        },
-      };
-
-      const ext = createSqliteKvExtension(config, makeFactoryCtx());
-
-      getCallable(ext, 'set').fn({
-        mount: 'test',
-        key: 'items',
-        value: [1, 2, 3],
-      });
-
-      expect(() =>
-        getCallable(ext, 'merge').fn({
-          mount: 'test',
-          key: 'items',
-          partial: { extra: 4 },
-        })
-      ).toThrow('non-dict');
-
-      ext.dispose?.();
-    });
+        ext.dispose?.();
+      }
+    );
   });
 });

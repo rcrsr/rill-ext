@@ -16,6 +16,8 @@ import path from 'node:path';
 import os from 'node:os';
 import {
   createRuntimeContext,
+  invokeCallable,
+  isCallable,
   isRillStream,
   type ApplicationCallable,
 } from '@rcrsr/rill';
@@ -335,6 +337,26 @@ describe('AC-6: list-output closure result feeds all three LLM providers without
     // (their stream is created eagerly when fn() is called).
     expect(mockAnthropicStream).toHaveBeenCalledOnce();
     expect(mockOpenAIStream).toHaveBeenCalledOnce();
+    expect(mockAnthropicStream.mock.calls[0]?.[0]).toMatchObject({
+      system: 'You are a helpful rill assistant.',
+      messages: [{ role: 'user', content: 'What is rill?\n' }],
+    });
+    expect(mockOpenAIStream.mock.calls[0]?.[0]).toMatchObject({
+      messages: [
+        { role: 'system', content: 'You are a helpful rill assistant.' },
+        { role: 'user', content: 'What is rill?\n' },
+      ],
+    });
+
+    // Gemini's stream is lazy: pulling the first chunk triggers the SDK call.
+    if (!isRillStream(geminiResult)) throw new Error('expected a stream');
+    const nextStep = geminiResult.next;
+    if (!isCallable(nextStep)) throw new Error('expected callable next');
+    await invokeCallable(nextStep, [], ctx);
+    expect(mockGeminiStream).toHaveBeenCalledOnce();
+    expect(mockGeminiStream.mock.calls[0]?.[0]).toMatchObject({
+      contents: [{ role: 'user', parts: [{ text: 'What is rill?\n' }] }],
+    });
 
     // Dispose all extensions
     await promptExt.dispose?.();

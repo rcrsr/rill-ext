@@ -232,6 +232,7 @@ describe('fs-local extension functions', () => {
         makeRuntimeCtx()
       );
       expectInvalid(result, /exceeds size limit/);
+      expect(getStatus(result as RillValue).code.name).toBe('UNAVAILABLE');
     });
   });
 

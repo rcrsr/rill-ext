@@ -81,11 +81,12 @@ function mockFetch(_url: string, options?: FetchOptions): Promise<Response> {
 beforeEach(() => {
   mockResponses = [];
   fetchCallCount = 0;
-  global.fetch = mockFetch as unknown as typeof fetch;
+  vi.stubGlobal('fetch', mockFetch);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -308,13 +309,14 @@ describe('executeRequest - HTTP errors', () => {
   });
 
   it('returns invalid value for HTTP 5xx after retries', async () => {
+    vi.useFakeTimers();
     mockResponses = [
       { status: 503, body: 'Service Unavailable' },
       { status: 503, body: 'Service Unavailable' },
       { status: 503, body: 'Service Unavailable' },
     ];
 
-    const result = await executeRequest(
+    const promise = executeRequest(
       'https://api.example.com/users',
       { method: 'GET', headers: {} },
       testConfig,
@@ -322,6 +324,8 @@ describe('executeRequest - HTTP errors', () => {
       'body',
       makeRuntimeCtx()
     );
+    await vi.runAllTimersAsync();
+    const result = await promise;
     const status = getStatus(result);
     expect(status.code.name).toBe('UNAVAILABLE');
     expect(status.message).toMatch(/HTTP 503/);
@@ -331,7 +335,8 @@ describe('executeRequest - HTTP errors', () => {
 
   it('returns invalid value for network error', async () => {
     // No mock responses - triggers TypeError
-    const result = await executeRequest(
+    vi.useFakeTimers();
+    const promise = executeRequest(
       'https://api.example.com/users',
       { method: 'GET', headers: {} },
       testConfig,
@@ -339,6 +344,8 @@ describe('executeRequest - HTTP errors', () => {
       'body',
       makeRuntimeCtx()
     );
+    await vi.runAllTimersAsync();
+    const result = await promise;
     const status = getStatus(result);
     expect(status.code.name).toBe('UNAVAILABLE');
     expect(status.message).toMatch(/network error/);
@@ -352,12 +359,13 @@ describe('executeRequest - HTTP errors', () => {
 
 describe('executeRequest - retry logic', () => {
   it('retries on HTTP 503', async () => {
+    vi.useFakeTimers();
     mockResponses = [
       { status: 503, body: 'Service Unavailable' },
       { status: 200, body: '{"success": true}' },
     ];
 
-    const result = await executeRequest(
+    const promise = executeRequest(
       'https://api.example.com/users',
       { method: 'GET', headers: {} },
       testConfig,
@@ -365,6 +373,8 @@ describe('executeRequest - retry logic', () => {
       'body',
       makeRuntimeCtx()
     );
+    await vi.runAllTimersAsync();
+    const result = await promise;
 
     expect(result).toEqual({ success: true });
     expect(fetchCallCount).toBe(2);
@@ -401,7 +411,7 @@ describe('executeRequest - retry logic', () => {
     let callCount = 0;
     const callTimes: number[] = [];
 
-    global.fetch = (async () => {
+    vi.stubGlobal('fetch', async () => {
       callTimes.push(Date.now());
       callCount++;
       if (callCount < 3) {
@@ -414,7 +424,7 @@ describe('executeRequest - retry logic', () => {
         text: async () => '{"success": true}',
         json: async () => ({ success: true }),
       } as Response;
-    }) as unknown as typeof fetch;
+    });
 
     const promise = executeRequest(
       'https://api.example.com/users',
@@ -454,11 +464,12 @@ describe('executeRequest - retry logic', () => {
 
 describe('executeRequest - timeout', () => {
   it('returns invalid value on timeout', async () => {
+    vi.useFakeTimers();
     mockResponses = [{ status: 200, body: '{"success": true}', delay: 2000 }];
 
     const shortTimeoutConfig = { ...testConfig, timeout: 100 };
 
-    const result = await executeRequest(
+    const promise = executeRequest(
       'https://api.example.com/users',
       { method: 'GET', headers: {} },
       shortTimeoutConfig,
@@ -466,6 +477,8 @@ describe('executeRequest - timeout', () => {
       'body',
       makeRuntimeCtx()
     );
+    await vi.runAllTimersAsync();
+    const result = await promise;
     const status = getStatus(result);
     expect(status.code.name).toBe('TIMEOUT');
   });
@@ -476,11 +489,6 @@ describe('executeRequest - timeout', () => {
 // ============================================================
 
 describe('createSemaphore', () => {
-  it('creates semaphore with max concurrent limit', () => {
-    const semaphore = createSemaphore(5);
-    expect(semaphore).toBeDefined();
-  });
-
   it('returns undefined when maxConcurrent not set', () => {
     const semaphore = createSemaphore(undefined);
     expect(semaphore).toBeUndefined();
@@ -493,12 +501,13 @@ describe('createSemaphore', () => {
 });
 
 describe('executeRequest - concurrency control', () => {
-  it('limits concurrent requests with semaphore', async () => {
+  it('limits concurrent requests to the semaphore maximum', async () => {
+    vi.useFakeTimers();
     const semaphore = createSemaphore(2);
     let activeCalls = 0;
     let maxActiveCalls = 0;
 
-    global.fetch = (async () => {
+    vi.stubGlobal('fetch', async () => {
       activeCalls++;
       maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -510,9 +519,9 @@ describe('executeRequest - concurrency control', () => {
         text: async () => '{"success": true}',
         json: async () => ({ success: true }),
       } as Response;
-    }) as unknown as typeof fetch;
+    });
 
-    await Promise.all(
+    const all = Promise.all(
       Array.from({ length: 5 }, () =>
         executeRequest(
           'https://api.example.com/users',
@@ -526,6 +535,9 @@ describe('executeRequest - concurrency control', () => {
       )
     );
 
-    expect(maxActiveCalls).toBeLessThanOrEqual(2);
+    await vi.runAllTimersAsync();
+    await all;
+
+    expect(maxActiveCalls).toBe(2);
   });
 });

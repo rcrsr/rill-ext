@@ -225,13 +225,13 @@ describe('tz::time', () => {
 // ============================================================
 
 describe('tz::offset', () => {
-  it('AC-4: Asia/Calcutta without dt returns typeof number', async () => {
+  it('defaults to the current instant and returns 5.5 for Asia/Calcutta without dt', async () => {
     const ext = getExt();
     const result = await getOffset(ext)(
       { zone: 'Asia/Calcutta' },
       makeRuntimeCtx()
     );
-    expect(typeof result).toBe('number');
+    expect(result).toBe(5.5);
   });
 
   it('AC-5: America/New_York with summer datetime returns -4', async () => {
@@ -306,21 +306,6 @@ describe('tz::offset', () => {
 // ============================================================
 
 describe('tz::zones', () => {
-  it('AC-6: returns non-empty array', async () => {
-    const ext = getExt();
-    const result = await getZones(ext)({}, makeRuntimeCtx());
-    expect(Array.isArray(result)).toBe(true);
-    expect((result as unknown[]).length).toBeGreaterThan(0);
-  });
-
-  it('AC-6: every element in result is a string', async () => {
-    const ext = getExt();
-    const result = (await getZones(ext)({}, makeRuntimeCtx())) as unknown[];
-    for (const z of result) {
-      expect(typeof z).toBe('string');
-    }
-  });
-
   it('AC-6: includes America/New_York and Asia/Tokyo', async () => {
     const ext = getExt();
     const allZones = (await getZones(ext)({}, makeRuntimeCtx())) as string[];
@@ -347,50 +332,6 @@ describe('tz::zones', () => {
       await expect(
         isoFn({ dt: DT_2026_JAN, zone }, makeRuntimeCtx())
       ).resolves.toBeTypeOf('string');
-    }
-  });
-});
-
-// ============================================================
-// AC-NF4: rill-compatible return types
-// ============================================================
-
-describe('AC-NF4: rill-compatible return types', () => {
-  const dt = Date.parse('2026-01-01T00:00:00Z');
-  const zone = 'America/New_York';
-
-  it('tz::iso returns typeof string', async () => {
-    const ext = getExt();
-    const result = await getIso(ext)({ dt, zone }, makeRuntimeCtx());
-    expect(typeof result).toBe('string');
-  });
-
-  it('tz::date returns typeof string', async () => {
-    const ext = getExt();
-    const result = await getDate(ext)({ dt, zone }, makeRuntimeCtx());
-    expect(typeof result).toBe('string');
-  });
-
-  it('tz::time returns typeof string', async () => {
-    const ext = getExt();
-    const result = await getTime(ext)({ dt, zone }, makeRuntimeCtx());
-    expect(typeof result).toBe('string');
-  });
-
-  it('tz::offset returns typeof number', async () => {
-    const ext = getExt();
-    const result = await getOffset(ext)({ dt, zone }, makeRuntimeCtx());
-    expect(typeof result).toBe('number');
-  });
-
-  it('tz::zones returns an array with string elements', async () => {
-    const ext = getExt();
-    const result = await getZones(ext)({}, makeRuntimeCtx());
-    expect(Array.isArray(result)).toBe(true);
-    const arr = result as unknown[];
-    expect(arr.length).toBeGreaterThan(0);
-    for (const z of arr) {
-      expect(typeof z).toBe('string');
     }
   });
 });

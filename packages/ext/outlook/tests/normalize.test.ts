@@ -76,79 +76,35 @@ const EPOCH_2024_03_15_12_00 = Date.parse('2024-03-15T12:00:00Z');
 const EPOCH_2024_03_15_13_00 = Date.parse('2024-03-15T13:00:00Z');
 
 // ============================================================
-// normalizeMessage tests [AC-2, AC-14]
+// normalizeMessage tests
 // ============================================================
 
 describe('normalizeMessage', () => {
-  describe('full Graph message', () => {
-    it('returns exactly 9 fields [AC-2]', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      const keys = Object.keys(result);
-      expect(keys).toHaveLength(9);
+  it('maps a full Graph message to the exact 9-field dict', () => {
+    expect(normalizeMessage(FULL_GRAPH_MESSAGE)).toEqual({
+      id: 'msg-001',
+      subject: 'Hello World',
+      preview: 'This is a preview of the message body.',
+      from: 'sender@example.com',
+      to: ['recipient1@example.com', 'recipient2@example.com'],
+      date: EPOCH_2024_03_15_10_30,
+      unread: true,
+      flagged: true,
+      has_attachments: true,
     });
+  });
 
-    it('includes all 9 required field names', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('subject');
-      expect(result).toHaveProperty('preview');
-      expect(result).toHaveProperty('from');
-      expect(result).toHaveProperty('to');
-      expect(result).toHaveProperty('date');
-      expect(result).toHaveProperty('unread');
-      expect(result).toHaveProperty('flagged');
-      expect(result).toHaveProperty('has_attachments');
-    });
-
-    it('maps id correctly', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(result.id).toBe('msg-001');
-    });
-
-    it('maps subject correctly', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(result.subject).toBe('Hello World');
-    });
-
-    it('maps preview from bodyPreview', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(result.preview).toBe('This is a preview of the message body.');
-    });
-
-    it('maps from address', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(result.from).toBe('sender@example.com');
-    });
-
-    it('maps to as array of addresses', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(Array.isArray(result.to)).toBe(true);
-      expect(result.to).toEqual([
-        'recipient1@example.com',
-        'recipient2@example.com',
-      ]);
-    });
-
-    it('maps date as epoch ms from receivedDateTime [AC-14]', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(typeof result.date).toBe('number');
-      expect(result.date).toBe(EPOCH_2024_03_15_10_30);
-    });
-
-    it('maps unread as inverse of isRead', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      // isRead = false → unread = true
-      expect(result.unread).toBe(true);
-    });
-
-    it('maps flagged when flag.flagStatus is flagged', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(result.flagged).toBe(true);
-    });
-
-    it('maps has_attachments correctly', () => {
-      const result = normalizeMessage(FULL_GRAPH_MESSAGE);
-      expect(result.has_attachments).toBe(true);
+  it('defaults every field when the Graph message is empty', () => {
+    expect(normalizeMessage({})).toEqual({
+      id: '',
+      subject: '',
+      preview: '',
+      from: '',
+      to: [],
+      date: 0,
+      unread: false,
+      flagged: false,
+      has_attachments: false,
     });
   });
 
@@ -180,288 +136,137 @@ describe('normalizeMessage', () => {
     });
   });
 
-  describe('null/absent field defaults [AC-14]', () => {
-    it('id defaults to empty string when absent', () => {
-      const result = normalizeMessage({});
-      expect(result.id).toBe('');
-    });
+  it('defaults date to 0 for unparseable date string', () => {
+    const result = normalizeMessage({ receivedDateTime: 'not-a-date' });
+    expect(result.date).toBe(0);
+  });
 
-    it('subject defaults to empty string when absent', () => {
-      const result = normalizeMessage({});
-      expect(result.subject).toBe('');
-    });
-
-    it('preview defaults to empty string when absent', () => {
-      const result = normalizeMessage({});
-      expect(result.preview).toBe('');
-    });
-
-    it('from defaults to empty string when absent', () => {
-      const result = normalizeMessage({});
-      expect(result.from).toBe('');
-    });
-
-    it('to defaults to empty array when absent', () => {
-      const result = normalizeMessage({});
-      expect(result.to).toEqual([]);
-    });
-
-    it('date defaults to 0 when receivedDateTime is absent [AC-14]', () => {
-      const result = normalizeMessage({});
-      expect(result.date).toBe(0);
-    });
-
-    it('date defaults to 0 for unparseable date string', () => {
-      const result = normalizeMessage({ receivedDateTime: 'not-a-date' });
-      expect(result.date).toBe(0);
-    });
-
-    it('unread defaults to false when absent', () => {
-      const result = normalizeMessage({});
-      expect(result.unread).toBe(false);
-    });
-
-    it('flagged defaults to false when absent', () => {
-      const result = normalizeMessage({});
-      expect(result.flagged).toBe(false);
-    });
-
-    it('has_attachments defaults to false when absent', () => {
-      const result = normalizeMessage({});
-      expect(result.has_attachments).toBe(false);
-    });
-
-    it('to excludes recipients with missing address', () => {
-      const msg = {
-        toRecipients: [
-          { emailAddress: { address: 'good@example.com' } },
-          { emailAddress: {} }, // no address
-          { emailAddress: { address: '' } }, // empty address
-        ],
-      };
-      const result = normalizeMessage(msg);
-      expect(result.to).toEqual(['good@example.com']);
-    });
+  it('excludes recipients with missing or empty address from to', () => {
+    const msg = {
+      toRecipients: [
+        { emailAddress: { address: 'good@example.com' } },
+        { emailAddress: {} }, // no address
+        { emailAddress: { address: '' } }, // empty address
+      ],
+    };
+    const result = normalizeMessage(msg);
+    expect(result.to).toEqual(['good@example.com']);
   });
 });
 
 // ============================================================
-// normalizeEvent tests [AC-14]
+// normalizeEvent tests
 // ============================================================
 
 describe('normalizeEvent', () => {
-  describe('full Graph event', () => {
-    it('returns exactly 8 fields', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      const keys = Object.keys(result);
-      expect(keys).toHaveLength(8);
-    });
-
-    it('includes all 8 required field names', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(result).toHaveProperty('id');
-      expect(result).toHaveProperty('title');
-      expect(result).toHaveProperty('start');
-      expect(result).toHaveProperty('end');
-      expect(result).toHaveProperty('location');
-      expect(result).toHaveProperty('attendees');
-      expect(result).toHaveProperty('is_online');
-      expect(result).toHaveProperty('online_url');
-    });
-
-    it('maps id correctly', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(result.id).toBe('evt-001');
-    });
-
-    it('maps title from subject', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(result.title).toBe('Team Standup');
-    });
-
-    it('maps start as epoch ms [AC-14]', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(typeof result.start).toBe('number');
-      expect(result.start).toBe(EPOCH_2024_03_15_09_00);
-    });
-
-    it('maps end as epoch ms [AC-14]', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(typeof result.end).toBe('number');
-      expect(result.end).toBe(EPOCH_2024_03_15_09_30);
-    });
-
-    it('maps location from displayName', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(result.location).toBe('Conference Room A');
-    });
-
-    it('maps attendees as array of addresses', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(Array.isArray(result.attendees)).toBe(true);
-      expect(result.attendees).toEqual([
-        'alice@example.com',
-        'bob@example.com',
-      ]);
-    });
-
-    it('maps is_online from isOnlineMeeting', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(result.is_online).toBe(true);
-    });
-
-    it('maps online_url from onlineMeeting.joinUrl', () => {
-      const result = normalizeEvent(FULL_GRAPH_EVENT);
-      expect(result.online_url).toBe('https://teams.microsoft.com/meet/123');
+  it('maps a full Graph event to the exact 8-field dict', () => {
+    expect(normalizeEvent(FULL_GRAPH_EVENT)).toEqual({
+      id: 'evt-001',
+      title: 'Team Standup',
+      start: EPOCH_2024_03_15_09_00,
+      end: EPOCH_2024_03_15_09_30,
+      location: 'Conference Room A',
+      attendees: ['alice@example.com', 'bob@example.com'],
+      is_online: true,
+      online_url: 'https://teams.microsoft.com/meet/123',
     });
   });
 
-  describe('null/absent field defaults', () => {
-    it('id defaults to empty string', () => {
-      expect(normalizeEvent({}).id).toBe('');
+  it('defaults every field when the Graph event is empty', () => {
+    expect(normalizeEvent({})).toEqual({
+      id: '',
+      title: '',
+      start: 0,
+      end: 0,
+      location: '',
+      attendees: [],
+      is_online: false,
+      online_url: '',
     });
+  });
 
-    it('title defaults to empty string', () => {
-      expect(normalizeEvent({}).title).toBe('');
-    });
-
-    it('start defaults to 0 when absent [AC-14]', () => {
-      expect(normalizeEvent({}).start).toBe(0);
-    });
-
-    it('end defaults to 0 when absent [AC-14]', () => {
-      expect(normalizeEvent({}).end).toBe(0);
-    });
-
-    it('location defaults to empty string', () => {
-      expect(normalizeEvent({}).location).toBe('');
-    });
-
-    it('attendees defaults to empty array', () => {
-      expect(normalizeEvent({}).attendees).toEqual([]);
-    });
-
-    it('is_online defaults to false', () => {
-      expect(normalizeEvent({}).is_online).toBe(false);
-    });
-
-    it('online_url defaults to empty string', () => {
-      expect(normalizeEvent({}).online_url).toBe('');
-    });
-
-    it('attendees excludes recipients with missing address', () => {
-      const ev = {
-        attendees: [
-          { emailAddress: { address: 'a@example.com' } },
-          { emailAddress: {} },
-        ],
-      };
-      const result = normalizeEvent(ev);
-      expect(result.attendees).toEqual(['a@example.com']);
-    });
+  it('excludes attendees with missing address', () => {
+    const ev = {
+      attendees: [
+        { emailAddress: { address: 'a@example.com' } },
+        { emailAddress: {} },
+      ],
+    };
+    const result = normalizeEvent(ev);
+    expect(result.attendees).toEqual(['a@example.com']);
   });
 });
 
 // ============================================================
-// normalizeScheduleItem tests [AC-14]
+// normalizeScheduleItem tests
 // ============================================================
 
 describe('normalizeScheduleItem', () => {
-  it('maps all 4 fields', () => {
+  it('maps a full Graph schedule item to the exact 4-field dict', () => {
     const item = {
       status: 'busy',
       subject: 'Meeting',
       start: { dateTime: '2024-03-15T09:00:00Z' },
       end: { dateTime: '2024-03-15T09:30:00Z' },
     };
-    const result = normalizeScheduleItem(item);
-    expect(result.status).toBe('busy');
-    expect(result.subject).toBe('Meeting');
-    expect(result.start).toBe(EPOCH_2024_03_15_09_00);
-    expect(result.end).toBe(EPOCH_2024_03_15_09_30);
+    expect(normalizeScheduleItem(item)).toEqual({
+      status: 'busy',
+      subject: 'Meeting',
+      start: EPOCH_2024_03_15_09_00,
+      end: EPOCH_2024_03_15_09_30,
+    });
   });
 
-  it('start defaults to 0 when absent [AC-14]', () => {
-    const result = normalizeScheduleItem({ status: 'free', subject: 'X' });
-    expect(result.start).toBe(0);
-    expect(result.end).toBe(0);
+  it('defaults start and end to 0 when absent', () => {
+    expect(normalizeScheduleItem({ status: 'free', subject: 'X' })).toEqual({
+      status: 'free',
+      subject: 'X',
+      start: 0,
+      end: 0,
+    });
   });
 
-  it('status defaults to empty string when absent', () => {
-    const result = normalizeScheduleItem({});
-    expect(result.status).toBe('');
-  });
-
-  it('subject defaults to empty string when absent', () => {
-    const result = normalizeScheduleItem({});
-    expect(result.subject).toBe('');
+  it('defaults every field when the Graph item is empty', () => {
+    expect(normalizeScheduleItem({})).toEqual({
+      status: '',
+      subject: '',
+      start: 0,
+      end: 0,
+    });
   });
 });
 
 // ============================================================
-// normalizeSchedule tests [AC-14]
+// normalizeSchedule tests
 // ============================================================
 
 describe('normalizeSchedule', () => {
-  describe('full Graph schedule', () => {
-    it('maps schedule_id', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.schedule_id).toBe('alice@example.com');
-    });
-
-    it('maps availability from availabilityView', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.availability).toBe('free');
-    });
-
-    it('maps items array with correct length', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(Array.isArray(result.items)).toBe(true);
-      expect(result.items).toHaveLength(2);
-    });
-
-    it('maps first item status', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.items[0]!.status).toBe('busy');
-    });
-
-    it('maps first item subject', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.items[0]!.subject).toBe('Team Standup');
-    });
-
-    it('maps first item start as epoch ms [AC-14]', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.items[0]!.start).toBe(EPOCH_2024_03_15_09_00);
-    });
-
-    it('maps first item end as epoch ms [AC-14]', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.items[0]!.end).toBe(EPOCH_2024_03_15_09_30);
-    });
-
-    it('maps second item start as epoch ms [AC-14]', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.items[1]!.start).toBe(EPOCH_2024_03_15_12_00);
-    });
-
-    it('maps second item end as epoch ms [AC-14]', () => {
-      const result = normalizeSchedule(FULL_GRAPH_SCHEDULE);
-      expect(result.items[1]!.end).toBe(EPOCH_2024_03_15_13_00);
+  it('maps a full Graph schedule including both items', () => {
+    expect(normalizeSchedule(FULL_GRAPH_SCHEDULE)).toEqual({
+      schedule_id: 'alice@example.com',
+      availability: 'free',
+      items: [
+        {
+          status: 'busy',
+          subject: 'Team Standup',
+          start: EPOCH_2024_03_15_09_00,
+          end: EPOCH_2024_03_15_09_30,
+        },
+        {
+          status: 'tentative',
+          subject: 'Lunch',
+          start: EPOCH_2024_03_15_12_00,
+          end: EPOCH_2024_03_15_13_00,
+        },
+      ],
     });
   });
 
-  describe('null/absent field defaults', () => {
-    it('schedule_id defaults to empty string', () => {
-      expect(normalizeSchedule({}).schedule_id).toBe('');
-    });
-
-    it('availability defaults to empty string', () => {
-      expect(normalizeSchedule({}).availability).toBe('');
-    });
-
-    it('items defaults to empty array', () => {
-      expect(normalizeSchedule({}).items).toEqual([]);
+  it('defaults every field when the Graph schedule is empty', () => {
+    expect(normalizeSchedule({})).toEqual({
+      schedule_id: '',
+      availability: '',
+      items: [],
     });
   });
 });

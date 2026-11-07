@@ -11,22 +11,12 @@ export { mapVectorError } from './errors.js';
 // ============================================================
 // TYPES
 // ============================================================
-export type {
-  VectorExtensionConfig,
-  BatchResult,
-  DisposalState,
-  DistanceMetric,
-} from './types.js';
+export type { VectorExtensionConfig, DisposalState } from './types.js';
 
 // ============================================================
 // EVENT EMISSION
 // ============================================================
 export { withEventEmission } from './events.js';
-
-// ============================================================
-// BATCH EXECUTION
-// ============================================================
-export { executeBatch } from './batch.js';
 
 // ============================================================
 // DISPOSAL UTILITIES
@@ -37,16 +27,6 @@ export { createDisposalState, checkDisposed, dispose } from './disposal.js';
 // VALIDATION
 // ============================================================
 export { assertRequired } from './validation.js';
-
-// ============================================================
-// FUNCTION WRAPPER
-// ============================================================
-export { createFunctionWrapper } from './wrapper.js';
-
-// ============================================================
-// DISTANCE NORMALIZATION
-// ============================================================
-export { normalizeDistance } from './distance.js';
 
 // ============================================================
 // PARAM HELPERS

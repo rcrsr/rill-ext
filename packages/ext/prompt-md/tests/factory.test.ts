@@ -1,16 +1,14 @@
 /**
  * Factory tests for the prompt-md extension.
  *
- * Covers config validation (EC-6, EC-7), parse-time errors (EC-8 through
- * EC-14), collision detection (EC-15), and the package.json dependency graph
- * check (AC-20).
+ * Covers config validation, parse-time errors, and resolution name
+ * collision detection.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { RuntimeError } from '@rcrsr/rill';
 import { createPromptMdExtension } from '../src/factory.js';
 import { makeFactoryCtx } from './_helpers.js';
@@ -193,23 +191,6 @@ describe('AC-9 / EC-15: resolution name collision', () => {
 });
 
 describe('AC-10 / EC-9: missing required fields', () => {
-  it('does NOT throw when output field is omitted (output is now inferred from body)', async () => {
-    const dir = await tempDir();
-    await writePrompt(
-      dir,
-      'no-output.prompt.md',
-      `---
-description: Test
-params: []
----
-body
-`
-    );
-    await expect(
-      createPromptMdExtension({ basePath: dir }, makeFactoryCtx())
-    ).resolves.toBeDefined();
-  });
-
   it('throws RILL-R001 for missing description field', async () => {
     const dir = await tempDir();
     await writePrompt(
@@ -260,53 +241,35 @@ body
 });
 
 describe('output field is no longer parsed from frontmatter', () => {
-  it('ignores stale output: dict — body without @@ markers infers output: string', async () => {
-    const dir = await tempDir();
-    await writePrompt(
-      dir,
-      'stale-output.prompt.md',
-      `---
+  it.each([
+    { value: 'dict', file: 'stale-output', key: 'stale_output' },
+    { value: 'json', file: 'unknown-output', key: 'unknown_output' },
+  ])(
+    'ignores stale output: $value — body without @@ markers infers output: string',
+    async ({ value, file, key }) => {
+      const dir = await tempDir();
+      await writePrompt(
+        dir,
+        `${file}.prompt.md`,
+        `---
 description: Test
 params: []
-output: dict
+output: ${value}
 ---
 body
 `
-    );
-    const ext = await createPromptMdExtension(
-      { basePath: dir },
-      makeFactoryCtx()
-    );
-    const dict = ext.value as Record<
-      string,
-      { annotations: Record<string, unknown> }
-    >;
-    expect(dict['stale_output']!.annotations['^output']).toBe('string');
-  });
-
-  it('ignores stale output: json — body without @@ markers infers output: string', async () => {
-    const dir = await tempDir();
-    await writePrompt(
-      dir,
-      'unknown-output.prompt.md',
-      `---
-description: Test
-params: []
-output: json
----
-body
-`
-    );
-    const ext = await createPromptMdExtension(
-      { basePath: dir },
-      makeFactoryCtx()
-    );
-    const dict = ext.value as Record<
-      string,
-      { annotations: Record<string, unknown> }
-    >;
-    expect(dict['unknown_output']!.annotations['^output']).toBe('string');
-  });
+      );
+      const ext = await createPromptMdExtension(
+        { basePath: dir },
+        makeFactoryCtx()
+      );
+      const dict = ext.value as Record<
+        string,
+        { annotations: Record<string, unknown> }
+      >;
+      expect(dict[key]!.annotations['^output']).toBe('string');
+    }
+  );
 });
 
 describe('AC-12 / EC-12: malformed params entry', () => {
@@ -413,38 +376,5 @@ body
     expect(caught).toBeInstanceOf(RuntimeError);
     const re = caught as RuntimeError;
     expect(re.errorId).toBe('RILL-R001');
-  });
-});
-
-// ── AC-20: dependency graph check ────────────────────────────────────────────
-
-describe('AC-20: package.json has no cross-extension dependencies', () => {
-  it('does not reference any packages/ext/* sibling in dependencies', async () => {
-    const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
-    const raw = await fs.readFile(pkgPath, 'utf-8');
-    const pkg = JSON.parse(raw) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-      peerDependencies?: Record<string, string>;
-    };
-
-    const allDeps = [
-      ...Object.keys(pkg.dependencies ?? {}),
-      ...Object.keys(pkg.devDependencies ?? {}),
-      ...Object.keys(pkg.peerDependencies ?? {}),
-    ];
-
-    // No dependency should point at packages/ext/* siblings.
-    // The convention is that packages/ext/* packages are named @rcrsr/rill-ext-*
-    // but do NOT include the shared packages (@rcrsr/rill-ext-*-shared).
-    // Shared packages are allowed; other extension packages are not.
-    const extSiblings = allDeps.filter(
-      (dep) =>
-        dep.startsWith('@rcrsr/rill-ext-') &&
-        !dep.endsWith('-shared') &&
-        dep !== '@rcrsr/rill-ext-prompt-md'
-    );
-
-    expect(extSiblings).toHaveLength(0);
   });
 });

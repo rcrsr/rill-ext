@@ -224,53 +224,5 @@ describe('extension event emission', () => {
       expect(typeof events[0]?.['duration']).toBe('number');
       expect(events[0]?.['error']).toBeDefined();
     });
-
-    it('emitted event duration is a non-negative number', async () => {
-      mockStream.mockReturnValue(
-        createMockStreamRunner('Response', 'gpt-4o', 5, 10)
-      );
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(validConfig());
-
-      const events: Array<Record<string, unknown>> = [];
-      const ctx = createRuntimeContext({
-        callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => {
-            events.push(event);
-          },
-        },
-      });
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-      await resolveStream(stream);
-
-      expect(events[0]?.['duration']).toBeGreaterThanOrEqual(0);
-    });
-
-    it('emitted event model matches the configured model', async () => {
-      mockStream.mockReturnValue(
-        createMockStreamRunner('Response', 'gpt-4o', 5, 10)
-      );
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(validConfig());
-
-      const events: Array<Record<string, unknown>> = [];
-      const ctx = createRuntimeContext({
-        callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => {
-            events.push(event);
-          },
-        },
-      });
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-      await resolveStream(stream);
-
-      expect(events[0]?.['model']).toBe('gpt-4o');
-    });
   });
 });

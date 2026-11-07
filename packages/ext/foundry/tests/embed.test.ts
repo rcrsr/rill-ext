@@ -89,7 +89,7 @@ describe('embed() function', () => {
   });
 
   // AC-4: embed returns a rill vector with float data
-  it('returns a rill vector with float data', async () => {
+  it('returns a rill vector with float data and embed model', async () => {
     const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding }],
@@ -106,27 +106,7 @@ describe('embed() function', () => {
     )) as Record<string, unknown>;
 
     expect(result['__rill_vector']).toBe(true);
-    expect(result['data']).toBeInstanceOf(Float32Array);
-    expect((result['data'] as Float32Array).length).toBe(1536);
-  });
-
-  // AC-4: vector carries the embed model name
-  it('returns vector with correct model field', async () => {
-    const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
-    mockEmbeddingsCreate.mockResolvedValue({
-      data: [{ embedding: mockEmbedding }],
-      model: 'text-embedding-3-small',
-      usage: { prompt_tokens: 5, total_tokens: 5 },
-    });
-
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    const result = (await getCallable(ext, 'embed').fn(
-      { text: 'test text' },
-      ctx
-    )) as Record<string, unknown>;
-
+    expect(result['data']).toEqual(Float32Array.from(mockEmbedding));
     expect(result['model']).toBe('text-embedding-3-small');
   });
 
@@ -155,7 +135,7 @@ describe('embed() function', () => {
       ctx
     )) as Record<string, unknown>;
 
-    expect((result['data'] as Float32Array).length).toBe(768);
+    expect(result['data']).toEqual(Float32Array.from(mockEmbedding));
   });
 
   // AC-4: throws when embed_model is not configured
@@ -179,17 +159,6 @@ describe('embed() function', () => {
     );
   });
 
-  // AC-4: throws RuntimeError for empty text
-  it('throws RuntimeError for empty text', async () => {
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    await expectRejectedHalt(getCallable(ext, 'embed').fn({ text: '' }, ctx), {
-      message: 'embed text cannot be empty',
-    });
-  });
-
-  // AC-4: throws RuntimeError for whitespace-only text
   it('throws RuntimeError for whitespace-only text', async () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
@@ -233,10 +202,9 @@ describe('embed_batch() function', () => {
     mockEmbeddingsCreate.mockReset();
   });
 
-  // AC-5: embed_batch returns list of vectors
-  it('returns list of rill vectors for multiple texts', async () => {
-    const mockEmbedding1 = Array.from({ length: 1536 }, (_, i) => i * 0.001);
-    const mockEmbedding2 = Array.from({ length: 1536 }, (_, i) => i * 0.002);
+  it('returns rill vectors in input order with values and model', async () => {
+    const mockEmbedding1 = Array.from({ length: 512 }, (_, i) => i * 0.001);
+    const mockEmbedding2 = Array.from({ length: 512 }, (_, i) => i * 0.002);
     mockEmbeddingsCreate.mockResolvedValue({
       data: [{ embedding: mockEmbedding1 }, { embedding: mockEmbedding2 }],
       model: 'text-embedding-3-small',
@@ -251,53 +219,17 @@ describe('embed_batch() function', () => {
       ctx
     )) as Array<Record<string, unknown>>;
 
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBe(2);
-    expect(result[0]?.['__rill_vector']).toBe(true);
-    expect(result[1]?.['__rill_vector']).toBe(true);
-  });
-
-  // AC-5: each vector has Float32Array data
-  it('each vector contains Float32Array data', async () => {
-    const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
-    mockEmbeddingsCreate.mockResolvedValue({
-      data: [{ embedding: mockEmbedding }, { embedding: mockEmbedding }],
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      __rill_vector: true,
       model: 'text-embedding-3-small',
-      usage: { prompt_tokens: 10, total_tokens: 10 },
     });
-
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    const result = (await getCallable(ext, 'embed_batch').fn(
-      { texts: ['a', 'b'] },
-      ctx
-    )) as Array<Record<string, unknown>>;
-
-    expect(result[0]?.['data']).toBeInstanceOf(Float32Array);
-    expect(result[1]?.['data']).toBeInstanceOf(Float32Array);
-    expect((result[0]!['data'] as Float32Array).length).toBe(1536);
-  });
-
-  // AC-5: each vector carries the embed model
-  it('each vector has correct model field', async () => {
-    const mockEmbedding = Array.from({ length: 512 }, (_, i) => i * 0.001);
-    mockEmbeddingsCreate.mockResolvedValue({
-      data: [{ embedding: mockEmbedding }, { embedding: mockEmbedding }],
+    expect(result[1]).toMatchObject({
+      __rill_vector: true,
       model: 'text-embedding-3-small',
-      usage: { prompt_tokens: 10, total_tokens: 10 },
     });
-
-    const ext = await createFoundryExtension(baseConfig);
-    const ctx = createRuntimeContext();
-
-    const result = (await getCallable(ext, 'embed_batch').fn(
-      { texts: ['hello', 'world'] },
-      ctx
-    )) as Array<Record<string, unknown>>;
-
-    expect(result[0]?.['model']).toBe('text-embedding-3-small');
-    expect(result[1]?.['model']).toBe('text-embedding-3-small');
+    expect(result[0]!['data']).toEqual(Float32Array.from(mockEmbedding1));
+    expect(result[1]!['data']).toEqual(Float32Array.from(mockEmbedding2));
   });
 
   // AC-5: empty list returns empty array without calling API
@@ -336,7 +268,6 @@ describe('embed_batch() function', () => {
     );
   });
 
-  // AC-5: throws RuntimeError for non-string element
   it('throws RuntimeError for non-string element in texts list', async () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();

@@ -51,10 +51,6 @@ describe('interpolate', () => {
     it('uses empty string for missing key (never throws)', () => {
       expect(interpolate('{missing}', {})).toBe('');
     });
-
-    it('does not throw when values map is empty but body has references', () => {
-      expect(() => interpolate('{x}', {})).not.toThrow();
-    });
   });
 
   // ============================================================
@@ -72,11 +68,6 @@ describe('interpolate', () => {
 
     it('{{name}} emits literal {name} without substitution', () => {
       expect(interpolate('{{name}}', { name: 'world' })).toBe('{name}');
-    });
-
-    it('{{name}} does not substitute even when key exists', () => {
-      const result = interpolate('Value: {{x}}', { x: 'injected' });
-      expect(result).toBe('Value: {x}');
     });
 
     it('mixes escaped and unescaped in same string', () => {
@@ -135,10 +126,6 @@ describe('scanTemplateReferences', () => {
         { name: 'x', line: 2 },
         { name: 'y', line: 4 },
       ]);
-    });
-
-    it('returns empty array for empty body', () => {
-      expect(scanTemplateReferences('')).toEqual([]);
     });
   });
 

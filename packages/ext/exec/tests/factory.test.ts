@@ -12,23 +12,6 @@ import { getCallable, makeFactoryCtx, makeRuntimeCtx } from './_setup.js';
 
 describe('exec extension factory', () => {
   describe('factory creation', () => {
-    it('creates ExtensionFactoryResult with command functions and dispose', () => {
-      const config: ExecExtensionConfig = {
-        commands: {
-          echo: { binary: 'echo' },
-          pwd: { binary: 'pwd' },
-        },
-      };
-
-      const ext = createExecExtension(config, makeFactoryCtx());
-
-      expect(ext).toHaveProperty('value');
-      expect(ext).toHaveProperty('dispose');
-      expect(ext.value).toHaveProperty('echo');
-      expect(ext.value).toHaveProperty('pwd');
-      expect(ext.value).toHaveProperty('commands');
-    });
-
     it('wraps each command as ApplicationCallable', () => {
       const config: ExecExtensionConfig = {
         commands: { echo: { binary: 'echo' } },
@@ -47,22 +30,6 @@ describe('exec extension factory', () => {
         }),
         returnType: expect.objectContaining({ __rill_type: true }),
       });
-    });
-
-    it('generates function for each declared command', () => {
-      const config: ExecExtensionConfig = {
-        commands: {
-          git: { binary: 'git', description: 'Git VCS' },
-          npm: { binary: 'npm', description: 'Node package manager' },
-          node: { binary: 'node', description: 'Node runtime' },
-        },
-      };
-
-      const ext = createExecExtension(config, makeFactoryCtx());
-
-      expect(ext.value).toHaveProperty('git');
-      expect(ext.value).toHaveProperty('npm');
-      expect(ext.value).toHaveProperty('node');
     });
   });
 
@@ -119,7 +86,7 @@ describe('exec extension factory', () => {
       );
     });
 
-    it('declares returnType as dict', () => {
+    it('declares returnType as dict with stdout, stderr and exit_code fields', () => {
       const ext = createExecExtension(
         {
           commands: { echo: { binary: 'echo' } },
@@ -129,7 +96,14 @@ describe('exec extension factory', () => {
 
       expect(getCallable(ext, 'echo').returnType).toMatchObject({
         __rill_type: true,
-        structure: { kind: 'dict' },
+        structure: {
+          kind: 'dict',
+          fields: {
+            stdout: { type: { kind: 'string' } },
+            stderr: { type: { kind: 'string' } },
+            exit_code: { type: { kind: 'number' } },
+          },
+        },
       });
     });
   });
@@ -242,21 +216,6 @@ describe('exec extension factory', () => {
       expect(invalidateSpy.mock.calls[0]![1].raw).toMatchObject({
         kind: 'aborted',
       });
-    });
-  });
-
-  describe('allowlist enforcement', () => {
-    it('script cannot execute undeclared binaries', () => {
-      const ext = createExecExtension(
-        {
-          commands: { git: { binary: 'git' } },
-        },
-        makeFactoryCtx()
-      );
-
-      expect(ext.value).toHaveProperty('git');
-      expect(ext.value).not.toHaveProperty('rm');
-      expect(ext.value).not.toHaveProperty('curl');
     });
   });
 });

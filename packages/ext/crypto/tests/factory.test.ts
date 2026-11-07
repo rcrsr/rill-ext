@@ -40,26 +40,5 @@ describe('crypto extension factory', () => {
         }),
       });
     });
-
-    it('applies config defaults', () => {
-      const ext = createCryptoExtensionT();
-      expect(ext).toBeDefined();
-    });
-
-    it('accepts custom default algorithm', () => {
-      const config: CryptoExtensionConfig = {
-        defaultAlgorithm: 'sha512',
-      };
-      const ext = createCryptoExtensionT(config);
-      expect(ext).toBeDefined();
-    });
-
-    it('accepts hmacKey in config', () => {
-      const config: CryptoExtensionConfig = {
-        hmacKey: 'secret-key-123',
-      };
-      const ext = createCryptoExtensionT(config);
-      expect(ext).toBeDefined();
-    });
   });
 });

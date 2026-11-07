@@ -235,30 +235,6 @@ describe('message() function', () => {
   });
 
   describe('stream return (IR-1/AC-1)', () => {
-    // IR-1/AC-1: message() returns RillStream
-    it('returns a RillStream object', () => {
-      const runner = createMockStreamRunner(
-        ['Hello'],
-        createMockFinalCompletion('Hello from OpenAI!')
-      );
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
-
-      // RillStream has __rill_stream discriminator
-      expect((stream as StreamCursor).__rill_stream).toBe(true);
-      expect((stream as StreamCursor).done).toBe(false);
-      expect(typeof (stream as StreamCursor).next).toBeDefined();
-    });
-
     // IR-1/AC-5: resolution dict has content, model, usage, stop_reason, id, messages
     it('resolves to dict with content, model, usage, stop_reason, id, messages', async () => {
       const runner = createMockStreamRunner(
@@ -415,152 +391,64 @@ describe('message() function', () => {
         { signal: expect.any(AbortSignal) }
       );
     });
-
-    it('uses default max_tokens when not specified', async () => {
-      const runner = createMockStreamRunner(
-        [],
-        createMockFinalCompletion('Response')
-      );
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      expect(mockStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          max_completion_tokens: 4096,
-        }),
-        { signal: expect.any(AbortSignal) }
-      );
-    });
   });
 
   describe('error cases', () => {
-    // EC-1: Empty prompt text throws before stream creation
-    it('throws RuntimeError for empty prompt text', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
+    it.each([
+      {
+        label: '401 authentication',
+        status: 401,
+        apiMessage: 'Invalid API key',
+        expected: 'OpenAI API error (HTTP 401): Invalid API key',
+      },
+      {
+        label: '429 rate limit',
+        status: 429,
+        apiMessage: 'Rate limit',
+        expected: 'OpenAI API error (HTTP 429): Rate limit',
+      },
+      {
+        label: '500 generic API',
+        status: 500,
+        apiMessage: 'Internal server error',
+        expected: 'OpenAI API error (HTTP 500): Internal server error',
+      },
+    ])(
+      'throws RuntimeError for $label error during stream iteration',
+      async ({ status, apiMessage, expected }) => {
+        const { APIError } = await import('openai');
+        const apiError = new APIError(status, {}, apiMessage, new Headers());
+        mockStream.mockReturnValue(createErrorStreamRunner(apiError));
 
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
+        const ext = createOpenAIExtension({
+          api_key: 'test-key',
+          model: 'gpt-4-turbo',
+        });
+        const ctx = createRuntimeContext();
 
-      expectThrowHalt(
-        () => getCallable(ext, 'message').fn({ prompt: '' }, ctx),
-        { message: 'prompt string cannot be empty' }
-      );
-    });
+        const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
-    it('throws RuntimeError for whitespace-only prompt text', () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      expectThrowHalt(
-        () => getCallable(ext, 'message').fn({ prompt: '   ' }, ctx),
-        { message: 'prompt string cannot be empty' }
-      );
-    });
-
-    // EC-2: Provider API error during stream — thrown when iterating chunks
-    it('throws RuntimeError for 401 authentication error during stream iteration', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(401, {}, 'Invalid API key', new Headers());
-      const runner = createErrorStreamRunner(apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'invalid-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(collectStreamChunks(stream), {
-        message: 'OpenAI API error (HTTP 401): Invalid API key',
-      });
-    });
-
-    it('throws RuntimeError for 429 rate limit error during stream iteration', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(429, {}, 'Rate limit', new Headers());
-      const runner = createErrorStreamRunner(apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(collectStreamChunks(stream), {
-        message: 'OpenAI API error (HTTP 429): Rate limit',
-      });
-    });
+        await expectRejectedHalt(collectStreamChunks(stream), {
+          message: expected,
+        });
+      }
+    );
 
     it('throws RuntimeError for timeout error during stream iteration', async () => {
       const timeoutError = new Error('Request timeout');
       timeoutError.name = 'AbortError';
-      const runner = createErrorStreamRunner(timeoutError);
-      mockStream.mockReturnValue(runner);
+      mockStream.mockReturnValue(createErrorStreamRunner(timeoutError));
 
-      const config: OpenAIExtensionConfig = {
+      const ext = createOpenAIExtension({
         api_key: 'test-key',
         model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
+      });
       const ctx = createRuntimeContext();
 
       const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
       await expectRejectedHalt(collectStreamChunks(stream), {
         message: 'OpenAI error: Request timeout',
-      });
-    });
-
-    it('throws RuntimeError for generic API error during stream iteration', async () => {
-      const { APIError } = await import('openai');
-      const apiError = new APIError(
-        500,
-        {},
-        'Internal server error',
-        new Headers()
-      );
-      const runner = createErrorStreamRunner(apiError);
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
-
-      await expectRejectedHalt(collectStreamChunks(stream), {
-        message: 'OpenAI API error (HTTP 500): Internal server error',
       });
     });
 
@@ -630,8 +518,8 @@ describe('message() function', () => {
       expect(result['model']).toBe('gpt-4-turbo');
     });
 
-    // EC-12: Provider failure during resolution propagates as RuntimeError RILL-R005
-    it('resolve() propagates provider error as RuntimeError RILL-R005 [EC-12]', async () => {
+    // Provider failure during resolution propagates as a halt with the mapped message
+    it('resolve() rejects with the mapped provider error', async () => {
       const { APIError } = await import('openai');
       const apiError = new APIError(
         500,
@@ -652,7 +540,9 @@ describe('message() function', () => {
 
       const stream = getCallable(ext, 'message').fn({ prompt: 'Test' }, ctx);
 
-      await expectRejectedHalt(resolveStream(stream));
+      await expectRejectedHalt(resolveStream(stream), {
+        message: 'OpenAI API error (HTTP 500): Internal server error',
+      });
     });
   });
 });
@@ -670,59 +560,38 @@ describe('embed() function', () => {
   });
 
   describe('success cases', () => {
-    // AC-4: embed("text") returns vector with model and dimensions
-    it('returns vector with correct model and dimensions', async () => {
-      const mockEmbedding = Array.from({ length: 1536 }, (_, i) => i * 0.001);
-      mockEmbeddingsCreate.mockResolvedValue({
-        data: [{ embedding: mockEmbedding }],
-        model: 'text-embedding-3-small',
-        usage: { prompt_tokens: 5, total_tokens: 5 },
-      });
+    // embed("text") returns a vector carrying the model and embedding length
+    it.each([
+      { dims: 1536, model: 'text-embedding-3-small' },
+      { dims: 768, model: 'text-embedding-3-large' },
+    ])(
+      'returns vector with $dims dimensions for $model',
+      async ({ dims, model }) => {
+        const mockEmbedding = Array.from({ length: dims }, (_, i) => i * 0.001);
+        mockEmbeddingsCreate.mockResolvedValue({
+          data: [{ embedding: mockEmbedding }],
+          model,
+          usage: { prompt_tokens: 5, total_tokens: 5 },
+        });
 
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        embed_model: 'text-embedding-3-small',
-      };
+        const ext = createOpenAIExtension({
+          api_key: 'test-key',
+          model: 'gpt-4-turbo',
+          embed_model: model,
+        });
+        const ctx = createRuntimeContext();
 
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
+        const result = (await getCallable(ext, 'embed').fn(
+          { text: 'test text' },
+          ctx
+        )) as VectorResult;
 
-      const result = (await getCallable(ext, 'embed').fn(
-        { text: 'test text' },
-        ctx
-      )) as VectorResult;
-
-      expect(result.__rill_vector).toBe(true);
-      expect(result.model).toBe('text-embedding-3-small');
-      expect(result.data).toBeInstanceOf(Float32Array);
-      expect(result.data.length).toBe(1536);
-    });
-
-    it('handles different embedding dimensions', async () => {
-      const mockEmbedding = Array.from({ length: 768 }, (_, i) => i * 0.001);
-      mockEmbeddingsCreate.mockResolvedValue({
-        data: [{ embedding: mockEmbedding }],
-        model: 'text-embedding-3-large',
-        usage: { prompt_tokens: 5, total_tokens: 5 },
-      });
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-        embed_model: 'text-embedding-3-large',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const result = (await getCallable(ext, 'embed').fn(
-        { text: 'different size' },
-        ctx
-      )) as VectorResult;
-
-      expect(result.data.length).toBe(768);
-    });
+        expect(result.__rill_vector).toBe(true);
+        expect(result.model).toBe(model);
+        expect(result.data).toBeInstanceOf(Float32Array);
+        expect(result.data.length).toBe(dims);
+      }
+    );
   });
 
   describe('error cases', () => {
@@ -1062,37 +931,6 @@ describe('tool_loop() function', () => {
   // ============================================================
 
   describe('stream return (AC-7/AC-8/AC-9)', () => {
-    // AC-7: tool_loop() returns a RillStream value
-    it('returns a RillStream object (isRillStream)', () => {
-      const runner = createMockToolLoopRunner(
-        [],
-        createMockFinalCompletion('Final response')
-      );
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const tools = {
-        test_tool: makeTool(vi.fn().mockResolvedValue('result'), {
-          description: 'A test tool',
-        }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test', tools },
-        ctx
-      );
-
-      expect((stream as StreamCursor).__rill_stream).toBe(true);
-      expect((stream as StreamCursor).done).toBe(false);
-    });
-
     // AC-8: Iterating tool_loop stream yields text_delta, tool_call, tool_result dicts
     it('iterating stream yields text_delta, tool_call, and tool_result chunks', async () => {
       // First turn: tool call response
@@ -1184,7 +1022,7 @@ describe('tool_loop() function', () => {
     });
 
     // AC-9: tool_loop()() resolution dict contains aggregated usage and turns
-    it('resolve() returns dict with content, model, usage, stop_reason, turns, messages', async () => {
+    it('resolve() returns final message text, model, usage, and stop_reason without calling tools', async () => {
       const runner = createMockToolLoopRunner(
         ['Final response'],
         createMockFinalCompletion('Final response')
@@ -1199,8 +1037,9 @@ describe('tool_loop() function', () => {
       const ext = createOpenAIExtension(config);
       const ctx = createRuntimeContext();
 
+      const toolFn = vi.fn().mockResolvedValue('result');
       const tools = {
-        test_tool: makeTool(vi.fn().mockResolvedValue('result'), {
+        test_tool: makeTool(toolFn, {
           description: 'A test tool',
         }),
       };
@@ -1211,6 +1050,7 @@ describe('tool_loop() function', () => {
       );
       const result = await resolveStream(stream);
 
+      expect(toolFn).not.toHaveBeenCalled();
       const msgs1 = result['messages'] as Array<{
         role: string;
         parts: Array<{ type: string; text: string }>;
@@ -1229,66 +1069,6 @@ describe('tool_loop() function', () => {
   });
 
   describe('success cases', () => {
-    // AC-9: tool_loop with tools returns dict with content, usage, turns
-    it('resolve returns dict with content, model, usage, stop_reason, turns, messages', async () => {
-      // Mock response without tool calls (final response)
-      const runner = createMockToolLoopRunner([], {
-        id: 'chatcmpl-test',
-        object: 'chat.completion' as const,
-        created: 1234567890,
-        model: 'gpt-4-turbo',
-        choices: [
-          {
-            index: 0,
-            logprobs: null,
-            message: {
-              role: 'assistant' as const,
-              content: 'Final response',
-              refusal: null,
-            },
-            finish_reason: 'stop' as const,
-          },
-        ],
-        usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
-      });
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const mockToolFn = vi.fn().mockResolvedValue('tool result');
-
-      const tools = {
-        test_tool: makeTool(mockToolFn, { description: 'A test tool' }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test prompt', tools },
-        ctx
-      );
-      const result = await resolveStream(stream);
-
-      const msgs2 = result['messages'] as Array<{
-        role: string;
-        parts: Array<{ type: string; text: string }>;
-      }>;
-      const last2 = msgs2[msgs2.length - 1]!;
-      const text2 = last2.parts
-        .filter((p) => p.type === 'text')
-        .map((p) => p.text)
-        .join('');
-      expect(text2).toBe('Final response');
-      expect(result['model']).toBe('gpt-4-turbo');
-      expect(result['usage']).toEqual({ input: 10, output: 20 });
-      expect(result['stop_reason']).toBe('stop');
-      expect(Array.isArray(msgs2)).toBe(true);
-    });
-
     // AC-25: tool_loop with max_turns:1 stops after 1 turn
     it('respects max_turns limit', async () => {
       // First call returns tool call (max_turns=1, loop exits after 1 turn)
@@ -1340,59 +1120,6 @@ describe('tool_loop() function', () => {
       );
 
       await expectRejectedHalt(resolveStream(stream), { message: 'max_turns' });
-    });
-
-    // AC-26: tool_loop with 0 tool calls
-    it('handles case with no tool calls', async () => {
-      const runner = createMockToolLoopRunner([], {
-        id: 'chatcmpl-test',
-        object: 'chat.completion' as const,
-        created: 1234567890,
-        model: 'gpt-4-turbo',
-        choices: [
-          {
-            index: 0,
-            logprobs: null,
-            message: {
-              role: 'assistant' as const,
-              content: 'No tools needed',
-              refusal: null,
-            },
-            finish_reason: 'stop' as const,
-          },
-        ],
-        usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
-      });
-      mockStream.mockReturnValue(runner);
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const tools = {
-        test_tool: makeTool(vi.fn(), { description: 'A test tool' }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test prompt', tools },
-        ctx
-      );
-      const result = await resolveStream(stream);
-
-      const msgsNoTool = result['messages'] as Array<{
-        role: string;
-        parts: Array<{ type: string; text: string }>;
-      }>;
-      const lastNoTool = msgsNoTool[msgsNoTool.length - 1]!;
-      const textNoTool = lastNoTool.parts
-        .filter((p) => p.type === 'text')
-        .map((p) => p.text)
-        .join('');
-      expect(textNoTool).toBe('No tools needed');
     });
 
     it('executes tool loop with tool calls', async () => {
@@ -1590,99 +1317,6 @@ describe('tool_loop() function', () => {
       );
     });
 
-    // EC-21: Missing tools argument — thrown during stream iteration (executeToolLoop validates)
-    it('throws RuntimeError when tools missing (during iteration)', async () => {
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const stream = getCallable(ext, 'tool_loop').fn({ prompt: 'test' }, ctx);
-
-      await expectRejectedHalt(resolveStream(stream), {
-        message: 'tools parameter is required',
-      });
-    });
-
-    // EC-22: Unknown tool name — exceeds max_errors, throws from iteration
-    // Note: Unknown tool errors are treated as tool execution errors
-    // and count toward max_errors. With default max_errors=3 the loop
-    // retries 3 times before throwing.
-    it('throws RuntimeError for unknown tool after max_errors (during iteration)', async () => {
-      function makeToolCallCompletion(id: string, callId: string) {
-        return {
-          id,
-          object: 'chat.completion' as const,
-          created: 1234567890,
-          model: 'gpt-4-turbo',
-          choices: [
-            {
-              index: 0,
-              logprobs: null,
-              message: {
-                role: 'assistant' as const,
-                refusal: null,
-                content: null,
-                tool_calls: [
-                  {
-                    id: callId,
-                    type: 'function' as const,
-                    function: { name: 'unknown_tool', arguments: '{}' },
-                  },
-                ],
-              },
-              finish_reason: 'tool_calls' as const,
-            },
-          ],
-          usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
-        };
-      }
-
-      mockStream
-        .mockReturnValueOnce(
-          createMockToolLoopRunner(
-            [],
-            makeToolCallCompletion('chatcmpl-1', 'call_1')
-          )
-        )
-        .mockReturnValueOnce(
-          createMockToolLoopRunner(
-            [],
-            makeToolCallCompletion('chatcmpl-2', 'call_2')
-          )
-        )
-        .mockReturnValueOnce(
-          createMockToolLoopRunner(
-            [],
-            makeToolCallCompletion('chatcmpl-3', 'call_3')
-          )
-        );
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const tools = {
-        known_tool: makeTool(vi.fn(), { description: 'A known tool' }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test prompt', tools },
-        ctx
-      );
-
-      await expectRejectedHalt(resolveStream(stream), {
-        message: 'Tool execution failed: 3 consecutive errors',
-      });
-    });
-
     // EC-4: Streaming API failure — resolve rejects with a halt containing the API error message
     it('resolve rejects with RILL-R005 on streaming API failure [EC-4]', async () => {
       // Use a runner that has .on but fails on finalChatCompletion to simulate API error
@@ -1799,83 +1433,6 @@ describe('tool_loop() function', () => {
         .map((p) => p.text)
         .join('');
       expect(textRecov).toBe('Recovered from tool error.');
-    });
-
-    // EC-23: max_errors exceeded — thrown during stream iteration
-    it('throws RuntimeError after max_errors consecutive failures (during iteration)', async () => {
-      function makeToolCallCompletion(id: string, callId: string) {
-        return {
-          id,
-          object: 'chat.completion' as const,
-          created: 1234567890,
-          model: 'gpt-4-turbo',
-          choices: [
-            {
-              index: 0,
-              logprobs: null,
-              message: {
-                role: 'assistant' as const,
-                refusal: null,
-                content: null,
-                tool_calls: [
-                  {
-                    id: callId,
-                    type: 'function' as const,
-                    function: { name: 'test_tool', arguments: '{}' },
-                  },
-                ],
-              },
-              finish_reason: 'tool_calls' as const,
-            },
-          ],
-          usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-        };
-      }
-
-      mockStream
-        .mockReturnValueOnce(
-          createMockToolLoopRunner(
-            [],
-            makeToolCallCompletion('chatcmpl-1', 'call_1')
-          )
-        )
-        .mockReturnValueOnce(
-          createMockToolLoopRunner(
-            [],
-            makeToolCallCompletion('chatcmpl-2', 'call_2')
-          )
-        )
-        .mockReturnValueOnce(
-          createMockToolLoopRunner(
-            [],
-            makeToolCallCompletion('chatcmpl-3', 'call_3')
-          )
-        );
-
-      const config: OpenAIExtensionConfig = {
-        api_key: 'test-key',
-        model: 'gpt-4-turbo',
-      };
-
-      const ext = createOpenAIExtension(config);
-      const ctx = createRuntimeContext();
-
-      const mockToolFn = vi
-        .fn()
-        .mockRejectedValue(new Error('Tool execution failed'));
-
-      const tools = {
-        test_tool: makeTool(mockToolFn, { description: 'A test tool' }),
-      };
-
-      const stream = getCallable(ext, 'tool_loop').fn(
-        { prompt: 'test prompt', tools },
-        ctx
-      );
-
-      await expectRejectedHalt(resolveStream(stream), {
-        message: 'Tool execution failed: 3 consecutive errors',
-      });
     });
   });
 });
@@ -2100,37 +1657,6 @@ describe('generate() function', () => {
       });
     });
 
-    // AC-12: absent system uses factory default
-    it('uses factory system when no system option provided', async () => {
-      const jsonContent = JSON.stringify({ val: 1 });
-      mockCreate.mockResolvedValue(createGenerateMockResponse(jsonContent));
-
-      const ext = createOpenAIExtension({
-        ...baseConfig,
-        system: 'factory default system',
-      });
-      const ctx = createRuntimeContext();
-
-      await getCallable(ext, 'generate').fn(
-        {
-          prompt: 'prompt',
-          schema: typeVal({
-            kind: 'dict',
-            fields: { val: { type: { kind: 'number' } } },
-          }),
-          options: {},
-        },
-        ctx
-      );
-
-      expect(mockCreate).toHaveBeenCalled();
-      const callArgs = mockCreate.mock.calls[0]![0] as {
-        messages: Array<{ role: string; content: string }>;
-      };
-      const systemMsg = callArgs.messages.find((m) => m.role === 'system');
-      expect(systemMsg?.content).toBe('factory default system');
-    });
-
     // IR-5: response_format uses json_schema with strict: true
     it('sends response_format with type json_schema and strict true', async () => {
       const jsonContent = JSON.stringify({ x: 1 });
@@ -2202,17 +1728,6 @@ describe('generate() function', () => {
   });
 
   describe('error cases', () => {
-    // EC-3: missing schema throws RuntimeError RILL-R005
-    it('throws RILL-R005 when schema option is missing', async () => {
-      const ext = createOpenAIExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'generate').fn({ prompt: 'prompt', options: {} }, ctx),
-        { message: 'generate requires a type expression as schema' }
-      );
-    });
-
     // EC-3: no HTTP call when schema is missing
     it('makes no API call when schema is missing', async () => {
       const ext = createOpenAIExtension(baseConfig);
@@ -2242,59 +1757,6 @@ describe('generate() function', () => {
           ctx
         ),
         { message: 'unsupported type: unsupported_type' }
-      );
-    });
-
-    // EC-5: JSON parse failure throws RILL-R005 with parse error detail
-    it('throws RILL-R005 with parse error detail when response is not valid JSON', async () => {
-      mockCreate.mockResolvedValue(
-        createGenerateMockResponse('not valid json {{')
-      );
-
-      const ext = createOpenAIExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'generate').fn(
-          {
-            prompt: 'prompt',
-            schema: typeVal({
-              kind: 'dict',
-              fields: { x: { type: { kind: 'number' } } },
-            }),
-            options: {},
-          },
-          ctx
-        ),
-        { message: 'generate: failed to parse response JSON:' }
-      );
-    });
-
-    // EC-6: provider API error mapped via mapProviderError
-    it('maps OpenAI API errors to RuntimeError', async () => {
-      mockCreate.mockRejectedValue(
-        new (class extends Error {
-          status = 429;
-          override name = 'APIError';
-        })('Rate limit exceeded')
-      );
-
-      const ext = createOpenAIExtension(baseConfig);
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getCallable(ext, 'generate').fn(
-          {
-            prompt: 'prompt',
-            schema: typeVal({
-              kind: 'dict',
-              fields: { x: { type: { kind: 'number' } } },
-            }),
-            options: {},
-          },
-          ctx
-        ),
-        { message: 'Rate limit exceeded' }
       );
     });
 

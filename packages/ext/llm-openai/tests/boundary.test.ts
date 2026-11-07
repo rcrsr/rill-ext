@@ -1,35 +1,16 @@
 /**
  * Boundary condition tests for the OpenAI extension.
  *
- * Asserts acceptance criteria for edge-case inputs and error paths.
- *
- * Coverage:
- *   AC-B2  — multiple consecutive user turns accepted
- *   AC-B3  — image-only user turn accepted
- *   AC-B4  — empty tools dict → INVALID_INPUT / empty_tools_dict
- *   AC-B6  — extra:{} accepted
- *   AC-B7  — max_turns:0 → RILL-R001 (verbatim message)
- *   AC-B8  — parallel message() calls do not mutate shared config
- *   AC-E1  — role:'tool' → INVALID_INPUT
- *   AC-E3  — role:'foo' → INVALID_INPUT
- *   AC-E4  — trailing assistant turn → raw.kind=trailing_assistant_turn
- *   AC-E5  — unknown part type:'audio' → INVALID_INPUT
- *   AC-E6  — extra:{model:...} → RILL-R001
- *   AC-E7  — extra:{temperature:...} → RILL-R001
- *   AC-E9  — tool_loop max_turns=-1 → INVALID_INPUT
- *   AC-E13 — message(123) → raw.kind=invalid_prompt_type
- *   AC-E14 — message([]) → raw.kind=empty_message_list
- *   AC-E15 — message("") → raw.kind=empty_prompt
- *   IC-21  — OpenAI reserved key in extra → RILL-R001
+ * Covers accepted edge-case inputs (consecutive user turns, image-only turns,
+ * empty extra, parallel calls sharing config) and factory-time rejections
+ * (max_turns of 0, reserved keys in extra). Prompt and tool_loop argument
+ * rejections are asserted for all providers in the shared contract suite.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   createRuntimeContext,
   RuntimeError,
-  RuntimeHaltSignal,
-  getStatus,
-  callable,
   type ApplicationCallable,
   type RillValue,
 } from '@rcrsr/rill';
@@ -138,29 +119,6 @@ const BASE_CONFIG: OpenAIExtensionConfig = {
   model: 'gpt-4o-mini',
 };
 
-/**
- * Asserts a synchronous throw is a RuntimeHaltSignal with matching code and optional raw.kind.
- */
-function expectHaltCode(
-  fn: () => unknown,
-  code: string,
-  rawKind?: string
-): RuntimeHaltSignal {
-  let thrown: unknown;
-  try {
-    fn();
-  } catch (err) {
-    thrown = err;
-  }
-  expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
-  const status = getStatus((thrown as RuntimeHaltSignal).value);
-  expect(status.code.name).toBe(code);
-  if (rawKind !== undefined) {
-    expect((status.raw as Record<string, unknown>)['kind']).toBe(rawKind);
-  }
-  return thrown as RuntimeHaltSignal;
-}
-
 // ============================================================
 // ACCEPTANCE CONDITIONS — VALID INPUTS
 // ============================================================
@@ -170,8 +128,7 @@ describe('boundary: valid input acceptance', () => {
     mockCCStream.mockReset();
   });
 
-  // AC-B2: multiple consecutive user turns accepted
-  it('AC-B2: two consecutive user turns are accepted', async () => {
+  it('accepts two consecutive user turns', async () => {
     const runner = mockCCStreamRunner();
     mockCCStream.mockReturnValue(runner);
 
@@ -185,11 +142,17 @@ describe('boundary: valid input acceptance', () => {
 
     const stream = getCallable(ext, 'message').fn({ prompt }, ctx);
     // Resolving without error confirms acceptance
-    await expect(resolveStream(stream)).resolves.toBeDefined();
+    await resolveStream(stream);
+
+    expect(mockCCStream.mock.calls[0]![0]).toMatchObject({
+      messages: [
+        { role: 'user', content: 'first user turn' },
+        { role: 'user', content: 'second user turn' },
+      ],
+    });
   });
 
-  // AC-B3: user turn with image-only (no text) accepted
-  it('AC-B3: user turn with image-only (no text part) is accepted', async () => {
+  it('accepts a user turn with an image-only part', async () => {
     const runner = mockCCStreamRunner();
     mockCCStream.mockReturnValue(runner);
 
@@ -213,22 +176,24 @@ describe('boundary: valid input acceptance', () => {
     ] as RillValue;
 
     const stream = getCallable(ext, 'message').fn({ prompt }, ctx);
-    await expect(resolveStream(stream)).resolves.toBeDefined();
+    await resolveStream(stream);
+
+    const sent = mockCCStream.mock.calls[0]![0] as {
+      messages: Array<{ role: string }>;
+    };
+    expect(sent.messages).toHaveLength(1);
+    expect(sent.messages[0]).toMatchObject({ role: 'user' });
   });
 
-  // AC-B6: extra:{} passes validateExtraKeys
-  it('AC-B6: factory with extra:{} is accepted', () => {
+  it('accepts a factory with an empty extra', () => {
     expect(() =>
       createOpenAIExtension({ ...BASE_CONFIG, extra: {} })
     ).not.toThrow();
   });
 
-  // AC-B8: parallel calls share factory extra without mutation
-  it('AC-B8: 10 parallel message() calls share config without mutation', async () => {
-    const ext = createOpenAIExtension({
-      ...BASE_CONFIG,
-      extra: { reasoning_effort: 'medium' },
-    });
+  it('shares config across 10 parallel message() calls without mutating extra', async () => {
+    const extra = { reasoning_effort: 'medium' };
+    const ext = createOpenAIExtension({ ...BASE_CONFIG, extra });
     const ctx = createRuntimeContext();
 
     // Arm 10 runners
@@ -247,6 +212,7 @@ describe('boundary: valid input acceptance', () => {
       const params = call[0] as Record<string, unknown>;
       expect(params['reasoning_effort']).toBe('medium');
     }
+    expect(extra).toEqual({ reasoning_effort: 'medium' });
   });
 });
 
@@ -255,8 +221,7 @@ describe('boundary: valid input acceptance', () => {
 // ============================================================
 
 describe('boundary: factory-time validation errors', () => {
-  // AC-B7: max_turns:0 → RILL-R001 (verbatim message)
-  it('AC-B7: max_turns:0 throws RILL-R001 with exact message', () => {
+  it('throws RILL-R001 with exact message for max_turns of 0', () => {
     expect(() =>
       createOpenAIExtension({ ...BASE_CONFIG, max_turns: 0 })
     ).toThrow(
@@ -272,201 +237,25 @@ describe('boundary: factory-time validation errors', () => {
     expect(thrown).toBeInstanceOf(RuntimeError);
   });
 
-  // AC-E6: extra:{model:'...'} → RILL-R001
-  it('AC-E6: extra:{model:...} throws RILL-R001', () => {
-    expect(() =>
-      createOpenAIExtension({
-        ...BASE_CONFIG,
-        extra: { model: 'gpt-99' } as Record<string, unknown>,
-      })
-    ).toThrow(RuntimeError);
-  });
+  it.each([
+    { key: 'model', extra: { model: 'gpt-99' } },
+    { key: 'temperature', extra: { temperature: 0.5 } },
+    {
+      key: 'previous_response_id',
+      extra: { previous_response_id: 'resp-old' },
+    },
+  ])('throws RILL-R001 naming reserved key $key in extra', ({ key, extra }) => {
+    let thrown: unknown;
+    try {
+      createOpenAIExtension({ ...BASE_CONFIG, extra });
+    } catch (err) {
+      thrown = err;
+    }
 
-  // AC-E7: extra:{temperature:0.5} → RILL-R001
-  it('AC-E7: extra:{temperature:0.5} throws RILL-R001', () => {
-    expect(() =>
-      createOpenAIExtension({
-        ...BASE_CONFIG,
-        extra: { temperature: 0.5 } as Record<string, unknown>,
-      })
-    ).toThrow(RuntimeError);
-  });
-
-  // IC-21: OpenAI Responses API reserved key in extra → RILL-R001
-  it('IC-21: extra:{previous_response_id:...} throws RILL-R001 (Responses API reserved key)', () => {
-    expect(() =>
-      createOpenAIExtension({
-        ...BASE_CONFIG,
-        extra: { previous_response_id: 'resp-old' } as Record<string, unknown>,
-      })
-    ).toThrow(RuntimeError);
-  });
-});
-
-// ============================================================
-// ACCEPTANCE CONDITIONS — RUNTIME ERRORS (host function)
-// ============================================================
-
-describe('boundary: runtime errors from message()', () => {
-  beforeEach(() => {
-    mockCCStream.mockReset();
-  });
-
-  // AC-E1: role:'tool' → INVALID_INPUT
-  it('AC-E1: message with role=tool is rejected with INVALID_INPUT', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    const prompt: RillValue = [
-      { role: 'tool', content: 'tool output' },
-    ] as RillValue;
-
-    expectHaltCode(
-      () => getCallable(ext, 'message').fn({ prompt }, ctx),
-      'INVALID_INPUT'
-    );
-  });
-
-  // AC-E3: role:'foo' → INVALID_INPUT
-  it('AC-E3: message with unknown role=foo is rejected with INVALID_INPUT', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    const prompt: RillValue = [
-      { role: 'foo', content: 'content' },
-    ] as RillValue;
-
-    expectHaltCode(
-      () => getCallable(ext, 'message').fn({ prompt }, ctx),
-      'INVALID_INPUT'
-    );
-  });
-
-  // AC-E4: trailing assistant turn → raw.kind=trailing_assistant_turn
-  it('AC-E4: trailing assistant turn is rejected with trailing_assistant_turn', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    const prompt: RillValue = [
-      { role: 'user', content: 'hi' },
-      { role: 'assistant', content: 'hello' },
-    ] as RillValue;
-
-    expectHaltCode(
-      () => getCallable(ext, 'message').fn({ prompt }, ctx),
-      'INVALID_INPUT',
-      'trailing_assistant_turn'
-    );
-  });
-
-  // AC-E5: unknown part type:'audio' → INVALID_INPUT
-  it('AC-E5: unknown part type audio is rejected with INVALID_INPUT', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    const prompt: RillValue = [
-      {
-        role: 'user',
-        parts: [{ type: 'audio', data: 'base64audio' }],
-      },
-    ] as RillValue;
-
-    expectHaltCode(
-      () => getCallable(ext, 'message').fn({ prompt }, ctx),
-      'INVALID_INPUT'
-    );
-  });
-
-  // AC-E13: message(123) → raw.kind=invalid_prompt_type
-  it('AC-E13: non-string non-list prompt is rejected with invalid_prompt_type', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    expectHaltCode(
-      () =>
-        getCallable(ext, 'message').fn(
-          { prompt: 123 as unknown as RillValue },
-          ctx
-        ),
-      'INVALID_INPUT',
-      'invalid_prompt_type'
-    );
-  });
-
-  // AC-E14: message([]) → raw.kind=empty_message_list
-  it('AC-E14: empty message list is rejected with empty_message_list', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    expectHaltCode(
-      () =>
-        getCallable(ext, 'message').fn(
-          { prompt: [] as unknown as RillValue },
-          ctx
-        ),
-      'INVALID_INPUT',
-      'empty_message_list'
-    );
-  });
-
-  // AC-E15: message("") → raw.kind=empty_prompt
-  it('AC-E15: empty string prompt is rejected with empty_prompt', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    expectHaltCode(
-      () => getCallable(ext, 'message').fn({ prompt: '' as RillValue }, ctx),
-      'INVALID_INPUT',
-      'empty_prompt'
-    );
-  });
-});
-
-// ============================================================
-// ACCEPTANCE CONDITIONS — RUNTIME ERRORS (tool_loop)
-// ============================================================
-
-describe('boundary: runtime errors from tool_loop()', () => {
-  beforeEach(() => {
-    mockCCCreate.mockReset();
-    mockCCStream.mockReset();
-  });
-
-  // AC-B4: empty tools dict → INVALID_INPUT / empty_tools_dict
-  it('AC-B4: empty tools dict is rejected with empty_tools_dict', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    expectHaltCode(
-      () =>
-        getCallable(ext, 'tool_loop').fn(
-          { prompt: 'run a tool', tools: {} as RillValue, max_turns: 0 },
-          ctx
-        ),
-      'INVALID_INPUT',
-      'empty_tools_dict'
-    );
-  });
-
-  // AC-E9: tool_loop max_turns=-1 → INVALID_INPUT
-  it('AC-E9: negative per-call max_turns is rejected with INVALID_INPUT', () => {
-    const ext = createOpenAIExtension(BASE_CONFIG);
-    const ctx = createRuntimeContext();
-
-    const tool = callable(async () => 'result' as RillValue);
-    const tools = { my_tool: tool } as unknown as RillValue;
-
-    expectHaltCode(
-      () =>
-        getCallable(ext, 'tool_loop').fn(
-          {
-            prompt: 'run a tool',
-            tools,
-            max_turns: -1 as unknown as RillValue,
-          },
-          ctx
-        ),
-      'INVALID_INPUT'
+    expect(thrown).toBeInstanceOf(RuntimeError);
+    expect((thrown as RuntimeError).errorId).toBe('RILL-R001');
+    expect((thrown as RuntimeError).message).toContain(
+      `Factory config 'extra' contains reserved key(s): '${key}'.`
     );
   });
 });

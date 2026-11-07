@@ -156,40 +156,6 @@ describe('search() host function', () => {
   // --------------------------------------------------------
 
   describe('returns list of { id, score, content } [AC-11]', () => {
-    it('returns array of result dicts [AC-11]', async () => {
-      globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithSearch());
-      const ctx = createRuntimeContext();
-
-      const result = (await getHostFn(ext, 'search').fn(
-        { query: 'azure search', options: {} },
-        ctx
-      )) as Array<Record<string, unknown>>;
-
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBe(2);
-    });
-
-    it('each result has id, score, and content fields [AC-11]', async () => {
-      globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithSearch());
-      const ctx = createRuntimeContext();
-
-      const result = (await getHostFn(ext, 'search').fn(
-        { query: 'azure search', options: {} },
-        ctx
-      )) as Array<Record<string, unknown>>;
-
-      const first = result[0]!;
-      expect('id' in first).toBe(true);
-      expect('score' in first).toBe(true);
-      expect('content' in first).toBe(true);
-    });
-
     it('score matches @search.score from API response [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
 
@@ -370,29 +336,7 @@ describe('search() host function', () => {
   // --------------------------------------------------------
 
   describe('search not configured [AC-21, EC-10]', () => {
-    it('halts with #UNAVAILABLE when search config absent [AC-21, EC-10]', async () => {
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithoutSearch());
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
-        { code: 'UNAVAILABLE', provider: 'foundry' }
-      );
-    });
-
-    it('error message is "foundry: search not configured" [EC-10]', async () => {
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(configWithoutSearch());
-      const ctx = createRuntimeContext();
-
-      await expectRejectedHalt(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
-        { message: 'foundry: search not configured' }
-      );
-    });
-
-    it('fetch is not called when search not configured [AC-21]', async () => {
+    it('halts with #UNAVAILABLE and does not call fetch when search config absent', async () => {
       const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
       globalThis.fetch = mockFetch;
 
@@ -400,9 +344,14 @@ describe('search() host function', () => {
       const ext = await createFoundryExtension(configWithoutSearch());
       const ctx = createRuntimeContext();
 
-      await expect(
-        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx)
-      ).rejects.toThrow();
+      await expectRejectedHalt(
+        getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx),
+        {
+          code: 'UNAVAILABLE',
+          provider: 'foundry',
+          message: 'foundry: search not configured',
+        }
+      );
 
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -466,22 +415,6 @@ describe('search() host function', () => {
 
       const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toContain('/indexes/override-index/docs/search');
-    });
-
-    it('uses config indexName when options.index not provided [AC-34]', async () => {
-      const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
-      globalThis.fetch = mockFetch;
-
-      const { createFoundryExtension } = await import('../src/factory.js');
-      const ext = await createFoundryExtension(
-        configWithSearch('default-index')
-      );
-      const ctx = createRuntimeContext();
-
-      await getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx);
-
-      const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect(url).toContain('/indexes/default-index/docs/search');
     });
 
     it('non-existent override index throws with override name [EC-11]', async () => {

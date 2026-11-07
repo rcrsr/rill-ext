@@ -17,16 +17,17 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  callable,
   createRuntimeContext,
   isInvalid,
   getStatus,
-  isRillStream,
   type ApplicationCallable,
   type RillTypeValue,
   type TypeStructure,
   type ExtensionFactoryResult,
   type RillValue,
   type RillStream,
+  RuntimeError,
   RuntimeHaltSignal,
 } from '@rcrsr/rill';
 
@@ -416,18 +417,6 @@ describe.each(FACTORIES)(
     // AC-1: message("hello") — string prompt succeeds
     // ──────────────────────────────────────────────────────────
     describe('AC-1: message(string) succeeds', () => {
-      it('returns a RillStream', async () => {
-        setupMessageMock('Hello from AI!');
-
-        const ext = factory({ api_key: 'test-key', model });
-        const ctx = createRuntimeContext();
-        const messageCallable = getCallable(ext, 'message');
-
-        const result = await messageCallable.fn({ prompt: 'hello' }, ctx);
-
-        expect(isRillStream(result)).toBe(true);
-      });
-
       it('resolves to dict ending with assistant turn containing text part', async () => {
         setupMessageMock('Hello from AI!');
 
@@ -459,21 +448,6 @@ describe.each(FACTORIES)(
     // AC-2: message([{role:'user', content:'hi'}]) — content-sugar form
     // ──────────────────────────────────────────────────────────
     describe('AC-2: message(list with content-sugar) succeeds', () => {
-      it('returns a RillStream for content-sugar form input', async () => {
-        setupMessageMock('Hi back!');
-
-        const ext = factory({ api_key: 'test-key', model });
-        const ctx = createRuntimeContext();
-        const messageCallable = getCallable(ext, 'message');
-
-        const result = await messageCallable.fn(
-          { prompt: [{ role: 'user', content: 'hi' }] },
-          ctx
-        );
-
-        expect(isRillStream(result)).toBe(true);
-      });
-
       it('resolves to dict with assistant turn carrying text part', async () => {
         setupMessageMock('Hi back!');
 
@@ -546,14 +520,6 @@ describe.each(FACTORIES)(
     // AC-12: `messages` callable does NOT exist on the result
     // ──────────────────────────────────────────────────────────
     describe('AC-12: messages callable removed', () => {
-      it('does not expose a messages key on the callable dict', () => {
-        const ext = factory({ api_key: 'test-key', model });
-        const callableDict = ext.value as Record<string, unknown>;
-
-        expect('messages' in callableDict).toBe(false);
-        expect(callableDict['messages']).toBeUndefined();
-      });
-
       it('exposes exactly the 5 expected keys: message, embed, embed_batch, tool_loop, generate', () => {
         const ext = factory({ api_key: 'test-key', model });
         const callableDict = ext.value as Record<string, unknown>;
@@ -634,6 +600,158 @@ describe.each(FACTORIES)(
         expect((status.raw as Record<string, unknown>)['kind']).toBe(
           'empty_prompt'
         );
+      });
+    });
+
+    describe('boundary errors — rejected prompts', () => {
+      it.each([
+        {
+          label: 'role tool',
+          prompt: [{ role: 'tool', content: 'result' }],
+          kind: 'invalid_role',
+        },
+        {
+          label: 'role model',
+          prompt: [{ role: 'model', content: 'hi' }],
+          kind: 'invalid_role',
+        },
+        {
+          label: 'unsupported part type audio',
+          prompt: [
+            {
+              role: 'user',
+              parts: [{ type: 'audio', data: 'base64audiodata' }],
+            },
+          ],
+          kind: 'unsupported_part_type',
+        },
+        { label: 'numeric prompt', prompt: 123, kind: 'invalid_prompt_type' },
+        {
+          label: 'object prompt',
+          prompt: { text: 'hello' },
+          kind: 'invalid_prompt_type',
+        },
+        { label: 'empty list', prompt: [], kind: 'empty_message_list' },
+        {
+          label: 'whitespace-only string',
+          prompt: '   ',
+          kind: 'empty_prompt',
+        },
+      ])(
+        'fires INVALID_INPUT with raw.kind=$kind for $label',
+        async ({ prompt, kind }) => {
+          const ext = factory({ api_key: 'test-key', model });
+          const ctx = createRuntimeContext();
+          const messageCallable = getCallable(ext, 'message');
+
+          let errorValue: unknown;
+          try {
+            errorValue = await messageCallable.fn({ prompt }, ctx);
+          } catch (err: unknown) {
+            errorValue = unwrapError(err);
+          }
+
+          expect(isInvalid(errorValue)).toBe(true);
+          const status = getStatus(errorValue as RillValue);
+          expect((status.code as { name: string }).name).toBe('INVALID_INPUT');
+          expect((status.raw as Record<string, unknown>)['kind']).toBe(kind);
+        }
+      );
+
+      it('names the audio part type in the error message', async () => {
+        const ext = factory({ api_key: 'test-key', model });
+        const ctx = createRuntimeContext();
+        let errorValue: unknown;
+        try {
+          errorValue = await getCallable(ext, 'message').fn(
+            {
+              prompt: [
+                { role: 'user', parts: [{ type: 'audio', data: 'abc' }] },
+              ],
+            },
+            ctx
+          );
+        } catch (err: unknown) {
+          errorValue = unwrapError(err);
+        }
+
+        expect(isInvalid(errorValue)).toBe(true);
+        expect(getStatus(errorValue as RillValue).message).toContain('audio');
+      });
+    });
+
+    describe('boundary errors — tool_loop arguments', () => {
+      async function invokeToolLoop(
+        args: Record<string, RillValue>
+      ): Promise<unknown> {
+        const ext = factory({ api_key: 'test-key', model });
+        const ctx = createRuntimeContext();
+        try {
+          return await getCallable(ext, 'tool_loop').fn(args, ctx);
+        } catch (err: unknown) {
+          return unwrapError(err);
+        }
+      }
+
+      it('fires INVALID_INPUT with raw.kind=empty_tools_dict for an empty tools dict', async () => {
+        const errorValue = await invokeToolLoop({ prompt: 'hello', tools: {} });
+
+        expect(isInvalid(errorValue)).toBe(true);
+        const status = getStatus(errorValue as RillValue);
+        expect((status.code as { name: string }).name).toBe('INVALID_INPUT');
+        expect((status.raw as Record<string, unknown>)['kind']).toBe(
+          'empty_tools_dict'
+        );
+      });
+
+      it('fires INVALID_INPUT for a negative per-call max_turns', async () => {
+        const errorValue = await invokeToolLoop({
+          prompt: 'test',
+          tools: { my_tool: callable(() => 'result') },
+          max_turns: -1,
+        });
+
+        expect(isInvalid(errorValue)).toBe(true);
+        const status = getStatus(errorValue as RillValue);
+        expect((status.code as { name: string }).name).toBe('INVALID_INPUT');
+      });
+    });
+
+    describe('factory config validation', () => {
+      it.each([
+        {
+          label: "reserved extra key 'model'",
+          config: { extra: { model: 'other-model' } },
+          message: "reserved key(s): 'model'.",
+        },
+        {
+          label: "reserved extra key 'temperature'",
+          config: { extra: { temperature: 0.5 } },
+          message: "reserved key(s): 'temperature'.",
+        },
+        {
+          label: 'max_turns of 0',
+          config: { max_turns: 0 },
+          message:
+            "Factory config 'max_turns' must be a positive integer or undefined; sentinel value 0 is reserved for per-call override semantics.",
+        },
+      ])('throws RILL-R001 for $label', ({ config, message }) => {
+        let thrown: unknown;
+        try {
+          factory({ api_key: 'test-key', model, ...config });
+        } catch (err: unknown) {
+          thrown = err;
+        }
+
+        expect(thrown).toBeInstanceOf(RuntimeError);
+        expect((thrown as RuntimeError).errorId).toBe('RILL-R001');
+        expect((thrown as RuntimeError).message).toContain(message);
+      });
+
+      it('accepts an empty extra dict', () => {
+        expect(() =>
+          factory({ api_key: 'test-key', model, extra: {} })
+        ).not.toThrow();
       });
     });
 

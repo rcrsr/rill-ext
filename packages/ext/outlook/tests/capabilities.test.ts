@@ -106,28 +106,13 @@ describe('capability gates', () => {
       }
       expectInvalid(caught, 'FORBIDDEN', 'outlook: mail.read not enabled');
     });
-
-    it('includes capability name in message', () => {
-      const ctx = createRuntimeContext();
-      let caught: unknown;
-      try {
-        checkCapability(ctx, false, 'calendar.create');
-      } catch (e) {
-        caught = e;
-      }
-      expectInvalid(
-        caught,
-        'FORBIDDEN',
-        'outlook: calendar.create not enabled'
-      );
-    });
   });
 
   // ============================================================
-  // checkFolder unit tests [EC-4, AC-22]
+  // checkFolder unit tests
   // ============================================================
 
-  describe('checkFolder [EC-4, AC-22]', () => {
+  describe('checkFolder', () => {
     it('does not throw when folder is in allowlist', () => {
       const ctx = createRuntimeContext();
       expect(() => checkFolder(ctx, ['inbox', 'sent'], 'inbox')).not.toThrow();
@@ -145,21 +130,6 @@ describe('capability gates', () => {
         caught,
         'FORBIDDEN',
         "outlook: folder 'drafts' not accessible"
-      );
-    });
-
-    it('throws with exact folder name in message', () => {
-      const ctx = createRuntimeContext();
-      let caught: unknown;
-      try {
-        checkFolder(ctx, ['inbox'], 'SentItems');
-      } catch (e) {
-        caught = e;
-      }
-      expectInvalid(
-        caught,
-        'FORBIDDEN',
-        "outlook: folder 'SentItems' not accessible"
       );
     });
 
@@ -183,59 +153,124 @@ describe('capability gates', () => {
   });
 
   // ============================================================
-  // mail.read capability [EC-2, AC-21]
+  // disabled capability gates
   // ============================================================
+  describe('disabled capability', () => {
+    const cases: {
+      name: string;
+      overrides: Parameters<typeof configWith>[0];
+      fn: string;
+      args: Record<string, RillValue>;
+      message: string;
+    }[] = [
+      {
+        name: 'mail.read',
+        overrides: { mailRead: false },
+        fn: 'inbox',
+        args: { top: 10 },
+        message: 'outlook: mail.read not enabled',
+      },
+      {
+        name: 'mail.read',
+        overrides: { mailRead: false },
+        fn: 'from',
+        args: { address: 'test@example.com' },
+        message: 'outlook: mail.read not enabled',
+      },
+      {
+        name: 'mail.read',
+        overrides: { mailRead: false },
+        fn: 'search',
+        args: { query: 'hello' },
+        message: 'outlook: mail.read not enabled',
+      },
+      {
+        name: 'mail.read',
+        overrides: { mailRead: false },
+        fn: 'read',
+        args: { message_id: 'msg-1' },
+        message: 'outlook: mail.read not enabled',
+      },
+      {
+        name: 'mail.send',
+        overrides: { mailSend: false },
+        fn: 'send',
+        args: { to: ['r@example.com'], subject: 's', body: 'b' },
+        message: 'outlook: mail.send not enabled',
+      },
+      {
+        name: 'mail.send',
+        overrides: { mailSend: false },
+        fn: 'reply',
+        args: { message_id: 'm', body: 'b' },
+        message: 'outlook: mail.send not enabled',
+      },
+      {
+        name: 'mail.draft',
+        overrides: { mailDraft: false },
+        fn: 'draft',
+        args: { to: ['r@example.com'], subject: 's', body: 'b' },
+        message: 'outlook: mail.draft not enabled',
+      },
+      {
+        name: 'mail.flag',
+        overrides: { mailFlag: false },
+        fn: 'flag',
+        args: { message_id: 'm' },
+        message: 'outlook: mail.flag not enabled',
+      },
+      {
+        name: 'mail.search',
+        overrides: { mailSearch: false },
+        fn: 'search',
+        args: { query: 'test' },
+        message: 'outlook: mail.search not enabled',
+      },
+      {
+        name: 'calendar.read',
+        overrides: { calRead: false },
+        fn: 'events',
+        args: { start: 0, end: 1000 },
+        message: 'outlook: calendar.read not enabled',
+      },
+      {
+        name: 'calendar.read',
+        overrides: { calRead: false },
+        fn: 'today',
+        args: {},
+        message: 'outlook: calendar.read not enabled',
+      },
+      {
+        name: 'calendar.read',
+        overrides: { calRead: false },
+        fn: 'free_busy',
+        args: { start: 0, end: 1000, attendees: ['a@example.com'] },
+        message: 'outlook: calendar.read not enabled',
+      },
+      {
+        name: 'calendar.create',
+        overrides: { calCreate: false },
+        fn: 'create_event',
+        args: { title: 'Meeting', start: 0, end: 1000 },
+        message: 'outlook: calendar.create not enabled',
+      },
+    ];
 
-  describe('mail.read disabled [EC-2, AC-21]', () => {
-    it('inbox emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailRead: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'inbox').fn({ top: 10 }, ctx),
-        'outlook: mail.read not enabled'
-      );
-    });
+    it.each(cases)(
+      'emits #FORBIDDEN for $fn when $name is disabled',
+      async ({ overrides, fn, args, message }) => {
+        const ext = createOutlookExtension(
+          configWith(overrides),
+          makeFactoryCtx()
+        );
+        const ctx = createRuntimeContext();
+        await expectForbidden(getCallable(ext, fn).fn(args, ctx), message);
+      }
+    );
+  });
 
-    it('from emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailRead: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'from').fn({ address: 'test@example.com' }, ctx),
-        'outlook: mail.read not enabled'
-      );
-    });
-
-    it('search emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailRead: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'search').fn({ query: 'hello' }, ctx),
-        'outlook: mail.read not enabled'
-      );
-    });
-
-    it('read emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailRead: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'read').fn({ message_id: 'msg-1' }, ctx),
-        'outlook: mail.read not enabled'
-      );
-    });
-
-    it('capability check fires before any fetch call', async () => {
+  describe('capability gate ordering', () => {
+    it('fires the mail.read check before any fetch call', async () => {
       const mockFetch = vi.fn();
       globalThis.fetch = mockFetch;
       const ext = createOutlookExtension(
@@ -245,138 +280,6 @@ describe('capability gates', () => {
       const ctx = createRuntimeContext();
       await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
       expect(mockFetch).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('mail.send disabled [EC-5, AC-21]', () => {
-    it('send emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailSend: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'send').fn(
-          { to: ['r@example.com'], subject: 's', body: 'b' },
-          ctx
-        ),
-        'outlook: mail.send not enabled'
-      );
-    });
-
-    it('reply emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailSend: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'reply').fn({ message_id: 'm', body: 'b' }, ctx),
-        'outlook: mail.send not enabled'
-      );
-    });
-  });
-
-  describe('mail.draft disabled [EC-7, AC-21]', () => {
-    it('draft emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailDraft: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'draft').fn(
-          { to: ['r@example.com'], subject: 's', body: 'b' },
-          ctx
-        ),
-        'outlook: mail.draft not enabled'
-      );
-    });
-  });
-
-  describe('mail.flag disabled [EC-7, AC-21]', () => {
-    it('flag emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailFlag: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'flag').fn({ message_id: 'm' }, ctx),
-        'outlook: mail.flag not enabled'
-      );
-    });
-  });
-
-  describe('mail.search disabled [EC-7, AC-21]', () => {
-    it('search emits #FORBIDDEN with mail.search-specific message', async () => {
-      const ext = createOutlookExtension(
-        configWith({ mailSearch: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'search').fn({ query: 'test' }, ctx),
-        'outlook: mail.search not enabled'
-      );
-    });
-  });
-
-  describe('calendar.read disabled [EC-7, AC-21]', () => {
-    it('events emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ calRead: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'events').fn({ start: 0, end: 1000 }, ctx),
-        'outlook: calendar.read not enabled'
-      );
-    });
-
-    it('today emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ calRead: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'today').fn({}, ctx),
-        'outlook: calendar.read not enabled'
-      );
-    });
-
-    it('free_busy emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ calRead: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'free_busy').fn(
-          { start: 0, end: 1000, attendees: ['a@example.com'] },
-          ctx
-        ),
-        'outlook: calendar.read not enabled'
-      );
-    });
-  });
-
-  describe('calendar.create disabled [EC-10, AC-21]', () => {
-    it('create_event emits #FORBIDDEN', async () => {
-      const ext = createOutlookExtension(
-        configWith({ calCreate: false }),
-        makeFactoryCtx()
-      );
-      const ctx = createRuntimeContext();
-      await expectForbidden(
-        getCallable(ext, 'create_event').fn(
-          { title: 'Meeting', start: 0, end: 1000 },
-          ctx
-        ),
-        'outlook: calendar.create not enabled'
-      );
     });
   });
 });

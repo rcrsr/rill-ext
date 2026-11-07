@@ -63,14 +63,11 @@ const SLOT_KEY = [...SCOPES].sort().join(' ');
 // createTokenCache / clearTokenCache
 // ============================================================
 
-describe('createTokenCache', () => {
-  it('returns a cache with slot = null', () => {
-    const cache = createTokenCache();
-    expect(cache.slots.size).toBe(0);
-  });
-});
-
 describe('clearTokenCache', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('sets slot to null when slot has a value (AC-10)', () => {
     const cache: TokenCache = {
       slots: new Map([
@@ -119,8 +116,6 @@ describe('clearTokenCache', () => {
 
     await resolveToken(auth, createRuntimeContext(), cache, SCOPES, SIGNAL);
     expect(mockSign).toHaveBeenCalledTimes(1);
-
-    vi.useRealTimers();
   });
 });
 
@@ -200,21 +195,6 @@ describe('resolveToken — session', () => {
     expect(getStatus(caught as RillValue).code.name).toBe('AUTH');
     expect(getStatus(caught as RillValue).message).toBe(
       "google: session token 'MISSING_TOKEN' not found"
-    );
-  });
-
-  it('session token error with exact var name in message (EC-21)', async () => {
-    const auth = { type: 'session' as const, tokenVar: 'gcp_access_token' };
-    const cache = createTokenCache();
-    const ctx = createRuntimeContext();
-    let caught: unknown;
-    try {
-      await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
-    } catch (e) {
-      caught = e;
-    }
-    expect(getStatus(caught as RillValue).message).toBe(
-      "google: session token 'gcp_access_token' not found"
     );
   });
 });

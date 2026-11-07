@@ -307,12 +307,13 @@ describe('message() function', () => {
 
     expect(mockStream).toHaveBeenCalledWith(
       expect.objectContaining({
-        messages: expect.arrayContaining([
+        messages: [
           expect.objectContaining({
             role: 'system',
             content: 'You are helpful.',
           }),
-        ]),
+          expect.objectContaining({ role: 'user', content: 'Hi' }),
+        ],
       })
     );
   });

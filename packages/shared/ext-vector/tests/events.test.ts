@@ -24,16 +24,17 @@ describe('withEventEmission', () => {
   const operation = 'upsert';
 
   describe('success path', () => {
-    it('emits success event with provider:operation, metadata, and duration', async () => {
+    it('emits success event with provider:operation, metadata, and duration, returning fn result unmodified', async () => {
       const onLogEvent = vi.fn();
+      const expectedResult = { data: 'complex', nested: { value: 42 } };
       const result = await withEventEmission(
         makeCtx({ onLogEvent }),
         provider,
         operation,
         { id: 'vec-1', count: 10 },
-        async () => 'success' as RillValue
+        async () => expectedResult as unknown as RillValue
       );
-      expect(result).toBe('success');
+      expect(result).toEqual(expectedResult);
       expect(onLogEvent).toHaveBeenCalledTimes(1);
       const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
       expect(event['event']).toBe(`${provider}:${operation}`);
@@ -41,31 +42,6 @@ describe('withEventEmission', () => {
       expect(event['id']).toBe('vec-1');
       expect(event['count']).toBe(10);
       expect(typeof event['duration']).toBe('number');
-    });
-
-    it('returns fn result without modification', async () => {
-      const expectedResult = { data: 'complex', nested: { value: 42 } };
-      const result = await withEventEmission(
-        makeCtx(),
-        provider,
-        operation,
-        {},
-        async () => expectedResult as unknown as RillValue
-      );
-      expect(result).toEqual(expectedResult);
-    });
-
-    it('handles empty metadata object', async () => {
-      const onLogEvent = vi.fn();
-      await withEventEmission(
-        makeCtx({ onLogEvent }),
-        provider,
-        operation,
-        {},
-        async () => 'done' as RillValue
-      );
-      const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
-      expect(event['event']).toBe(`${provider}:${operation}`);
     });
   });
 
@@ -103,22 +79,6 @@ describe('withEventEmission', () => {
       expect(getStatus(result).message).toContain(
         'authentication failed (401)'
       );
-    });
-  });
-
-  describe('provider naming', () => {
-    it('uses provider name in event and subsystem', async () => {
-      const onLogEvent = vi.fn();
-      await withEventEmission(
-        makeCtx({ onLogEvent }),
-        'chroma',
-        'query',
-        {},
-        async () => 'result' as RillValue
-      );
-      const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
-      expect(event['event']).toBe('chroma:query');
-      expect(event['subsystem']).toBe('extension:chroma');
     });
   });
 });

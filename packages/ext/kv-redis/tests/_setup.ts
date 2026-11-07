@@ -2,6 +2,7 @@
  * Shared test helpers for kv-redis extension.
  */
 
+import { Redis } from 'ioredis';
 import {
   createRuntimeContext,
   type ExtensionFactoryCtx,
@@ -37,5 +38,25 @@ export function assertServiceAvailable(
     throw new Error(
       `${service} is required (RILL_EXT_REQUIRE_SERVICES=${required}) but is not reachable`
     );
+  }
+}
+
+/**
+ * Probe a Redis server; resolves false when it cannot be reached.
+ */
+export async function isRedisAvailable(url: string): Promise<boolean> {
+  const client = new Redis(url, {
+    connectTimeout: 1000,
+    maxRetriesPerRequest: 1,
+    lazyConnect: true,
+  });
+  try {
+    await client.connect();
+    await client.ping();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    client.disconnect();
   }
 }

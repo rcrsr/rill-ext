@@ -133,20 +133,7 @@ describe('Process Manager', () => {
           rows: 30,
         })
       );
-    });
-
-    it('passes prompt via -p flag', () => {
-      // Prompt passed as CLI argument, not stdin
-      const mockPty = createMockPty();
-      vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
-
-      spawnClaudeCli('my prompt');
-
-      expect(pty.spawn).toHaveBeenCalledWith(
-        'claude',
-        expect.arrayContaining(['-p', 'my prompt']),
-        expect.any(Object)
-      );
+      // Prompt is passed as a CLI argument, not written to stdin
       expect(mockPty.write).not.toHaveBeenCalled();
     });
 
@@ -292,26 +279,6 @@ describe('Process Manager', () => {
         'Claude CLI exited with code 1'
       );
     });
-
-    it('rejects on exit code 127', async () => {
-      // Common error code (command not found)
-      const mockPty = createMockPty();
-      let exitCallback: ((event: { exitCode: number }) => void) | undefined;
-
-      mockPty.onExit.mockImplementation((cb) => {
-        exitCallback = cb;
-      });
-
-      vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
-
-      const result = spawnClaudeCli('test');
-
-      exitCallback?.({ exitCode: 127 });
-
-      await expect(result.exitCode).rejects.toThrow(
-        'Claude CLI exited with code 127'
-      );
-    });
   });
 
   describe('cleanup and disposal', () => {
@@ -352,6 +319,7 @@ describe('Process Manager', () => {
         result.dispose();
         result.dispose();
       }).not.toThrow();
+      expect(mockPty.kill).toHaveBeenCalledTimes(1);
     });
 
     it('logs warning but does not throw when kill fails', () => {
@@ -442,34 +410,6 @@ describe('Process Manager', () => {
         result3.dispose();
       }).not.toThrow();
     });
-
-    it('handles 10 concurrent spawns without interference', () => {
-      // AC-15: 10 concurrent spawns
-      const mockPtys = Array.from({ length: 10 }, () => createMockPty());
-      let callCount = 0;
-
-      vi.mocked(pty.spawn).mockImplementation(() => {
-        const mock = mockPtys[callCount];
-        callCount++;
-        return mock as unknown as pty.IPty;
-      });
-
-      const results = Array.from({ length: 10 }, (_, i) =>
-        spawnClaudeCli(`prompt${i}`, { timeoutMs: (i + 1) * 1000 })
-      );
-
-      // Catch rejections to prevent unhandled errors
-      results.forEach((r) => r.exitCode.catch(() => {}));
-
-      // Each timeout fires independently
-      for (let i = 0; i < 10; i++) {
-        vi.advanceTimersByTime(1000);
-        expect(mockPtys[i]?.kill).toHaveBeenCalled();
-      }
-
-      // All can be disposed
-      results.forEach((r) => r.dispose());
-    });
   });
 
   describe('resource leak prevention', () => {
@@ -494,8 +434,9 @@ describe('Process Manager', () => {
       // No hanging timers - advancing time should not cause issues
       vi.advanceTimersByTime(10000);
 
-      // No excessive kill calls (only from disposal, not timeouts)
-      expect(mockPty.kill.mock.calls.length).toBeLessThanOrEqual(100);
+      // Processes exited normally: nothing is killed and no timer survives
+      expect(mockPty.kill).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     it('disposed processes do not respond to late events', () => {

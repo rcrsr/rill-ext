@@ -214,10 +214,16 @@ describe('Serper extension host functions', () => {
         ctx
       )) as Record<string, unknown>;
 
-      expect(result['answer_box']).toBeDefined();
-      expect(result['knowledge_graph']).toBeDefined();
-      expect(result['people_also_ask']).toBeDefined();
-      expect(result['related_searches']).toBeDefined();
+      expect(result['answer_box']).toEqual(responseWithOptionals.answerBox);
+      expect(result['knowledge_graph']).toEqual(
+        responseWithOptionals.knowledgeGraph
+      );
+      expect(result['people_also_ask']).toEqual(
+        responseWithOptionals.peopleAlsoAsk
+      );
+      expect(result['related_searches']).toEqual(
+        responseWithOptionals.relatedSearches
+      );
     });
 
     it('sends POST to /search with X-API-KEY header', async () => {
