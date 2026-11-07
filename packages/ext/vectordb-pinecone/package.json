@@ -27,16 +27,16 @@
     "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
-    "@rcrsr/rill": "~0.21.0"
+    "@rcrsr/rill": "~0.23.0"
   },
   "devDependencies": {
-    "@rcrsr/rill": "~0.21.0",
+    "@rcrsr/rill": "~0.23.0",
     "@rcrsr/rill-ext-param-shared": "workspace:^",
     "@rcrsr/rill-ext-vector-shared": "workspace:^",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.6",
     "dts-bundle-generator": "^9.5.1",
-    "tsup": "^8.5.1",
-    "undici-types": "^8.11.2"
+    "tsup": "^9.0.0",
+    "undici-types": "^8.12.4"
   },
   "files": [
     "dist"
@@ -54,6 +54,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@pinecone-database/pinecone": "^9.0.0"
+    "@pinecone-database/pinecone": "^9.2.0"
   }
 }

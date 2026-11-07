@@ -793,12 +793,7 @@ describe('boundary conditions', () => {
       expect(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         () => (current.next as any).fn({}, null)
-      ).toThrow(
-        expect.objectContaining({
-          errorId: 'RILL-R002',
-          message: 'Stream already consumed; cannot re-iterate',
-        })
-      );
+      ).toThrow(/#RILL_R002: Stream already consumed; cannot re-iterate/);
     });
 
     it('calling next() on the initial stream step after it was consumed throws RILL-R002', async () => {
@@ -822,10 +817,9 @@ describe('boundary conditions', () => {
       await expect(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (stream as any).next.fn({}, null)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R002',
-        message: 'Stream already consumed; cannot re-iterate',
-      });
+      ).rejects.toThrow(
+        /#RILL_R002: Stream already consumed; cannot re-iterate/
+      );
     });
   });
 
@@ -859,10 +853,9 @@ describe('boundary conditions', () => {
       await expect(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (stream as any).next.fn({}, null)
-      ).rejects.toMatchObject({
-        errorId: 'RILL-R002',
-        message: 'Stream already consumed; cannot re-iterate',
-      });
+      ).rejects.toThrow(
+        /#RILL_R002: Stream already consumed; cannot re-iterate/
+      );
 
       // Also: once exhausted, calling next on done step throws RILL-R002
       void step1; // used for exhaustion path verification

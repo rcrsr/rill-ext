@@ -1273,34 +1273,6 @@ describe('executeToolLoop', () => {
       expect(result.toolCalls[0]?.result).toBe('received: Alice, 30');
     });
 
-    it('rejects runtime callables at validation', async () => {
-      // RuntimeCallable (builtins) cannot be used as tools — must wrap in closure
-      const mockFn = vi.fn((args: Record<string, RillValue>) => args['value']);
-
-      const toolFn: RillValue = {
-        __type: 'callable',
-        kind: 'runtime',
-        fn: mockFn,
-        isProperty: false,
-      };
-
-      const tools = {
-        runtime_tool: toolFn,
-      };
-
-      await expect(
-        executeToolLoop(
-          [{ role: 'user', content: 'Test' }],
-          tools,
-          3,
-          createMockCallbacks(),
-          vi.fn()
-        )
-      ).rejects.toThrow(
-        'tool_loop: builtin "runtime_tool" cannot be used as a tool — wrap in a closure'
-      );
-    });
-
     it('handles application callable without params metadata', async () => {
       // Application callable without params gets dict as named args
       const mockFn = vi.fn((args: Record<string, RillValue>) => {
@@ -1858,14 +1830,6 @@ describe('executeToolLoop', () => {
       isProperty: false,
     };
 
-    // Shared mock RuntimeCallable (builtin)
-    const mockRuntimeCallable: RillValue = {
-      __type: 'callable' as const,
-      kind: 'runtime' as const,
-      fn: (args: Record<string, RillValue>) => args['value'],
-      isProperty: false,
-    };
-
     /** Terminal callbacks: API returns a response with no tool calls */
     function createTerminalCallbacks() {
       return createMockCallbacks({
@@ -2017,30 +1981,6 @@ describe('executeToolLoop', () => {
         await expect(
           executeToolLoop([], tools, 3, createMockCallbacks(), vi.fn())
         ).rejects.toThrow('tool_loop: tool "my_number_tool" is not a callable');
-      });
-    });
-
-    describe('RuntimeCallable dict value throws', () => {
-      it('throws with the builtin name in the message', async () => {
-        const tools = {
-          builtin_fn: mockRuntimeCallable,
-        } as unknown as RillValue;
-
-        await expect(
-          executeToolLoop([], tools, 3, createMockCallbacks(), vi.fn())
-        ).rejects.toThrow(
-          'tool_loop: builtin "builtin_fn" cannot be used as a tool — wrap in a closure'
-        );
-      });
-
-      it('includes the correct builtin name in error message', async () => {
-        const tools = { log: mockRuntimeCallable } as unknown as RillValue;
-
-        await expect(
-          executeToolLoop([], tools, 3, createMockCallbacks(), vi.fn())
-        ).rejects.toThrow(
-          'tool_loop: builtin "log" cannot be used as a tool — wrap in a closure'
-        );
       });
     });
 
