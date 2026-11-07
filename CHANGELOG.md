@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Test suite trust:** type-checks test files, fixes false-pass tests, and runs kv-redis and fs-s3 integration suites in CI. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 
+### Fixed
+
+- **mcp dispose:** host functions halt with `#DISPOSED` after `dispose()`, and calls it cancels report `#DISPOSED` ([#139](https://github.com/rcrsr/rill-ext/issues/139)). ([#148](https://github.com/rcrsr/rill-ext/pull/148))
+
 ## [0.23.0] - 2026-11-06
 
 ### Changed
