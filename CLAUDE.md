@@ -108,21 +108,17 @@ Both custom oxlint rules, `rill/no-spec-id-reference` and `rill/no-duplicate-err
 
 ### Conformance status
 
-`pnpm check:standards` currently reports `NON-CONFORMANT` against rill-dev 0.2.9,
-failing 4 elements:
+`pnpm check:standards` currently reports `NON-CONFORMANT` against rill-dev 0.3.0,
+failing 3 elements: `STD-LINT-10`, `STD-LINT-11`, `STD-LINT-12`. rill-dev 0.2.8
+added the 1000-line `max-lines` cap, type-aware linting (`--type-aware` on
+every package `lint` script), and 24 baseline rules at `error`.
+`oxlint-tsgolint` is declared; enabling the rest surfaces about 3,750 findings
+(1,000 in `src/`), so adoption is its own change.
 
-- `STD-LINT-10`, `STD-LINT-11`, `STD-LINT-12`: rill-dev 0.2.8 added the
-  1000-line `max-lines` cap, type-aware linting (`--type-aware` on every
-  package `lint` script), and 24 baseline rules at `error`. `oxlint-tsgolint`
-  is declared; enabling the rest surfaces about 3,750 findings (1,000 in
-  `src/`), so adoption is its own change.
-- `STD-DEP-5` reads the published rill version from rill-dev's `baseline.json`
-  snapshot (0.22.0), which lags npm (0.23.0, the peer range here). It clears
-  when a rill-dev release refreshes the snapshot.
-
-`STD-DEP-5` otherwise compares every extension's `@rcrsr/rill` peer range
-against the published version, so it goes red the day rill publishes a new
-minor and stays red until the range is bumped here.
+`STD-DEP-5` treats `publishedVersions` in rill-dev's `baseline.json` as a
+floor: an extension's `@rcrsr/rill` peer range fails only when its major.minor
+is older than the baseline, so it goes red when a rill-dev release raises the
+floor and stays red until the range is bumped here.
 
 `@rcrsr/rill-dev` 0.2.5 added elements this repository now satisfies:
 `STD-SUP-8` (dependabot `open-pull-requests-limit: 0` on both ecosystems, so

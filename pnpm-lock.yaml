@@ -170,8 +170,8 @@ importers:
   .:
     devDependencies:
       '@rcrsr/rill-dev':
-        specifier: ^0.2.9
-        version: 0.2.9
+        specifier: ^0.3.0
+        version: 0.3.0
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -2024,8 +2024,8 @@ packages:
     resolution: {integrity: sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==}
     engines: {node: '>=18.0.0', pnpm: '>=8'}
 
-  '@rcrsr/rill-dev@0.2.9':
-    resolution: {integrity: sha512-3cynL9Jt0XI/xxBVUCle556TEAovKg0DrdGwtrU8G5AQ+Y7aXj1gBRiTl35dyvctF1RT4AR+W750Bd1k2vIw6Q==}
+  '@rcrsr/rill-dev@0.3.0':
+    resolution: {integrity: sha512-2gozBbXPvP2OW7S/AesA4gmkm/RhxQoZ4rSRUT54gwkYDez03DSA9nIGRnt1/KMPKjPJyjBRbS517PgdYbqy3A==}
     engines: {node: '>=22.16.0'}
     hasBin: true
 
@@ -4657,7 +4657,7 @@ snapshots:
 
   '@qdrant/openapi-typescript-fetch@1.2.6': {}
 
-  '@rcrsr/rill-dev@0.2.9': {}
+  '@rcrsr/rill-dev@0.3.0': {}
 
   '@rcrsr/rill@0.23.0': {}
 
