@@ -281,21 +281,28 @@ describe('createLocalFsExtension - factory', () => {
 
       it('keeps the original error when a non-abort failure settles after dispose', async () => {
         let rejectRead: (e: unknown) => void = () => {};
-        vi.spyOn(fs, 'readFile').mockImplementation(
-          () =>
-            new Promise((_, reject) => {
+        let readStarted = false;
+        const realOpen = fs.open.bind(fs);
+        // read() goes through a FileHandle; hold its readFile instead.
+        vi.spyOn(fs, 'open').mockImplementation((async (
+          ...args: Parameters<typeof fs.open>
+        ) => {
+          const handle = await realOpen(...args);
+          handle.readFile = (() => {
+            readStarted = true;
+            return new Promise((_, reject) => {
               rejectRead = reject;
-            }) as never
-        );
+            });
+          }) as never;
+          return handle;
+        }) as never);
         await fs.writeFile(path.join(testMount, 'r.txt'), 'x');
         const ext = await mountExt();
         const pending = getCallable(ext, 'read').fn(
           { path: '/workspace/r.txt' },
           makeRuntimeCtx()
         );
-        await vi.waitFor(() =>
-          expect(vi.mocked(fs.readFile)).toHaveBeenCalled()
-        );
+        await vi.waitFor(() => expect(readStarted).toBe(true));
         await ext.dispose?.();
         rejectRead(Object.assign(new Error('EIO'), { code: 'EIO' }));
 

@@ -152,15 +152,19 @@ export async function createLocalFsExtension(
     if (isInvalid(resolved as RillValue)) return resolved as RillValue;
     const resolvedPath = resolved as string;
 
-    const stats = await fs.stat(resolvedPath);
-    const max = getMaxFileSize(mountName);
-    const sizeInvalid = checkFileSize(stats.size, max, resolvedPath, runCtx);
-    if (sizeInvalid !== null) return sizeInvalid;
+    // Stat and read through one handle so the size check applies to the
+    // file actually read (no check-then-use race on the path).
+    const handle = await fs.open(resolvedPath, 'r');
+    try {
+      const stats = await handle.stat();
+      const max = getMaxFileSize(mountName);
+      const sizeInvalid = checkFileSize(stats.size, max, resolvedPath, runCtx);
+      if (sizeInvalid !== null) return sizeInvalid;
 
-    return await fs.readFile(resolvedPath, {
-      encoding,
-      signal: lifetime.signal,
-    });
+      return await handle.readFile({ encoding, signal: lifetime.signal });
+    } finally {
+      await handle.close();
+    }
   };
 
   const write: CallableFn = async (args, ctxIn) => {
