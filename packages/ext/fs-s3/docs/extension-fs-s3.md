@@ -191,6 +191,9 @@ All `path`, `src`, and `dest` arguments use `/mount/path` format. `stat` returns
 |---|---|---|
 | Called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
 | In-flight request aborted by `dispose()` (thrown) | `#DISPOSED` | `extension_disposed` |
+| Multi-step call (`read`, `append`, `remove`, `copy`, `move`, `find`) still running when `dispose()` runs (thrown before the next S3 command) | `#DISPOSED` | `extension_disposed` |
+
+Only abort-shaped failures map to `#DISPOSED` after dispose; any other error keeps its own code.
 
 ## See Also
 

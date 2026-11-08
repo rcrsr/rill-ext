@@ -412,9 +412,16 @@ describe('createS3FsExtension', () => {
         return { spy, rejectWith: (e) => rejectFn(e) };
       }
 
+      function abortError(): Error {
+        return Object.assign(new Error('Request aborted'), {
+          name: 'AbortError',
+        });
+      }
+
       async function statusOfInFlight(
         name: 'read' | 'append',
-        disposeFirst: boolean
+        disposeFirst: boolean,
+        failure: Error = new Error('socket hang up')
       ): Promise<{
         code: string;
         kind: unknown;
@@ -431,7 +438,7 @@ describe('createS3FsExtension', () => {
           );
           await Promise.resolve();
           if (disposeFirst) await ext.dispose?.();
-          rejectWith(new Error('socket hang up'));
+          rejectWith(failure);
           let result: RillValue;
           let thrown = false;
           try {
@@ -454,8 +461,8 @@ describe('createS3FsExtension', () => {
         }
       }
 
-      it('throws #DISPOSED when read fails after dispose', async () => {
-        const status = await statusOfInFlight('read', true);
+      it('throws #DISPOSED when read is aborted by dispose', async () => {
+        const status = await statusOfInFlight('read', true, abortError());
 
         expect(status).toEqual({
           code: 'DISPOSED',
@@ -472,7 +479,14 @@ describe('createS3FsExtension', () => {
         expect(status.thrown).toBe(false);
       });
 
-      it('throws #DISPOSED when append NoSuchKey bypass hits a socket error after dispose', async () => {
+      it('keeps the error code when a non-abort failure settles after dispose', async () => {
+        const status = await statusOfInFlight('read', true);
+
+        expect(status.code).toBe('UNAVAILABLE');
+        expect(status.thrown).toBe(false);
+      });
+
+      it('throws #DISPOSED when append NoSuchKey bypass is aborted after dispose', async () => {
         const noSuchKey = Object.assign(new Error('missing'), {
           name: 'NoSuchKey',
         });
@@ -496,7 +510,7 @@ describe('createS3FsExtension', () => {
           );
           await vi.waitFor(() => expect(calls).toBe(2));
           await ext.dispose?.();
-          rejectPut(new Error('socket hang up'));
+          rejectPut(abortError());
           const thrown: unknown = await pending.then(
             () => {},
             (error: unknown) => error
@@ -506,6 +520,212 @@ describe('createS3FsExtension', () => {
           const status = getStatus((thrown as RuntimeHaltSignal).value);
           expect(status.code.name).toBe('DISPOSED');
           expect(status.raw['kind']).toBe('extension_disposed');
+        } finally {
+          spy.mockRestore();
+        }
+      });
+
+      it('aborts the request signal when dispose runs', async () => {
+        let seen: AbortSignal | undefined;
+        const spy = vi.spyOn(S3Client.prototype, 'send').mockImplementation(((
+          _cmd: unknown,
+          opts: unknown
+        ) => {
+          seen = (opts as { abortSignal: AbortSignal }).abortSignal;
+          return new Promise(() => {});
+        }) as never);
+        try {
+          const ext = createTestExtension();
+          const fns = ext.value as unknown as Record<string, HostFn>;
+          void fns['stat']!.fn({ path: 'test/file.txt' }, makeRuntimeCtx());
+          await vi.waitFor(() => expect(seen).toBeDefined());
+          expect(seen?.aborted).toBe(false);
+
+          await ext.dispose?.();
+
+          expect(seen?.aborted).toBe(true);
+        } finally {
+          spy.mockRestore();
+        }
+      });
+
+      it('throws #DISPOSED from exists when the aborted head request fails after dispose', async () => {
+        const { spy, rejectWith } = deferredSend();
+        try {
+          const ext = createTestExtension();
+          const fns = ext.value as unknown as Record<string, HostFn>;
+          const pending = fns['exists']!.fn(
+            { path: 'test/file.txt' },
+            makeRuntimeCtx()
+          );
+          await Promise.resolve();
+          await ext.dispose?.();
+          rejectWith(abortError());
+          const thrown: unknown = await pending.then(
+            () => {},
+            (error: unknown) => error
+          );
+
+          expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+          const status = getStatus((thrown as RuntimeHaltSignal).value);
+          expect(status.code.name).toBe('DISPOSED');
+        } finally {
+          spy.mockRestore();
+        }
+      });
+
+      it('returns false from exists when a stale 404 settles after dispose', async () => {
+        const { spy, rejectWith } = deferredSend();
+        try {
+          const ext = createTestExtension();
+          const fns = ext.value as unknown as Record<string, HostFn>;
+          const pending = fns['exists']!.fn(
+            { path: 'test/file.txt' },
+            makeRuntimeCtx()
+          );
+          await Promise.resolve();
+          await ext.dispose?.();
+          rejectWith(Object.assign(new Error('nf'), { name: 'NotFound' }));
+
+          await expect(pending).resolves.toBe(false);
+        } finally {
+          spy.mockRestore();
+        }
+      });
+    });
+
+    describe('between steps', () => {
+      type Step = (value: unknown) => void;
+
+      async function runDisposedAfterFirstSend(
+        name: string
+      ): Promise<{ thrown: unknown; commands: string[] }> {
+        const commands: string[] = [];
+        let release: Step = () => {};
+        const spy = vi
+          .spyOn(S3Client.prototype, 'send')
+          .mockImplementation(((cmd: { constructor: { name: string } }) => {
+            commands.push(cmd.constructor.name);
+            if (commands.length === 1) {
+              return new Promise((resolve) => {
+                release = resolve;
+              });
+            }
+            return Promise.resolve({ ContentLength: 1 });
+          }) as never);
+        try {
+          const ext = createTestExtension();
+          const fns = ext.value as unknown as Record<string, HostFn>;
+          const pending = fns[name]!.fn(
+            {
+              path: 'test/file.txt',
+              content: 'x',
+              src: 'test/a',
+              dest: 'test/b',
+            },
+            makeRuntimeCtx()
+          );
+          await vi.waitFor(() => expect(commands).toHaveLength(1));
+          await ext.dispose?.();
+          release({
+            ContentLength: 1,
+            Body: { transformToString: () => Promise.resolve('') },
+          });
+          const thrown: unknown = await pending.then(
+            () => {},
+            (error: unknown) => error
+          );
+          return { thrown, commands };
+        } finally {
+          spy.mockRestore();
+        }
+      }
+
+      it.each([
+        ['move', ['HeadObjectCommand']],
+        ['copy', ['HeadObjectCommand']],
+        ['remove', ['HeadObjectCommand']],
+        ['read', ['HeadObjectCommand']],
+        ['append', ['GetObjectCommand']],
+      ])(
+        'throws #DISPOSED from %s without sending a second command',
+        async (name, expected) => {
+          const { thrown, commands } = await runDisposedAfterFirstSend(name);
+
+          expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+          expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
+            'DISPOSED'
+          );
+          expect(commands).toEqual(expected);
+        }
+      );
+
+      it('skips the delete in move when dispose lands after the copy', async () => {
+        const commands: string[] = [];
+        let release: Step = () => {};
+        const spy = vi
+          .spyOn(S3Client.prototype, 'send')
+          .mockImplementation(((cmd: { constructor: { name: string } }) => {
+            commands.push(cmd.constructor.name);
+            if (cmd.constructor.name === 'CopyObjectCommand') {
+              return new Promise((resolve) => {
+                release = resolve;
+              });
+            }
+            return Promise.resolve({ ContentLength: 1 });
+          }) as never);
+        try {
+          const ext = createTestExtension();
+          const fns = ext.value as unknown as Record<string, HostFn>;
+          const pending = fns['move']!.fn(
+            { src: 'test/a', dest: 'test/b' },
+            makeRuntimeCtx()
+          );
+          await vi.waitFor(() =>
+            expect(commands).toContain('CopyObjectCommand')
+          );
+          await ext.dispose?.();
+          release({});
+          const thrown: unknown = await pending.then(
+            () => {},
+            (error: unknown) => error
+          );
+
+          expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+          expect(commands).not.toContain('DeleteObjectCommand');
+        } finally {
+          spy.mockRestore();
+        }
+      });
+
+      it('stops paginating find once disposed', async () => {
+        const commands: string[] = [];
+        let release: Step = () => {};
+        const spy = vi
+          .spyOn(S3Client.prototype, 'send')
+          .mockImplementation(((cmd: { constructor: { name: string } }) => {
+            commands.push(cmd.constructor.name);
+            return new Promise((resolve) => {
+              release = resolve;
+            });
+          }) as never);
+        try {
+          const ext = createTestExtension();
+          const fns = ext.value as unknown as Record<string, HostFn>;
+          const pending = fns['find']!.fn(
+            { path: 'test', pattern: '*' },
+            makeRuntimeCtx()
+          );
+          await vi.waitFor(() => expect(commands).toHaveLength(1));
+          await ext.dispose?.();
+          release({ Contents: [], NextContinuationToken: 'page-2' });
+          const thrown: unknown = await pending.then(
+            () => {},
+            (error: unknown) => error
+          );
+
+          expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+          expect(commands).toHaveLength(1);
         } finally {
           spy.mockRestore();
         }

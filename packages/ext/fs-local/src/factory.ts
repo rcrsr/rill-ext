@@ -18,8 +18,11 @@ import {
   type RillFunction,
   type RillValue,
   type RuntimeContext,
-  RuntimeHaltSignal,
 } from '@rcrsr/rill';
+import {
+  createDisposedHalt,
+  throwIfCancelledByDispose,
+} from '@rcrsr/rill-ext-lifecycle-shared';
 import type { FsExtensionContract } from '@rcrsr/rill-ext-fs-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { FsLocalExtensionConfig, MountConfig } from './types.js';
@@ -32,20 +35,6 @@ import {
 } from './sandbox.js';
 
 const PROVIDER = 'fs-local';
-
-/**
- * Builds the halt for a call made after dispose(). Returns a catchable
- * halt carrying #DISPOSED (raw.kind 'extension_disposed') for the caller to throw.
- */
-const failDisposed = (ctx: RuntimeContext): RuntimeHaltSignal =>
-  new RuntimeHaltSignal(
-    ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed' },
-    }),
-    true
-  );
 
 /**
  * Creates a local filesystem extension with sandboxed operations.
@@ -66,6 +55,35 @@ export async function createLocalFsExtension(
   }
 
   let disposed = false;
+  const lifetime = new AbortController();
+
+  /**
+   * Throws the #DISPOSED halt once dispose() has run. Called before every
+   * mutating await and per loop iteration so no write lands after dispose.
+   */
+  const assertLive = (runCtx: RuntimeContext): void => {
+    if (disposed) throw createDisposedHalt(runCtx, PROVIDER);
+  };
+
+  /**
+   * Reports #DISPOSED for a call cancelled by dispose() (abort-shaped error
+   * after dispose). Any other error propagates unchanged.
+   */
+  const guardDispose =
+    (fn: CallableFn): CallableFn =>
+    async (args, ctxIn) => {
+      try {
+        return await fn(args, ctxIn);
+      } catch (error) {
+        throwIfCancelledByDispose(
+          ctxIn as RuntimeContext,
+          PROVIDER,
+          error,
+          disposed
+        );
+        throw error;
+      }
+    };
 
   // Apply defaults
   const maxFileSize = config.maxFileSize ?? 10485760; // 10MB
@@ -116,7 +134,7 @@ export async function createLocalFsExtension(
 
   const read: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -139,12 +157,15 @@ export async function createLocalFsExtension(
     const sizeInvalid = checkFileSize(stats.size, max, resolvedPath, runCtx);
     if (sizeInvalid !== null) return sizeInvalid;
 
-    return await fs.readFile(resolvedPath, encoding);
+    return await fs.readFile(resolvedPath, {
+      encoding,
+      signal: lifetime.signal,
+    });
   };
 
   const write: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -169,13 +190,17 @@ export async function createLocalFsExtension(
     const sizeInvalid = checkFileSize(contentSize, max, resolvedPath, runCtx);
     if (sizeInvalid !== null) return sizeInvalid;
 
-    await fs.writeFile(resolvedPath, content, encoding);
+    assertLive(runCtx);
+    await fs.writeFile(resolvedPath, content, {
+      encoding,
+      signal: lifetime.signal,
+    });
     return String(contentSize);
   };
 
   const append: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -225,13 +250,14 @@ export async function createLocalFsExtension(
       }
     }
 
+    assertLive(runCtx);
     await fs.appendFile(resolvedPath, content, encoding);
     return String(contentSize);
   };
 
   const list: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: dirPath } = parsed as {
@@ -253,6 +279,7 @@ export async function createLocalFsExtension(
 
     const result: RillValue[] = [];
     for (const entry of entries) {
+      assertLive(runCtx);
       const fullPath = path.join(resolvedPath, entry.name);
       const stats = await fs.stat(fullPath);
 
@@ -268,7 +295,7 @@ export async function createLocalFsExtension(
 
   const find: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: searchBase } = parsed as {
@@ -310,6 +337,7 @@ export async function createLocalFsExtension(
       const entries = await fs.readdir(currentPath, { withFileTypes: true });
 
       for (const entry of entries) {
+        assertLive(runCtx);
         const fullPath = path.join(currentPath, entry.name);
 
         if (entry.isDirectory()) {
@@ -327,7 +355,7 @@ export async function createLocalFsExtension(
 
   const exists: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return false;
     const { mountName, relativePath: filePath } = parsed as {
@@ -348,7 +376,7 @@ export async function createLocalFsExtension(
 
   const remove: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -372,6 +400,7 @@ export async function createLocalFsExtension(
     const resolvedPath = resolved as string;
 
     try {
+      assertLive(runCtx);
       await fs.rm(resolvedPath);
       return true;
     } catch (error) {
@@ -386,7 +415,7 @@ export async function createLocalFsExtension(
 
   const stat: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: filePath } = parsed as {
@@ -425,7 +454,7 @@ export async function createLocalFsExtension(
    */
   const mkdir: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
     if (isInvalid(parsed as RillValue)) return parsed as RillValue;
     const { mountName, relativePath: dirPath } = parsed as {
@@ -541,6 +570,7 @@ export async function createLocalFsExtension(
     }
 
     try {
+      assertLive(runCtx);
       await fs.mkdir(normalized, { recursive: true });
       return true;
     } catch (error) {
@@ -555,7 +585,7 @@ export async function createLocalFsExtension(
 
   const copy: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const srcParsed = parseMountPath(args['src'] as string, mounts, runCtx);
     if (isInvalid(srcParsed as RillValue)) return srcParsed as RillValue;
     const { mountName: srcMountName, relativePath: srcPath } = srcParsed as {
@@ -615,6 +645,7 @@ export async function createLocalFsExtension(
     if (sizeInvalid !== null) return sizeInvalid;
 
     try {
+      assertLive(runCtx);
       await fs.copyFile(resolvedSrc, resolvedDest);
       return true;
     } catch (error) {
@@ -633,7 +664,7 @@ export async function createLocalFsExtension(
 
   const move: CallableFn = async (args, ctxIn) => {
     const runCtx = ctxIn as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    assertLive(runCtx);
     const srcParsed = parseMountPath(args['src'] as string, mounts, runCtx);
     if (isInvalid(srcParsed as RillValue)) return srcParsed as RillValue;
     const { mountName: srcMountName, relativePath: srcPath } = srcParsed as {
@@ -688,6 +719,7 @@ export async function createLocalFsExtension(
     const resolvedDest = resolvedDestVal as string;
 
     try {
+      assertLive(runCtx);
       await fs.rename(resolvedSrc, resolvedDest);
       return true;
     } catch (error) {
@@ -705,7 +737,7 @@ export async function createLocalFsExtension(
   };
 
   const mountsList: CallableFn = async (_args, ctxIn) => {
-    if (disposed) throw failDisposed(ctxIn as RuntimeContext);
+    assertLive(ctxIn as RuntimeContext);
     const result: RillValue[] = [];
 
     for (const [name, mount] of Object.entries(mounts)) {
@@ -748,7 +780,7 @@ export async function createLocalFsExtension(
           },
         },
       ],
-      fn: read,
+      fn: guardDispose(read),
       annotations: { description: 'Read file contents' },
       returnType: structureToTypeValue({ kind: 'string' }),
     },
@@ -764,7 +796,7 @@ export async function createLocalFsExtension(
         },
         p.str('content', 'Content to write'),
       ],
-      fn: write,
+      fn: guardDispose(write),
       annotations: { description: 'Write file, replacing if exists' },
       returnType: structureToTypeValue({ kind: 'string' }),
     },
@@ -780,7 +812,7 @@ export async function createLocalFsExtension(
         },
         p.str('content', 'Content to append'),
       ],
-      fn: append,
+      fn: guardDispose(append),
       annotations: { description: 'Append content to file' },
       returnType: structureToTypeValue({ kind: 'string' }),
     },
@@ -795,7 +827,7 @@ export async function createLocalFsExtension(
           },
         },
       ],
-      fn: list,
+      fn: guardDispose(list),
       annotations: { description: 'List directory contents' },
       returnType: structureToTypeValue({
         kind: 'list',
@@ -827,7 +859,7 @@ export async function createLocalFsExtension(
           annotations: { description: 'Glob pattern for filtering' },
         },
       ],
-      fn: find,
+      fn: guardDispose(find),
       annotations: { description: 'Recursive file search' },
       returnType: structureToTypeValue({
         kind: 'list',
@@ -845,7 +877,7 @@ export async function createLocalFsExtension(
           },
         },
       ],
-      fn: exists,
+      fn: guardDispose(exists),
       annotations: { description: 'Check file existence' },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
@@ -860,7 +892,7 @@ export async function createLocalFsExtension(
           },
         },
       ],
-      fn: remove,
+      fn: guardDispose(remove),
       annotations: { description: 'Delete file' },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
@@ -875,7 +907,7 @@ export async function createLocalFsExtension(
           },
         },
       ],
-      fn: stat,
+      fn: guardDispose(stat),
       annotations: { description: 'Get file metadata' },
       returnType: structureToTypeValue({
         kind: 'dict',
@@ -899,7 +931,7 @@ export async function createLocalFsExtension(
           },
         },
       ],
-      fn: mkdir,
+      fn: guardDispose(mkdir),
       annotations: { description: 'Create directory' },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
@@ -908,7 +940,7 @@ export async function createLocalFsExtension(
         p.str('src', 'Mount-prefixed source path'),
         p.str('dest', 'Mount-prefixed destination path'),
       ],
-      fn: copy,
+      fn: guardDispose(copy),
       annotations: { description: 'Copy file within mount' },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
@@ -917,13 +949,13 @@ export async function createLocalFsExtension(
         p.str('src', 'Mount-prefixed source path'),
         p.str('dest', 'Mount-prefixed destination path'),
       ],
-      fn: move,
+      fn: guardDispose(move),
       annotations: { description: 'Move file within mount' },
       returnType: structureToTypeValue({ kind: 'bool' }),
     },
     mounts: {
       params: [],
-      fn: mountsList,
+      fn: guardDispose(mountsList),
       annotations: { description: 'List configured mounts' },
       returnType: structureToTypeValue({
         kind: 'list',
@@ -955,7 +987,9 @@ export async function createLocalFsExtension(
   } satisfies FsExtensionContract;
 
   const dispose = async (): Promise<void> => {
+    if (disposed) return;
     disposed = true;
+    lifetime.abort();
   };
 
   return {

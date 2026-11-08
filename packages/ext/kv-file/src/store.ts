@@ -368,7 +368,20 @@ export async function createStore(
     return result;
   }
 
-  async function flush(): Promise<void> {
+  /**
+   * Flushes are serialized per store: each one starts after the previous one
+   * settles, so two flushes never write the shared `.tmp` file concurrently.
+   * `writeSnapshot` never rejects, so the chain never breaks.
+   */
+  let flushChain: Promise<void> = Promise.resolve();
+
+  function flush(): Promise<void> {
+    const run = flushChain.then(writeSnapshot);
+    flushChain = run;
+    return run;
+  }
+
+  async function writeSnapshot(): Promise<void> {
     const entries = getAll();
     const content = JSON.stringify(entries, null, 2);
     const tmpPath = `${storePath}.tmp`;

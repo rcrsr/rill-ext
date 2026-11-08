@@ -259,6 +259,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-lifecycle
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -356,6 +359,9 @@ importers:
       '@rcrsr/rill-ext-fs-shared':
         specifier: workspace:*
         version: link:../../shared/ext-fs
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-lifecycle
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -384,6 +390,9 @@ importers:
       '@rcrsr/rill-ext-fs-shared':
         specifier: workspace:*
         version: link:../../shared/ext-fs
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-lifecycle
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -463,6 +472,9 @@ importers:
       '@rcrsr/rill-ext-kv-shared':
         specifier: workspace:*
         version: link:../../shared/ext-kv
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-lifecycle
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param

@@ -5,7 +5,6 @@
  */
 
 import {
-  RuntimeHaltSignal,
   structureToTypeValue,
   toCallable,
   type CallableFn,
@@ -15,7 +14,9 @@ import {
   type RillParam,
   type RillValue,
   type RuntimeContext,
+  type RuntimeHaltSignal,
 } from '@rcrsr/rill';
+import { createDisposedHalt } from '@rcrsr/rill-ext-lifecycle-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { DatetimeExtensionConfig } from './types.js';
 
@@ -218,17 +219,7 @@ export function createDatetimeExtension(
   // ----------------------------------------------------------
 
   function checkDisposed(runCtx: RuntimeContext): RuntimeHaltSignal | null {
-    if (disposed) {
-      return new RuntimeHaltSignal(
-        runCtx.invalidate(new Error('datetime: operation cancelled'), {
-          code: 'DISPOSED',
-          provider: PROVIDER,
-          raw: { kind: 'extension_disposed' },
-        }),
-        true
-      );
-    }
-    return null;
+    return disposed ? createDisposedHalt(runCtx, PROVIDER) : null;
   }
 
   function validateZone(

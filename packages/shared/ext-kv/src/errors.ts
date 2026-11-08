@@ -7,6 +7,7 @@
 
 import {
   RuntimeHaltSignal,
+  getStatus,
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
@@ -23,6 +24,9 @@ interface ErrorWithCode {
  * @param ctx - Runtime context (provides `invalidate`)
  * @param provider - Provider name (e.g. "kv-redis", "kv-sqlite")
  * @param error - Error caught from a kv operation
+ *
+ * A `#DISPOSED` halt raised by an extension between steps is rethrown
+ * unchanged: it is a thrown contract, never a returned or remapped value.
  */
 export function mapKvError(
   ctx: RuntimeContext,
@@ -30,6 +34,7 @@ export function mapKvError(
   error: unknown
 ): RillValue {
   if (error instanceof RuntimeHaltSignal) {
+    if (getStatus(error.value).code.name === 'DISPOSED') throw error;
     return ctx.invalidate(error, {
       code: 'TIMEOUT',
       provider,

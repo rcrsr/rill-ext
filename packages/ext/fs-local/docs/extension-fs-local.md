@@ -150,3 +150,7 @@ generic atoms. Host scripts match coarsely (`guard #FORBIDDEN`) or finely
 | Value or file exceeds configured size limit | `#INVALID_INPUT` | `size_limit_exceeded` |
 | Filesystem read or write failure | `#UNAVAILABLE` | `io_error` |
 | Any call after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
+| Call still running when `dispose()` runs (thrown before the next mutating step: `write`, `append`, `copy`, `move`, `mkdir`, `remove`, and per entry in `list`/`find`) | `#DISPOSED` | `extension_disposed` |
+| `read`/`write` aborted by `dispose()` (thrown) | `#DISPOSED` | `extension_disposed` |
+
+`dispose()` aborts the signal passed to `readFile` and `writeFile`. A `write` aborted mid-call can leave the target file truncated or partially written. Other errors that settle after dispose keep their original failure.

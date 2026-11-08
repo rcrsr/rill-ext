@@ -12,9 +12,10 @@
   ],
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware --config ../../../.oxlintrc.json src/ tests/",
-    "check": "pnpm run build && pnpm run lint"
+    "check": "pnpm run build && pnpm run test && pnpm run lint"
   },
   "peerDependencies": {
     "@rcrsr/rill": "~0.23.0"

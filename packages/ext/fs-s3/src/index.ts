@@ -18,6 +18,7 @@ import { createRequire } from 'node:module';
 import {
   RuntimeError,
   RuntimeHaltSignal,
+  getStatus,
   structureToTypeValue,
   toCallable,
   type CallableFn,
@@ -30,6 +31,10 @@ import {
   type RuntimeContext,
 } from '@rcrsr/rill';
 import type { FsExtensionContract } from '@rcrsr/rill-ext-fs-shared';
+import {
+  createDisposedHalt,
+  disposedHaltFor,
+} from '@rcrsr/rill-ext-lifecycle-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 
 const _require = createRequire(import.meta.url);
@@ -212,9 +217,11 @@ export function createS3FsExtension(
   const s3Client = new S3Client(clientConfig);
 
   let disposed = false;
+  const lifetime = new AbortController();
   const dispose = async (): Promise<void> => {
     if (disposed) return;
     disposed = true;
+    lifetime.abort();
     s3Client.destroy();
   };
 
@@ -232,31 +239,46 @@ export function createS3FsExtension(
     }
   }
 
+  /** Aborts on dispose() or when the host context signal aborts. */
   function requestSignal(): AbortSignal {
-    return ctx?.signal ?? new AbortController().signal;
+    return ctx?.signal
+      ? AbortSignal.any([lifetime.signal, ctx.signal])
+      : lifetime.signal;
   }
 
   /**
-   * Builds the halt for a call made after dispose(). Returns a catchable
-   * halt carrying #DISPOSED (raw.kind 'extension_disposed') for the caller to throw.
+   * Throws the #DISPOSED halt once dispose() has run. Multi-step functions call
+   * this between awaits so no further S3 command is sent after dispose().
    */
-  function disposedInvalid(runCtx: RuntimeContext): RuntimeHaltSignal {
-    return new RuntimeHaltSignal(
-      runCtx.invalidate(new Error('S3 fs extension disposed'), {
-        code: 'DISPOSED',
-        provider: PROVIDER,
-        raw: { kind: 'extension_disposed' },
-      }),
-      true
-    );
+  function assertLive(runCtx: RuntimeContext): void {
+    if (disposed) throw createDisposedHalt(runCtx, PROVIDER);
   }
 
   /**
-   * Maps a failed S3 call. A failure after dispose() is the cancelled
-   * in-flight request, so it throws the #DISPOSED halt instead of the raw cause.
+   * Throws the #DISPOSED halt when dispose() cancelled the request in flight
+   * (disposed and the error is abort-shaped). Other errors return to the caller.
+   */
+  function throwIfDisposeCancelled(
+    runCtx: RuntimeContext,
+    error: unknown
+  ): void {
+    const halt = disposedHaltFor(runCtx, PROVIDER, error, disposed);
+    if (halt !== undefined) throw halt;
+  }
+
+  /**
+   * Maps a failed S3 call. A #DISPOSED halt raised between steps passes
+   * through; an abort-shaped failure after dispose() is the cancelled in-flight
+   * request and throws #DISPOSED. Any other error keeps its own code.
    */
   function mapError(runCtx: RuntimeContext, error: unknown): RillValue {
-    if (disposed) throw disposedInvalid(runCtx);
+    if (
+      error instanceof RuntimeHaltSignal &&
+      getStatus(error.value).code.name === 'DISPOSED'
+    ) {
+      throw error;
+    }
+    throwIfDisposeCancelled(runCtx, error);
     return mapS3Error(runCtx, error);
   }
 
@@ -406,7 +428,7 @@ export function createS3FsExtension(
 
   const read: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -422,6 +444,7 @@ export function createS3FsExtension(
       const sizeCheck = checkFileSize(runCtx, size, mount, key);
       if (sizeCheck) return sizeCheck;
 
+      assertLive(runCtx);
       const getResult = await s3Client.send(
         new GetObjectCommand({ Bucket: mount.bucket, Key: key }),
         { abortSignal: requestSignal() }
@@ -435,7 +458,7 @@ export function createS3FsExtension(
 
   const write: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -464,7 +487,7 @@ export function createS3FsExtension(
 
   const append: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -494,6 +517,7 @@ export function createS3FsExtension(
     if (sizeCheck) return sizeCheck;
 
     try {
+      assertLive(runCtx);
       await s3Client.send(
         new PutObjectCommand({
           Bucket: mount.bucket,
@@ -511,7 +535,7 @@ export function createS3FsExtension(
 
   const list: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -561,7 +585,7 @@ export function createS3FsExtension(
 
   const find: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -574,6 +598,7 @@ export function createS3FsExtension(
 
     try {
       do {
+        assertLive(runCtx);
         const result = await s3Client.send(
           new ListObjectsV2Command({
             Bucket: mount.bucket,
@@ -607,7 +632,7 @@ export function createS3FsExtension(
 
   const exists: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -621,6 +646,7 @@ export function createS3FsExtension(
       );
       return true;
     } catch (error) {
+      throwIfDisposeCancelled(runCtx, error);
       const name = (error as S3ErrorLike)?.name;
       const status = (error as S3ErrorLike)?.$metadata?.httpStatusCode;
       if (name === 'NotFound' || name === 'NoSuchKey' || status === 404)
@@ -631,7 +657,7 @@ export function createS3FsExtension(
 
   const remove: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -645,6 +671,7 @@ export function createS3FsExtension(
           { abortSignal: requestSignal() }
         );
       } catch (error) {
+        throwIfDisposeCancelled(runCtx, error);
         const name = (error as S3ErrorLike)?.name;
         const status = (error as S3ErrorLike)?.$metadata?.httpStatusCode;
         if (name === 'NotFound' || name === 'NoSuchKey' || status === 404)
@@ -652,6 +679,7 @@ export function createS3FsExtension(
         return mapError(runCtx, error);
       }
 
+      assertLive(runCtx);
       await s3Client.send(
         new DeleteObjectCommand({ Bucket: mount.bucket, Key: key }),
         { abortSignal: requestSignal() }
@@ -664,7 +692,7 @@ export function createS3FsExtension(
 
   const stat: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
@@ -690,7 +718,7 @@ export function createS3FsExtension(
 
   const mkdir: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     return true;
@@ -698,7 +726,7 @@ export function createS3FsExtension(
 
   const copy: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const src = parseMountPath(runCtx, args['src'] as string);
     if (!src.ok) return src.invalid;
     const dest = parseMountPath(runCtx, args['dest'] as string);
@@ -735,6 +763,7 @@ export function createS3FsExtension(
       const sizeCheck = checkFileSize(runCtx, size, dest.mount, dest.key);
       if (sizeCheck) return sizeCheck;
 
+      assertLive(runCtx);
       await s3Client.send(
         new CopyObjectCommand({
           Bucket: src.mount.bucket,
@@ -751,9 +780,10 @@ export function createS3FsExtension(
 
   const move: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const copied = await copy(args, runtimeCtx);
     if (copied !== true) return copied;
+    assertLive(runCtx);
 
     const src = parseMountPath(runCtx, args['src'] as string);
     if (!src.ok) return src.invalid;
@@ -770,7 +800,7 @@ export function createS3FsExtension(
   };
 
   const mountsList: CallableFn = async (_args, runtimeCtx) => {
-    if (disposed) throw disposedInvalid(runtimeCtx as RuntimeContext);
+    assertLive(runtimeCtx as RuntimeContext);
     const result: RillValue[] = [];
     for (const [name, mount] of Object.entries(config.mounts)) {
       result.push({
