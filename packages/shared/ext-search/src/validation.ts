@@ -1,9 +1,9 @@
-import type { RuntimeContext } from '@rcrsr/rill';
-
 /**
  * Configuration validation utilities for search extensions.
  * Validates required fields with type-safe assertions.
  */
+
+import type { RuntimeContext } from '@rcrsr/rill';
 
 /**
  * Validate that a configuration field is present and non-empty.

@@ -194,7 +194,7 @@ export function toAddressList(
     return failInput(
       ctx,
       'invalid_recipient',
-      'outlook: recipient must be a string'
+      'outlook: each recipient or attendee must be a string, number or boolean'
     );
   });
 }

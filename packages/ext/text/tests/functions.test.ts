@@ -404,10 +404,6 @@ describe('window', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// truncate
-// ---------------------------------------------------------------------------
-
 describe('host function results', () => {
   it('returns a Promise from a host function', async () => {
     const result = getCallable(ext, 'truncate').fn(
@@ -418,6 +414,10 @@ describe('host function results', () => {
     await result;
   });
 });
+
+// ---------------------------------------------------------------------------
+// truncate
+// ---------------------------------------------------------------------------
 
 describe('truncate', () => {
   it('AC-20: truncates to first max characters', async () => {
