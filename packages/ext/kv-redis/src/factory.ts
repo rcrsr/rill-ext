@@ -121,8 +121,10 @@ export function createRedisKvExtension(
     // disconnect() closes the socket now and rejects queued and in-flight
     // commands. quit() would wait for every pending reply, so dispose() would
     // not stop work already issued.
-    client.disconnect();
-    return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      client.disconnect();
+      resolve();
+    });
   };
 
   if (ctx?.signal) {

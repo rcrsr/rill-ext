@@ -186,7 +186,7 @@ export function ccChoiceToCanonical(
   const parts: Part[] = [];
   const msg = choice.message;
 
-  if (msg.content !== null && msg.content !== '') {
+  if (typeof msg.content === 'string' && msg.content !== '') {
     parts.push({ type: 'text', text: msg.content });
   }
 

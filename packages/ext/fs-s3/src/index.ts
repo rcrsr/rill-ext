@@ -221,9 +221,11 @@ export function createS3FsExtension(
   const dispose = (): Promise<void> => {
     if (disposed) return Promise.resolve();
     disposed = true;
-    lifetime.abort();
-    s3Client.destroy();
-    return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      lifetime.abort();
+      s3Client.destroy();
+      resolve();
+    });
   };
 
   if (ctx?.signal) {
