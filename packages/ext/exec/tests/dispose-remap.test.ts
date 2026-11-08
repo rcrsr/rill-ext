@@ -7,7 +7,12 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import {
+  RuntimeHaltSignal,
+  getStatus,
+  type RillValue,
+  type RuntimeContext,
+} from '@rcrsr/rill';
 import { createExecExtension } from '../src/factory.js';
 import {
   getCallable,
@@ -54,7 +59,7 @@ function settle(value: RillValue): void {
 }
 
 describe('exec in-flight dispose remap', () => {
-  it('maps an abort caused by dispose to DISPOSED', async () => {
+  it('throws DISPOSED for an abort caused by dispose', async () => {
     const { ext, result, ctx } = startCommand();
     await ext.dispose!();
 
@@ -66,7 +71,9 @@ describe('exec in-flight dispose remap', () => {
       })
     );
 
-    const status = invalidStatus(await result);
+    const thrown = await result.catch((e: unknown) => e);
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
     expect(status.code.name).toBe('DISPOSED');
     expect(status.raw['kind']).toBe('extension_disposed');
   });
@@ -86,5 +93,21 @@ describe('exec in-flight dispose remap', () => {
     const status = invalidStatus(await result);
     expect(status.code.name).toBe('INVALID_INPUT');
     expect(status.raw['kind']).toBe('binary_not_found');
+  });
+
+  it('keeps the original atom when an abort-kind failure is not abort-shaped', async () => {
+    const { ext, result, ctx } = startCommand();
+
+    settle(
+      ctx.invalidate(new Error('command "tool" aborted'), {
+        code: 'TIMEOUT',
+        provider: 'exec',
+        raw: { kind: 'aborted', commandName: 'tool' },
+      })
+    );
+
+    const status = invalidStatus(await result);
+    expect(status.code.name).toBe('TIMEOUT');
+    await ext.dispose!();
   });
 });

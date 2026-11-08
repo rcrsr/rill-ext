@@ -8,6 +8,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeContext } from '@rcrsr/rill';
+import { createDisposedHalt } from '@rcrsr/rill-ext-lifecycle-shared';
 import {
   anyTypeValue,
   emitExtensionEvent,
@@ -16,7 +17,8 @@ import {
 } from '@rcrsr/rill';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import {
-  failDisposed,
+  PROVIDER,
+  haltIfCancelledByDispose,
   isDisposed,
   failInput,
   failTimeout,
@@ -163,7 +165,7 @@ export function createReadResourceFunction(
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
     if (isDisposed(lifecycleState)) {
-      throw failDisposed(ctx);
+      throw createDisposedHalt(ctx, PROVIDER);
     }
 
     if (!lifecycleState.connectEmitted) {
@@ -203,9 +205,8 @@ export function createReadResourceFunction(
 
       return parseResourceContent(result);
     } catch (error) {
-      if (isDisposed(lifecycleState)) {
-        return failDisposed(ctx).value;
-      }
+      const halt = haltIfCancelledByDispose(ctx, lifecycleState, error);
+      if (halt !== undefined) throw halt;
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
@@ -270,7 +271,7 @@ function createStaticResourceFunction(
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
     if (isDisposed(lifecycleState)) {
-      throw failDisposed(ctx);
+      throw createDisposedHalt(ctx, PROVIDER);
     }
 
     if (!lifecycleState.connectEmitted) {
@@ -302,9 +303,8 @@ function createStaticResourceFunction(
 
       return parseResourceContent(result);
     } catch (error) {
-      if (isDisposed(lifecycleState)) {
-        return failDisposed(ctx).value;
-      }
+      const halt = haltIfCancelledByDispose(ctx, lifecycleState, error);
+      if (halt !== undefined) throw halt;
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
@@ -412,7 +412,7 @@ function createResourceTemplateFunction(
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
     if (isDisposed(lifecycleState)) {
-      throw failDisposed(ctx);
+      throw createDisposedHalt(ctx, PROVIDER);
     }
 
     if (!lifecycleState.connectEmitted) {
@@ -462,9 +462,8 @@ function createResourceTemplateFunction(
 
       return parseResourceContent(result);
     } catch (error) {
-      if (isDisposed(lifecycleState)) {
-        return failDisposed(ctx).value;
-      }
+      const halt = haltIfCancelledByDispose(ctx, lifecycleState, error);
+      if (halt !== undefined) throw halt;
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',

@@ -243,7 +243,7 @@ Configure via `calendar.denyAllDay`.
 
 The extension evaluates gates in this order for every call:
 
-1. **Disposal check** — throws `google: operation cancelled` if `dispose()` was called.
+1. **Disposal check** — throws `google-workspace: extension disposed` if `dispose()` was called.
 2. **Capability gate** — throws `google: <service>.<capability> not enabled` if the flag is `false`.
 3. **Allowlist/denylist check** — throws the relevant label, folder, MIME type, or calendar error.
 4. **Token resolution** — resolves the bearer token from config or RuntimeContext.

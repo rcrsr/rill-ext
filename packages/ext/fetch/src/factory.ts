@@ -16,6 +16,10 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
+import {
+  createDisposedHalt,
+  throwIfCancelledByDispose,
+} from '@rcrsr/rill-ext-lifecycle-shared';
 import type {
   FetchExtensionConfig,
   EndpointConfig,
@@ -25,11 +29,11 @@ import {
   buildRequest,
   executeRequest,
   createSemaphore,
-  failDisposed,
   type InternalFetchConfig,
   type InternalEndpointConfig,
   type EndpointArg,
   type Semaphore,
+  PROVIDER,
 } from './request.js';
 
 // ============================================================
@@ -232,20 +236,20 @@ export function createFetchExtension(
           semaphore
         );
 
-        // dispose() cancelled this request: report DISPOSED, not TIMEOUT.
-        // Only the abort-shaped failure is remapped; a genuine failure that
-        // resolved while dispose ran keeps its own atom.
+        // dispose() cancelled this request: executeRequest maps the abort to a
+        // request_timeout invalid, which is remapped to a thrown #DISPOSED.
+        // A genuine failure that resolved while dispose ran keeps its own atom.
         if (
-          disposed &&
           controller.signal.aborted &&
           isInvalid(result) &&
           getStatus(result).raw['kind'] === 'request_timeout'
         ) {
-          return runCtx.invalidate(new Error('fetch: extension disposed'), {
-            code: 'DISPOSED',
-            provider: 'fetch',
-            raw: { kind: 'extension_disposed' },
-          });
+          throwIfCancelledByDispose(
+            runCtx,
+            PROVIDER,
+            controller.signal.reason,
+            disposed
+          );
         }
 
         return result;
@@ -356,7 +360,7 @@ export function createFetchExtension(
     const guarded: RillFunction = {
       ...def,
       fn: (args, ctxLike, location) => {
-        if (disposed) throw failDisposed(ctxLike);
+        if (disposed) throw createDisposedHalt(ctxLike, PROVIDER);
         return def.fn(args, ctxLike, location);
       },
     };

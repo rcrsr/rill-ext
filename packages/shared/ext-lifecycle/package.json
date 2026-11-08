@@ -1,0 +1,32 @@
+{
+  "name": "@rcrsr/rill-ext-lifecycle-shared",
+  "private": true,
+  "version": "0.23.0",
+  "description": "Shared dispose-cancellation helpers for rill extensions",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --type-aware --config ../../../.oxlintrc.json src/ tests/",
+    "check": "pnpm run build && pnpm run test && pnpm run lint"
+  },
+  "peerDependencies": {
+    "@rcrsr/rill": "~0.23.0"
+  },
+  "devDependencies": {
+    "@rcrsr/rill": "~0.23.0",
+    "@types/node": "^26.6.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rcrsr/rill-ext.git",
+    "directory": "packages/shared/ext-lifecycle"
+  }
+}

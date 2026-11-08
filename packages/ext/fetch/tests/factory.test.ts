@@ -528,7 +528,7 @@ describe('createFetchExtension', () => {
       expect(() => dispose!()).not.toThrow();
     });
 
-    it('returns DISPOSED for in-flight requests aborted by dispose', async () => {
+    it('throws DISPOSED for in-flight requests aborted by dispose', async () => {
       mockResponses.push({ status: 200, body: '{"id":123}', delay: 500 });
 
       const config: FetchExtensionConfig = {
@@ -553,11 +553,97 @@ describe('createFetchExtension', () => {
       expect(ext.dispose).toBeDefined();
       ext.dispose!();
 
-      const result = await requestPromise;
-      const status = getStatus(result);
+      const thrown = await Promise.resolve(requestPromise).catch(
+        (e: unknown) => e
+      );
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
       expect(status.code.name).toBe('DISPOSED');
       expect(status.provider).toBe('fetch');
       expect(status.raw).toMatchObject({ kind: 'extension_disposed' });
+    });
+
+    it('throws DISPOSED for a call queued on the concurrency limit', async () => {
+      mockResponses.push({ status: 200, body: '{"id":1}', delay: 5_000 });
+
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        maxConcurrent: 1,
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+          },
+        },
+      };
+
+      const ext = createFetchExtension(config, makeFactoryCtx());
+      const running = Promise.resolve(
+        getCallable(ext, 'getUser').fn({ id: '1' }, makeRuntimeCtx())
+      ).catch((e: unknown) => e);
+      const queued = Promise.resolve(
+        getCallable(ext, 'getUser').fn({ id: '2' }, makeRuntimeCtx())
+      ).catch((e: unknown) => e);
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 20);
+      });
+      expect(fetchCallCount).toBe(1);
+
+      const started = Date.now();
+      ext.dispose!();
+      const [runningResult, queuedResult] = await Promise.all([
+        running,
+        queued,
+      ]);
+
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(fetchCallCount).toBe(1);
+      for (const thrown of [runningResult, queuedResult]) {
+        expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+        expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
+          'DISPOSED'
+        );
+      }
+    });
+
+    it('throws DISPOSED without waiting out the retry backoff', async () => {
+      mockResponses.push({ status: 503, body: 'unavailable' });
+
+      const config: FetchExtensionConfig = {
+        baseUrl: 'https://api.example.com',
+        retries: 1,
+        retryDelay: 60_000,
+        endpoints: {
+          getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            params: [{ name: 'id', type: 'string', location: 'path' }],
+          },
+        },
+      };
+
+      const ext = createFetchExtension(config, makeFactoryCtx());
+      const requestPromise = getCallable(ext, 'getUser').fn(
+        { id: '123' },
+        makeRuntimeCtx()
+      );
+      // Let the 503 resolve so the call is inside the backoff sleep.
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 20);
+      });
+      ext.dispose!();
+
+      const started = Date.now();
+      const thrown = await Promise.resolve(requestPromise).catch(
+        (e: unknown) => e
+      );
+      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
+        'DISPOSED'
+      );
     });
 
     it('keeps the original atom when a response fails while dispose runs', async () => {
@@ -587,7 +673,7 @@ describe('createFetchExtension', () => {
       ext.dispose!();
 
       const status = getStatus(await requestPromise);
-      expect(status.code.name).not.toBe('DISPOSED');
+      expect(status.code.name).toBe('NOT_FOUND');
       expect(status.raw['kind']).not.toBe('extension_disposed');
     });
 

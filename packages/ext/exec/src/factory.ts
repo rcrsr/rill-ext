@@ -21,7 +21,11 @@ import type {
   CommandResult,
   ExecExtensionConfig,
 } from './types.js';
-import { failDisposed, runCommand } from './runner.js';
+import {
+  createDisposedHalt,
+  throwIfCancelledByDispose,
+} from '@rcrsr/rill-ext-lifecycle-shared';
+import { PROVIDER, runCommand } from './runner.js';
 
 /**
  * Creates an exec extension with sandboxed command execution.
@@ -101,19 +105,19 @@ export function createExecExtension(
         );
 
         if (isInvalid(result as RillValue)) {
-          // dispose() cancelled this command: report DISPOSED, not TIMEOUT.
-          // Only the abort-shaped failure is remapped; a genuine failure that
-          // resolved while dispose ran keeps its own atom.
+          // dispose() cancelled this command: runCommand maps the abort to an
+          // 'aborted' invalid, which is remapped to a thrown #DISPOSED. A
+          // genuine failure that resolved while dispose ran keeps its own atom.
           if (
-            disposed &&
             controller.signal.aborted &&
             getStatus(result as RillValue).raw['kind'] === 'aborted'
           ) {
-            return runCtx.invalidate(new Error('exec: extension disposed'), {
-              code: 'DISPOSED',
-              provider: 'exec',
-              raw: { kind: 'extension_disposed' },
-            });
+            throwIfCancelledByDispose(
+              runCtx,
+              PROVIDER,
+              controller.signal.reason,
+              disposed
+            );
           }
           return result as RillValue;
         }
@@ -212,7 +216,8 @@ export function createExecExtension(
     const guarded: RillFunction = {
       ...def,
       fn: (args, runCtx, location) => {
-        if (disposed) throw failDisposed(runCtx as RuntimeContext);
+        if (disposed)
+          throw createDisposedHalt(runCtx as RuntimeContext, PROVIDER);
         return def.fn(args, runCtx, location);
       },
     };

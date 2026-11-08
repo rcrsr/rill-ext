@@ -1,4 +1,5 @@
 import {
+  RuntimeError,
   RuntimeHaltSignal,
   type RillValue,
   type RuntimeContext,
@@ -21,15 +22,48 @@ export function buildDisposedInvalid(
   ctx: RuntimeContext,
   provider: string
 ): RillValue {
-  const error = new Error(`${provider}: operation cancelled`);
+  const error = new Error(`${provider}: extension disposed`);
   return ctx.invalidate(error, {
     code: 'DISPOSED',
     provider,
     raw: {
       kind: 'extension_disposed',
-      message: `${provider}: operation cancelled`,
+      message: `${provider}: extension disposed`,
     },
   });
+}
+
+function causeOf(error: unknown): unknown {
+  if (error instanceof RuntimeError) {
+    const ctxCause = error.context?.['cause'];
+    if (ctxCause !== undefined) return ctxCause;
+  }
+  return error instanceof Error ? error.cause : undefined;
+}
+
+/**
+ * True for errors an aborted request produces: `AbortError` (fetch,
+ * `DOMException`), or any error whose `cause` chain contains one.
+ * `TimeoutError` (from `AbortSignal.timeout`) is not abort-shaped: a request
+ * that timed out on its own keeps its timeout code even after dispose.
+ *
+ * Local twin of `isAbortShaped` in ext-lifecycle; shared packages never
+ * import each other. Not re-exported from the barrel.
+ */
+export function isAbortShaped(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8; depth++) {
+    if (
+      typeof current === 'object' &&
+      current !== null &&
+      (current as { name?: unknown }).name === 'AbortError'
+    ) {
+      return true;
+    }
+    current = causeOf(current);
+    if (current === undefined) return false;
+  }
+  return false;
 }
 
 /**

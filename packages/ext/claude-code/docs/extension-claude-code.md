@@ -198,7 +198,7 @@ generic atoms. Host scripts match coarsely (`guard #UNAVAILABLE`) or finely
 | CLI exceeded configured timeout | `#TIMEOUT` | `cli_timeout` |
 | Cooperative cancellation propagated from `ctx.signal` | `#TIMEOUT` | `request_cancelled` |
 | CLI exited with a non-zero status | `#UNAVAILABLE` | `exit_nonzero` |
-| In-flight call cancelled by `dispose()` (returned) | `#DISPOSED` | `extension_disposed` |
+| In-flight call cancelled by `dispose()` (thrown; abort-shaped failures only, any other error keeps its own code) | `#DISPOSED` | `extension_disposed` |
 | Other spawn / process failure | `#UNAVAILABLE` | `unknown_error` |
 | Any call after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
 

@@ -12,7 +12,6 @@ import type { IPty } from 'node-pty';
 import {
   createRuntimeContext,
   getStatus,
-  isInvalid,
   RuntimeHaltSignal,
 } from '@rcrsr/rill';
 import { SpawnError } from '../src/errors.js';
@@ -735,7 +734,7 @@ describe('In-flight call cancelled by dispose', () => {
   const cancelled = (): SpawnError =>
     new SpawnError('request_cancelled', 'cancelled');
 
-  it('returns DISPOSED with extension_disposed when extension dispose cancels the call', async () => {
+  it('throws DISPOSED with extension_disposed when extension dispose cancels the call', async () => {
     const { disposeFn } = await startCancellable(cancelled);
     const events: Array<{ event?: unknown }> = [];
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -752,9 +751,9 @@ describe('In-flight call cancelled by dispose', () => {
     await ext.dispose!();
     expect(disposeFn).toHaveBeenCalledTimes(1);
 
-    const result = await resolveStream(stream);
-    expect(isInvalid(result as never)).toBe(true);
-    const status = getStatus(result as never);
+    const thrown = await resolveStream(stream).catch((e: unknown) => e);
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
     expect(status.code.name).toBe('DISPOSED');
     expect(status.raw['kind']).toBe('extension_disposed');
     expect(status.provider).toBe('claude-code');
@@ -780,7 +779,7 @@ describe('In-flight call cancelled by dispose', () => {
     expect(status.provider).toBe('claude-code');
   });
 
-  it('ignores non-request_cancelled exit errors when the extension is disposed', async () => {
+  it('keeps its own code for a non-request_cancelled exit error after dispose', async () => {
     const { disposeFn } = await startCancellable(
       () =>
         new SpawnError('exit_nonzero', 'exited with code 1', { exit_code: 1 })

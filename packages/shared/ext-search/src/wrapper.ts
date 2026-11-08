@@ -2,20 +2,26 @@
  * Function wrapper factory for search extensions.
  * Combines disposal check, in-flight tracking, timing, event emission,
  * and error mapping. Operation errors surface as invalid RillValues via
- * `ctx.invalidate`; a call after dispose throws the `#DISPOSED` invalid value.
+ * `ctx.invalidate`; a call after dispose, and an in-flight call cancelled by
+ * dispose, throw the `#DISPOSED` halt.
  *
  * Emits rill-core generic atoms (`#TIMEOUT`, `#DISPOSED`, `#UNAVAILABLE`,
  * etc.) directly. No per-extension atom registration required.
  */
 
 import {
+  RuntimeHaltSignal,
   type RillValue,
   type RuntimeContext,
   getStatus,
   isInvalid,
 } from '@rcrsr/rill';
 import type { DisposalState, InFlightState } from './types.js';
-import { buildDisposedInvalid, checkDisposed } from './disposal.js';
+import {
+  buildDisposedInvalid,
+  checkDisposed,
+  isAbortShaped,
+} from './disposal.js';
 import { trackRequest } from './request.js';
 import { mapSearchError } from './errors.js';
 import { emitSuccessEvent, emitErrorEvent } from './events.js';
@@ -45,7 +51,8 @@ export type WrapFunction = (
  * Create a function wrapper that adds disposal check, in-flight tracking,
  * timing, event emission, and error mapping. The disposal check throws a
  * catchable RuntimeHaltSignal wrapping the #DISPOSED invalid
- * before any work starts (before tracking or events); all other failures are
+ * before any work starts (before tracking or events). An abort-shaped failure
+ * on a disposed extension throws the same halt; all other failures are
  * returned.
  *
  * @param provider - Extension provider name (e.g., "exa", "tavily")
@@ -91,15 +98,17 @@ export function createSearchFunctionWrapper(
         return result;
       } catch (error: unknown) {
         const duration = Date.now() - startTime;
-        // dispose() cancelled this request: disposal wins over any other
-        // classification. Only abortAll aborts `controller`; a ctx.signal
-        // abort leaves it clear and maps through mapSearchError.
-        const invalid =
-          disposalState.isDisposed || controller.signal.aborted
-            ? buildDisposedInvalid(ctx, provider)
-            : isInvalid(error as RillValue)
-              ? (error as RillValue)
-              : mapSearchError(ctx, provider, error);
+        // dispose() cancelled this request: an abort-shaped failure on a
+        // disposed extension throws the #DISPOSED halt. Any other error,
+        // including one that settles after dispose, keeps its own code.
+        if (disposalState.isDisposed && isAbortShaped(error)) {
+          const disposed = buildDisposedInvalid(ctx, provider);
+          emitErrorEvent(ctx, provider, duration, getStatus(disposed).message);
+          throw new RuntimeHaltSignal(disposed, true);
+        }
+        const invalid = isInvalid(error as RillValue)
+          ? (error as RillValue)
+          : mapSearchError(ctx, provider, error);
         const status = getStatus(invalid);
         emitErrorEvent(ctx, provider, duration, status.message);
         return invalid;

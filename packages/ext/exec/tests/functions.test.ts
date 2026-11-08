@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { RuntimeHaltSignal, getStatus } from '@rcrsr/rill';
 import { createExecExtension } from '../src/factory.js';
 import { runCommand } from '../src/runner.js';
 import type { CommandConfig } from '../src/types.js';
@@ -298,7 +299,7 @@ describe('runner: error handling', () => {
     expect(status.message).toMatch(/timed out.*100ms/);
   });
 
-  it('returns DISPOSED when dispose aborts a running command', async () => {
+  it('throws DISPOSED when dispose aborts a running command', async () => {
     const ext = createExecExtension(
       { commands: { sleep: { binary: 'sleep', maxBuffer: 1024 } } },
       makeFactoryCtx()
@@ -309,8 +310,10 @@ describe('runner: error handling', () => {
       makeRuntimeCtx()
     );
     await ext.dispose!();
-    const status = invalidStatus(await pending);
+    const thrown = await Promise.resolve(pending).catch((e: unknown) => e);
 
+    expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((thrown as RuntimeHaltSignal).value);
     expect(status.code.name).toBe('DISPOSED');
     expect(status.raw['kind']).toBe('extension_disposed');
   });

@@ -544,4 +544,54 @@ describe('Exa extension host functions', () => {
       );
     });
   });
+
+  // ============================================================
+  // dispose with in-flight requests
+  // ============================================================
+
+  describe('dispose with in-flight requests', () => {
+    it('throws DISPOSED for an in-flight search aborted by dispose', async () => {
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          });
+        });
+
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
+      const ctx = createRuntimeContext();
+
+      const promise = getCallable(ext, 'search').fn({ query: 'test' }, ctx);
+      await ext.dispose!();
+
+      await expectDisposedThrow(() => promise, 'exa');
+    });
+
+    it('keeps its own code for a non-abort error that settles after dispose', async () => {
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new Error('socket hang up'));
+            });
+          });
+        });
+
+      const ext = createExaExtension(VALID_CONFIG, makeFactoryCtx());
+      const ctx = createRuntimeContext();
+
+      const promise = getCallable(ext, 'search').fn({ query: 'test' }, ctx);
+      await ext.dispose!();
+
+      const result = await promise;
+      expect(isInvalid(result as RillValue)).toBe(true);
+      expect(getStatus(result as RillValue).code.name).toBe('UNAVAILABLE');
+    });
+  });
 });

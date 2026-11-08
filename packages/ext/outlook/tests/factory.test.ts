@@ -417,7 +417,7 @@ describe('createOutlookExtension', () => {
       );
     });
 
-    it('returns #DISPOSED for an in-flight call aborted by dispose', async () => {
+    it('throws #DISPOSED for an in-flight call aborted by dispose', async () => {
       globalThis.fetch = vi.fn<typeof fetch>(
         (_input, init) =>
           new Promise((_resolve, reject) => {
@@ -435,15 +435,35 @@ describe('createOutlookExtension', () => {
 
       const pending = getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
       await ext.dispose!();
-      const result = (await pending) as RillValue;
+      const thrown = await captureThrown(() => pending);
 
-      expect(isInvalid(result)).toBe(true);
-      const status = getStatus(result);
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
       expect(status.code.name).toBe('DISPOSED');
       expect(status.raw['kind']).toBe('extension_disposed');
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({ event: 'outlook:error' })
       );
+    });
+
+    it('keeps its own code for a non-abort error that settles after dispose', async () => {
+      globalThis.fetch = vi.fn<typeof fetch>(
+        (_input, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new TypeError('fetch failed'));
+            });
+          })
+      );
+      const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
+      const ctx = createRuntimeContext();
+
+      const pending = getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
+      await ext.dispose!();
+      const result = (await pending) as RillValue;
+
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
     });
 
     it.each(POST_DISPOSE_CASES)(
@@ -470,7 +490,7 @@ describe('createOutlookExtension', () => {
         expect(status.code.name).toBe('DISPOSED');
         expect(status.provider).toBe('outlook');
         expect(status.raw['kind']).toBe('extension_disposed');
-        expect(status.message).toBe('outlook: operation cancelled');
+        expect(status.message).toBe('outlook: extension disposed');
         expect(onLogEvent).toHaveBeenCalledWith(
           expect.objectContaining({
             event: 'outlook:error',

@@ -85,18 +85,6 @@ export function mapSpawnError(ctx: RuntimeContext, error: unknown): RillValue {
   });
 }
 
-/** Call made after the extension was disposed. */
-export function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
-  return new RuntimeHaltSignal(
-    ctx.invalidate(new Error('claude-code: extension disposed'), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed' },
-    }),
-    true
-  );
-}
-
 function codeForKind(
   kind: SpawnErrorKind
 ): 'UNAVAILABLE' | 'FORBIDDEN' | 'TIMEOUT' {

@@ -31,7 +31,7 @@ declare -a AREAS=(
   "area:prompt|prompt/content processing: prompt-md, text, shared/ext-prompt"
   "area:integrations|third-party integrations: Outlook, Google Workspace, Claude Code"
   "area:utils|native-primitive extensions: crypto, exec, fetch, datetime"
-  "area:shared|cross-cutting foundations: shared/ext-param (p.* helpers)"
+  "area:shared|cross-cutting foundations: shared/ext-param (p.* helpers), shared/ext-lifecycle (dispose helpers)"
   "area:docs|documentation content: per-package docs, README, CHANGELOG"
   "area:dx|CI, toolchain, lint/format rules, root workspace config"
 )

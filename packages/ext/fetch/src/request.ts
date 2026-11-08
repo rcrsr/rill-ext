@@ -86,25 +86,15 @@ export interface FetchOptions {
   signal?: AbortSignal | undefined;
 }
 
-const PROVIDER = 'fetch';
-
-/**
- * Build the invalid value thrown when a host function is called after dispose.
- */
-export function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
-  return new RuntimeHaltSignal(
-    ctx.invalidate(new Error(`${PROVIDER}: extension disposed`), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed' },
-    }),
-    true
-  );
-}
+export const PROVIDER = 'fetch';
 
 // ============================================================
 // CONCURRENCY SEMAPHORE
 // ============================================================
+
+function createAbortError(): DOMException {
+  return new DOMException('The operation was aborted', 'AbortError');
+}
 
 /**
  * Simple semaphore for limiting concurrent requests.
@@ -118,13 +108,28 @@ export class Semaphore {
     this.permits = permits;
   }
 
-  async acquire(): Promise<void> {
+  /**
+   * Acquire a permit. When `signal` aborts while waiting, the waiter leaves
+   * the queue and the promise rejects with an `AbortError`.
+   */
+  async acquire(signal?: AbortSignal | undefined): Promise<void> {
+    if (signal?.aborted) throw createAbortError();
     if (this.permits > 0) {
       this.permits--;
       return;
     }
-    return new Promise((resolve) => {
-      this.queue.push(resolve);
+    return new Promise((resolve, reject) => {
+      const waiter = (): void => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      };
+      const onAbort = (): void => {
+        const index = this.queue.indexOf(waiter);
+        if (index !== -1) this.queue.splice(index, 1);
+        reject(createAbortError());
+      };
+      this.queue.push(waiter);
+      signal?.addEventListener('abort', onAbort, { once: true });
     });
   }
 
@@ -269,8 +274,24 @@ function calculateBackoff(baseDelay: number, attempt: number): number {
   return baseDelay * Math.pow(2, attempt);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Wait `ms` milliseconds, or until `signal` aborts, whichever comes first.
+ * An abort ends the wait early without rejecting: the retry loop's next
+ * request attempt then fails on the aborted signal.
+ */
+function sleep(ms: number, signal?: AbortSignal | undefined): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 // ============================================================
@@ -299,10 +320,19 @@ export async function executeRequest(
   let lastError: Error | null = null;
   let attempt = 0;
 
+  // Dispose and host cancellation end the backoff wait and the semaphore wait.
+  const cancelSignals = [options.signal, ctx.signal].filter(
+    (signal): signal is AbortSignal => signal !== undefined
+  );
+  const cancelSignal =
+    cancelSignals.length > 0 ? AbortSignal.any(cancelSignals) : undefined;
+
   while (attempt <= retryLimit) {
     try {
+      if (cancelSignal?.aborted) throw createAbortError();
+
       if (semaphore) {
-        await semaphore.acquire();
+        await semaphore.acquire(cancelSignal);
       }
 
       try {
@@ -359,7 +389,7 @@ export async function executeRequest(
                   }
                 }
 
-                await sleep(delay);
+                await sleep(delay, cancelSignal);
                 attempt++;
                 continue;
               } else {
@@ -461,7 +491,7 @@ export async function executeRequest(
       if (error instanceof TypeError) {
         if (attempt < retryLimit) {
           const delay = calculateBackoff(retryDelay, attempt);
-          await sleep(delay);
+          await sleep(delay, cancelSignal);
           attempt++;
           lastError = error;
           continue;

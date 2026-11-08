@@ -7,6 +7,7 @@
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { RillFunction, RillValue, RuntimeContext } from '@rcrsr/rill';
+import { createDisposedHalt } from '@rcrsr/rill-ext-lifecycle-shared';
 import {
   anyTypeValue,
   emitExtensionEvent,
@@ -16,7 +17,8 @@ import {
 } from '@rcrsr/rill';
 import type { McpLifecycleState } from './types.js';
 import {
-  failDisposed,
+  PROVIDER,
+  haltIfCancelledByDispose,
   isDisposed,
   failTool,
   failTimeout,
@@ -198,7 +200,7 @@ function generateToolFunction(
   ): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
     if (isDisposed(lifecycleState)) {
-      throw failDisposed(ctx);
+      throw createDisposedHalt(ctx, PROVIDER);
     }
 
     // Emit mcp:connect on first tool call
@@ -253,9 +255,8 @@ function generateToolFunction(
 
       return parseToolResult(result);
     } catch (error) {
-      if (isDisposed(lifecycleState)) {
-        return failDisposed(ctx).value;
-      }
+      const halt = haltIfCancelledByDispose(ctx, lifecycleState, error);
+      if (halt !== undefined) throw halt;
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',

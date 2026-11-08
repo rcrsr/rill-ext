@@ -58,7 +58,7 @@ function expectDisposedThrow(thrown: RillValue): void {
   expect(status.code.name).toBe('DISPOSED');
   expect(status.provider).toBe(PROVIDER);
   expect(status.raw['kind']).toBe('extension_disposed');
-  expect(status.message).toBe('google: operation cancelled');
+  expect(status.message).toBe('google-workspace: extension disposed');
 }
 
 function getCallable(
@@ -180,11 +180,11 @@ describe('createGoogleWorkspaceExtension', () => {
   });
 
   // ============================================================
-  // AC-6: Call after dispose → operation cancelled
+  // AC-6: Call after dispose → extension disposed
   // ============================================================
 
-  describe('AC-6: call after dispose throws "operation cancelled"', () => {
-    it('emits #DISPOSED "google: operation cancelled" when disposed', async () => {
+  describe('AC-6: call after dispose throws "extension disposed"', () => {
+    it('emits #DISPOSED "google-workspace: extension disposed" when disposed', async () => {
       const ext = createGoogleWorkspaceExtension(
         ALL_CAPS_CONFIG,
         makeFactoryCtx()
@@ -252,7 +252,7 @@ describe('createGoogleWorkspaceExtension', () => {
       globalThis.fetch = originalFetch;
     });
 
-    it('in-flight call resolves to #DISPOSED when dispose fires mid-flight (BC-5)', async () => {
+    it('in-flight call throws #DISPOSED when dispose fires mid-flight (BC-5)', async () => {
       // Arrange: mock fetch to hang until its AbortSignal fires.
       globalThis.fetch = vi.fn((_url: unknown, init?: RequestInit) => {
         return new Promise<Response>((_, reject) => {
@@ -292,15 +292,43 @@ describe('createGoogleWorkspaceExtension', () => {
       // Dispose while the call is in-flight: sets isDisposed=true and aborts controllers
       await disposeExt(ext);
 
-      // Assert: the in-flight call resolves to an invalid #DISPOSED RillValue
-      const result = (await inflight) as RillValue;
-      expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).code.name).toBe('DISPOSED');
-      expect(getStatus(result).message).toBe('google: operation cancelled');
-      expect(getStatus(result).raw['kind']).toBe('extension_disposed');
+      // Assert: the in-flight call throws a catchable #DISPOSED halt
+      const thrown = await Promise.resolve(inflight).catch((e: unknown) => e);
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expect((thrown as RuntimeHaltSignal).catchable).toBe(true);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
     });
 
-    it('multiple concurrent in-flight calls all resolve to #DISPOSED on dispose (BC-5)', async () => {
+    it('keeps its own code for a non-abort error that settles after dispose', async () => {
+      globalThis.fetch = vi.fn((_url: unknown, init?: RequestInit) => {
+        return new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new TypeError('fetch failed'));
+          });
+        });
+      }) as unknown as typeof fetch;
+
+      const ext = createGoogleWorkspaceExtension(
+        ALL_CAPS_CONFIG,
+        makeFactoryCtx()
+      );
+      const ctx = createRuntimeContext();
+      const inflight = getCallable(ext, 'gmail_search').fn(
+        { query: 'test query' },
+        ctx
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      await disposeExt(ext);
+
+      const result = (await inflight) as RillValue;
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
+    });
+
+    it('multiple concurrent in-flight calls all throw #DISPOSED on dispose (BC-5)', async () => {
       // Arrange: same hanging fetch mock
       globalThis.fetch = vi.fn((_url: unknown, init?: RequestInit) => {
         return new Promise<Response>((_, reject) => {
@@ -341,15 +369,15 @@ describe('createGoogleWorkspaceExtension', () => {
       // Dispose aborts all three in-flight controllers
       await disposeExt(ext);
 
-      // All three resolve to invalid #DISPOSED RillValues (aborted by dispose)
+      // All three throw a #DISPOSED halt (aborted by dispose)
       const results = await Promise.allSettled(calls);
       for (const result of results) {
-        expect(result.status).toBe('fulfilled');
-        if (result.status === 'fulfilled') {
-          const value = result.value as RillValue;
-          expect(isInvalid(value)).toBe(true);
-          expect(getStatus(value).code.name).toBe('DISPOSED');
-          expect(getStatus(value).raw['kind']).toBe('extension_disposed');
+        expect(result.status).toBe('rejected');
+        if (result.status === 'rejected') {
+          expect(result.reason).toBeInstanceOf(RuntimeHaltSignal);
+          const status = getStatus((result.reason as RuntimeHaltSignal).value);
+          expect(status.code.name).toBe('DISPOSED');
+          expect(status.raw['kind']).toBe('extension_disposed');
         }
       }
     });

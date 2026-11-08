@@ -21,7 +21,8 @@ import type { ClaudeCodeConfig, ClaudeMessage } from './types.js';
 import { spawnClaudeCli } from './process.js';
 import { createStreamParser } from './stream-parser.js';
 import { extractResult } from './result.js';
-import { SpawnError, failDisposed, mapSpawnError } from './errors.js';
+import { createDisposedHalt } from '@rcrsr/rill-ext-lifecycle-shared';
+import { PROVIDER, SpawnError, mapSpawnError } from './errors.js';
 
 // ============================================================
 // TYPES
@@ -221,7 +222,7 @@ function createPtyStream(
     }
 
     await exitPromise;
-    if (cancelledByExtensionDispose) throw failDisposed(ctx);
+    if (cancelledByExtensionDispose) throw createDisposedHalt(ctx, PROVIDER);
   }
 
   const retTypeStructure = {
@@ -268,14 +269,14 @@ function createPtyStream(
       }
       tracker.disposers.delete(spawn.dispose);
       spawn.dispose();
-      // Only the abort caused by extension dispose() reports DISPOSED; every
+      // Only the abort caused by extension dispose() throws DISPOSED; every
       // other exit error keeps its mapping.
       if (
         isExtensionDisposed() &&
         exitError instanceof SpawnError &&
         exitError.kind === 'request_cancelled'
       ) {
-        return failDisposed(ctx).value;
+        throw createDisposedHalt(ctx, PROVIDER);
       }
       return mapSpawnError(ctx, exitError);
     }
@@ -441,7 +442,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (args, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
-        if (disposed) throw failDisposed(ctx);
+        if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const text = args['text'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
@@ -531,7 +532,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (fnArgs, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
-        if (disposed) throw failDisposed(ctx);
+        if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
@@ -625,7 +626,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (fnArgs, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
-        if (disposed) throw failDisposed(ctx);
+        if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 

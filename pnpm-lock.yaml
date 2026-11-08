@@ -211,6 +211,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-lifecycle
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -277,6 +280,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-lifecycle
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -295,6 +301,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-lifecycle
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -396,6 +405,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-lifecycle
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -591,6 +603,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:*
+        version: link:../../shared/ext-lifecycle
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:*
         version: link:../../shared/ext-param
@@ -615,6 +630,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-lifecycle-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-lifecycle
       '@rcrsr/rill-ext-param-shared':
         specifier: workspace:^
         version: link:../../shared/ext-param
@@ -926,6 +944,15 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+
+  packages/shared/ext-lifecycle:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ~0.23.0
+        version: 0.23.0
+      '@types/node':
+        specifier: ^26.6.6
+        version: 26.6.6
 
   packages/shared/ext-llm:
     devDependencies:

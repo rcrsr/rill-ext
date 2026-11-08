@@ -14,9 +14,14 @@ import {
   makeFactoryCtx,
   makeRuntimeCtx,
   getCallable,
+  expectRejectsHalt,
   expectRejectsInvalid,
 } from '../_helpers.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ErrorCode,
+  McpError,
+  type CallToolResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import {
   createRuntimeContext,
   execute,
@@ -53,7 +58,9 @@ describe('dispose() functionality', () => {
         .spyOn(Client.prototype, 'close')
         .mockImplementation(() => {
           // The real SDK rejects pending requests when the transport closes
-          rejectToolCall(new Error('MCP error -32000: Connection closed'));
+          rejectToolCall(
+            new McpError(ErrorCode.ConnectionClosed, 'Connection closed')
+          );
           return Promise.resolve();
         });
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
@@ -109,7 +116,7 @@ describe('dispose() functionality', () => {
 
       expect(mockClose).toHaveBeenCalledTimes(1);
 
-      const pendingError = await pendingCall;
+      const pendingError = await expectRejectsHalt(pendingCall);
       await settledTracker;
       expect(settled).toBe(true);
       const pendingStatus = getStatus(pendingError);
