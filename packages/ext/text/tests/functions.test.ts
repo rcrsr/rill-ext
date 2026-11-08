@@ -404,6 +404,17 @@ describe('window', () => {
   });
 });
 
+describe('host function results', () => {
+  it('returns a Promise from a host function', async () => {
+    const result = getCallable(ext, 'truncate').fn(
+      { text: 'abc', max: 2, ellipsis: '' },
+      makeRuntimeCtx()
+    );
+    expect(result).toBeInstanceOf(Promise);
+    await result;
+  });
+});
+
 // ---------------------------------------------------------------------------
 // truncate
 // ---------------------------------------------------------------------------

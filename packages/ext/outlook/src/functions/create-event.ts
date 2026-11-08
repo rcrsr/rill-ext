@@ -3,6 +3,7 @@
  * Requires calendar.create capability. Graph returns HTTP 201 with event body.
  */
 
+import { toAddressList } from '../config.js';
 import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
@@ -52,12 +53,13 @@ export async function createEvent(
     typeof options === 'object'
   ) {
     if (Array.isArray(options['attendees'])) {
-      eventBody['attendees'] = (options['attendees'] as RillValue[]).map(
-        (addr) => ({
-          emailAddress: { address: String(addr) },
-          type: 'required',
-        })
-      );
+      eventBody['attendees'] = toAddressList(
+        options['attendees'] as RillValue[],
+        ctx
+      ).map((address) => ({
+        emailAddress: { address },
+        type: 'required',
+      }));
     }
 
     if (typeof options['location'] === 'string' && options['location'] !== '') {

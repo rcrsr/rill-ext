@@ -27,7 +27,10 @@ import {
 } from '@rcrsr/rill-ext-llm-shared';
 import { detectFoundryError } from './errors.js';
 import type { AzureOpenAI } from 'openai';
-import type { ResponseOutputItem } from 'openai/resources/responses/responses.js';
+import type {
+  ResponseOutputItem,
+  Tool,
+} from 'openai/resources/responses/responses.js';
 import type {
   FoundryConfig,
   FoundryDisposalRef,
@@ -126,8 +129,7 @@ export async function callGround(
       {
         model,
         input: query,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bing_grounding is Azure-specific and absent from the openai-node Tool union
-        tools: [bingTool] as any,
+        tools: [bingTool] as unknown as Tool[],
       },
       {
         signal: AbortSignal.any([

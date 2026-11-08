@@ -45,12 +45,12 @@ function readHaltMessage(halt: RuntimeHaltSignal): string {
   return halt.message;
 }
 
-function throwToolLoopHalt(
+function buildToolLoopHalt(
   ctx: RuntimeContextLike | undefined,
   code: string,
   kind: string,
   message: string
-): never {
+): RuntimeHaltSignal | RuntimeError {
   if (ctx !== undefined) {
     const hostCtx = ctx as RuntimeContext;
     if (typeof hostCtx.invalidate === 'function') {
@@ -59,10 +59,19 @@ function throwToolLoopHalt(
         provider: 'tool_loop',
         raw: { kind, message },
       });
-      throw new RuntimeHaltSignal(invalid, true);
+      return new RuntimeHaltSignal(invalid, true);
     }
   }
-  throw new RuntimeError('RILL-R005', message);
+  return new RuntimeError('RILL-R005', message);
+}
+
+function throwToolLoopHalt(
+  ctx: RuntimeContextLike | undefined,
+  code: string,
+  kind: string,
+  message: string
+): never {
+  throw buildToolLoopHalt(ctx, code, kind, message);
 }
 
 // Minimal context interface compatible with CallableFn signature
@@ -233,7 +242,7 @@ function patchResponseToolCallNames(
   response: unknown,
   nameMap: Map<string, string>
 ): void {
-  if (!nameMap.size || !response || typeof response !== 'object') return;
+  if (nameMap.size === 0 || !response || typeof response !== 'object') return;
   const resp = response as Record<string, unknown>;
 
   // OpenAI: choices[N].message.tool_calls[N].function.name
@@ -743,14 +752,14 @@ export async function executeToolLoop(
 
     // Append tool results — handle both single message and array of messages
     if (Array.isArray(toolResultMessage)) {
-      currentMessages.push(...toolResultMessage);
+      currentMessages.push(...(toolResultMessage as unknown[]));
     } else {
       currentMessages.push(toolResultMessage);
     }
   }
 
   // Max turns reached — halt with max_turns_exceeded
-  throwToolLoopHalt(
+  throw buildToolLoopHalt(
     context,
     'INVALID_INPUT',
     'max_turns_exceeded',

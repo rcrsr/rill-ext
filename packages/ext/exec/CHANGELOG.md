@@ -6,6 +6,7 @@
 
 - **Test suite trust:** Tests are type-checked and the abort test now fails on regression. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
+- **Non-scalar argument validation:** Non-scalar arguments return `#INVALID_INPUT` before the process spawns instead of becoming "[object Object]". ([#154](https://github.com/rcrsr/rill-ext/pull/154))
 
 ### Fixed
 

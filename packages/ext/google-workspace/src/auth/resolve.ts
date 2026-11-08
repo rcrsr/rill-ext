@@ -105,7 +105,15 @@ export async function resolveToken(
     while (scope !== undefined) {
       const value = scope.variables.get(tokenVar);
       if (value !== undefined) {
-        return String(value);
+        if (typeof value !== 'string') {
+          failAuth(
+            ctx,
+            'invalid_session_token',
+            `google: session token '${tokenVar}' must be a string`,
+            { tokenVar }
+          );
+        }
+        return value;
       }
       scope = scope.parent;
     }

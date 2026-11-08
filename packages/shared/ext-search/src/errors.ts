@@ -201,14 +201,15 @@ export function mapProviderSearchError(
     const braveBody = body as { error?: { code?: unknown } } | null | undefined;
     const code = braveBody?.error?.code;
     if (code !== undefined && code !== null) {
-      const message = `brave: access denied (${String(code)})`;
+      const codeText = formatVendorCode(code);
+      const message = `brave: access denied (${codeText})`;
       return ctx.invalidate(new Error(message), {
         code: 'FORBIDDEN',
         provider,
         raw: {
           kind: 'access_denied',
           status,
-          providerCode: String(code),
+          providerCode: codeText,
           message,
         },
       });
@@ -216,4 +217,16 @@ export function mapProviderSearchError(
   }
 
   return mapSearchError(ctx, provider, { status });
+}
+
+/**
+ * Format a vendor-supplied JSON value for diagnostics: strings unchanged,
+ * numbers and booleans via String(), anything else as JSON.
+ */
+function formatVendorCode(code: unknown): string {
+  if (typeof code === 'string') return code;
+  if (typeof code === 'number' || typeof code === 'boolean') {
+    return String(code);
+  }
+  return JSON.stringify(code);
 }

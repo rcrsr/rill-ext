@@ -105,7 +105,7 @@ export function createTextExtension(
         p.bool('word_wrap', 'Wrap output lines', true),
         p.num('word_wrap_width', 'Line wrap width in characters', 80),
       ],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const html = args['html'];
         if (typeof html !== 'string') {
@@ -166,7 +166,7 @@ export function createTextExtension(
 
     html_to_markdown: {
       params: [p.str('html', 'HTML string to convert')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const html = args['html'];
         if (typeof html !== 'string') {
@@ -204,7 +204,7 @@ export function createTextExtension(
 
     decode_entities: {
       params: [p.str('text', 'Text containing HTML entities to decode')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -222,7 +222,7 @@ export function createTextExtension(
 
     decode_quoted_printable: {
       params: [p.str('text', 'Quoted-printable encoded text to decode')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -240,7 +240,7 @@ export function createTextExtension(
 
     strip_diacritics: {
       params: [p.str('text', 'Text from which to remove diacritics')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -261,7 +261,7 @@ export function createTextExtension(
         p.str('text', 'Text to collapse whitespace in'),
         p.bool('preserve_newlines', 'Keep newline characters', false),
       ],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -294,7 +294,7 @@ export function createTextExtension(
 
     dedent: {
       params: [p.str('text', 'Indented text to dedent')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -314,7 +314,7 @@ export function createTextExtension(
 
     trim_lines: {
       params: [p.str('text', 'Text whose lines should be trimmed')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -334,7 +334,7 @@ export function createTextExtension(
 
     extract_urls: {
       params: [p.str('text', 'Text to extract URLs from')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -352,7 +352,7 @@ export function createTextExtension(
 
     extract_emails: {
       params: [p.str('text', 'Text to extract email addresses from')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -370,7 +370,7 @@ export function createTextExtension(
 
     split_paragraphs: {
       params: [p.str('text', 'Text to split into paragraphs')],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -395,7 +395,7 @@ export function createTextExtension(
           'Step size between windows; defaults to size when omitted'
         ),
       ],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -444,7 +444,7 @@ export function createTextExtension(
         p.bool('word_boundary', 'Truncate at word boundary', false),
         ellipsisParam,
       ],
-      fn: async (args, ctx) => {
+      fn: (args, ctx) => {
         const runCtx = ctx as RuntimeContext;
         const text = args['text'];
         if (typeof text !== 'string') {
@@ -502,9 +502,11 @@ export function createTextExtension(
   for (const [name, def] of Object.entries(fnDict)) {
     const guarded: RillFunction = {
       ...def,
-      fn: (args, ctx, location) => {
+      fn: (args, ctx, location): Promise<RillValue> => {
         if (disposed) throw failDisposed(ctx);
-        return def.fn(args, ctx, location);
+        return new Promise<RillValue>((resolve) => {
+          resolve(def.fn(args, ctx, location));
+        });
       },
     };
     callableDict[name] = toCallable(guarded);
@@ -512,8 +514,9 @@ export function createTextExtension(
 
   return {
     value: callableDict as unknown as RillValue,
-    dispose: async (): Promise<void> => {
+    dispose: (): Promise<void> => {
       disposed = true;
+      return Promise.resolve();
     },
   } satisfies ExtensionFactoryResult;
 }

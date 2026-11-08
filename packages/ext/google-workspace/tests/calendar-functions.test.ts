@@ -520,6 +520,34 @@ describe('EC-11: allowedCalendarIds restriction', () => {
   });
 });
 
+describe('calendar_create_event attendee validation', () => {
+  it('rejects a non-string attendee email with invalid_attendee before fetch', async () => {
+    const mockFetch = makeFetchOk({ id: 'evt-1' });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const ext = createGoogleWorkspaceExtension(
+      ALL_CAPS_CONFIG,
+      makeFactoryCtx()
+    );
+    const ctx = createRuntimeContext();
+
+    const caught = (await getCallable(ext, 'calendar_create_event').fn(
+      {
+        title: 'Meeting',
+        start_time: START_Z,
+        end_time: END_Z,
+        options: { attendees: [{ email: 42 }] },
+      },
+      ctx
+    )) as RillValue;
+    expect(isInvalid(caught)).toBe(true);
+    const status = getStatus(caught);
+    expect(status.code.name).toBe('INVALID_INPUT');
+    expect(status.raw['kind']).toBe('invalid_attendee');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
 // ============================================================
 // EC-12/EC-13: denyAllDay validation
 // ============================================================

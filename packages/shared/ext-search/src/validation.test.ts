@@ -4,7 +4,17 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { assertRequired, validateBaseUrl } from './validation.js';
+import {
+  createRuntimeContext,
+  getStatus,
+  isInvalid,
+  type RillValue,
+} from '@rcrsr/rill';
+import {
+  appendQueryOptions,
+  assertRequired,
+  validateBaseUrl,
+} from './validation.js';
 
 describe('assertRequired', () => {
   describe('Throws for missing values', () => {
@@ -93,5 +103,43 @@ describe('validateBaseUrl', () => {
     it('accepts https:// URL with path', () => {
       expect(() => validateBaseUrl('https://api.example.com/v1')).not.toThrow();
     });
+  });
+});
+
+describe('appendQueryOptions', () => {
+  const ctx = createRuntimeContext();
+
+  it('sets string, number and boolean options in key order', () => {
+    const params = new URLSearchParams();
+    appendQueryOptions(ctx, 'test', params, { b: 2, a: 'x', c: true }, [
+      'a',
+      'b',
+      'c',
+    ]);
+    expect(params.toString()).toBe('a=x&b=2&c=true');
+  });
+
+  it('skips undefined options', () => {
+    const params = new URLSearchParams();
+    appendQueryOptions(ctx, 'test', params, { a: 'x' }, ['a', 'b']);
+    expect(params.toString()).toBe('a=x');
+  });
+
+  it.each([
+    ['dict', { nested: 1 }],
+    ['list', [1, 2]],
+  ])('throws invalid_option_type for %s value', (_label, value) => {
+    const params = new URLSearchParams();
+    let thrown: unknown;
+    try {
+      appendQueryOptions(ctx, 'test', params, { a: value }, ['a']);
+    } catch (e: unknown) {
+      thrown = e;
+    }
+    expect(isInvalid(thrown as RillValue)).toBe(true);
+    const status = getStatus(thrown as RillValue);
+    expect(status.code.name).toBe('INVALID_INPUT');
+    expect(status.raw['kind']).toBe('invalid_option_type');
+    expect(status.raw['option']).toBe('a');
   });
 });

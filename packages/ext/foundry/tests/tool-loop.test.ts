@@ -78,7 +78,7 @@ function createMockToolCallResponse(
   toolCalls: Array<{
     id: string;
     name: string;
-    arguments: Record<string, unknown>;
+    arguments: Record<string, unknown> | null;
   }>,
   model = 'gpt-4o'
 ) {
@@ -434,6 +434,39 @@ describe('tool_loop() function', () => {
         expect.objectContaining({ city: 'Paris' }),
         expect.anything()
       );
+    });
+
+    it('dispatches tool with empty arguments when the model sends JSON null', async () => {
+      const toolFn = vi.fn().mockResolvedValue('tool result');
+
+      mockStream
+        .mockReturnValueOnce(
+          createMockStreamRunner(
+            createMockToolCallResponse([
+              { id: 'tc_1', name: 'my_tool', arguments: null },
+            ])
+          )
+        )
+        .mockReturnValueOnce(
+          createMockStreamRunner(createMockTextResponse('Done.'))
+        );
+
+      const ext = await createFoundryExtension(baseConfig);
+      const ctx = createRuntimeContext();
+
+      const tools = {
+        my_tool: makeTool(toolFn, { description: 'My tool', params: [] }),
+      };
+
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Call my_tool', tools, options: {} },
+        ctx
+      );
+
+      await resolveStream(stream);
+
+      expect(toolFn).toHaveBeenCalledOnce();
+      expect(toolFn).toHaveBeenCalledWith({}, expect.anything());
     });
 
     // AC-7: returns immediately when no tool calls are made

@@ -84,10 +84,7 @@ export function makeCalendarToday(
       ctx,
       controller,
       deps.cache,
-      CAL_READ_SCOPES,
-      undefined,
-      undefined,
-      undefined
+      CAL_READ_SCOPES
     );
 
     // Project to rill-compatible shape

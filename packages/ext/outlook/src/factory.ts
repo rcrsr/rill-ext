@@ -447,9 +447,9 @@ export function createOutlookExtension(
    * Abort all in-flight requests and mark extension as disposed.
    * Idempotent: second call returns immediately without side effects.
    */
-  const disposeExtension = async (): Promise<void> => {
+  const disposeExtension = (): Promise<void> => {
     if (disposalState.isDisposed) {
-      return;
+      return Promise.resolve();
     }
 
     // Mark disposed first so aborted in-flight calls map to DISPOSED
@@ -460,6 +460,7 @@ export function createOutlookExtension(
       controller.abort();
     }
     inFlightState.controllers.clear();
+    return Promise.resolve();
   };
 
   // ============================================================

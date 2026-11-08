@@ -16,6 +16,7 @@ import {
 import {
   assertRequired,
   validateBaseUrl,
+  appendQueryOptions,
   createDisposalState,
   createInFlightState,
   abortAll,
@@ -28,6 +29,13 @@ import type { SearxngConfig, SearxngExtensionContract } from './types.js';
 const DEFAULT_TIMEOUT = 30000;
 const PROVIDER = 'searxng';
 
+const SEARXNG_QUERY_KEYS = [
+  'categories',
+  'engines',
+  'language',
+  'pageno',
+  'safesearch',
+] as const;
 const VALID_TIME_RANGES = new Set(['day', 'month', 'year']);
 
 export async function createSearxngExtension(
@@ -89,30 +97,27 @@ export async function createSearxngExtension(
     }
 
     const params = new URLSearchParams({ format: 'json', q: query });
-    if (options['categories'] !== undefined)
-      params.set('categories', String(options['categories']));
-    if (options['engines'] !== undefined)
-      params.set('engines', String(options['engines']));
-    if (options['language'] !== undefined)
-      params.set('language', String(options['language']));
-    if (options['pageno'] !== undefined)
-      params.set('pageno', String(options['pageno']));
-    if (options['safesearch'] !== undefined)
-      params.set('safesearch', String(options['safesearch']));
+    appendQueryOptions(callCtx, PROVIDER, params, options, SEARXNG_QUERY_KEYS);
 
     if (options['time_range'] !== undefined) {
-      const timeRange = String(options['time_range']);
-      if (!VALID_TIME_RANGES.has(timeRange)) {
+      const rawTimeRange = options['time_range'];
+      if (
+        typeof rawTimeRange !== 'string' ||
+        !VALID_TIME_RANGES.has(rawTimeRange)
+      ) {
         throw failConfig(
           callCtx,
           'time_range must be one of: day, month, year',
           {
             kind: 'invalid_time_range',
-            received: timeRange,
+            received:
+              typeof rawTimeRange === 'string'
+                ? rawTimeRange
+                : JSON.stringify(rawTimeRange),
           }
         );
       }
-      params.set('time_range', timeRange);
+      params.set('time_range', rawTimeRange);
     }
 
     const requestSignal = AbortSignal.any([

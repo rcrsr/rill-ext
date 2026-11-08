@@ -78,7 +78,26 @@ export function createExecExtension(
       const runCtx = runCtxLike as RuntimeContext;
       const argsParam = (args['args'] as RillValue[] | undefined) ?? [];
       const stdinParam = args['stdin'] as string | undefined;
-      const stringArgs = argsParam.map((arg) => String(arg));
+      const stringArgs: string[] = [];
+      for (const arg of argsParam) {
+        if (
+          typeof arg !== 'string' &&
+          typeof arg !== 'number' &&
+          typeof arg !== 'boolean'
+        ) {
+          return runCtx.invalidate(
+            new Error(
+              `argument for command "${commandName}" must be a string, number, or boolean`
+            ),
+            {
+              code: 'INVALID_INPUT',
+              provider: PROVIDER,
+              raw: { kind: 'invalid_arg_type', commandName },
+            }
+          );
+        }
+        stringArgs.push(String(arg));
+      }
 
       const controller = new AbortController();
       abortControllers.push(controller);
@@ -171,12 +190,12 @@ export function createExecExtension(
   // Introspection
   // ----------------------------------------------------------
 
-  const commands: CallableFn = async () => {
+  const commands: CallableFn = (): Promise<RillValue> => {
     const result: RillValue[] = [];
     for (const [name, cmd] of Object.entries(config.commands)) {
       result.push({ name, description: cmd.description ?? '' });
     }
-    return result as unknown as RillValue;
+    return Promise.resolve(result as unknown as RillValue);
   };
 
   functions['commands'] = {
@@ -199,12 +218,13 @@ export function createExecExtension(
   // Dispose
   // ----------------------------------------------------------
 
-  const dispose = async (): Promise<void> => {
+  const dispose = (): Promise<void> => {
     disposed = true;
     for (const controller of abortControllers) {
       controller.abort();
     }
     abortControllers.length = 0;
+    return Promise.resolve();
   };
 
   // ----------------------------------------------------------

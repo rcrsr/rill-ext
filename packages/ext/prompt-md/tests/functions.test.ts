@@ -458,6 +458,37 @@ body
   });
 });
 
+describe('closure return shape', () => {
+  it('returns a Promise resolving to the interpolated string', async () => {
+    const dir = await tempDir();
+    await writePrompt(
+      dir,
+      'shape.prompt.md',
+      `---
+description: Test
+params:
+  - "name: string"
+output: string
+---
+Hi {name}
+`
+    );
+    const ext = await createPromptMdExtension(
+      { basePath: dir },
+      makeFactoryCtx()
+    );
+
+    const pending = asDict(ext.value)['shape']!.fn(
+      { name: 'Bo' },
+      createRuntimeContext()
+    );
+
+    expect(pending).toBeInstanceOf(Promise);
+    await expect(pending).resolves.toContain('Hi Bo');
+    await ext.dispose?.();
+  });
+});
+
 // ── AC-18: byte-identical prompts → equal hash, different id ─────────────────
 
 describe('AC-18: byte-identical content at different paths has equal ^hash but different ^id', () => {

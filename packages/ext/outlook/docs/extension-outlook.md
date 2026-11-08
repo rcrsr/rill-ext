@@ -438,6 +438,8 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 | Failure | Atom | `meta.raw.kind` |
 |---|---|---|
 | Session token variable not found | `#AUTH` | `session_token_missing` |
+| Session token variable is not a string | `#AUTH` | `invalid_session_token` |
+| Recipient or attendee in `to` / `attendees` is not a string, number or boolean | `#INVALID_INPUT` | `invalid_recipient` |
 | Capability disabled in config | `#FORBIDDEN` | `capability_disabled` |
 | Empty `to` / `subject` / `body` / required field | `#INVALID_INPUT` | `invalid_input` |
 | `start` after `end` on events / `free_busy` | `#INVALID_INPUT` | `invalid_input` |

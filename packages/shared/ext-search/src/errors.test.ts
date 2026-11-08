@@ -159,6 +159,15 @@ describe('mapProviderSearchError', () => {
     expect(status.raw['kind']).toBe('access_denied');
   });
 
+  it('formats object error.code as JSON in brave 403 message', () => {
+    const body = { error: { code: { id: 7 } } };
+    const result = mapProviderSearchError(ctx, 'brave', 403, body);
+    const status = statusOf(result);
+    expect(status.message).toBe('brave: access denied ({"id":7})');
+    expect(status.message).not.toContain('[object Object]');
+    expect(status.raw['providerCode']).toBe('{"id":7}');
+  });
+
   it('maps brave 403 without error.code falls back to FORBIDDEN', () => {
     const result = mapProviderSearchError(ctx, 'brave', 403, {});
     const status = statusOf(result);

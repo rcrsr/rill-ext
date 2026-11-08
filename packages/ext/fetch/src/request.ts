@@ -112,11 +112,11 @@ export class Semaphore {
    * Acquire a permit. When `signal` aborts while waiting, the waiter leaves
    * the queue and the promise rejects with an `AbortError`.
    */
-  async acquire(signal?: AbortSignal | undefined): Promise<void> {
-    if (signal?.aborted) throw createAbortError();
+  acquire(signal?: AbortSignal | undefined): Promise<void> {
+    if (signal?.aborted) return Promise.reject(createAbortError());
     if (this.permits > 0) {
       this.permits--;
-      return;
+      return Promise.resolve();
     }
     return new Promise((resolve, reject) => {
       const waiter = (): void => {
@@ -348,11 +348,13 @@ export async function executeRequest(
         const combinedSignal = AbortSignal.any(signals);
 
         try {
-          const response = await fetch(url, {
-            ...options,
+          const init: RequestInit = {
+            method: options.method,
+            headers: options.headers,
             signal: combinedSignal,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FetchOptions.body is `string | undefined`, which RequestInit rejects under exactOptionalPropertyTypes (TS2379)
-          } as any);
+          };
+          if (options.body !== undefined) init.body = options.body;
+          const response = await fetch(url, init);
 
           clearTimeout(timeoutId);
 

@@ -197,6 +197,22 @@ describe('resolveToken — session', () => {
       "google: session token 'MISSING_TOKEN' not found"
     );
   });
+
+  it('emits #AUTH invalid_session_token when the session variable is not a string', async () => {
+    const auth = { type: 'session' as const, tokenVar: 'MY_TOKEN' };
+    const cache = createTokenCache();
+    const ctx = createRuntimeContext({ variables: { MY_TOKEN: 42 } });
+    let caught: unknown;
+    try {
+      await resolveToken(auth, ctx, cache, SCOPES, SIGNAL);
+    } catch (e) {
+      caught = e;
+    }
+    expect(isInvalid(caught as RillValue)).toBe(true);
+    const status = getStatus(caught as RillValue);
+    expect(status.code.name).toBe('AUTH');
+    expect(status.raw['kind']).toBe('invalid_session_token');
+  });
 });
 
 // ============================================================

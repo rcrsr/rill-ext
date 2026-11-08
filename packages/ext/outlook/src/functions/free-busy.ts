@@ -2,6 +2,7 @@
  * freeBusy host function — query free/busy schedules for attendees.
  */
 
+import { toAddressList } from '../config.js';
 import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
@@ -30,7 +31,7 @@ export async function freeBusy(
 
   const rawAttendees = args['attendees'];
   const attendees: string[] = Array.isArray(rawAttendees)
-    ? (rawAttendees as RillValue[]).map((v) => String(v))
+    ? toAddressList(rawAttendees as RillValue[], ctx)
     : [];
 
   if (attendees.length === 0) {

@@ -551,3 +551,26 @@ describe('createRedisKvExtension', () => {
     });
   });
 });
+
+describe('createRedisKvExtension post-dispose shape', () => {
+  it('returns a Promise rejecting with DISPOSED from schema', async () => {
+    const result = createRedisKvExtension(
+      { url: 'redis://localhost:6379', mounts: validMounts },
+      makeFactoryCtx()
+    );
+    await result.dispose?.();
+    const fns = result.value as unknown as Record<
+      string,
+      { fn: (a: Record<string, RillValue>, c: unknown) => Promise<RillValue> }
+    >;
+
+    const pending = fns['schema']!.fn({ mount: 'test' }, makeRuntimeCtx());
+
+    expect(pending).toBeInstanceOf(Promise);
+    const halt: unknown = await pending.catch((e: unknown) => e);
+    expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((halt as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+});

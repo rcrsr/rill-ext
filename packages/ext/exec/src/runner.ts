@@ -16,6 +16,7 @@ import {
 } from '@rcrsr/rill';
 import type { CommandConfig, CommandResult } from './types.js';
 
+// oxlint-disable-next-line typescript/strict-void-return -- wrapping promisify(execFile) would drop util.promisify.custom, which resolves { stdout, stderr }
 const execFileAsync = promisify(execFile);
 export const PROVIDER = 'exec';
 

@@ -3,6 +3,7 @@
  * Graph returns HTTP 201 with the created message body.
  */
 
+import { toAddressList } from '../config.js';
 import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
@@ -28,7 +29,7 @@ export async function draft(
   if (typeof rawTo === 'string') {
     toList = [rawTo];
   } else if (Array.isArray(rawTo)) {
-    toList = (rawTo as RillValue[]).map((v) => String(v));
+    toList = toAddressList(rawTo as RillValue[], ctx);
   } else {
     toList = [];
   }

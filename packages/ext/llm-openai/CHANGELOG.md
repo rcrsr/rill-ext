@@ -6,6 +6,7 @@
 
 - **Test suite trust:** Tests are now type-checked and assertion-free tests removed. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
+- **Type-aware lint cleanup:** Clears type-aware lint findings and splits the factory into smaller modules. No API or behavior change. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
 
 ### Fixed
 

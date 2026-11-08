@@ -124,7 +124,7 @@ export function extractTemplateVariables(uriTemplate: string): string[] {
 function expandUriTemplate(
   uriTemplate: string,
   variables: string[],
-  args: Record<string, RillValue>
+  args: Record<string, string>
 ): string {
   let expanded = uriTemplate;
 
@@ -132,7 +132,7 @@ function expandUriTemplate(
     const varName = variables[i]!;
     const value = args[varName];
     // Convert value to string for URI expansion
-    const stringValue = value !== undefined ? String(value) : '';
+    const stringValue = value ?? '';
     expanded = expanded.replace(`{${varName}}`, stringValue);
   }
 
@@ -439,10 +439,13 @@ function createResourceTemplateFunction(
       lifecycleState.connectEmitted = true;
     }
 
+    const stringArgs: Record<string, string> = {};
     for (let i = 0; i < variables.length; i++) {
       const varName = variables[i]!;
       const arg = args[varName];
-      if (typeof arg !== 'string') {
+      if (typeof arg === 'string') {
+        stringArgs[varName] = arg;
+      } else {
         throw failInput(
           ctx,
           `expected string for parameter ${varName}, got ${typeof arg}`,
@@ -454,7 +457,7 @@ function createResourceTemplateFunction(
     const expandedUri = expandUriTemplate(
       template.uriTemplate,
       variables,
-      args
+      stringArgs
     );
 
     emitExtensionEvent(ctx, {

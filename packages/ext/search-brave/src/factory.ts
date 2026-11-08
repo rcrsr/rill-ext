@@ -23,6 +23,7 @@ import {
 import {
   assertRequired,
   validateBaseUrl,
+  appendQueryOptions,
   createDisposalState,
   createInFlightState,
   abortAll,
@@ -36,6 +37,22 @@ import type { BraveConfig, BraveExtensionContract } from './types.js';
 const DEFAULT_BASE_URL = 'https://api.search.brave.com';
 const DEFAULT_TIMEOUT = 30000;
 const PROVIDER = 'brave';
+const BRAVE_QUERY_KEYS = [
+  'count',
+  'offset',
+  'country',
+  'search_lang',
+  'freshness',
+  'safesearch',
+  'extra_snippets',
+  'goggles',
+] as const;
+const BRAVE_SUMMARIZE_KEYS = [
+  'count',
+  'country',
+  'search_lang',
+  'safesearch',
+] as const;
 
 export function createBraveExtension(
   config: BraveConfig,
@@ -90,22 +107,7 @@ export function createBraveExtension(
     requireQuery(callCtx, query);
 
     const params = new URLSearchParams({ q: query });
-    if (options['count'] !== undefined)
-      params.set('count', String(options['count']));
-    if (options['offset'] !== undefined)
-      params.set('offset', String(options['offset']));
-    if (options['country'] !== undefined)
-      params.set('country', String(options['country']));
-    if (options['search_lang'] !== undefined)
-      params.set('search_lang', String(options['search_lang']));
-    if (options['freshness'] !== undefined)
-      params.set('freshness', String(options['freshness']));
-    if (options['safesearch'] !== undefined)
-      params.set('safesearch', String(options['safesearch']));
-    if (options['extra_snippets'] !== undefined)
-      params.set('extra_snippets', String(options['extra_snippets']));
-    if (options['goggles'] !== undefined)
-      params.set('goggles', String(options['goggles']));
+    appendQueryOptions(callCtx, PROVIDER, params, options, BRAVE_QUERY_KEYS);
 
     const requestSignal = AbortSignal.any([
       signal,
@@ -156,22 +158,7 @@ export function createBraveExtension(
     requireQuery(callCtx, query);
 
     const params = new URLSearchParams({ q: query });
-    if (options['count'] !== undefined)
-      params.set('count', String(options['count']));
-    if (options['offset'] !== undefined)
-      params.set('offset', String(options['offset']));
-    if (options['country'] !== undefined)
-      params.set('country', String(options['country']));
-    if (options['search_lang'] !== undefined)
-      params.set('search_lang', String(options['search_lang']));
-    if (options['freshness'] !== undefined)
-      params.set('freshness', String(options['freshness']));
-    if (options['safesearch'] !== undefined)
-      params.set('safesearch', String(options['safesearch']));
-    if (options['extra_snippets'] !== undefined)
-      params.set('extra_snippets', String(options['extra_snippets']));
-    if (options['goggles'] !== undefined)
-      params.set('goggles', String(options['goggles']));
+    appendQueryOptions(callCtx, PROVIDER, params, options, BRAVE_QUERY_KEYS);
 
     const requestSignal = AbortSignal.any([
       signal,
@@ -214,14 +201,13 @@ export function createBraveExtension(
     requireQuery(callCtx, query);
 
     const searchParams = new URLSearchParams({ q: query, summary: '1' });
-    if (options['count'] !== undefined)
-      searchParams.set('count', String(options['count']));
-    if (options['country'] !== undefined)
-      searchParams.set('country', String(options['country']));
-    if (options['search_lang'] !== undefined)
-      searchParams.set('search_lang', String(options['search_lang']));
-    if (options['safesearch'] !== undefined)
-      searchParams.set('safesearch', String(options['safesearch']));
+    appendQueryOptions(
+      callCtx,
+      PROVIDER,
+      searchParams,
+      options,
+      BRAVE_SUMMARIZE_KEYS
+    );
 
     const signal1 = AbortSignal.any([signal, AbortSignal.timeout(timeout)]);
     const searchResponse = await fetch(

@@ -384,6 +384,21 @@ describe('createS3FsExtension', () => {
       }
     });
 
+    it('returns a Promise rejecting with DISPOSED from mounts', async () => {
+      const ext = createTestExtension();
+      const fns = ext.value as unknown as Record<string, HostFn>;
+      await ext.dispose?.();
+
+      const pending = fns['mounts']!.fn({}, makeRuntimeCtx());
+
+      expect(pending).toBeInstanceOf(Promise);
+      const halt: unknown = await pending.catch((e: unknown) => e);
+      expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+      const status = getStatus((halt as RuntimeHaltSignal).value);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+    });
+
     it('resolves on repeated dispose and keeps throwing', async () => {
       const ext = createTestExtension();
       const fns = ext.value as unknown as Record<string, HostFn>;

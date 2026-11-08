@@ -164,7 +164,9 @@ function createPtyStream(
     }
 
     // Parse chunk to accumulate structured messages
-    parser.processChunk(chunk, (msg) => messages.push(msg));
+    parser.processChunk(chunk, (msg) => {
+      messages.push(msg);
+    });
 
     wake();
   });
@@ -185,12 +187,16 @@ function createPtyStream(
 
   const exitPromise = spawn.exitCode.then(
     () => {
-      parser.flush((msg) => messages.push(msg));
+      parser.flush((msg) => {
+        messages.push(msg);
+      });
       done = true;
       wake();
     },
     (error: unknown) => {
-      parser.flush((msg) => messages.push(msg));
+      parser.flush((msg) => {
+        messages.push(msg);
+      });
       done = true;
       exitError = error;
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -205,7 +211,9 @@ function createPtyStream(
   );
   // Suppress unhandled-rejection for the timeout path: exitPromise may reject before
   // the generator or resolve callback awaits it. The rejection is handled at await sites.
-  exitPromise.catch(() => undefined);
+  exitPromise.catch(() => {
+    // Handled at the await sites; this only suppresses the unhandled-rejection report.
+  });
 
   // Async generator bridges push-based onData to pull-based iteration.
   async function* chunks(): AsyncGenerator<RillValue> {

@@ -31,6 +31,7 @@
  */
 
 import {
+  formatValue,
   structureToTypeValue,
   type RillValue,
   type RuntimeContext,
@@ -279,14 +280,24 @@ export function assertBoundaryRoles(
 
     const role = msg['role'];
     if (typeof role !== 'string' || !VALID_ROLES.has(role)) {
-      return ctx.invalidate(new Error(`invalid role '${String(role)}'`), {
-        code: 'INVALID_INPUT',
-        provider: '',
-        raw: { kind: 'invalid_role', role: String(role) },
-      });
+      return ctx.invalidate(
+        new Error(`invalid role '${describeValue(role)}'`),
+        {
+          code: 'INVALID_INPUT',
+          provider: '',
+          raw: { kind: 'invalid_role', role: describeValue(role) },
+        }
+      );
     }
   }
   return undefined;
+}
+
+/** Render a RillValue for diagnostics: strings unchanged, others via formatValue. */
+function describeValue(value: RillValue | undefined): string {
+  if (typeof value === 'string') return value;
+  if (value === undefined) return 'undefined';
+  return formatValue(value);
 }
 
 // ============================================================
@@ -306,7 +317,7 @@ export function assertNoTrailingAssistant(
   messages: Array<Record<string, RillValue>>,
   ctx: RuntimeContext
 ): RillValue | undefined {
-  const last = messages[messages.length - 1];
+  const last = messages.at(-1);
   if (last && last['role'] === 'assistant') {
     return ctx.invalidate(
       new Error('message list cannot end with an assistant turn'),
@@ -364,11 +375,14 @@ export function assertPartTypes(
 
       if (typeof partType !== 'string' || !VALID_PART_TYPES.has(partType)) {
         return ctx.invalidate(
-          new Error(`unsupported part type '${String(partType)}'`),
+          new Error(`unsupported part type '${describeValue(partType)}'`),
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'unsupported_part_type', type: String(partType) },
+            raw: {
+              kind: 'unsupported_part_type',
+              type: describeValue(partType),
+            },
           }
         );
       }
@@ -518,11 +532,14 @@ function validatePartShape(
       const srcKind = src['kind'];
       if (srcKind !== 'base64' && srcKind !== 'url') {
         return ctx.invalidate(
-          new Error(`invalid image source kind '${String(srcKind)}'`),
+          new Error(`invalid image source kind '${describeValue(srcKind)}'`),
           {
             code: 'INVALID_INPUT',
             provider: '',
-            raw: { kind: 'invalid_image_source', source_kind: String(srcKind) },
+            raw: {
+              kind: 'invalid_image_source',
+              source_kind: describeValue(srcKind),
+            },
           }
         );
       }

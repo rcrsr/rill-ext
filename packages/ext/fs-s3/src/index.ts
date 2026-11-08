@@ -218,11 +218,14 @@ export function createS3FsExtension(
 
   let disposed = false;
   const lifetime = new AbortController();
-  const dispose = async (): Promise<void> => {
-    if (disposed) return;
+  const dispose = (): Promise<void> => {
+    if (disposed) return Promise.resolve();
     disposed = true;
-    lifetime.abort();
-    s3Client.destroy();
+    return new Promise<void>((resolve) => {
+      lifetime.abort();
+      s3Client.destroy();
+      resolve();
+    });
   };
 
   if (ctx?.signal) {
@@ -405,7 +408,7 @@ export function createS3FsExtension(
 
   const getFilename = (key: string): string => {
     const parts = key.split('/');
-    return parts[parts.length - 1] ?? '';
+    return parts.at(-1) ?? '';
   };
 
   const streamToString = async (
@@ -716,12 +719,17 @@ export function createS3FsExtension(
     }
   };
 
-  const mkdir: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
-    assertLive(runCtx);
-    const parsed = parseMountPath(runCtx, args['path'] as string);
-    if (!parsed.ok) return parsed.invalid;
-    return true;
+  const mkdir: CallableFn = (args, runtimeCtx): Promise<RillValue> => {
+    const body = (): RillValue => {
+      const runCtx = runtimeCtx as RuntimeContext;
+      assertLive(runCtx);
+      const parsed = parseMountPath(runCtx, args['path'] as string);
+      if (!parsed.ok) return parsed.invalid;
+      return true;
+    };
+    return new Promise<RillValue>((resolve) => {
+      resolve(body());
+    });
   };
 
   const copy: CallableFn = async (args, runtimeCtx) => {
@@ -799,19 +807,24 @@ export function createS3FsExtension(
     }
   };
 
-  const mountsList: CallableFn = async (_args, runtimeCtx) => {
-    assertLive(runtimeCtx as RuntimeContext);
-    const result: RillValue[] = [];
-    for (const [name, mount] of Object.entries(config.mounts)) {
-      result.push({
-        name,
-        mode: mount.mode,
-        glob: mount.glob ?? '',
-        bucket: mount.bucket,
-        prefix: mount.prefix,
-      });
-    }
-    return result;
+  const mountsList: CallableFn = (_args, runtimeCtx): Promise<RillValue> => {
+    const body = (): RillValue => {
+      assertLive(runtimeCtx as RuntimeContext);
+      const result: RillValue[] = [];
+      for (const [name, mount] of Object.entries(config.mounts)) {
+        result.push({
+          name,
+          mode: mount.mode,
+          glob: mount.glob ?? '',
+          bucket: mount.bucket,
+          prefix: mount.prefix,
+        });
+      }
+      return result;
+    };
+    return new Promise<RillValue>((resolve) => {
+      resolve(body());
+    });
   };
 
   // ============================================================

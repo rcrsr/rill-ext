@@ -117,6 +117,7 @@ generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
 | Argument rejected by `blockedArgs` | `#INVALID_INPUT` | `arg_blocked` |
 | Executable not found at path | `#INVALID_INPUT` | `binary_not_found` |
 | stdout / stderr exceeded `maxBuffer` | `#INVALID_INPUT` | `output_too_large` |
+| An element of `args` is not a string, number, or boolean (rejected before the process spawns) | `#INVALID_INPUT` | `invalid_arg_type` |
 | `stdin` provided but command has `stdin: false` | `#INVALID_INPUT` | `stdin_not_supported` |
 | Command exceeded configured timeout | `#TIMEOUT` | `command_timeout` |
 | Cooperative cancellation via `ctx.signal` | `#TIMEOUT` | `request_cancelled` |

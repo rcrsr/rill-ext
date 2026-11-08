@@ -10,7 +10,11 @@ export type {
 // ============================================================
 // VALIDATION
 // ============================================================
-export { assertRequired, validateBaseUrl } from './validation.js';
+export {
+  assertRequired,
+  validateBaseUrl,
+  appendQueryOptions,
+} from './validation.js';
 
 // ============================================================
 // DISPOSAL

@@ -3,6 +3,7 @@
  * Graph returns HTTP 202 with no body; returns SendConfirmationDict.
  */
 
+import { toAddressList } from '../config.js';
 import { failInput } from '../errors.js';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
 import { graphFetch } from '../graph.js';
@@ -27,7 +28,7 @@ export async function send(
   if (typeof rawTo === 'string') {
     toList = [rawTo];
   } else if (Array.isArray(rawTo)) {
-    toList = (rawTo as RillValue[]).map((v) => String(v));
+    toList = toAddressList(rawTo as RillValue[], ctx);
   } else {
     toList = [];
   }

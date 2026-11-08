@@ -34,7 +34,7 @@ export const detectFoundryError: ProviderErrorDetector = (error: unknown) => {
   // AzureOpenAI uses the same APIError shape
   if (error instanceof APIError) {
     return {
-      status: error.status ?? undefined,
+      ...(typeof error.status === 'number' ? { status: error.status } : {}),
       message: error.message,
     };
   }

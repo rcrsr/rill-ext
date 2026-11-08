@@ -286,25 +286,27 @@ export function createFileKvExtension(
     return r.store.getAll();
   };
 
-  const schema: CallableFn = async (args, ctx) => {
+  const schema: CallableFn = (args, ctx): Promise<RillValue> => {
     const runCtx = ctx as RuntimeContext;
-    if (disposed) throw failDisposed(runCtx);
+    if (disposed) return Promise.reject(failDisposed(runCtx));
     const mountName = args['mount'] as string;
     const mountConfig = mounts[mountName];
 
     if (!mountConfig) {
-      return runCtx.invalidate(new Error(`Mount '${mountName}' not found`), {
-        code: 'INVALID_INPUT',
-        provider: PROVIDER,
-        raw: {
-          kind: 'unknown_mount',
-          mountName,
-          availableMounts: Object.keys(mounts),
-        },
-      });
+      return Promise.resolve(
+        runCtx.invalidate(new Error(`Mount '${mountName}' not found`), {
+          code: 'INVALID_INPUT',
+          provider: PROVIDER,
+          raw: {
+            kind: 'unknown_mount',
+            mountName,
+            availableMounts: Object.keys(mounts),
+          },
+        })
+      );
     }
 
-    if (!mountConfig.schema) return [];
+    if (!mountConfig.schema) return Promise.resolve([]);
 
     const result: RillValue[] = [];
     for (const [key, entry] of Object.entries(mountConfig.schema)) {
@@ -314,11 +316,11 @@ export function createFileKvExtension(
         description: entry.description ?? '',
       });
     }
-    return result;
+    return Promise.resolve(result);
   };
 
-  const mountsList: CallableFn = async (_args, ctx) => {
-    if (disposed) throw failDisposed(ctx as RuntimeContext);
+  const mountsList: CallableFn = (_args, ctx): Promise<RillValue> => {
+    if (disposed) return Promise.reject(failDisposed(ctx as RuntimeContext));
     const result: RillValue[] = [];
     for (const [name, cfg] of Object.entries(mounts)) {
       result.push({
@@ -329,7 +331,7 @@ export function createFileKvExtension(
         max_value_size: cfg.maxValueSize ?? 102400,
       });
     }
-    return result;
+    return Promise.resolve(result);
   };
 
   // ----------------------------------------------------------
