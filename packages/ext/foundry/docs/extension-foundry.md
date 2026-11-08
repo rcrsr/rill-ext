@@ -526,7 +526,7 @@ Counts accumulate across all `message`, `messages`, `tool_loop`, `generate`, and
 
 ### dispose()
 
-Release all resources held by the extension. Safe to call multiple times. Calling any host function after `dispose()` throws (halts with) `#DISPOSED` (with `raw.kind == 'extension_disposed'`).
+Release all resources held by the extension and abort in-flight requests. Safe to call multiple times. A request aborted by `dispose()` throws `#DISPOSED`; any other failure that settles after `dispose()` keeps its own code. `shield()`, `ground()` and `search()` also honor the host runtime's cancellation signal (`ctx.signal`); a request cancelled that way fails with its own error, not `#DISPOSED`. Calling any host function after `dispose()` throws (halts with) `#DISPOSED` (with `raw.kind == 'extension_disposed'`).
 
 ```rill
 $foundry.dispose()
@@ -655,6 +655,7 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 | Empty prompt / messages list / unresolved `@{VAR}` reference | `#INVALID_INPUT` | `unresolved_variable` (and others) |
 | Malformed JSON / SSE response | `#PROTOCOL` | `rest_error` (other status) |
 | Called a function after `dispose()` | `#DISPOSED` | `extension_disposed` |
+| In-flight request (including `shield()`, `ground()`, `search()`) aborted by `dispose()` (thrown) | `#DISPOSED` | `extension_disposed` |
 
 ---
 

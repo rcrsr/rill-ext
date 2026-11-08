@@ -3,7 +3,7 @@
  * happened before dispose keep their original atom.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createRuntimeContext,
   getStatus,
@@ -17,6 +17,7 @@ import type { FoundryConfig } from '../src/types.js';
 const mockCreate = vi.fn();
 const mockStream = vi.fn();
 const mockEmbeddingsCreate = vi.fn();
+const mockResponsesCreate = vi.fn();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {
@@ -38,6 +39,9 @@ vi.mock('openai', () => {
     embeddings = {
       create: mockEmbeddingsCreate,
     };
+    responses = {
+      create: mockResponsesCreate,
+    };
     static APIError = MockAPIError;
   }
 
@@ -57,6 +61,19 @@ const CONFIG: FoundryConfig = {
   },
 };
 
+const REST_CONFIG: FoundryConfig = {
+  ...CONFIG,
+  contentSafety: {
+    endpoint: 'https://my-safety.cognitiveservices.azure.com',
+  },
+  grounding: { connectionId: '/connections/bing' },
+  search: {
+    endpoint: 'https://my-search.search.windows.net',
+    indexName: 'my-index',
+    apiKey: 'search-api-key',
+  },
+};
+
 function getCallable(
   ext: { value: unknown },
   name: string
@@ -72,6 +89,10 @@ function abortError(): Error {
 
 function pendingUntilAborted(signal: AbortSignal | undefined): Promise<never> {
   return new Promise<never>((_resolve, reject) => {
+    if (signal?.aborted === true) {
+      reject(abortError());
+      return;
+    }
     signal?.addEventListener('abort', () => reject(abortError()));
   });
 }
@@ -98,11 +119,26 @@ function expectCode(thrown: unknown, code: string): void {
   expect(status.provider).toBe('foundry');
 }
 
+let originalFetch: typeof globalThis.fetch;
+
+/** Replace fetch with a request that stays pending until its signal aborts. */
+function mockPendingFetch(): void {
+  globalThis.fetch = vi.fn<typeof fetch>((_url, init) =>
+    pendingUntilAborted(init?.signal ?? undefined)
+  );
+}
+
 describe('dispose() with in-flight requests', () => {
   beforeEach(() => {
     mockCreate.mockReset();
     mockStream.mockReset();
     mockEmbeddingsCreate.mockReset();
+    mockResponsesCreate.mockReset();
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   describe('message()', () => {
@@ -183,6 +219,127 @@ describe('dispose() with in-flight requests', () => {
       await ext.dispose?.();
 
       expectCode(await pending, 'DISPOSED');
+    });
+  });
+
+  describe('shield()', () => {
+    it('throws DISPOSED when dispose aborts the pending request', async () => {
+      mockPendingFetch();
+      const ext = await createFoundryExtension(REST_CONFIG);
+      const pending = settleRejection(
+        Promise.resolve(
+          getCallable(ext, 'shield').fn(
+            { text: 'hello', documents: [] },
+            createRuntimeContext()
+          )
+        )
+      );
+
+      await ext.dispose?.();
+
+      expectCode(await pending, 'DISPOSED');
+    });
+
+    it('keeps the original atom when a non-abort error settles after dispose', async () => {
+      let rejectRequest: (error: unknown) => void = () => {};
+      globalThis.fetch = vi.fn<typeof fetch>(
+        () =>
+          new Promise<never>((_resolve, reject) => {
+            rejectRequest = reject;
+          })
+      );
+      const ext = await createFoundryExtension(REST_CONFIG);
+      const pending = settleRejection(
+        Promise.resolve(
+          getCallable(ext, 'shield').fn(
+            { text: 'hello', documents: [] },
+            createRuntimeContext()
+          )
+        )
+      );
+
+      await ext.dispose?.();
+      rejectRequest(new TypeError('fetch failed'));
+
+      expectCode(await pending, 'UNAVAILABLE');
+    });
+  });
+
+  describe('search()', () => {
+    it('throws DISPOSED and emits foundry:search:error when dispose aborts the pending request', async () => {
+      mockPendingFetch();
+      const ext = await createFoundryExtension(REST_CONFIG);
+      const events: Array<Record<string, unknown>> = [];
+      const ctx = createRuntimeContext({
+        callbacks: {
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
+        },
+      });
+      const pending = settleRejection(
+        Promise.resolve(getCallable(ext, 'search').fn({ query: 'q' }, ctx))
+      );
+
+      await ext.dispose?.();
+
+      expectCode(await pending, 'DISPOSED');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        event: 'foundry:search:error',
+        error: 'foundry: extension disposed',
+      });
+    });
+  });
+
+  describe('ctx.signal cancellation', () => {
+    it('cancels a pending search request without reporting DISPOSED', async () => {
+      mockPendingFetch();
+      const ext = await createFoundryExtension(REST_CONFIG);
+      const controller = new AbortController();
+      const ctx = createRuntimeContext({ signal: controller.signal });
+      const pending = settleRejection(
+        Promise.resolve(getCallable(ext, 'search').fn({ query: 'q' }, ctx))
+      );
+
+      controller.abort();
+      const thrown = await pending;
+
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
+      expect(status.code.name).not.toBe('DISPOSED');
+    });
+  });
+
+  describe('ground()', () => {
+    it('throws DISPOSED and emits foundry:ground:error when dispose aborts the pending request', async () => {
+      mockResponsesCreate.mockImplementation(
+        (_params: unknown, options: { signal?: AbortSignal }) =>
+          pendingUntilAborted(options.signal)
+      );
+      const ext = await createFoundryExtension(REST_CONFIG);
+      const events: Array<Record<string, unknown>> = [];
+      const ctx = createRuntimeContext({
+        callbacks: {
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
+        },
+      });
+      const pending = settleRejection(
+        Promise.resolve(getCallable(ext, 'ground').fn({ query: 'q' }, ctx))
+      );
+
+      await ext.dispose?.();
+
+      expectCode(await pending, 'DISPOSED');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        event: 'foundry:ground:error',
+        error: 'foundry: extension disposed',
+      });
     });
   });
 });

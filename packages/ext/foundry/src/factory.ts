@@ -26,6 +26,7 @@ import {
   validateEmbedModel,
   validateEmbedBatch,
   mapProviderError,
+  disposedHaltFor,
   throwProviderHalt,
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
@@ -37,7 +38,7 @@ import {
 } from '@rcrsr/rill-ext-llm-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type OpenAI from 'openai';
-import type { FoundryConfig } from './types.js';
+import type { FoundryConfig, FoundryDisposalRef } from './types.js';
 import { createAzureOpenAIClient } from './client.js';
 import { detectFoundryError } from './errors.js';
 import { callShield, createAutoShieldMiddleware } from './safety.js';
@@ -173,8 +174,12 @@ export async function createFoundryExtension(
   // Inline AbortController per D-3 (follow llm-openai precedent, no import from ext-search-shared)
   let abortController: AbortController | undefined = new AbortController();
 
-  // Object-reference disposal flag shared with safety/grounding/search modules
-  const disposedRef: { value: boolean } = { value: false };
+  // Disposal state shared with safety/grounding/search modules: the flag marks
+  // disposal and the signal aborts their in-flight requests.
+  const disposedRef: FoundryDisposalRef = {
+    value: false,
+    signal: abortController.signal,
+  };
 
   // ============================================================
   // AUTO-SHIELD MIDDLEWARE
@@ -283,24 +288,6 @@ export async function createFoundryExtension(
   // CANCELLATION CLASSIFIER
   // ============================================================
 
-  // True for errors an aborted request produces (fetch AbortError, or the
-  // shared tool loop's halt or RuntimeError wrapping an abort or its own
-  // cancellation), as opposed to API, auth or rate-limit failures.
-  function isAbortShaped(error: unknown): boolean {
-    if (error instanceof RuntimeHaltSignal) {
-      const kind = getStatus(error.value).raw?.['kind'];
-      return kind === 'tool_loop_cancelled' || kind === 'request_timeout';
-    }
-    if (error instanceof RuntimeError) {
-      return isAbortShaped(error.context?.['cause']);
-    }
-    return (
-      error instanceof Error &&
-      (error.name === 'AbortError' ||
-        error.constructor.name === 'APIUserAbortError')
-    );
-  }
-
   /**
    * Returns the #DISPOSED halt when dispose() cancelled the call, otherwise
    * undefined. An error that happened before dispose keeps its own class.
@@ -309,12 +296,11 @@ export async function createFoundryExtension(
     ctx: RuntimeContext,
     error: unknown
   ): RuntimeHaltSignal | undefined {
-    if (abortController || !isAbortShaped(error)) return undefined;
-    return haltInvalid(
+    return disposedHaltFor(
       ctx,
-      'DISPOSED',
-      'extension_disposed',
-      'foundry: extension disposed'
+      'foundry',
+      error,
+      abortController === undefined
     );
   }
 

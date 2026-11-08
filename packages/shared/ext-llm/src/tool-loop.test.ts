@@ -2426,3 +2426,119 @@ describe('executeToolLoop tool halt propagation', () => {
     ]);
   });
 });
+
+describe('executeToolLoop cancellation mid-turn', () => {
+  function cancelledKind(rejection: unknown): unknown {
+    expect(rejection).toBeInstanceOf(RuntimeHaltSignal);
+    return getStatus((rejection as RuntimeHaltSignal).value).raw?.['kind'];
+  }
+
+  it('invokes no tool when the signal aborts during the API call', async () => {
+    const controller = new AbortController();
+    const toolFn = vi.fn((): RillValue => 'ok');
+    const callbacks = createMockCallbacks({
+      callAPI: vi.fn(() => {
+        controller.abort();
+        return Promise.resolve({ content: 'x' });
+      }),
+      extractToolCalls: vi.fn(() => [
+        { id: 'call_1', name: 'tool_a', input: {} },
+      ]),
+    });
+
+    const rejection: unknown = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      { tool_a: createMockTool(toolFn) },
+      3,
+      callbacks,
+      vi.fn(),
+      undefined,
+      createRuntimeContext(),
+      undefined,
+      controller.signal
+    ).catch((error: unknown) => error);
+
+    expect(cancelledKind(rejection)).toBe('tool_loop_cancelled');
+    expect(toolFn).not.toHaveBeenCalled();
+  });
+
+  it('reports tool_loop_cancelled when callAPI fails with a non-abort error while the signal is aborted', async () => {
+    const controller = new AbortController();
+    const callbacks = createMockCallbacks({
+      callAPI: vi.fn(() => {
+        controller.abort();
+        return Promise.reject(new Error('some vendor error'));
+      }),
+      detectError: () => ({ message: 'vendor' }),
+    });
+
+    const rejection: unknown = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      {},
+      3,
+      callbacks,
+      vi.fn(),
+      undefined,
+      createRuntimeContext(),
+      undefined,
+      controller.signal
+    ).catch((error: unknown) => error);
+
+    expect(cancelledKind(rejection)).toBe('tool_loop_cancelled');
+  });
+
+  it('returns a completed final response even when the signal aborted during the API call', async () => {
+    const controller = new AbortController();
+    const callbacks = createMockCallbacks({
+      callAPI: vi.fn(() => {
+        controller.abort();
+        return Promise.resolve({ content: 'final' });
+      }),
+    });
+
+    const result = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      {},
+      3,
+      callbacks,
+      vi.fn(),
+      undefined,
+      createRuntimeContext(),
+      undefined,
+      controller.signal
+    );
+
+    expect(result.toolCalls).toEqual([]);
+  });
+
+  it('invokes no further tool when the signal aborts between tool calls', async () => {
+    const controller = new AbortController();
+    const firstTool = vi.fn((): RillValue => {
+      controller.abort();
+      return 'ok';
+    });
+    const secondTool = vi.fn((): RillValue => 'ok');
+    const callbacks = createMockCallbacks({
+      extractToolCalls: vi.fn(() => [
+        { id: 'call_1', name: 'tool_a', input: {} },
+        { id: 'call_2', name: 'tool_b', input: {} },
+      ]),
+    });
+
+    const rejection: unknown = await executeToolLoop(
+      [{ role: 'user', content: 'Test' }],
+      { tool_a: createMockTool(firstTool), tool_b: createMockTool(secondTool) },
+      3,
+      callbacks,
+      vi.fn(),
+      undefined,
+      createRuntimeContext(),
+      undefined,
+      controller.signal
+    ).catch((error: unknown) => error);
+
+    expect(cancelledKind(rejection)).toBe('tool_loop_cancelled');
+    expect(firstTool).toHaveBeenCalledTimes(1);
+    expect(secondTool).not.toHaveBeenCalled();
+  });
+});

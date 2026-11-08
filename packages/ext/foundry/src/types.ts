@@ -176,3 +176,12 @@ export interface FoundryConfig {
    */
   readonly search?: FoundrySearchConfig | undefined;
 }
+
+/**
+ * Disposal state shared with the safety, grounding and search modules.
+ * `value` flips true on dispose(); `signal` aborts in-flight vendor requests.
+ */
+export interface FoundryDisposalRef {
+  value: boolean;
+  readonly signal: AbortSignal;
+}

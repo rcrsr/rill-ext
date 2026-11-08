@@ -275,13 +275,16 @@ describe('message() function', () => {
 
       getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
-      expect(mockStream).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 4096,
-        temperature: 0.7,
-        system: 'You are helpful.',
-        messages: [{ role: 'user', content: 'What is 2+2?' }],
-      });
+      expect(mockStream).toHaveBeenCalledWith(
+        {
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 4096,
+          temperature: 0.7,
+          system: 'You are helpful.',
+          messages: [{ role: 'user', content: 'What is 2+2?' }],
+        },
+        { signal: expect.any(AbortSignal) as AbortSignal }
+      );
     });
   });
 

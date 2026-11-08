@@ -18,7 +18,11 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
+import {
+  createDisposedHalt,
+  mapProviderError,
+  throwIfCancelledByDispose,
+} from '@rcrsr/rill-ext-llm-shared';
 import { buildRestAuthHeaders } from './client.js';
 import {
   mapRestError,
@@ -29,6 +33,7 @@ import type {
   FoundryAuth,
   FoundryContentSafetyConfig,
   FoundryConfig,
+  FoundryDisposalRef,
 } from './types.js';
 
 // ============================================================
@@ -89,10 +94,10 @@ export async function callShield(
   config: FoundryConfig,
   auth: FoundryAuth,
   ctx: RuntimeContext,
-  disposed: { value: boolean }
+  disposed: FoundryDisposalRef
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw haltDisposed(ctx);
+    throw createDisposedHalt(ctx, PROVIDER);
   }
 
   // Content Safety must be configured
@@ -113,7 +118,8 @@ export async function callShield(
       text,
       documents,
       safetyConfig,
-      auth
+      auth,
+      disposed.signal
     );
     const duration = Date.now() - startTime;
 
@@ -134,6 +140,8 @@ export async function callShield(
       analysis: analysis as RillValue,
     } as RillValue;
   } catch (error: unknown) {
+    // A request cancelled by dispose() reports #DISPOSED; other errors keep their class.
+    throwIfCancelledByDispose(ctx, PROVIDER, error, disposed.value);
     if (error instanceof RuntimeHaltSignal) {
       throw error;
     }
@@ -166,7 +174,7 @@ export async function callShield(
 export function createAutoShieldMiddleware(
   config: FoundryConfig,
   auth: FoundryAuth,
-  disposed: { value: boolean }
+  disposed: FoundryDisposalRef
 ): ShieldMiddleware {
   return async (args, ctx, inner, triggeredBy) => {
     // Only run when autoShield is enabled and contentSafety is configured
@@ -180,13 +188,20 @@ export function createAutoShieldMiddleware(
     const promptText = extractPromptText(args);
     const startTime = Date.now();
 
-    const result = await runShieldRequest(
-      ctx,
-      promptText,
-      [],
-      safetyConfig,
-      auth
-    );
+    let result: ShieldResult;
+    try {
+      result = await runShieldRequest(
+        ctx,
+        promptText,
+        [],
+        safetyConfig,
+        auth,
+        disposed.signal
+      );
+    } catch (error: unknown) {
+      throwIfCancelledByDispose(ctx, PROVIDER, error, disposed.value);
+      throw error;
+    }
     const duration = Date.now() - startTime;
 
     emitExtensionEvent(ctx, {
@@ -230,6 +245,7 @@ export function createAutoShieldMiddleware(
  * @param documents - Supporting documents
  * @param safetyConfig - Content Safety sub-config
  * @param auth - Authentication config
+ * @param disposeSignal - Aborts the request when the extension is disposed
  * @returns Parsed ShieldResult
  */
 async function runShieldRequest(
@@ -237,7 +253,8 @@ async function runShieldRequest(
   text: string,
   documents: string[],
   safetyConfig: FoundryContentSafetyConfig,
-  auth: FoundryAuth
+  auth: FoundryAuth,
+  disposeSignal: AbortSignal
 ): Promise<ShieldResult> {
   const url =
     `${safetyConfig.endpoint}/contentsafety/text:shieldPrompt` +
@@ -259,7 +276,11 @@ async function runShieldRequest(
         ...authHeaders,
       },
       body,
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
+      signal: AbortSignal.any([
+        disposeSignal,
+        AbortSignal.timeout(DEFAULT_TIMEOUT),
+        ...(ctx.signal ? [ctx.signal] : []),
+      ]),
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'TimeoutError') {
@@ -303,18 +324,6 @@ async function runShieldRequest(
 // ============================================================
 // HALT HELPERS
 // ============================================================
-
-function haltDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
-  const message = `${PROVIDER}: extension disposed`;
-  return new RuntimeHaltSignal(
-    ctx.invalidate(new Error(message), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed', message },
-    }),
-    true
-  );
-}
 
 function haltUnconfigured(
   ctx: RuntimeContext,

@@ -19,7 +19,11 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
+import {
+  createDisposedHalt,
+  mapProviderError,
+  throwIfCancelledByDispose,
+} from '@rcrsr/rill-ext-llm-shared';
 import { buildRestAuthHeaders } from './client.js';
 import {
   mapRestError,
@@ -29,6 +33,7 @@ import {
 import type {
   FoundryAuth,
   FoundryConfig,
+  FoundryDisposalRef,
   FoundrySearchConfig,
 } from './types.js';
 
@@ -72,10 +77,10 @@ export async function callSearch(
   config: FoundryConfig,
   auth: FoundryAuth,
   ctx: RuntimeContext,
-  disposed: { value: boolean }
+  disposed: FoundryDisposalRef
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw haltDisposed(ctx);
+    throw createDisposedHalt(ctx, PROVIDER);
   }
 
   // Search must be configured
@@ -115,7 +120,8 @@ export async function callSearch(
       filter,
       searchConfig,
       auth,
-      apiVersion
+      apiVersion,
+      disposed.signal
     );
 
     const duration = Date.now() - startTime;
@@ -132,6 +138,17 @@ export async function callSearch(
     return results as RillValue;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
+
+    // A request cancelled by dispose() reports #DISPOSED; other errors keep their class.
+    throwIfCancelledByDispose(ctx, PROVIDER, error, disposed.value, () => {
+      emitExtensionEvent(ctx, {
+        event: 'foundry:search:error',
+        subsystem: `extension:${PROVIDER}`,
+        index: indexName,
+        error: `${PROVIDER}: extension disposed`,
+        duration,
+      });
+    });
 
     if (error instanceof RuntimeHaltSignal) {
       emitExtensionEvent(ctx, {
@@ -182,6 +199,7 @@ export async function callSearch(
  * @param searchConfig - Search sub-config
  * @param auth - Authentication config
  * @param apiVersion - Search API version string
+ * @param disposeSignal - Aborts the request when the extension is disposed
  * @returns Array of result dicts with id, score, content fields
  */
 async function runSearchRequest(
@@ -193,7 +211,8 @@ async function runSearchRequest(
   filter: string | undefined,
   searchConfig: FoundrySearchConfig,
   auth: FoundryAuth,
-  apiVersion: string
+  apiVersion: string,
+  disposeSignal: AbortSignal
 ): Promise<Array<Record<string, RillValue>>> {
   const url =
     `${searchConfig.endpoint}/indexes/${encodeURIComponent(indexName)}/docs/search` +
@@ -231,7 +250,11 @@ async function runSearchRequest(
         ...authHeaders,
       },
       body: JSON.stringify(requestBody),
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
+      signal: AbortSignal.any([
+        disposeSignal,
+        AbortSignal.timeout(DEFAULT_TIMEOUT),
+        ...(ctx.signal ? [ctx.signal] : []),
+      ]),
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === 'TimeoutError') {
@@ -316,24 +339,6 @@ function extractDocumentId(item: Record<string, unknown>): string {
   return '';
 }
 
-/**
- * Build a content dict from a search result item, excluding Azure metadata fields.
- *
- * @param item - Raw search result item
- * @returns Dict of document fields (excluding Azure-prefixed metadata)
- */
-function haltDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
-  const message = `${PROVIDER}: extension disposed`;
-  return new RuntimeHaltSignal(
-    ctx.invalidate(new Error(message), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed', message },
-    }),
-    true
-  );
-}
-
 function haltUnconfigured(
   ctx: RuntimeContext,
   rawKind: string,
@@ -349,6 +354,12 @@ function haltUnconfigured(
   );
 }
 
+/**
+ * Build a content dict from a search result item, excluding Azure metadata fields.
+ *
+ * @param item - Raw search result item
+ * @returns Dict of document fields (excluding Azure-prefixed metadata)
+ */
 function buildContentDict(
   item: Record<string, unknown>
 ): Record<string, RillValue> {

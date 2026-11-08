@@ -10,13 +10,13 @@ import {
   RuntimeHaltSignal,
   type ApplicationCallable,
 } from '@rcrsr/rill';
-import { APIError } from 'openai';
+import { APIError, APIUserAbortError } from 'openai';
 import { createOpenAIExtension } from '../src/factory.js';
 
 const mockStream = vi.fn();
 const mockEmbeddingsCreate = vi.fn();
 
-vi.mock('openai', () => {
+vi.mock('openai', async () => {
   class MockAPIError extends Error {
     status: number | undefined;
     constructor(status: number | undefined, _error: unknown, message: string) {
@@ -26,7 +26,10 @@ vi.mock('openai', () => {
     }
   }
 
+  const actual = await vi.importActual<typeof import('openai')>('openai');
+
   return {
+    APIUserAbortError: actual.APIUserAbortError,
     default: class MockOpenAI {
       chat = {
         completions: {
@@ -128,6 +131,33 @@ describe('dispose() with in-flight requests', () => {
 
       expectDisposedHalt(await settled);
     });
+
+    it('emits openai:error when dispose aborts the pending request', async () => {
+      mockPendingRunner();
+      const ext = createOpenAIExtension(CONFIG);
+      const events: Array<Record<string, unknown>> = [];
+      const ctx = createRuntimeContext({
+        callbacks: {
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
+        },
+      });
+      const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
+      const settled = settleRejection(resolveStream(stream));
+
+      await ext.dispose?.();
+      await settled;
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        event: 'openai:error',
+        subsystem: 'extension:openai',
+        error: 'openai: extension disposed',
+      });
+      expect(typeof events[0]?.['duration']).toBe('number');
+    });
   });
 
   describe('tool_loop()', () => {
@@ -139,6 +169,38 @@ describe('dispose() with in-flight requests', () => {
           prompt: 'Hello',
           tools: { noop: callable(() => 'ok') },
         },
+        createRuntimeContext()
+      );
+      const settled = settleRejection(resolveStream(stream));
+
+      await ext.dispose?.();
+
+      expectDisposedHalt(await settled);
+    });
+  });
+
+  describe('tool_loop() with the SDK abort error', () => {
+    it('throws DISPOSED when the pending request rejects with APIUserAbortError', async () => {
+      mockStream.mockImplementation(
+        (_params: unknown, options: { signal?: AbortSignal }) => {
+          const runner = {
+            on: vi.fn(() => runner),
+            finalChatCompletion: vi.fn(
+              () =>
+                new Promise<never>((_resolve, reject) => {
+                  options.signal?.addEventListener('abort', () =>
+                    reject(new APIUserAbortError())
+                  );
+                })
+            ),
+            abort: vi.fn(),
+          };
+          return runner;
+        }
+      );
+      const ext = createOpenAIExtension(CONFIG);
+      const stream = getCallable(ext, 'tool_loop').fn(
+        { prompt: 'Hello', tools: { noop: callable(() => 'ok') } },
         createRuntimeContext()
       );
       const settled = settleRejection(resolveStream(stream));

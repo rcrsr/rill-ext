@@ -37,6 +37,7 @@ import {
   validateEmbedBatch,
   validateEmbedModel,
   mapProviderError,
+  disposedHaltFor,
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
   buildResponseMessages,
@@ -542,22 +543,6 @@ export function createGeminiExtension(
     );
   }
 
-  // True for errors an aborted request produces (fetch AbortError, or the
-  // shared tool loop's #TIMEOUT halt wrapping an abort or its own cancellation),
-  // as opposed to API, auth or rate-limit failures.
-  function isAbortShaped(error: unknown): boolean {
-    if (error instanceof RuntimeHaltSignal) {
-      const kind = getStatus(error.value).raw?.['kind'];
-      return kind === 'tool_loop_cancelled' || kind === 'request_timeout';
-    }
-    // The shared tool loop wraps provider errors without a detector in a
-    // RuntimeError carrying the original error as context.cause.
-    if (error instanceof RuntimeError) {
-      return isAbortShaped(error.context?.['cause']);
-    }
-    return error instanceof Error && error.name === 'AbortError';
-  }
-
   // Single failure classifier: a request cancelled by dispose() reports
   // #DISPOSED; an error that happened before dispose keeps its class, so rill
   // errors pass through and vendor errors map.
@@ -565,14 +550,13 @@ export function createGeminiExtension(
     ctx: RuntimeContext,
     error: unknown
   ): RuntimeError | RuntimeHaltSignal {
-    if (!abortController && isAbortShaped(error)) {
-      return haltInvalid(
-        ctx,
-        'DISPOSED',
-        'extension_disposed',
-        'gemini: extension disposed'
-      );
-    }
+    const disposedHalt = disposedHaltFor(
+      ctx,
+      'gemini',
+      error,
+      abortController === undefined
+    );
+    if (disposedHalt) return disposedHalt;
     return error instanceof RuntimeError || error instanceof RuntimeHaltSignal
       ? error
       : mapToHalt(ctx, error);

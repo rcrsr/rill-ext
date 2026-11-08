@@ -43,6 +43,7 @@ import {
   validateEmbedModel,
   validateEmbedBatch,
   mapProviderError,
+  throwIfCancelledByDispose,
   throwProviderHalt,
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
@@ -99,6 +100,13 @@ const O_SERIES_PATTERN = /^o\d/;
  * Extracts status code and message from APIError instances.
  */
 const detectOpenAIError: ProviderErrorDetector = (error: unknown) => {
+  // A user-initiated abort is a cancellation, not an API failure.
+  if (
+    error instanceof Error &&
+    error.constructor.name === 'APIUserAbortError'
+  ) {
+    return null;
+  }
   if (error instanceof APIError) {
     return {
       status: error.status ?? undefined,
@@ -491,22 +499,6 @@ export function createOpenAIExtension(
     }
   }
 
-  // True for errors an aborted request produces (fetch AbortError, the
-  // SDK's APIUserAbortError, or the tool loop's cancellation halt), as opposed to API, auth or rate-limit failures.
-  function isAbortShaped(error: unknown): boolean {
-    // The shared tool loop wraps an aborted request, or its own signal abort,
-    // as a #TIMEOUT halt.
-    if (error instanceof RuntimeHaltSignal) {
-      const kind = getStatus(error.value).raw?.['kind'];
-      return kind === 'tool_loop_cancelled' || kind === 'request_timeout';
-    }
-    return (
-      error instanceof Error &&
-      (error.name === 'AbortError' ||
-        error.constructor.name === 'APIUserAbortError')
-    );
-  }
-
   // Called first in every catch block. Reports #DISPOSED only when dispose()
   // is what cancelled the call; an error that happened before dispose keeps its
   // original classification. Emits openai:error when startTime is supplied.
@@ -515,16 +507,22 @@ export function createOpenAIExtension(
     error: unknown,
     startTime?: number
   ): void {
-    if (abortController || !isAbortShaped(error)) return;
-    if (startTime !== undefined) {
-      emitExtensionEvent(ctx, {
-        event: 'openai:error',
-        subsystem: 'extension:openai',
-        error: 'openai: extension disposed',
-        duration: Date.now() - startTime,
-      });
-    }
-    assertNotDisposed(ctx);
+    throwIfCancelledByDispose(
+      ctx,
+      'openai',
+      error,
+      abortController === undefined,
+      () => {
+        if (startTime !== undefined) {
+          emitExtensionEvent(ctx, {
+            event: 'openai:error',
+            subsystem: 'extension:openai',
+            error: 'openai: extension disposed',
+            duration: Date.now() - startTime,
+          });
+        }
+      }
+    );
   }
 
   // ============================================================

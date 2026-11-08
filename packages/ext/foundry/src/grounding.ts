@@ -20,11 +20,19 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import { mapProviderError } from '@rcrsr/rill-ext-llm-shared';
+import {
+  createDisposedHalt,
+  mapProviderError,
+  throwIfCancelledByDispose,
+} from '@rcrsr/rill-ext-llm-shared';
 import { detectFoundryError } from './errors.js';
 import type { AzureOpenAI } from 'openai';
 import type { ResponseOutputItem } from 'openai/resources/responses/responses.js';
-import type { FoundryConfig, FoundryGroundingConfig } from './types.js';
+import type {
+  FoundryConfig,
+  FoundryDisposalRef,
+  FoundryGroundingConfig,
+} from './types.js';
 
 // ============================================================
 // CONSTANTS
@@ -71,10 +79,10 @@ export async function callGround(
   config: FoundryConfig,
   client: AzureOpenAI,
   ctx: RuntimeContext,
-  disposed: { value: boolean }
+  disposed: FoundryDisposalRef
 ): Promise<RillValue> {
   if (disposed.value) {
-    throw haltDisposed(ctx);
+    throw createDisposedHalt(ctx, PROVIDER);
   }
 
   // Grounding must be configured
@@ -114,12 +122,20 @@ export async function callGround(
 
     // Cast tools because bing_grounding is Azure-specific and not in base openai-node types.
     // The tools array is typed as Tool[] (non-undefined when present); cast via unknown.
-    const response = await client.responses.create({
-      model,
-      input: query,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bing_grounding is Azure-specific and absent from the openai-node Tool union
-      tools: [bingTool] as any,
-    });
+    const response = await client.responses.create(
+      {
+        model,
+        input: query,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bing_grounding is Azure-specific and absent from the openai-node Tool union
+        tools: [bingTool] as any,
+      },
+      {
+        signal: AbortSignal.any([
+          disposed.signal,
+          ...(ctx.signal ? [ctx.signal] : []),
+        ]),
+      }
+    );
 
     const answer = response.output_text ?? '';
     const citations = extractCitations(response.output);
@@ -139,6 +155,16 @@ export async function callGround(
     } as RillValue;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
+
+    // A request cancelled by dispose() reports #DISPOSED; other errors keep their class.
+    throwIfCancelledByDispose(ctx, PROVIDER, error, disposed.value, () => {
+      emitExtensionEvent(ctx, {
+        event: 'foundry:ground:error',
+        subsystem: `extension:${PROVIDER}`,
+        error: `${PROVIDER}: extension disposed`,
+        duration,
+      });
+    });
 
     if (error instanceof RuntimeHaltSignal) {
       emitExtensionEvent(ctx, {
@@ -174,18 +200,6 @@ export async function callGround(
 // ============================================================
 // HALT HELPERS
 // ============================================================
-
-function haltDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
-  const message = `${PROVIDER}: extension disposed`;
-  return new RuntimeHaltSignal(
-    ctx.invalidate(new Error(message), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed', message },
-    }),
-    true
-  );
-}
 
 function haltUnconfigured(
   ctx: RuntimeContext,
