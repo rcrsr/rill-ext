@@ -115,13 +115,14 @@ export function createRedisKvExtension(
   });
 
   let disposed = false;
-  const dispose = async (): Promise<void> => {
-    if (disposed) return;
+  const dispose = (): Promise<void> => {
+    if (disposed) return Promise.resolve();
     disposed = true;
     // disconnect() closes the socket now and rejects queued and in-flight
     // commands. quit() would wait for every pending reply, so dispose() would
     // not stop work already issued.
     client.disconnect();
+    return Promise.resolve();
   };
 
   if (ctx?.signal) {
@@ -539,7 +540,7 @@ export function createRedisKvExtension(
       const pattern = `${mountConfig.prefix}*`;
       const redisKeys = await scanKeys(runCtx, pattern);
       const prefixLen = mountConfig.prefix.length;
-      return redisKeys.map((k) => k.substring(prefixLen));
+      return redisKeys.map((k) => k.slice(prefixLen));
     } catch (error) {
       return mapError(runCtx, error);
     }
@@ -623,7 +624,7 @@ export function createRedisKvExtension(
       const prefixLen = mountConfig.prefix.length;
 
       for (let i = 0; i < redisKeys.length; i++) {
-        const k = redisKeys[i]!.substring(prefixLen);
+        const k = redisKeys[i]!.slice(prefixLen);
         const value = values[i];
         if (value !== null && value !== undefined) {
           result[k] = JSON.parse(value) as RillValue;
@@ -635,41 +636,51 @@ export function createRedisKvExtension(
     }
   };
 
-  const schema: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
-    assertLive(runCtx);
-    const mountName = args['mount'] as string;
-    const mountConfig = getMountConfig(mountName);
-    if (!mountConfig) return unknownMount(runCtx, mountName);
+  const schema: CallableFn = (args, runtimeCtx): Promise<RillValue> => {
+    const body = (): RillValue => {
+      const runCtx = runtimeCtx as RuntimeContext;
+      assertLive(runCtx);
+      const mountName = args['mount'] as string;
+      const mountConfig = getMountConfig(mountName);
+      if (!mountConfig) return unknownMount(runCtx, mountName);
 
-    if (!mountConfig.schema) return [];
+      if (!mountConfig.schema) return [];
 
-    const result: RillValue[] = [];
-    for (const [key, entry] of Object.entries(mountConfig.schema)) {
-      result.push({
-        key,
-        type: entry.type,
-        description: entry.description ?? '',
-      });
-    }
-    return result;
+      const result: RillValue[] = [];
+      for (const [key, entry] of Object.entries(mountConfig.schema)) {
+        result.push({
+          key,
+          type: entry.type,
+          description: entry.description ?? '',
+        });
+      }
+      return result;
+    };
+    return new Promise<RillValue>((resolve) => {
+      resolve(body());
+    });
   };
 
-  const mountsList: CallableFn = async (_args, runtimeCtx) => {
-    assertLive(runtimeCtx as RuntimeContext);
-    const result: RillValue[] = [];
-    for (const [name, mountConfig] of Object.entries(config.mounts)) {
-      result.push({
-        name,
-        mode: mountConfig.mode,
-        schema: mountConfig.schema ? 'declared' : 'open',
-        max_entries: mountConfig.maxEntries ?? 10000,
-        max_value_size: mountConfig.maxValueSize ?? 102400,
-        prefix: mountConfig.prefix,
-        ttl: mountConfig.ttl ?? 0,
-      });
-    }
-    return result;
+  const mountsList: CallableFn = (_args, runtimeCtx): Promise<RillValue> => {
+    const body = (): RillValue => {
+      assertLive(runtimeCtx as RuntimeContext);
+      const result: RillValue[] = [];
+      for (const [name, mountConfig] of Object.entries(config.mounts)) {
+        result.push({
+          name,
+          mode: mountConfig.mode,
+          schema: mountConfig.schema ? 'declared' : 'open',
+          max_entries: mountConfig.maxEntries ?? 10000,
+          max_value_size: mountConfig.maxValueSize ?? 102400,
+          prefix: mountConfig.prefix,
+          ttl: mountConfig.ttl ?? 0,
+        });
+      }
+      return result;
+    };
+    return new Promise<RillValue>((resolve) => {
+      resolve(body());
+    });
   };
 
   // ============================================================

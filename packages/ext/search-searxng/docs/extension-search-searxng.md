@@ -176,6 +176,7 @@ generic atoms. Host scripts match coarsely (`guard #UNAVAILABLE`) or finely
 |---|---|---|
 | Empty / missing query | `#INVALID_INPUT` | `invalid_input` |
 | Invalid `time_range` value | `#INVALID_INPUT` | `invalid_input` |
+| Non-scalar option value (dict or list) | `#INVALID_INPUT` | `invalid_option_type` |
 | Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
 | Forbidden (HTTP 403) | `#FORBIDDEN` | `forbidden` |
 | Resource not found (HTTP 404) | `#NOT_FOUND` | `not_found` |

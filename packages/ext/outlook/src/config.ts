@@ -5,6 +5,7 @@
 
 import { RuntimeError } from '@rcrsr/rill';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import { failInput } from './errors.js';
 import type {
   OutlookAuth,
   OutlookCapabilities,
@@ -148,7 +149,19 @@ export function resolveToken(auth: OutlookAuth, ctx: RuntimeContext): string {
   while (scope !== undefined) {
     const value = scope.variables.get(tokenVar);
     if (value !== undefined) {
-      return String(value);
+      if (typeof value !== 'string') {
+        const invalidMessage = `outlook: session token '${tokenVar}' must be a string`;
+        throw ctx.invalidate(new Error(invalidMessage), {
+          code: 'AUTH',
+          provider: PROVIDER,
+          raw: {
+            kind: 'invalid_session_token',
+            tokenVar,
+            message: invalidMessage,
+          },
+        }) as unknown as RillValue;
+      }
+      return value;
     }
     scope = scope.parent;
   }
@@ -159,4 +172,29 @@ export function resolveToken(auth: OutlookAuth, ctx: RuntimeContext): string {
     provider: PROVIDER,
     raw: { kind: 'session_token_missing', tokenVar, message },
   }) as unknown as RillValue;
+}
+
+/**
+ * Convert a list of recipient/attendee values to address strings.
+ * Strings pass through; numbers and booleans stringify as before; any other
+ * value is rejected with `#INVALID_INPUT` (`raw.kind == 'invalid_recipient'`)
+ * before any Graph call.
+ */
+export function toAddressList(
+  values: readonly RillValue[],
+  ctx: RuntimeContext
+): string[] {
+  return values.map((v) => {
+    if (typeof v === 'string') {
+      return v;
+    }
+    if (typeof v === 'number' || typeof v === 'boolean') {
+      return String(v);
+    }
+    return failInput(
+      ctx,
+      'invalid_recipient',
+      'outlook: recipient must be a string'
+    );
+  });
 }

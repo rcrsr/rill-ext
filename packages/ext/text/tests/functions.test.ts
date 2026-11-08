@@ -408,6 +408,17 @@ describe('window', () => {
 // truncate
 // ---------------------------------------------------------------------------
 
+describe('host function results', () => {
+  it('returns a Promise from a host function', async () => {
+    const result = getCallable(ext, 'truncate').fn(
+      { text: 'abc', max: 2, ellipsis: '' },
+      makeRuntimeCtx()
+    );
+    expect(result).toBeInstanceOf(Promise);
+    await result;
+  });
+});
+
 describe('truncate', () => {
   it('AC-20: truncates to first max characters', async () => {
     const text = 'x'.repeat(500);

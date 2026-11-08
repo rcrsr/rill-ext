@@ -96,7 +96,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
   };
 
   // ── Closure fn ────────────────────────────────────────────────────────────
-  const fn: CallableFn = async (args, ctxLike): Promise<RillValue> => {
+  const fn: CallableFn = (args, ctxLike): Promise<RillValue> => {
     const ctx = ctxLike as RuntimeContext;
     try {
       // Build interpolation values via rill's canonical formatValue; null/undefined → empty string.
@@ -114,7 +114,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
       // Produce output shape based on declared output type.
       if (parsed.output === 'string') {
         // Plain string output has no role structure; interpolate the whole body.
-        return interpolate(parsed.body, values);
+        return Promise.resolve(interpolate(parsed.body, values));
       }
 
       // output === 'list': split the TEMPLATE into @@ role messages FIRST, then
@@ -124,25 +124,29 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
       // guarantees at least one marker exists, so splitRoleMessages will not
       // throw RILL-R001 here.
       const templateMessages = splitRoleMessages(parsed.body);
-      return templateMessages.map(({ role, content }) => ({
-        role,
-        content: interpolate(content, values),
-      })) as RillValue[];
+      return Promise.resolve(
+        templateMessages.map(({ role, content }) => ({
+          role,
+          content: interpolate(content, values),
+        })) as RillValue[]
+      );
     } catch (err) {
       // Re-throw RuntimeErrors as-is (any RILL-R001 propagated from splitRoleMessages).
       if (err instanceof RuntimeError) {
-        throw err;
+        return Promise.reject(err);
       }
       // Closure-runtime failure: invalidate via ctx with #PROTOCOL.
-      throw ctx.invalidate(err, {
-        code: 'PROTOCOL',
-        provider: 'prompt-md',
-        raw: {
-          kind: 'closure_failure',
-          name: parsed.name,
-          detail: err instanceof Error ? err.message : String(err),
-        },
-      }) as unknown as RillValue;
+      return Promise.reject(
+        ctx.invalidate(err, {
+          code: 'PROTOCOL',
+          provider: 'prompt-md',
+          raw: {
+            kind: 'closure_failure',
+            name: parsed.name,
+            detail: err instanceof Error ? err.message : String(err),
+          },
+        }) as unknown as RillValue
+      );
     }
   };
 

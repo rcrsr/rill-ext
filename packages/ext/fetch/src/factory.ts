@@ -306,7 +306,7 @@ export function createFetchExtension(
   // INTROSPECTION FUNCTION
   // ============================================================
 
-  const endpointsFn = async (): Promise<RillValue[]> => {
+  const endpointsFn = (): Promise<RillValue[]> => {
     const result: RillValue[] = [];
 
     for (const [name, endpointConfig] of Object.entries(config.endpoints)) {
@@ -318,7 +318,7 @@ export function createFetchExtension(
       });
     }
 
-    return result;
+    return Promise.resolve(result);
   };
 
   functions['endpoints'] = {

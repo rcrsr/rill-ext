@@ -400,3 +400,24 @@ describe('createLocalFsExtension - runtime dispatch after dispose', () => {
     expect(getStatus(result.result).code.name).toBe('DISPOSED');
   });
 });
+
+describe('createLocalFsExtension - post-dispose shape', () => {
+  it('returns a Promise rejecting with DISPOSED from mounts', async () => {
+    const ext = await createLocalFsExtension(
+      { mounts: { workspace: { path: os.tmpdir(), mode: 'read' } } },
+      makeFactoryCtx()
+    );
+    await ext.dispose?.();
+
+    const pending = getCallable(ext, 'mounts').fn({}, makeRuntimeCtx());
+
+    expect(pending).toBeInstanceOf(Promise);
+    const halt: unknown = await Promise.resolve(pending).catch(
+      (e: unknown) => e
+    );
+    expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus((halt as RuntimeHaltSignal).value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+  });
+});

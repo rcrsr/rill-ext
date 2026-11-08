@@ -738,19 +738,24 @@ export async function createLocalFsExtension(
     }
   };
 
-  const mountsList: CallableFn = async (_args, ctxIn) => {
-    assertLive(ctxIn as RuntimeContext);
-    const result: RillValue[] = [];
+  const mountsList: CallableFn = (_args, ctxIn): Promise<RillValue> => {
+    const body = (): RillValue => {
+      assertLive(ctxIn as RuntimeContext);
+      const result: RillValue[] = [];
 
-    for (const [name, mount] of Object.entries(mounts)) {
-      result.push({
-        name,
-        mode: mount.mode,
-        glob: mount.glob ?? '',
-      });
-    }
+      for (const [name, mount] of Object.entries(mounts)) {
+        result.push({
+          name,
+          mode: mount.mode,
+          glob: mount.glob ?? '',
+        });
+      }
 
-    return result;
+      return result;
+    };
+    return new Promise<RillValue>((resolve) => {
+      resolve(body());
+    });
   };
 
   // ============================================================
@@ -988,10 +993,11 @@ export async function createLocalFsExtension(
     mounts: toCallable(fnDict.mounts),
   } satisfies FsExtensionContract;
 
-  const dispose = async (): Promise<void> => {
-    if (disposed) return;
+  const dispose = (): Promise<void> => {
+    if (disposed) return Promise.resolve();
     disposed = true;
     lifetime.abort();
+    return Promise.resolve();
   };
 
   return {

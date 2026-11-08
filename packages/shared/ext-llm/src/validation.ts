@@ -4,7 +4,7 @@
  * Provides type-safe validation with assertion functions and error handling.
  */
 
-import { RuntimeError, type RillValue } from '@rcrsr/rill';
+import { RuntimeError, formatValue, type RillValue } from '@rcrsr/rill';
 
 // ============================================================
 // CONSTANTS
@@ -128,7 +128,11 @@ export function validateMessages(
       message['content'] !== null;
 
     if (!hasParts && !hasContent) {
-      const role = String(message['role']);
+      const roleValue = message['role'];
+      const role =
+        typeof roleValue === 'string'
+          ? roleValue
+          : formatValue(roleValue as RillValue);
       throw new RuntimeError(
         'RILL-R001',
         `${role} message requires 'parts' or 'content'`

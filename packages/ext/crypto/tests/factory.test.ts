@@ -23,6 +23,17 @@ const createCryptoExtensionT = (config?: CryptoExtensionConfig) =>
   createCryptoExtension(config ?? {}, makeFactoryCtx());
 
 describe('crypto extension factory', () => {
+  describe('host function results', () => {
+    it('returns a Promise from a host function', async () => {
+      const ext = createCryptoExtensionT();
+
+      const result = fnOf(ext, 'uuid').fn({}, makeRuntimeCtx());
+
+      expect(result).toBeInstanceOf(Promise);
+      await result;
+    });
+  });
+
   describe('factory creation', () => {
     it('creates ExtensionFactoryResult with 4 functions', () => {
       const ext = createCryptoExtensionT();

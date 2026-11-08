@@ -106,7 +106,7 @@ function parseToolResult(result: McpToolResult): RillValue {
 
       // Try parsing as JSON
       try {
-        const parsed = JSON.parse(text);
+        const parsed: unknown = JSON.parse(text);
         // JSON successfully parsed: return as dict if object, otherwise as-is
         if (
           typeof parsed === 'object' &&
@@ -115,7 +115,7 @@ function parseToolResult(result: McpToolResult): RillValue {
         ) {
           return parsed as { [key: string]: RillValue };
         }
-        return parsed;
+        return parsed as RillValue;
       } catch {
         // Not JSON: return as plain string
         return text;

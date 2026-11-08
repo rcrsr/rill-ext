@@ -964,6 +964,30 @@ describe('Brave extension host functions', () => {
     });
   });
 
+  describe('non-scalar options', () => {
+    it.each(['search', 'news', 'summarize'])(
+      'rejects dict option in %s() with invalid_option_type before fetch',
+      async (name) => {
+        const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
+        globalThis.fetch = mockFetch;
+        const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
+        const ctx = createRuntimeContext();
+
+        const thrown = await getCallable(ext, name).fn(
+          { query: 'test', options: { count: { nested: 1 } } },
+          ctx
+        );
+
+        expect(isInvalid(thrown as RillValue)).toBe(true);
+        const status = getStatus(thrown as RillValue);
+        expect(status.code.name).toBe('INVALID_INPUT');
+        expect(status.raw['kind']).toBe('invalid_option_type');
+        expect(status.raw['option']).toBe('count');
+        expect(mockFetch).not.toHaveBeenCalled();
+      }
+    );
+  });
+
   // ============================================================
   // dispose with in-flight requests
   // ============================================================

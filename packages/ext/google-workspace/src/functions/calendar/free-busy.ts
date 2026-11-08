@@ -90,9 +90,7 @@ export function makeCalendarFreeBusy(
       controller,
       deps.cache,
       CAL_FREEBUSY_SCOPES,
-      body,
-      undefined,
-      undefined
+      body
     );
     // Project to { <email>: { busy: [{ start, end }, ...] }, ... }
     const data = response as {

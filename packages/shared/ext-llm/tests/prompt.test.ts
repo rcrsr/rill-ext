@@ -184,6 +184,14 @@ describe('assertBoundaryRoles', () => {
     expect(result).toBeUndefined();
   });
 
+  it('renders dict role via formatValue in the message', () => {
+    const ctx = makeCtx();
+    const result = assertBoundaryRoles([{ role: { a: 1 }, parts: [] }], ctx);
+    const message = getStatus(result as never).message;
+    expect(message).not.toContain('[object Object]');
+    expect(message).toContain('invalid role');
+  });
+
   it('EC-4: numeric role rejected', () => {
     const ctx = makeCtx();
     const messages = [{ role: 42, parts: [] }];

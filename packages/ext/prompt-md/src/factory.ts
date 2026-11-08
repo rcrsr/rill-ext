@@ -156,9 +156,10 @@ export async function createPromptMdExtension(
   const callableDict = innerDict satisfies PromptExtensionContract;
 
   // ── dispose ───────────────────────────────────────────────────────────────
-  const dispose = async (): Promise<void> => {
+  const dispose = (): Promise<void> => {
     // Entries stay in the dict so post-dispose calls reach the guard and throw #DISPOSED.
     disposed = true;
+    return Promise.resolve();
   };
 
   // ── Return ────────────────────────────────────────────────────────────────

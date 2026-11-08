@@ -321,7 +321,11 @@ function extractDocumentId(item: Record<string, unknown>): string {
   for (const key of ['id', 'ID', 'key']) {
     const value = item[key];
     if (value !== undefined && value !== null) {
-      return String(value);
+      return typeof value === 'string'
+        ? value
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : JSON.stringify(value);
     }
   }
   for (const key of Object.keys(item)) {

@@ -226,10 +226,10 @@ export function createGoogleWorkspaceExtension(
    * Abort all in-flight requests and mark extension as disposed.
    * Idempotent: second call returns immediately without side effects.
    */
-  const disposeExtension = async (): Promise<void> => {
+  const disposeExtension = (): Promise<void> => {
     // Idempotent guard
     if (disposalState.isDisposed) {
-      return;
+      return Promise.resolve();
     }
 
     // Set disposed first so new calls fail immediately
@@ -243,6 +243,7 @@ export function createGoogleWorkspaceExtension(
 
     // Clear service-account token cache
     clearTokenCache(tokenCache);
+    return Promise.resolve();
   };
 
   // ============================================================

@@ -79,7 +79,7 @@ export function createCryptoExtension(
   // Functions
   // ----------------------------------------------------------
 
-  const hash: CallableFn = async (args, ctx) => {
+  const hash: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const input = args['input'] as string;
     const algorithm =
@@ -91,7 +91,7 @@ export function createCryptoExtension(
     return h.digest('hex');
   };
 
-  const hmac: CallableFn = async (args, ctx) => {
+  const hmac: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     if (!hmacKey) {
       return runCtx.invalidate(
@@ -113,13 +113,13 @@ export function createCryptoExtension(
     return h.digest('hex');
   };
 
-  const uuid: CallableFn = async () => {
+  const uuid: CallableFn = () => {
     return crypto.randomUUID();
   };
 
   const MAX_RANDOM_BYTES = 1_048_576;
 
-  const random: CallableFn = async (args, ctx) => {
+  const random: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const bytes = args['bytes'] as number;
     if (!Number.isInteger(bytes) || bytes < 0) {
@@ -195,17 +195,20 @@ export function createCryptoExtension(
 
   const callableDict: Record<string, RillValue> = {};
   for (const [name, def] of Object.entries(fnDict)) {
-    const guarded: CallableFn = (args, ctx, location) => {
+    const guarded: CallableFn = (args, ctx, location): Promise<RillValue> => {
       if (disposed) throw failDisposed(ctx);
-      return def.fn(args, ctx, location);
+      return new Promise<RillValue>((resolve) => {
+        resolve(def.fn(args, ctx, location));
+      });
     };
     callableDict[name] = toCallable({ ...def, fn: guarded });
   }
 
   return {
     value: callableDict as unknown as RillValue,
-    dispose: async (): Promise<void> => {
+    dispose: (): Promise<void> => {
       disposed = true;
+      return Promise.resolve();
     },
   } satisfies ExtensionFactoryResult;
 }

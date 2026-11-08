@@ -96,7 +96,17 @@ export function makeCalendarCreateEvent(
             (a): a is Record<string, RillValue> =>
               typeof a === 'object' && a !== null
           )
-          .map((a) => ({ email: String(a['email'] ?? '') }))
+          .map((a) => {
+            const email = a['email'] ?? '';
+            if (typeof email !== 'string') {
+              failInput(
+                ctx,
+                'invalid_attendee',
+                'google: attendee email must be a string'
+              );
+            }
+            return { email };
+          })
           .filter((a) => a.email !== '');
       }
       const rawDescription = options['description'];
@@ -149,9 +159,7 @@ export function makeCalendarCreateEvent(
       controller,
       deps.cache,
       CAL_WRITE_SCOPES,
-      body,
-      undefined,
-      undefined
+      body
     );
     // Return event ID string
     const data = response as { id?: string } | null;

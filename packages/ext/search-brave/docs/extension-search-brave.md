@@ -184,6 +184,7 @@ generic atoms. Host scripts match coarsely (`guard #FORBIDDEN`) or finely
 | Empty / missing query | `#INVALID_INPUT` | `empty_query` |
 | Summarizer key not in initial response | `#UNAVAILABLE` | `summarizer_key_missing` |
 | Summarizer second request failed | `#UNAVAILABLE` | `summarizer_request_failed` |
+| Non-scalar option value (dict or list) | `#INVALID_INPUT` | `invalid_option_type` |
 | Authentication failed (HTTP 401) | `#AUTH` | `authentication_failed` |
 | Access denied — body carries provider code (HTTP 403) | `#FORBIDDEN` | `access_denied` |
 | Forbidden — no body code (HTTP 403) | `#FORBIDDEN` | `forbidden` |

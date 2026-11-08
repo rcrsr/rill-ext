@@ -418,7 +418,7 @@ export function createDatetimeExtension(
   // tz::iso
   // ----------------------------------------------------------
 
-  const iso: CallableFn = async (args, ctx) => {
+  const iso: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
     if (dInv) throw dInv;
@@ -445,7 +445,7 @@ export function createDatetimeExtension(
   // tz::date
   // ----------------------------------------------------------
 
-  const date: CallableFn = async (args, ctx) => {
+  const date: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
     if (dInv) throw dInv;
@@ -465,7 +465,7 @@ export function createDatetimeExtension(
   // tz::time
   // ----------------------------------------------------------
 
-  const time: CallableFn = async (args, ctx) => {
+  const time: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
     if (dInv) throw dInv;
@@ -488,7 +488,7 @@ export function createDatetimeExtension(
   // tz::offset
   // ----------------------------------------------------------
 
-  const offset: CallableFn = async (args, ctx) => {
+  const offset: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
     if (dInv) throw dInv;
@@ -515,7 +515,7 @@ export function createDatetimeExtension(
   // tz::zones
   // ----------------------------------------------------------
 
-  const zones: CallableFn = async (_args, ctx) => {
+  const zones: CallableFn = (_args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
     if (dInv) throw dInv;
@@ -526,7 +526,7 @@ export function createDatetimeExtension(
   // time::format
   // ----------------------------------------------------------
 
-  const format: CallableFn = async (args, ctx) => {
+  const format: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
     if (dInv) throw dInv;
@@ -545,7 +545,7 @@ export function createDatetimeExtension(
   // time::parse
   // ----------------------------------------------------------
 
-  const parse: CallableFn = async (args, ctx) => {
+  const parse: CallableFn = (args, ctx) => {
     const runCtx = ctx as RuntimeContext;
     const dInv = checkDisposed(runCtx);
     if (dInv) throw dInv;
@@ -657,13 +657,20 @@ export function createDatetimeExtension(
 
   const callableDict: Record<string, RillValue> = {};
   for (const [name, def] of Object.entries(fnDict)) {
-    callableDict[name] = toCallable(def);
+    callableDict[name] = toCallable({
+      ...def,
+      fn: (args, ctx, location): Promise<RillValue> =>
+        new Promise<RillValue>((resolve) => {
+          resolve(def.fn(args, ctx, location));
+        }),
+    });
   }
 
   return {
     value: callableDict as unknown as RillValue,
-    dispose: async (): Promise<void> => {
+    dispose: (): Promise<void> => {
       disposed = true;
+      return Promise.resolve();
     },
   } satisfies ExtensionFactoryResult;
 }

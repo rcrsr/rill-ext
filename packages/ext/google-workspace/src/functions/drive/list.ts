@@ -68,10 +68,7 @@ export function makeDriveList(
       ctx,
       controller,
       deps.cache,
-      DRIVE_READ_SCOPES,
-      undefined,
-      undefined,
-      undefined
+      DRIVE_READ_SCOPES
     );
     // Empty folder returns { files: [] }
     const data = response as {

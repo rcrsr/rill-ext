@@ -640,6 +640,43 @@ describe('SearXNG extension host functions', () => {
     });
   });
 
+  describe('non-scalar options', () => {
+    it('rejects list option with invalid_option_type before fetch', async () => {
+      const ext = await createTestExtension();
+      const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
+      globalThis.fetch = mockFetch;
+      const ctx = createRuntimeContext();
+
+      const thrown = await getCallable(ext, 'search').fn(
+        { query: 'test', options: { engines: ['a', 'b'] } },
+        ctx
+      );
+
+      expect(isInvalid(thrown as RillValue)).toBe(true);
+      const status = getStatus(thrown as RillValue);
+      expect(status.raw['kind']).toBe('invalid_option_type');
+      expect(status.raw['option']).toBe('engines');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-string time_range with invalid_time_range', async () => {
+      const ext = await createTestExtension();
+      const mockFetch = mockFetchJson(200, SEARCH_RESPONSE);
+      globalThis.fetch = mockFetch;
+      const ctx = createRuntimeContext();
+
+      const thrown = await getCallable(ext, 'search').fn(
+        { query: 'test', options: { time_range: 5 } },
+        ctx
+      );
+
+      expect(isInvalid(thrown as RillValue)).toBe(true);
+      const status = getStatus(thrown as RillValue);
+      expect(status.raw['kind']).toBe('invalid_time_range');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
   // ============================================================
   // dispose with in-flight requests [AC-22]
   // ============================================================

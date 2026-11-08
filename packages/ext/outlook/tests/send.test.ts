@@ -159,6 +159,45 @@ describe('send() host function', () => {
     expect(getStatus(caught).message).toContain(message);
   });
 
+  it('rejects a non-string recipient with invalid_recipient before fetch', async () => {
+    const mockFetch = mockFetch202();
+    globalThis.fetch = mockFetch;
+    const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
+    const ctx = createRuntimeContext();
+
+    const caught = (await getCallable(ext, 'send').fn(
+      { ...SEND_ARGS, to: [{ address: 'x@example.com' }] },
+      ctx
+    )) as RillValue;
+
+    expect(isInvalid(caught)).toBe(true);
+    const status = getStatus(caught);
+    expect(status.code.name).toBe('INVALID_INPUT');
+    expect(status.raw['kind']).toBe('invalid_recipient');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-string session token with invalid_session_token before fetch', async () => {
+    const mockFetch = mockFetch202();
+    globalThis.fetch = mockFetch;
+    const ext = createOutlookExtension(
+      { ...BEARER_CONFIG, auth: { type: 'session' as const, tokenVar: 'TOK' } },
+      makeFactoryCtx()
+    );
+    const ctx = createRuntimeContext({ variables: { TOK: 42 } });
+
+    const caught = (await getCallable(ext, 'send').fn(
+      SEND_ARGS,
+      ctx
+    )) as RillValue;
+
+    expect(isInvalid(caught)).toBe(true);
+    const status = getStatus(caught);
+    expect(status.code.name).toBe('AUTH');
+    expect(status.raw['kind']).toBe('invalid_session_token');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   // ============================================================
   // event emission
   // ============================================================

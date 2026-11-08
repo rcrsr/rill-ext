@@ -154,7 +154,7 @@ export function createPineconeExtension(
         const metadataArg = (args['metadata'] ?? {}) as Record<string, unknown>;
         const metadata = convertMetadata(metadataArg);
 
-        return withEvents(ctx, 'upsert', { id }, async () => {
+        return await withEvents(ctx, 'upsert', { id }, async () => {
           const index = client.index({ name: factoryIndex });
           await index.namespace(factoryNamespace).upsert({
             records: [{ id, values: Array.from(vector.data), metadata }],
@@ -371,7 +371,7 @@ export function createPineconeExtension(
 
         const id = args['id'] as string;
 
-        return withEvents(ctx, 'get', { id }, async () => {
+        return await withEvents(ctx, 'get', { id }, async () => {
           const index = client.index({ name: factoryIndex });
           const response = await index
             .namespace(factoryNamespace)
@@ -420,7 +420,7 @@ export function createPineconeExtension(
         if (disposed !== null) throw disposed;
 
         const id = args['id'] as string;
-        return withEvents(ctx, 'delete', { id }, async () => {
+        return await withEvents(ctx, 'delete', { id }, async () => {
           const index = client.index({ name: factoryIndex });
           await index.namespace(factoryNamespace || '').deleteOne({ id });
           return { id, deleted: true } as RillValue;
@@ -504,7 +504,7 @@ export function createPineconeExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
-        return withEvents(ctx, 'count', {}, async () => {
+        return await withEvents(ctx, 'count', {}, async () => {
           const index = client.index({ name: factoryIndex });
           const stats = await index.describeIndexStats();
           const count = stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
@@ -553,20 +553,25 @@ export function createPineconeExtension(
           );
         }
 
-        return withEvents(ctx, 'create_collection', { name }, async () => {
-          let pineconeMetric: 'cosine' | 'euclidean' | 'dotproduct';
-          if (distance === 'cosine') pineconeMetric = 'cosine';
-          else if (distance === 'euclidean') pineconeMetric = 'euclidean';
-          else pineconeMetric = 'dotproduct';
+        return await withEvents(
+          ctx,
+          'create_collection',
+          { name },
+          async () => {
+            let pineconeMetric: 'cosine' | 'euclidean' | 'dotproduct';
+            if (distance === 'cosine') pineconeMetric = 'cosine';
+            else if (distance === 'euclidean') pineconeMetric = 'euclidean';
+            else pineconeMetric = 'dotproduct';
 
-          await client.createIndex({
-            name,
-            dimension: dimensions,
-            metric: pineconeMetric,
-            spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
-          });
-          return { name, created: true } as RillValue;
-        });
+            await client.createIndex({
+              name,
+              dimension: dimensions,
+              metric: pineconeMetric,
+              spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
+            });
+            return { name, created: true } as RillValue;
+          }
+        );
       },
       annotations: { description: 'Create new vector collection' },
       returnType: structureToTypeValue({
@@ -586,10 +591,15 @@ export function createPineconeExtension(
         if (disposed !== null) throw disposed;
 
         const name = args['name'] as string;
-        return withEvents(ctx, 'delete_collection', { name }, async () => {
-          await client.deleteIndex(name);
-          return { name, deleted: true } as RillValue;
-        });
+        return await withEvents(
+          ctx,
+          'delete_collection',
+          { name },
+          async () => {
+            await client.deleteIndex(name);
+            return { name, deleted: true } as RillValue;
+          }
+        );
       },
       annotations: { description: 'Delete vector collection' },
       returnType: structureToTypeValue({
@@ -608,7 +618,7 @@ export function createPineconeExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
-        return withEvents(ctx, 'list_collections', {}, async () => {
+        return await withEvents(ctx, 'list_collections', {}, async () => {
           const response = await client.listIndexes();
           const names =
             response.indexes?.map((index) => index.name ?? '') ?? [];
@@ -629,34 +639,40 @@ export function createPineconeExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
-        return withEvents(ctx, 'describe', { name: factoryIndex }, async () => {
-          const index = client.index({ name: factoryIndex });
-          const stats = await index.describeIndexStats();
-          const indexInfo = await client.describeIndex(factoryIndex);
+        return await withEvents(
+          ctx,
+          'describe',
+          { name: factoryIndex },
+          async () => {
+            const index = client.index({ name: factoryIndex });
+            const stats = await index.describeIndexStats();
+            const indexInfo = await client.describeIndex(factoryIndex);
 
-          const dimensions = stats.dimension ?? 0;
-          const count = stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
+            const dimensions = stats.dimension ?? 0;
+            const count =
+              stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
 
-          let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
-          // SDK v9 backs the legacy `metric` accessor with a getter that throws
-          // while the index is initializing; keep the 'cosine' default then.
-          let metric: string | undefined;
-          try {
-            metric = indexInfo.metric;
-          } catch {
-            metric = undefined;
+            let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
+            // SDK v9 backs the legacy `metric` accessor with a getter that throws
+            // while the index is initializing; keep the 'cosine' default then.
+            let metric: string | undefined;
+            try {
+              metric = indexInfo.metric;
+            } catch {
+              metric = undefined;
+            }
+            if (metric === 'cosine') distance = 'cosine';
+            else if (metric === 'euclidean') distance = 'euclidean';
+            else if (metric === 'dotproduct') distance = 'dot';
+
+            return {
+              name: factoryIndex,
+              count,
+              dimensions,
+              distance,
+            } as RillValue;
           }
-          if (metric === 'cosine') distance = 'cosine';
-          else if (metric === 'euclidean') distance = 'euclidean';
-          else if (metric === 'dotproduct') distance = 'dot';
-
-          return {
-            name: factoryIndex,
-            count,
-            dimensions,
-            distance,
-          } as RillValue;
-        });
+        );
       },
       annotations: { description: 'Describe configured collection' },
       returnType: structureToTypeValue({

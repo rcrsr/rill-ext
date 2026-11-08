@@ -63,10 +63,7 @@ export function makeGmailSearch(
       ctx,
       controller,
       deps.cache,
-      GMAIL_SCOPES,
-      undefined,
-      undefined,
-      undefined
+      GMAIL_SCOPES
     );
     // Project response to { messages: [{ id, thread_id }, ...] }
     const data = response as {

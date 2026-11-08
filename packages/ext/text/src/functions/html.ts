@@ -102,9 +102,15 @@ export function htmlToMarkdown(html: string): string {
  * full page with `<article>` → article HTML fragment
  * page with no `<article>`/`<main>` → body innerHTML
  */
+type ParsedHtml = {
+  readonly document: {
+    readonly body?: { readonly innerHTML: string } | null | undefined;
+  };
+};
+
 export async function extractContent(html: string): Promise<string> {
-  const { document } = parseHTML(html);
-  const result = await Defuddle(document, '');
+  const { document } = parseHTML(html) as unknown as ParsedHtml;
+  const result = await Defuddle(document as Parameters<typeof Defuddle>[0], '');
 
   const content = result.content;
 
