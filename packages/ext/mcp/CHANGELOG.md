@@ -6,6 +6,7 @@
 
 - **Test suite trust:** Tests are type-checked, false-pass tests are fixed, and HTTP transport tests run offline with no env gate. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, tightens weak or misnamed assertions, and removes the unused `getDefaultValueForType` helper. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
+- **Type-aware lint cleanup:** Fixes type-aware lint findings in source. No API or behavior change. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
 
 ### Fixed
 

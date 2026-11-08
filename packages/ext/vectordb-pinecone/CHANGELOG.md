@@ -6,6 +6,7 @@
 
 - **Test suite trust:** Tests are type-checked, and the dispose-during-upsert_batch test asserts real results. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, tightens weak or misnamed assertions, and drops unused batch, distance and wrapper helpers from the bundled shared vector code. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
+- **Type-aware lint cleanup:** Fixes type-aware lint findings in source. No API or behavior change. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
 
 ### Fixed
 

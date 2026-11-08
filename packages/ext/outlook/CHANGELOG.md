@@ -6,6 +6,7 @@
 
 - **Test suite trust:** Tests are type-checked and regression tests now fail on behavior changes. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
+- **Recipient and token validation:** Non-scalar recipients return `#INVALID_INPUT` and non-string session tokens return `#AUTH`, before any Graph call. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
 
 ### Fixed
 

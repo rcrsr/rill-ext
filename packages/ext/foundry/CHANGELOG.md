@@ -10,6 +10,7 @@
 ### Fixed
 
 - **Post-dispose docs:** Docs state post-dispose calls throw `#DISPOSED` with `raw.kind` `extension_disposed`. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+- **tool_loop null arguments:** Tool calls whose arguments parse to JSON null now run with an empty argument dict instead of being skipped. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
 
 ## [0.23.0] - 2026-11-06
 

@@ -6,6 +6,7 @@
 
 - **Test suite trust:** Tests are type-checked, and default-limit tests assert a non-invalid result with `limit=10`. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
+- **Type-aware lint cleanup:** Fixes type-aware lint findings in source. No API or behavior change. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
 
 ### Fixed
 

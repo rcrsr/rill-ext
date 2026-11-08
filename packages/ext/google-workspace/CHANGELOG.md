@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **Attendee and token validation:** Non-string attendee emails return #INVALID_INPUT and non-string session tokens return #AUTH, before any Google call. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
 - **Test suite trust:** Test files are type-checked and their type errors fixed. No runtime change. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant and self-evident tests, parametrizes copy-paste cases, and tightens weak or misnamed assertions. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 
