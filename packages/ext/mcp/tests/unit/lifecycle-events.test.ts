@@ -902,9 +902,13 @@ describe('disposed guard', () => {
 
       expect(status.code.name).toBe('DISPOSED');
       expect(status.raw['kind']).toBe('extension_disposed');
-      expect(emitExtensionEvent).not.toHaveBeenCalledWith(
+      expect(emitExtensionEvent).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ event: 'mcp:error' })
+        expect.objectContaining({
+          event: 'mcp:error',
+          subsystem: 'extension:mcp',
+          error: 'mcp: extension disposed',
+        })
       );
     });
 

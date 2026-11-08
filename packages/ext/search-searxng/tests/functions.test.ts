@@ -682,6 +682,34 @@ describe('SearXNG extension host functions', () => {
       await expectDisposedThrow(() => promise, 'searxng');
     });
 
+    it('throws #DISPOSED when dispose aborts the response body read', async () => {
+      const ext = await createTestExtension();
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () =>
+              new Promise((_resolve, reject) => {
+                init?.signal?.addEventListener('abort', () => {
+                  reject(new DOMException('aborted', 'AbortError'));
+                });
+              }),
+          })
+        );
+      const ctx = createRuntimeContext();
+
+      const promise = getCallable(ext, 'search').fn({ query: 'test' }, ctx);
+      await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      await ext.dispose!();
+
+      await expectDisposedThrow(() => promise, 'searxng');
+    });
+
     it('keeps its own code for a non-abort error that settles after dispose', async () => {
       const ext = await createTestExtension();
       globalThis.fetch = vi

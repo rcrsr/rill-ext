@@ -195,10 +195,8 @@ export async function createLocalFsExtension(
     if (sizeInvalid !== null) return sizeInvalid;
 
     assertLive(runCtx);
-    await fs.writeFile(resolvedPath, content, {
-      encoding,
-      signal: lifetime.signal,
-    });
+    // No lifetime signal: a mid-write abort would leave a truncated file.
+    await fs.writeFile(resolvedPath, content, { encoding });
     return String(contentSize);
   };
 

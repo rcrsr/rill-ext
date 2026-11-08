@@ -376,6 +376,36 @@ describe('createSearchFunctionWrapper', () => {
 
       expect(getStatus(result).code.name).toBe('TIMEOUT');
     });
+
+    it('keeps TIMEOUT when only ctx.signal aborted the request and dispose ran afterwards', async () => {
+      const disposalState = createDisposalState();
+      const inFlightState = createInFlightState();
+      const wrap = createSearchFunctionWrapper(
+        provider,
+        disposalState,
+        inFlightState
+      );
+      const wrappedFn = wrap(
+        'search',
+        (_args, _ctx, signal) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted');
+              err.name = 'AbortError';
+              // Settle after dispose flipped the flag, without the request
+              // controller having been aborted.
+              setTimeout(() => reject(err), 0);
+            });
+          })
+      );
+      const hostAbort = new AbortController();
+      const pending = wrappedFn({}, makeCtx({ signal: hostAbort.signal }));
+      hostAbort.abort();
+      disposalState.isDisposed = true;
+      const result = await pending;
+
+      expect(getStatus(result).code.name).toBe('TIMEOUT');
+    });
   });
 
   describe('return value', () => {

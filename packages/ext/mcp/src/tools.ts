@@ -256,7 +256,15 @@ function generateToolFunction(
       return parseToolResult(result);
     } catch (error) {
       const halt = haltIfCancelledByDispose(ctx, lifecycleState, error);
-      if (halt !== undefined) throw halt;
+      if (halt !== undefined) {
+        emitExtensionEvent(ctx, {
+          event: 'mcp:error',
+          subsystem: 'extension:mcp',
+          error: describeError(halt.value),
+          tool: tool.name,
+        });
+        throw halt;
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',

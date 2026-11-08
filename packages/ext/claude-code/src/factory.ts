@@ -270,12 +270,9 @@ function createPtyStream(
       tracker.disposers.delete(spawn.dispose);
       spawn.dispose();
       // Only the abort caused by extension dispose() throws DISPOSED; every
-      // other exit error keeps its mapping.
-      if (
-        isExtensionDisposed() &&
-        exitError instanceof SpawnError &&
-        exitError.kind === 'request_cancelled'
-      ) {
+      // other exit error keeps its mapping. The flag is latched at exit time,
+      // so a dispose() that runs after an unrelated cancel does not flip it.
+      if (cancelledByExtensionDispose) {
         throw createDisposedHalt(ctx, PROVIDER);
       }
       return mapSpawnError(ctx, exitError);

@@ -1149,6 +1149,9 @@ export function createOpenAIExtension(
           ]),
           factoryMaxTurns
         );
+        // Mark the rejection handled: dispose() aborts the loop and it can
+        // reject before any consumer awaits it. Consumers still see it.
+        void loopPromise.catch(() => {});
 
         async function* chunks(): AsyncGenerator<RillValue> {
           try {
@@ -1443,6 +1446,9 @@ export function createOpenAIExtension(
           ]),
           factoryMaxTurns
         );
+        // Mark the rejection handled: dispose() aborts the loop and it can
+        // reject before any consumer awaits it. Consumers still see it.
+        void loopPromise.catch(() => {});
 
         async function* chunks(): AsyncGenerator<RillValue> {
           try {

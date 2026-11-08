@@ -206,7 +206,15 @@ export function createReadResourceFunction(
       return parseResourceContent(result);
     } catch (error) {
       const halt = haltIfCancelledByDispose(ctx, lifecycleState, error);
-      if (halt !== undefined) throw halt;
+      if (halt !== undefined) {
+        emitExtensionEvent(ctx, {
+          event: 'mcp:error',
+          subsystem: 'extension:mcp',
+          error: describeError(halt.value),
+          uri,
+        });
+        throw halt;
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
@@ -304,7 +312,15 @@ function createStaticResourceFunction(
       return parseResourceContent(result);
     } catch (error) {
       const halt = haltIfCancelledByDispose(ctx, lifecycleState, error);
-      if (halt !== undefined) throw halt;
+      if (halt !== undefined) {
+        emitExtensionEvent(ctx, {
+          event: 'mcp:error',
+          subsystem: 'extension:mcp',
+          error: describeError(halt.value),
+          uri,
+        });
+        throw halt;
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',
@@ -463,7 +479,15 @@ function createResourceTemplateFunction(
       return parseResourceContent(result);
     } catch (error) {
       const halt = haltIfCancelledByDispose(ctx, lifecycleState, error);
-      if (halt !== undefined) throw halt;
+      if (halt !== undefined) {
+        emitExtensionEvent(ctx, {
+          event: 'mcp:error',
+          subsystem: 'extension:mcp',
+          error: describeError(halt.value),
+          uri: expandedUri,
+        });
+        throw halt;
+      }
       emitExtensionEvent(ctx, {
         event: 'mcp:error',
         subsystem: 'extension:mcp',

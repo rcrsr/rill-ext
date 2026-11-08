@@ -22,10 +22,15 @@ import {
  */
 export function isAbortShaped(error: unknown): boolean {
   // The shared tool loop wraps an aborted request, or its own signal abort,
-  // as a #TIMEOUT halt.
+  // as a #TIMEOUT halt. A `request_timeout` halt counts only when it came from
+  // an AbortError (`raw.aborted`); a genuine HTTP 408 or provider timeout
+  // shares the kind but keeps its own atom.
   if (error instanceof RuntimeHaltSignal) {
-    const kind = getStatus(error.value).raw?.['kind'];
-    return kind === 'tool_loop_cancelled' || kind === 'request_timeout';
+    const raw = getStatus(error.value).raw;
+    return (
+      raw?.['kind'] === 'tool_loop_cancelled' ||
+      (raw?.['kind'] === 'request_timeout' && raw['aborted'] === true)
+    );
   }
   // The shared tool loop wraps provider errors without a detector in a
   // RuntimeError carrying the original error as context.cause.

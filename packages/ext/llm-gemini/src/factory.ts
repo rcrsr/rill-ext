@@ -652,6 +652,9 @@ export function createGeminiExtension(
 
         const streamAbortController = new AbortController();
         const messageStartTime = Date.now();
+        // Read eagerly: dispose() clears abortController, and the generator
+        // body runs lazily on the first pull.
+        const lifetimeSignal = abortController!.signal;
 
         async function* streamChunks(): AsyncGenerator<RillValue> {
           try {
@@ -661,7 +664,7 @@ export function createGeminiExtension(
               config: {
                 ...apiConfig,
                 abortSignal: AbortSignal.any([
-                  abortController!.signal,
+                  lifetimeSignal,
                   streamAbortController.signal,
                 ]),
               },

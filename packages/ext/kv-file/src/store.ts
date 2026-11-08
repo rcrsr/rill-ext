@@ -382,11 +382,10 @@ export async function createStore(
   }
 
   async function writeSnapshot(): Promise<void> {
-    const entries = getAll();
-    const content = JSON.stringify(entries, null, 2);
     const tmpPath = `${storePath}.tmp`;
 
     try {
+      const content = JSON.stringify(getAll(), null, 2);
       await fs.writeFile(tmpPath, content, 'utf-8');
       await fs.rename(tmpPath, storePath);
     } catch (error) {

@@ -199,12 +199,6 @@ describe('createLocalFsExtension - factory', () => {
         );
       }
 
-      function abortError(): Error {
-        return Object.assign(new Error('The operation was aborted'), {
-          name: 'AbortError',
-        });
-      }
-
       /** Holds fs.stat for one path until release() is called. */
       function holdStat(target: string): {
         release: () => void;
@@ -229,14 +223,14 @@ describe('createLocalFsExtension - factory', () => {
         vi.restoreAllMocks();
       });
 
-      it('aborts the write signal when dispose runs', async () => {
-        let seen: AbortSignal | undefined;
+      it('writes without the lifetime signal so dispose cannot truncate the file', async () => {
+        let seen: { signal?: AbortSignal } | undefined;
         vi.spyOn(fs, 'writeFile').mockImplementation(((
           _p: unknown,
           _d: unknown,
-          o: { signal: AbortSignal }
+          o: { signal?: AbortSignal }
         ) => {
-          seen = o.signal;
+          seen = o;
           return new Promise(() => {});
         }) as never);
         const ext = await mountExt();
@@ -245,38 +239,8 @@ describe('createLocalFsExtension - factory', () => {
           makeRuntimeCtx()
         );
         await vi.waitFor(() => expect(seen).toBeDefined());
-        expect(seen?.aborted).toBe(false);
 
-        await ext.dispose?.();
-
-        expect(seen?.aborted).toBe(true);
-      });
-
-      it('throws #DISPOSED when write is aborted by dispose', async () => {
-        let rejectWrite: (e: unknown) => void = () => {};
-        vi.spyOn(fs, 'writeFile').mockImplementation(
-          () =>
-            new Promise((_, reject) => {
-              rejectWrite = reject;
-            }) as never
-        );
-        const ext = await mountExt();
-        const pending = getCallable(ext, 'write').fn(
-          { path: '/workspace/a.txt', content: 'x' },
-          makeRuntimeCtx()
-        );
-        await vi.waitFor(() =>
-          expect(vi.mocked(fs.writeFile)).toHaveBeenCalled()
-        );
-        await ext.dispose?.();
-        rejectWrite(abortError());
-
-        const { halt } = await captureThrown(() => pending);
-
-        expect(halt).toBeInstanceOf(RuntimeHaltSignal);
-        const status = getStatus(halt!.value);
-        expect(status.code.name).toBe('DISPOSED');
-        expect(status.raw['kind']).toBe('extension_disposed');
+        expect(seen?.signal).toBeUndefined();
       });
 
       it('keeps the original error when a non-abort failure settles after dispose', async () => {

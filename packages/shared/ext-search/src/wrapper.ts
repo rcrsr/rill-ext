@@ -99,9 +99,14 @@ export function createSearchFunctionWrapper(
       } catch (error: unknown) {
         const duration = Date.now() - startTime;
         // dispose() cancelled this request: an abort-shaped failure on a
-        // disposed extension throws the #DISPOSED halt. Any other error,
-        // including one that settles after dispose, keeps its own code.
-        if (disposalState.isDisposed && isAbortShaped(error)) {
+        // disposed extension whose request controller was aborted throws the
+        // #DISPOSED halt. Any other error, including one that settles after
+        // dispose or an abort from ctx.signal alone, keeps its own code.
+        if (
+          disposalState.isDisposed &&
+          controller.signal.aborted &&
+          isAbortShaped(error)
+        ) {
           const disposed = buildDisposedInvalid(ctx, provider);
           emitErrorEvent(ctx, provider, duration, getStatus(disposed).message);
           throw new RuntimeHaltSignal(disposed, true);

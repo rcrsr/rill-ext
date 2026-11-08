@@ -144,6 +144,23 @@ describe('in-flight calls cancelled by dispose()', () => {
 
       expectDisposedHalt(await pending);
     });
+
+    it('throws DISPOSED halt when dispose runs before the first chunk is pulled', async () => {
+      mockGenerateContentStream.mockImplementation(makeAbortableStream);
+      const ext = createGeminiExtension({
+        api_key: 'test-key',
+        model: 'gemini-2.0-flash',
+      });
+      const ctx = createRuntimeContext();
+
+      const stream = await getCallable(ext, 'message').fn(
+        { prompt: 'hello' },
+        ctx
+      );
+      await ext.dispose!();
+
+      expectDisposedHalt(await drainForError(stream, ctx));
+    });
   });
 
   describe('tool_loop()', () => {

@@ -10,7 +10,7 @@
 ### Fixed
 
 - **Post-dispose calls:** Calls after `dispose()` or factory signal abort throw `#DISPOSED` instead of spawning a process. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
-- **In-flight dispose:** A call cancelled by `dispose()` now settles and returns `#DISPOSED` (`extension_disposed`) instead of hanging; a `ctx.signal` abort returns `#TIMEOUT` (`request_cancelled`). ([#153](https://github.com/rcrsr/rill-ext/pull/153))
+- **In-flight dispose:** A call cancelled by `dispose()` now settles and throws `#DISPOSED` (`extension_disposed`) instead of hanging; a `ctx.signal` abort returns `#TIMEOUT` (`request_cancelled`). ([#153](https://github.com/rcrsr/rill-ext/pull/153))
 
 ## [0.23.0] - 2026-11-06
 

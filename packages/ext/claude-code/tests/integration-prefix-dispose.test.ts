@@ -779,6 +779,27 @@ describe('In-flight call cancelled by dispose', () => {
     expect(status.provider).toBe('claude-code');
   });
 
+  it('keeps TIMEOUT when dispose runs after a ctx.signal abort already settled the call', async () => {
+    await startCancellable(cancelled);
+    const ext = createClaudeCodeExtension({}, makeFactoryCtx());
+    const controller = new AbortController();
+    const stream = extValue(ext).prompt.fn(
+      { text: 'Test', options: {} },
+      createRuntimeContext({ signal: controller.signal })
+    );
+
+    controller.abort();
+    await new Promise<void>((done) => {
+      setTimeout(done, 0);
+    });
+    await ext.dispose!();
+
+    const result = await resolveStream(stream);
+    const status = getStatus(result as never);
+    expect(status.code.name).toBe('TIMEOUT');
+    expect(status.raw['kind']).toBe('request_cancelled');
+  });
+
   it('keeps its own code for a non-request_cancelled exit error after dispose', async () => {
     const { disposeFn } = await startCancellable(
       () =>

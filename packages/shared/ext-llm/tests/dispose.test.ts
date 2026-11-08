@@ -46,7 +46,31 @@ describe('isAbortShaped', () => {
 
   it('returns true for tool loop cancellation and timeout halts', () => {
     expect(isAbortShaped(haltWithKind('tool_loop_cancelled'))).toBe(true);
-    expect(isAbortShaped(haltWithKind('request_timeout'))).toBe(true);
+  });
+
+  it('returns true for a request_timeout halt derived from an abort', () => {
+    const halt = new RuntimeHaltSignal(
+      createRuntimeContext().invalidate(new Error('aborted'), {
+        code: 'TIMEOUT',
+        provider: 'test',
+        raw: { kind: 'request_timeout', aborted: true },
+      }),
+      true
+    );
+    expect(isAbortShaped(halt)).toBe(true);
+  });
+
+  it('returns false for a genuine request_timeout halt such as HTTP 408', () => {
+    const halt = new RuntimeHaltSignal(
+      createRuntimeContext().invalidate(new Error('408'), {
+        code: 'TIMEOUT',
+        provider: 'test',
+        raw: { kind: 'request_timeout', status: 408 },
+      }),
+      true
+    );
+    expect(isAbortShaped(halt)).toBe(false);
+    expect(isAbortShaped(haltWithKind('request_timeout'))).toBe(false);
   });
 
   it('returns true for a RuntimeError caused by an abort', () => {

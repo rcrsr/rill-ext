@@ -152,7 +152,9 @@ export async function createSearxngExtension(
     };
     try {
       data = (await response.json()) as typeof data;
-    } catch {
+    } catch (err: unknown) {
+      // An abort or timeout while reading the body is not a malformed response.
+      if (requestSignal.aborted) throw err;
       throw failHttp(callCtx, 'unexpected response format', {
         kind: 'unexpected_response_format',
       });
@@ -214,7 +216,9 @@ export async function createSearxngExtension(
     };
     try {
       data = (await response.json()) as typeof data;
-    } catch {
+    } catch (err: unknown) {
+      // An abort or timeout while reading the body is not a malformed response.
+      if (requestSignal.aborted) throw err;
       throw failHttp(callCtx, 'unexpected response format', {
         kind: 'unexpected_response_format',
       });
