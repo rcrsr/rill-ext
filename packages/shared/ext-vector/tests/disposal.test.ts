@@ -16,6 +16,7 @@ import {
 import {
   createDisposalState,
   checkDisposed,
+  disposedHaltFor,
   dispose,
 } from '../src/disposal.js';
 
@@ -43,7 +44,7 @@ describe('checkDisposed', () => {
     expect(result).toBeInstanceOf(RuntimeHaltSignal);
     expect(result!.catchable).toBe(true);
     expect(getStatus(result!.value).message).toBe(
-      `${provider}: operation cancelled`
+      `${provider}: extension disposed`
     );
   });
 
@@ -57,6 +58,67 @@ describe('checkDisposed', () => {
     const state = { isDisposed: true };
     const result = checkDisposed(ctx, state, provider);
     expect(getStatus(result!.value).raw['kind']).toBe('extension_disposed');
+  });
+});
+
+describe('disposedHaltFor', () => {
+  const provider = 'test-db';
+  const ctx = createRuntimeContext();
+  const abortError = (): Error =>
+    Object.assign(new Error('aborted'), { name: 'AbortError' });
+
+  it('returns null when not disposed even for an abort-shaped error', () => {
+    expect(
+      disposedHaltFor(ctx, { isDisposed: false }, provider, abortError())
+    ).toBeNull();
+  });
+
+  it('returns DISPOSED halt when disposed and error is abort-shaped', () => {
+    const halt = disposedHaltFor(
+      ctx,
+      { isDisposed: true },
+      provider,
+      abortError()
+    );
+    expect(halt).toBeInstanceOf(RuntimeHaltSignal);
+    const status = getStatus(halt!.value);
+    expect(status.code.name).toBe('DISPOSED');
+    expect(status.raw['kind']).toBe('extension_disposed');
+    expect(status.message).toBe(`${provider}: extension disposed`);
+  });
+
+  it('returns DISPOSED halt when an AbortError sits in the cause chain', () => {
+    const wrapped = new Error('connection failed', { cause: abortError() });
+    expect(
+      disposedHaltFor(ctx, { isDisposed: true }, provider, wrapped)
+    ).not.toBeNull();
+  });
+
+  it('returns null when disposed but error is not abort-shaped', () => {
+    expect(
+      disposedHaltFor(
+        ctx,
+        { isDisposed: true },
+        provider,
+        new Error('429 rate limit')
+      )
+    ).toBeNull();
+  });
+
+  it('returns a DISPOSED halt unchanged even when state is not disposed', () => {
+    const halt = checkDisposed(ctx, { isDisposed: true }, provider)!;
+    expect(disposedHaltFor(ctx, { isDisposed: false }, provider, halt)).toBe(
+      halt
+    );
+  });
+
+  it('returns null for a TimeoutError even when disposed', () => {
+    const timeout = Object.assign(new Error('timed out'), {
+      name: 'TimeoutError',
+    });
+    expect(
+      disposedHaltFor(ctx, { isDisposed: true }, provider, timeout)
+    ).toBeNull();
   });
 });
 

@@ -23,6 +23,7 @@ import {
   withEventEmission,
   createDisposalState,
   checkDisposed,
+  disposedHaltFor,
   dispose as sharedDispose,
   assertRequired,
   vectorParam,
@@ -38,8 +39,8 @@ const PROVIDER = 'pinecone';
  *
  * @param config - Extension configuration
  * @param factoryCtx - ExtensionFactoryCtx (rill 0.19); `factoryCtx.signal`
- *   triggers full disposal because the Pinecone SDK does not accept per-call
- *   signals.
+ *   triggers full disposal. Disposal aborts in-flight requests through a
+ *   lifetime signal injected by the `fetchApi` override.
  */
 export function createPineconeExtension(
   config: PineconeConfig,
@@ -49,14 +50,30 @@ export function createPineconeExtension(
   assertRequired(config.apiKey, 'apiKey');
   assertRequired(config.index, 'index');
 
-  const client = new Pinecone({ apiKey: config.apiKey });
+  // dispose() aborts this signal; the fetch override applies it to every
+  // request the SDK issues.
+  const lifetime = new AbortController();
+  const client = new Pinecone({
+    apiKey: config.apiKey,
+    fetchApi: (input, init) =>
+      fetch(input, {
+        ...init,
+        signal:
+          init?.signal === undefined || init.signal === null
+            ? lifetime.signal
+            : AbortSignal.any([init.signal, lifetime.signal]),
+      }),
+  });
 
   const factoryIndex = config.index;
   const factoryNamespace: string = config.namespace ?? '';
   const disposalState: DisposalState = createDisposalState(PROVIDER);
 
   const dispose = async (): Promise<void> => {
-    await sharedDispose(disposalState);
+    await sharedDispose(disposalState, () => {
+      lifetime.abort();
+      return Promise.resolve();
+    });
   };
 
   if (factoryCtx?.signal !== undefined) {
@@ -87,6 +104,27 @@ export function createPineconeExtension(
     return result;
   };
 
+  // Throws #DISPOSED once dispose() has run. Batch loops call this before each
+  // item so no further request is sent after dispose().
+  function assertLive(ctx: RuntimeContext): void {
+    const halt = checkDisposed(ctx, disposalState, PROVIDER);
+    if (halt !== null) throw halt;
+  }
+
+  // Throws the #DISPOSED halt when dispose() cancelled the request in flight.
+  function throwIfDisposeCancelled(ctx: RuntimeContext, error: unknown): void {
+    const halt = disposedHaltFor(ctx, disposalState, PROVIDER, error);
+    if (halt !== null) throw halt;
+  }
+
+  const withEvents = <T extends RillValue>(
+    ctx: RuntimeContext,
+    operation: string,
+    metadata: Record<string, unknown>,
+    fn: () => Promise<T>
+  ): Promise<T | RillValue> =>
+    withEventEmission(ctx, PROVIDER, operation, metadata, fn, disposalState);
+
   const fnDict: {
     upsert: RillFunction;
     upsert_batch: RillFunction;
@@ -116,7 +154,7 @@ export function createPineconeExtension(
         const metadataArg = (args['metadata'] ?? {}) as Record<string, unknown>;
         const metadata = convertMetadata(metadataArg);
 
-        return withEventEmission(ctx, PROVIDER, 'upsert', { id }, async () => {
+        return withEvents(ctx, 'upsert', { id }, async () => {
           const index = client.index({ name: factoryIndex });
           await index.namespace(factoryNamespace).upsert({
             records: [{ id, values: Array.from(vector.data), metadata }],
@@ -150,6 +188,7 @@ export function createPineconeExtension(
           const index = client.index({ name: factoryIndex });
 
           for (let i = 0; i < items.length; i++) {
+            assertLive(ctx);
             const item = items[i];
 
             if (!item || typeof item !== 'object') {
@@ -182,6 +221,7 @@ export function createPineconeExtension(
               });
               succeeded++;
             } catch (error: unknown) {
+              throwIfDisposeCancelled(ctx, error);
               const invalid = mapVectorError(ctx, PROVIDER, error);
               const result = {
                 succeeded,
@@ -331,7 +371,7 @@ export function createPineconeExtension(
 
         const id = args['id'] as string;
 
-        return withEventEmission(ctx, PROVIDER, 'get', { id }, async () => {
+        return withEvents(ctx, 'get', { id }, async () => {
           const index = client.index({ name: factoryIndex });
           const response = await index
             .namespace(factoryNamespace)
@@ -380,7 +420,7 @@ export function createPineconeExtension(
         if (disposed !== null) throw disposed;
 
         const id = args['id'] as string;
-        return withEventEmission(ctx, PROVIDER, 'delete', { id }, async () => {
+        return withEvents(ctx, 'delete', { id }, async () => {
           const index = client.index({ name: factoryIndex });
           await index.namespace(factoryNamespace || '').deleteOne({ id });
           return { id, deleted: true } as RillValue;
@@ -410,11 +450,13 @@ export function createPineconeExtension(
           const index = client.index({ name: factoryIndex });
 
           for (let i = 0; i < ids.length; i++) {
+            assertLive(ctx);
             const id = ids[i]!;
             try {
               await index.namespace(factoryNamespace).deleteOne({ id });
               succeeded++;
             } catch (error: unknown) {
+              throwIfDisposeCancelled(ctx, error);
               const invalid = mapVectorError(ctx, PROVIDER, error);
               const result = {
                 succeeded,
@@ -462,7 +504,7 @@ export function createPineconeExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
-        return withEventEmission(ctx, PROVIDER, 'count', {}, async () => {
+        return withEvents(ctx, 'count', {}, async () => {
           const index = client.index({ name: factoryIndex });
           const stats = await index.describeIndexStats();
           const count = stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
@@ -511,26 +553,20 @@ export function createPineconeExtension(
           );
         }
 
-        return withEventEmission(
-          ctx,
-          PROVIDER,
-          'create_collection',
-          { name },
-          async () => {
-            let pineconeMetric: 'cosine' | 'euclidean' | 'dotproduct';
-            if (distance === 'cosine') pineconeMetric = 'cosine';
-            else if (distance === 'euclidean') pineconeMetric = 'euclidean';
-            else pineconeMetric = 'dotproduct';
+        return withEvents(ctx, 'create_collection', { name }, async () => {
+          let pineconeMetric: 'cosine' | 'euclidean' | 'dotproduct';
+          if (distance === 'cosine') pineconeMetric = 'cosine';
+          else if (distance === 'euclidean') pineconeMetric = 'euclidean';
+          else pineconeMetric = 'dotproduct';
 
-            await client.createIndex({
-              name,
-              dimension: dimensions,
-              metric: pineconeMetric,
-              spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
-            });
-            return { name, created: true } as RillValue;
-          }
-        );
+          await client.createIndex({
+            name,
+            dimension: dimensions,
+            metric: pineconeMetric,
+            spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
+          });
+          return { name, created: true } as RillValue;
+        });
       },
       annotations: { description: 'Create new vector collection' },
       returnType: structureToTypeValue({
@@ -550,16 +586,10 @@ export function createPineconeExtension(
         if (disposed !== null) throw disposed;
 
         const name = args['name'] as string;
-        return withEventEmission(
-          ctx,
-          PROVIDER,
-          'delete_collection',
-          { name },
-          async () => {
-            await client.deleteIndex(name);
-            return { name, deleted: true } as RillValue;
-          }
-        );
+        return withEvents(ctx, 'delete_collection', { name }, async () => {
+          await client.deleteIndex(name);
+          return { name, deleted: true } as RillValue;
+        });
       },
       annotations: { description: 'Delete vector collection' },
       returnType: structureToTypeValue({
@@ -578,18 +608,12 @@ export function createPineconeExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
-        return withEventEmission(
-          ctx,
-          PROVIDER,
-          'list_collections',
-          {},
-          async () => {
-            const response = await client.listIndexes();
-            const names =
-              response.indexes?.map((index) => index.name ?? '') ?? [];
-            return names as RillValue;
-          }
-        );
+        return withEvents(ctx, 'list_collections', {}, async () => {
+          const response = await client.listIndexes();
+          const names =
+            response.indexes?.map((index) => index.name ?? '') ?? [];
+          return names as RillValue;
+        });
       },
       annotations: { description: 'List all collection names' },
       returnType: structureToTypeValue({
@@ -605,41 +629,34 @@ export function createPineconeExtension(
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
-        return withEventEmission(
-          ctx,
-          PROVIDER,
-          'describe',
-          { name: factoryIndex },
-          async () => {
-            const index = client.index({ name: factoryIndex });
-            const stats = await index.describeIndexStats();
-            const indexInfo = await client.describeIndex(factoryIndex);
+        return withEvents(ctx, 'describe', { name: factoryIndex }, async () => {
+          const index = client.index({ name: factoryIndex });
+          const stats = await index.describeIndexStats();
+          const indexInfo = await client.describeIndex(factoryIndex);
 
-            const dimensions = stats.dimension ?? 0;
-            const count =
-              stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
+          const dimensions = stats.dimension ?? 0;
+          const count = stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
 
-            let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
-            // SDK v9 backs the legacy `metric` accessor with a getter that throws
-            // while the index is initializing; keep the 'cosine' default then.
-            let metric: string | undefined;
-            try {
-              metric = indexInfo.metric;
-            } catch {
-              metric = undefined;
-            }
-            if (metric === 'cosine') distance = 'cosine';
-            else if (metric === 'euclidean') distance = 'euclidean';
-            else if (metric === 'dotproduct') distance = 'dot';
-
-            return {
-              name: factoryIndex,
-              count,
-              dimensions,
-              distance,
-            } as RillValue;
+          let distance: 'cosine' | 'euclidean' | 'dot' = 'cosine';
+          // SDK v9 backs the legacy `metric` accessor with a getter that throws
+          // while the index is initializing; keep the 'cosine' default then.
+          let metric: string | undefined;
+          try {
+            metric = indexInfo.metric;
+          } catch {
+            metric = undefined;
           }
-        );
+          if (metric === 'cosine') distance = 'cosine';
+          else if (metric === 'euclidean') distance = 'euclidean';
+          else if (metric === 'dotproduct') distance = 'dot';
+
+          return {
+            name: factoryIndex,
+            count,
+            dimensions,
+            distance,
+          } as RillValue;
+        });
       },
       annotations: { description: 'Describe configured collection' },
       returnType: structureToTypeValue({
@@ -659,6 +676,18 @@ export function createPineconeExtension(
     error: unknown,
     startTime: number
   ): RillValue {
+    // A #DISPOSED halt thrown inside a try block, or an abort-shaped failure
+    // dispose() caused, reports #DISPOSED instead of a mapped invalid.
+    const halt = disposedHaltFor(ctx, disposalState, PROVIDER, error);
+    if (halt !== null) {
+      emitExtensionEvent(ctx, {
+        event: 'pinecone:error',
+        subsystem: 'extension:pinecone',
+        error: getStatus(halt.value).message,
+        duration: Date.now() - startTime,
+      });
+      throw halt;
+    }
     const invalid = mapVectorError(ctx, PROVIDER, error);
     emitExtensionEvent(ctx, {
       event: 'pinecone:error',

@@ -12,7 +12,9 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
+import { disposedHaltFor } from './disposal.js';
 import { mapVectorError } from './errors.js';
+import type { DisposalState } from './types.js';
 
 /**
  * Wrap async operation with start-time recording and event emission.
@@ -22,6 +24,8 @@ import { mapVectorError } from './errors.js';
  * @param operation - Operation name (e.g., "upsert", "query", "delete")
  * @param metadata - Additional metadata to include in success event
  * @param fn - Async operation to execute
+ * @param disposalState - When given, an abort-shaped failure after dispose
+ *   throws the `#DISPOSED` halt instead of returning a mapped invalid
  * @returns Promise resolving to operation result, or an invalid RillValue on error
  */
 export async function withEventEmission<T extends RillValue>(
@@ -29,7 +33,8 @@ export async function withEventEmission<T extends RillValue>(
   provider: string,
   operation: string,
   metadata: Record<string, unknown>,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  disposalState?: DisposalState
 ): Promise<T | RillValue> {
   const startTime = Date.now();
   try {
@@ -44,6 +49,19 @@ export async function withEventEmission<T extends RillValue>(
     return result;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
+    const halt =
+      disposalState === undefined
+        ? null
+        : disposedHaltFor(ctx, disposalState, provider, error);
+    if (halt !== null) {
+      emitExtensionEvent(ctx, {
+        event: `${provider}:error`,
+        subsystem: `extension:${provider}`,
+        error: getStatus(halt.value).message,
+        duration,
+      });
+      throw halt;
+    }
     const invalid = mapVectorError(ctx, provider, error);
     const status = getStatus(invalid);
     emitExtensionEvent(ctx, {

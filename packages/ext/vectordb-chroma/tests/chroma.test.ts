@@ -140,6 +140,7 @@ const mockListCollections = vi.fn();
 
 vi.mock('chromadb', () => {
   return {
+    ChromaConnectionError: class MockChromaConnectionError extends Error {},
     ChromaClient: class MockChromaClient {
       constructor(_config: unknown) {}
       getOrCreateCollection = mockGetOrCreateCollection;
@@ -991,7 +992,6 @@ describe('Dispose lifecycle', () => {
 describe('Request cancellation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Setup default mock collection
     mockGetOrCreateCollection.mockResolvedValue({
       upsert: mockUpsert,
       query: mockQuery,
@@ -1001,44 +1001,12 @@ describe('Request cancellation', () => {
     });
   });
 
-  it('dispose during upsert_batch lets the in-flight batch settle and rejects later calls', async () => {
-    const config: ChromaConfig = {
-      collection: 'test_collection',
-    };
-    const ext = createChromaExtension(config);
+  it('rejects later calls without reaching the SDK after dispose', async () => {
+    const ext = createChromaExtension({ collection: 'test_collection' });
     const ctx = createRuntimeContext();
-
-    // Create a batch that takes time
-    const items = Array.from({ length: 10 }, (_, i) => ({
-      id: `doc-${i}`,
-      vector: createVector(new Float32Array([0.1, 0.2, 0.3, 0.4]), 'test'),
-      metadata: {},
-    }));
-
-    // Dispose from inside the third upsert call; no timers involved
-    mockUpsert.mockClear();
-    mockQuery.mockClear();
-    mockUpsert.mockImplementation(async () => {
-      if (mockUpsert.mock.calls.length === 3) {
-        await ext.dispose!();
-      }
-      return undefined;
-    });
-
-    const batchResult = await getCallable(ext, 'upsert_batch').fn(
-      { items: items },
-      ctx
-    );
-
-    // The in-flight batch settles with a result dict, not an invalid value
-    expect(isInvalid(batchResult)).toBe(false);
-    expect(mockUpsert.mock.calls.length).toBeGreaterThanOrEqual(3);
-    expect((batchResult as Record<string, RillValue>)['succeeded']).toBe(
-      mockUpsert.mock.calls.length
-    );
-
-    // New operations throw after dispose without reaching the SDK
+    await ext.dispose!();
     vi.clearAllMocks();
+
     await expectAllDisposedThrows(ext, ctx, [
       mockUpsert,
       mockQuery,
