@@ -79,6 +79,16 @@ export {
 export { mapProviderError, throwProviderHalt } from './errors.js';
 
 // ============================================================
+// DISPOSE CANCELLATION
+// ============================================================
+export {
+  isAbortShaped,
+  createDisposedHalt,
+  disposedHaltFor,
+  throwIfCancelledByDispose,
+} from './dispose.js';
+
+// ============================================================
 // TOOL ORCHESTRATION
 // ============================================================
 export { executeToolLoop, buildResponseMessages } from './tool-loop.js';

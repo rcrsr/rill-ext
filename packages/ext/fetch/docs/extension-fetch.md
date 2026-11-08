@@ -66,6 +66,8 @@ Returns a list of all configured endpoints.
 
 Retries on HTTP 429, 502, 503, and 504. Uses exponential backoff starting at `retryDelay` ms. Respects `Retry-After` header for 429 responses. HTTP 4xx errors (except 429) fail immediately without retry.
 
+`dispose()` ends a pending backoff wait or concurrency-limit wait at once. A call still in flight when `dispose()` aborts it throws `#DISPOSED` (`raw.kind: 'extension_disposed'`); a call that fails for any other reason keeps its own atom, even if it settles after `dispose()`.
+
 ## Error Codes
 
 | Code | Condition |

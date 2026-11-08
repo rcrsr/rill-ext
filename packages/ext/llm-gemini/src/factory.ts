@@ -37,6 +37,7 @@ import {
   validateEmbedBatch,
   validateEmbedModel,
   mapProviderError,
+  disposedHaltFor,
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
   buildResponseMessages,
@@ -535,6 +536,32 @@ export function createGeminiExtension(
     }
   }
 
+  function isDisposedHalt(error: unknown): boolean {
+    return (
+      error instanceof RuntimeHaltSignal &&
+      getStatus(error.value).raw?.['kind'] === 'extension_disposed'
+    );
+  }
+
+  // Single failure classifier: a request cancelled by dispose() reports
+  // #DISPOSED; an error that happened before dispose keeps its class, so rill
+  // errors pass through and vendor errors map.
+  function classifyError(
+    ctx: RuntimeContext,
+    error: unknown
+  ): RuntimeError | RuntimeHaltSignal {
+    const disposedHalt = disposedHaltFor(
+      ctx,
+      'gemini',
+      error,
+      abortController === undefined
+    );
+    if (disposedHalt) return disposedHalt;
+    return error instanceof RuntimeError || error instanceof RuntimeHaltSignal
+      ? error
+      : mapToHalt(ctx, error);
+  }
+
   /**
    * Build the generationConfig object, merging factory extra.
    * Validated extra fields merge into generationConfig per Gemini SDK shape.
@@ -625,6 +652,9 @@ export function createGeminiExtension(
 
         const streamAbortController = new AbortController();
         const messageStartTime = Date.now();
+        // Read eagerly: dispose() clears abortController, and the generator
+        // body runs lazily on the first pull.
+        const lifetimeSignal = abortController!.signal;
 
         async function* streamChunks(): AsyncGenerator<RillValue> {
           try {
@@ -634,7 +664,7 @@ export function createGeminiExtension(
               config: {
                 ...apiConfig,
                 abortSignal: AbortSignal.any([
-                  abortController!.signal,
+                  lifetimeSignal,
                   streamAbortController.signal,
                 ]),
               },
@@ -647,11 +677,7 @@ export function createGeminiExtension(
               }
             }
           } catch (error: unknown) {
-            streamError =
-              error instanceof RuntimeError ||
-              error instanceof RuntimeHaltSignal
-                ? error
-                : mapToHalt(ctx as RuntimeContext, error);
+            streamError = classifyError(ctx as RuntimeContext, error);
             const duration = Date.now() - messageStartTime;
             emitExtensionEvent(ctx as RuntimeContext, {
               event: 'gemini:error',
@@ -762,10 +788,10 @@ export function createGeminiExtension(
           return vector as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeError || error instanceof RuntimeHaltSignal
-              ? error
-              : mapToHalt(ctx as RuntimeContext, error);
+          const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
+            ctx as RuntimeContext,
+            error
+          );
 
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:error',
@@ -848,10 +874,10 @@ export function createGeminiExtension(
           return vectors as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeError || error instanceof RuntimeHaltSignal
-              ? error
-              : mapToHalt(ctx as RuntimeContext, error);
+          const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
+            ctx as RuntimeContext,
+            error
+          );
 
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:error',
@@ -1195,11 +1221,7 @@ export function createGeminiExtension(
             }
           })
           .catch((error: unknown) => {
-            streamError =
-              error instanceof RuntimeError ||
-              error instanceof RuntimeHaltSignal
-                ? error
-                : mapToHalt(ctx as RuntimeContext, error);
+            streamError = classifyError(ctx as RuntimeContext, error);
             streamDone = true;
             if (resolveNext) {
               const r = resolveNext;
@@ -1228,7 +1250,11 @@ export function createGeminiExtension(
           await loopPromise;
 
           if (streamError) {
-            if (accumulatedTextDeltas.length > 0) {
+            // #DISPOSED outranks the partial-output result.
+            if (
+              accumulatedTextDeltas.length > 0 &&
+              !isDisposedHalt(streamError)
+            ) {
               const partialContent = accumulatedTextDeltas.join('');
               emitExtensionEvent(ctx as RuntimeContext, {
                 event: 'gemini:error',
@@ -1472,10 +1498,10 @@ export function createGeminiExtension(
           return generateResult as RillValue;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
-          const rillError: RuntimeError | RuntimeHaltSignal =
-            error instanceof RuntimeError || error instanceof RuntimeHaltSignal
-              ? error
-              : mapToHalt(ctx as RuntimeContext, error);
+          const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
+            ctx as RuntimeContext,
+            error
+          );
 
           emitExtensionEvent(ctx as RuntimeContext, {
             event: 'gemini:error',

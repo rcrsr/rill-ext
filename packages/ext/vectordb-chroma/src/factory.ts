@@ -3,11 +3,17 @@
  * Creates extension instance with config validation and SDK lifecycle management.
  */
 
-import { ChromaClient, type Where, type CollectionMetadata } from 'chromadb';
+import {
+  ChromaClient,
+  ChromaConnectionError,
+  type Where,
+  type CollectionMetadata,
+} from 'chromadb';
 import {
   emitExtensionEvent,
   createVector,
   getStatus,
+  type RuntimeHaltSignal,
   structureToTypeValue,
   toCallable,
   type ExtensionFactoryCtx,
@@ -22,6 +28,7 @@ import {
   mapVectorError,
   createDisposalState,
   checkDisposed,
+  disposedHaltFor,
   dispose,
   assertRequired,
   vectorParam,
@@ -42,7 +49,8 @@ const PROVIDER = 'chroma';
  *
  * @param config - Extension configuration
  * @param ctx - ExtensionFactoryCtx (rill 0.19); `ctx.signal` triggers
- *   full disposal because the ChromaDB SDK does not accept per-call signals.
+ *   full disposal. Disposal aborts in-flight requests through the lifetime
+ *   signal passed to the SDK as a fetch option.
  * @returns ExtensionResult with 11 vector database functions and dispose
  *
  * @example
@@ -66,18 +74,25 @@ export function createChromaExtension(
   if (config.url !== undefined) {
     clientConfig.path = config.url;
   }
-  const client = new ChromaClient(clientConfig);
+  // dispose() aborts this signal; the SDK forwards it to every request.
+  const lifetime = new AbortController();
+  const client = new ChromaClient({
+    ...clientConfig,
+    fetchOptions: { signal: lifetime.signal },
+  });
 
   const factoryCollection = config.collection;
   const disposalState: DisposalState = createDisposalState(PROVIDER);
 
   const disposeExtension = async (): Promise<void> => {
-    await dispose(disposalState, async () => {
-      // ChromaDB SDK does not expose a close() method.
+    await dispose(disposalState, () => {
+      // ChromaDB SDK does not expose a close() method; abort in-flight requests.
+      lifetime.abort();
+      return Promise.resolve();
     });
   };
 
-  // Wire ctx.signal abort → full disposal (SDK has no per-call signal)
+  // Wire ctx.signal abort → full disposal
   if (factoryCtx?.signal !== undefined) {
     factoryCtx.signal.addEventListener(
       'abort',
@@ -86,6 +101,35 @@ export function createChromaExtension(
       },
       { once: true }
     );
+  }
+
+  // Throws #DISPOSED once dispose() has run. Multi-step functions call this
+  // between awaits so no further request is sent after dispose().
+  function assertLive(ctx: RuntimeContext): void {
+    const halt = checkDisposed(ctx, disposalState, PROVIDER);
+    if (halt !== null) throw halt;
+  }
+
+  // Throws the #DISPOSED halt when dispose() cancelled the request in flight.
+  function throwIfDisposeCancelled(ctx: RuntimeContext, error: unknown): void {
+    const halt = disposeHaltFor(ctx, error);
+    if (halt !== null) throw halt;
+  }
+
+  // The SDK wraps the fetch AbortError in a ChromaConnectionError without a
+  // cause, so once the lifetime signal is aborted that wrapper stands for it.
+  // Residual race: a genuine connection failure settling just after dispose
+  // also reports #DISPOSED, because the SDK discards the AbortError cause.
+  function disposeHaltFor(
+    ctx: RuntimeContext,
+    error: unknown
+  ): RuntimeHaltSignal | null {
+    const abortReason: unknown = lifetime.signal.reason;
+    const cause =
+      lifetime.signal.aborted && error instanceof ChromaConnectionError
+        ? abortReason
+        : error;
+    return disposedHaltFor(ctx, disposalState, PROVIDER, cause);
   }
 
   // Build function dict — satisfies verifies contract shape at compile time
@@ -122,6 +166,7 @@ export function createChromaExtension(
           const collection = await client.getOrCreateCollection({
             name: factoryCollection,
           });
+          assertLive(ctx);
           await collection.upsert({
             ids: [id],
             embeddings: [Array.from(vector.data)],
@@ -169,6 +214,7 @@ export function createChromaExtension(
           });
 
           for (let i = 0; i < items.length; i++) {
+            assertLive(ctx);
             const item = items[i];
 
             if (!item || typeof item !== 'object') {
@@ -204,6 +250,7 @@ export function createChromaExtension(
               });
               succeeded++;
             } catch (error: unknown) {
+              throwIfDisposeCancelled(ctx, error);
               const invalid = mapVectorError(ctx, PROVIDER, error);
               const result = {
                 succeeded,
@@ -407,6 +454,7 @@ export function createChromaExtension(
           const collection = await client.getOrCreateCollection({
             name: factoryCollection,
           });
+          assertLive(ctx);
           await collection.delete({ ids: [id] });
 
           emitExtensionEvent(ctx, {
@@ -447,11 +495,13 @@ export function createChromaExtension(
           });
 
           for (let i = 0; i < ids.length; i++) {
+            assertLive(ctx);
             const id = ids[i]!;
             try {
               await collection.delete({ ids: [id] });
               succeeded++;
             } catch (error: unknown) {
+              throwIfDisposeCancelled(ctx, error);
               const invalid = mapVectorError(ctx, PROVIDER, error);
               const result = {
                 succeeded,
@@ -667,12 +717,25 @@ export function createChromaExtension(
     },
   };
 
-  // Shared error path: map, emit, return invalid value (never throw).
+  // Shared error path: map, emit, return invalid value. Throws only the
+  // #DISPOSED halt for work dispose() cancelled.
   function emitError(
     ctx: RuntimeContext,
     error: unknown,
     startTime: number
   ): RillValue {
+    // A #DISPOSED halt thrown inside a try block, or an abort-shaped failure
+    // dispose() caused, reports #DISPOSED instead of a mapped invalid.
+    const halt = disposeHaltFor(ctx, error);
+    if (halt !== null) {
+      emitExtensionEvent(ctx, {
+        event: 'chroma:error',
+        subsystem: 'extension:chroma',
+        error: getStatus(halt.value).message,
+        duration: Date.now() - startTime,
+      });
+      throw halt;
+    }
     const invalid = mapVectorError(ctx, PROVIDER, error);
     emitExtensionEvent(ctx, {
       event: 'chroma:error',

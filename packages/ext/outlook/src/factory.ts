@@ -12,7 +12,6 @@
  */
 
 import {
-  RuntimeHaltSignal,
   toCallable,
   structureToTypeValue,
   emitExtensionEvent,
@@ -25,6 +24,11 @@ import {
   type RuntimeContext,
   type TypeStructure,
 } from '@rcrsr/rill';
+import {
+  abortCauseOf,
+  createDisposedHalt,
+  disposedHaltFor,
+} from '@rcrsr/rill-ext-lifecycle-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import {
   validateConfig,
@@ -165,14 +169,9 @@ export function createOutlookExtension(
       };
 
       if (disposalState.isDisposed) {
-        const message = `${PROVIDER}: operation cancelled`;
-        const invalid = ctx.invalidate(new Error(message), {
-          code: 'DISPOSED',
-          provider: PROVIDER,
-          raw: { kind: 'extension_disposed', message },
-        });
-        emitError(message);
-        throw new RuntimeHaltSignal(invalid, true);
+        const halt = createDisposedHalt(ctx, PROVIDER);
+        emitError(getStatus(halt.value).message);
+        throw halt;
       }
 
       if (capabilityCheck !== null) {
@@ -206,17 +205,22 @@ export function createOutlookExtension(
 
         return result;
       } catch (error: unknown) {
-        // dispose() cancelled this request: disposal wins over other mapping.
-        const disposedMessage = `${PROVIDER}: operation cancelled`;
-        const invalid = disposalState.isDisposed
-          ? ctx.invalidate(new Error(disposedMessage), {
-              code: 'DISPOSED',
-              provider: PROVIDER,
-              raw: { kind: 'extension_disposed', message: disposedMessage },
-            })
-          : isInvalid(error as RillValue)
-            ? (error as RillValue)
-            : mapFetchError(ctx, error);
+        // dispose() cancelled this request: an abort-shaped failure on a
+        // disposed extension throws #DISPOSED. Any other error, including
+        // one that settles after dispose, keeps its own code.
+        const halt = disposedHaltFor(
+          ctx,
+          PROVIDER,
+          abortCauseOf(error, controller.signal),
+          disposalState.isDisposed
+        );
+        if (halt !== undefined) {
+          emitError(getStatus(halt.value).message);
+          throw halt;
+        }
+        const invalid = isInvalid(error as RillValue)
+          ? (error as RillValue)
+          : mapFetchError(ctx, error);
         emitError(getStatus(invalid).message);
         return invalid;
       } finally {

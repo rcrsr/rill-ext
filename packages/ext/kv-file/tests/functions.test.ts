@@ -5,7 +5,7 @@
  * type-mismatch reporting, persistence, and the size limit on the file store.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -106,6 +106,69 @@ describe('kv-file functions', () => {
       const status = getStatus(result);
       expect(status.code.name).toBe('INVALID_INPUT');
       expect(status.message).toMatch(/exceeds size limit/);
+    });
+  });
+
+  describe('flush serialization', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('never writes the tmp file concurrently when an immediate set races dispose', async () => {
+      const realWrite = fs.writeFile.bind(fs);
+      const tmpPath = `${storePath}.tmp`;
+      let active = 0;
+      let maxActive = 0;
+      let writes = 0;
+      let openGate: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        openGate = resolve;
+      });
+      vi.spyOn(fs, 'writeFile').mockImplementation((async (
+        file: string,
+        data: string,
+        opts: 'utf-8'
+      ) => {
+        if (file !== tmpPath) return realWrite(file, data, opts);
+        writes += 1;
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        if (writes === 1) await gate;
+        active -= 1;
+        return realWrite(file, data, opts);
+      }) as never);
+      const ext = createFileKvExtension(
+        {
+          mounts: {
+            default: {
+              mode: 'read-write',
+              store: storePath,
+              writePolicy: 'immediate',
+            },
+          },
+        },
+        makeFactoryCtx()
+      );
+      const pendingSet = fnOf(ext, 'set').fn(
+        { mount: 'default', key: 'k', value: 'v' },
+        makeRuntimeCtx()
+      );
+      await vi.waitFor(() => expect(writes).toBe(1));
+
+      const disposing = ext.dispose!();
+      // Give an unserialized dispose flush time to start its own write.
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 30);
+      });
+      openGate();
+      await disposing;
+      await pendingSet;
+
+      expect(writes).toBe(2);
+      expect(maxActive).toBe(1);
+      expect(JSON.parse(await fs.readFile(storePath, 'utf-8'))).toEqual({
+        k: 'v',
+      });
     });
   });
 

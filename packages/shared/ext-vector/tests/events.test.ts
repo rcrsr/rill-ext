@@ -9,6 +9,7 @@ import {
   getStatus,
   isInvalid,
   type RillValue,
+  RuntimeHaltSignal,
   type RuntimeContext,
 } from '@rcrsr/rill';
 import { withEventEmission } from '../src/events.js';
@@ -17,6 +18,10 @@ function makeCtx(opts?: { onLogEvent?: (e: unknown) => void }): RuntimeContext {
   return createRuntimeContext({
     callbacks: { onLogEvent: opts?.onLogEvent ?? (() => {}) },
   });
+}
+
+function failWith(error: Error): Promise<never> {
+  return Promise.reject(error);
 }
 
 describe('withEventEmission', () => {
@@ -53,8 +58,8 @@ describe('withEventEmission', () => {
         provider,
         operation,
         {},
-        async () => {
-          throw new Error('Database connection failed');
+        () => {
+          return failWith(new Error('Database connection failed'));
         }
       );
       expect(isInvalid(result)).toBe(true);
@@ -72,13 +77,67 @@ describe('withEventEmission', () => {
         provider,
         operation,
         {},
-        async () => {
-          throw new Error('401 unauthorized');
+        () => {
+          return failWith(new Error('401 unauthorized'));
         }
       );
       expect(getStatus(result).message).toContain(
         'authentication failed (401)'
       );
+    });
+  });
+  describe('disposal', () => {
+    const abortError = (): Error =>
+      Object.assign(new Error('aborted'), { name: 'AbortError' });
+
+    it('throws DISPOSED halt when disposed and fn fails abort-shaped', async () => {
+      const onLogEvent = vi.fn();
+      const thrown = await withEventEmission(
+        makeCtx({ onLogEvent }),
+        provider,
+        operation,
+        {},
+        () => {
+          return failWith(abortError());
+        },
+        { isDisposed: true }
+      ).catch((e: unknown) => e);
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw['kind']).toBe('extension_disposed');
+      expect(status.message).toBe(`${provider}: extension disposed`);
+      const event = onLogEvent.mock.calls[0]![0] as Record<string, unknown>;
+      expect(event['event']).toBe(`${provider}:error`);
+    });
+
+    it('keeps the mapped code when disposed and fn fails non-abort', async () => {
+      const result = await withEventEmission(
+        makeCtx(),
+        provider,
+        operation,
+        {},
+        () => {
+          return failWith(new Error('401 unauthorized'));
+        },
+        { isDisposed: true }
+      );
+      expect(getStatus(result).code.name).toBe('AUTH');
+    });
+
+    it('returns mapped invalid when abort-shaped but not disposed', async () => {
+      const result = await withEventEmission(
+        makeCtx(),
+        provider,
+        operation,
+        {},
+        () => {
+          return failWith(abortError());
+        },
+        { isDisposed: false }
+      );
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).not.toBe('DISPOSED');
     });
   });
 });

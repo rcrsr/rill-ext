@@ -21,7 +21,12 @@ export { withEventEmission } from './events.js';
 // ============================================================
 // DISPOSAL UTILITIES
 // ============================================================
-export { createDisposalState, checkDisposed, dispose } from './disposal.js';
+export {
+  createDisposalState,
+  checkDisposed,
+  disposedHaltFor,
+  dispose,
+} from './disposal.js';
 
 // ============================================================
 // VALIDATION

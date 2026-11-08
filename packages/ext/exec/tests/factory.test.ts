@@ -174,7 +174,7 @@ describe('exec extension factory', () => {
       if (ext?.dispose) await ext.dispose();
     });
 
-    it('aborts in-flight processes and returns invalid DISPOSED', async () => {
+    it('aborts in-flight processes and throws DISPOSED', async () => {
       ext = createExecExtension(
         {
           commands: { sleep: { binary: 'sleep', timeout: 10000 } },
@@ -187,11 +187,13 @@ describe('exec extension factory', () => {
       const start = Date.now();
       const promise = getCallable(ext, 'sleep').fn({ args: ['5'] }, ctx);
       await ext.dispose!();
-      const result = await promise;
+      const thrown = await Promise.resolve(promise).catch((e: unknown) => e);
 
       expect(Date.now() - start).toBeLessThan(2000);
-      expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).code.name).toBe('DISPOSED');
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      expect(getStatus((thrown as RuntimeHaltSignal).value).code.name).toBe(
+        'DISPOSED'
+      );
       expect(invalidateSpy.mock.calls.at(-1)![1].raw).toMatchObject({
         kind: 'extension_disposed',
       });

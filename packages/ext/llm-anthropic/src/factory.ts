@@ -27,6 +27,7 @@ import {
   validateEmbedBatch,
   validateEmbedModel,
   mapProviderError,
+  throwIfCancelledByDispose,
   throwProviderHalt,
   executeToolLoop,
   buildJsonSchemaFromStructuralType,
@@ -506,24 +507,26 @@ export function createAnthropicExtension(
   const factoryMaxTurns = config.max_turns;
   const factoryMaxErrors = config.max_errors ?? 3;
 
-  // Disposal sentinel: set by dispose(), read by assertNotDisposed().
-  let disposed = false;
+  // AbortController for cancelling in-flight requests; cleared by dispose().
+  let abortController: AbortController | undefined = new AbortController();
 
-  // Dispose function for cleanup
+  // Dispose function for cleanup: aborts every in-flight vendor request.
   const dispose = async (): Promise<void> => {
-    disposed = true;
     try {
-      // @anthropic-ai/sdk does not expose a close() method; placeholder for future SDK versions
+      if (abortController) {
+        abortController.abort();
+        abortController = undefined;
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      console.warn(`Failed to cleanup Anthropic SDK: ${message}`);
+      console.warn(`Failed to abort Anthropic requests: ${message}`);
     }
   };
 
   // Reject calls after dispose() so requests do not proceed on a disposed
   // extension.
   function assertNotDisposed(ctx: RuntimeContext): void {
-    if (disposed) {
+    if (!abortController) {
       throw haltInvalid(
         ctx,
         'DISPOSED',
@@ -531,6 +534,33 @@ export function createAnthropicExtension(
         'anthropic: extension disposed'
       );
     }
+  }
+
+  // Called first in every catch block. Reports #DISPOSED only when dispose()
+  // is what cancelled the call; an error that happened before dispose, or a
+  // non-abort failure that settles after it, keeps its original classification.
+  // Emits anthropic:error when startTime is supplied.
+  function haltIfCancelledByDispose(
+    ctx: RuntimeContext,
+    error: unknown,
+    startTime?: number
+  ): void {
+    throwIfCancelledByDispose(
+      ctx,
+      'anthropic',
+      error,
+      abortController === undefined,
+      () => {
+        if (startTime !== undefined) {
+          emitExtensionEvent(ctx, {
+            event: 'anthropic:error',
+            subsystem: 'extension:anthropic',
+            error: 'anthropic: extension disposed',
+            duration: Date.now() - startTime,
+          });
+        }
+      }
+    );
   }
 
   // Return extension result — satisfies verifies contract at compile time
@@ -588,7 +618,9 @@ export function createAnthropicExtension(
         }
 
         // Create the Anthropic streaming request (lazy — SDK starts on first iteration)
-        const sdkStream = client.messages.stream(apiParams);
+        const sdkStream = client.messages.stream(apiParams, {
+          signal: abortController!.signal,
+        });
 
         // Async generator yields string text deltas from the provider stream
         async function* chunks(): AsyncGenerator<RillValue> {
@@ -602,6 +634,7 @@ export function createAnthropicExtension(
               }
             }
           } catch (error: unknown) {
+            haltIfCancelledByDispose(ctx as RuntimeContext, error);
             throwProviderHalt(
               ctx as RuntimeContext,
               'Anthropic',
@@ -652,6 +685,7 @@ export function createAnthropicExtension(
 
             return result as unknown as RillValue;
           } catch (error: unknown) {
+            haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
             const duration = Date.now() - startTime;
             const invalid = mapProviderError(
               ctx as RuntimeContext,
@@ -723,6 +757,7 @@ export function createAnthropicExtension(
             'Anthropic: embeddings API not available'
           );
         } catch (error: unknown) {
+          haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
           const duration = Date.now() - startTime;
 
           if (error instanceof RuntimeHaltSignal) {
@@ -800,6 +835,7 @@ export function createAnthropicExtension(
             'Anthropic: embeddings API not available'
           );
         } catch (error: unknown) {
+          haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
           const duration = Date.now() - startTime;
 
           if (error instanceof RuntimeHaltSignal) {
@@ -1102,7 +1138,10 @@ export function createAnthropicExtension(
           maxTurnsArg,
           ctx,
           yieldChunkFn,
-          toolLoopAbortController.signal,
+          AbortSignal.any([
+            abortController!.signal,
+            toolLoopAbortController.signal,
+          ]),
           factoryMaxTurns
         );
 
@@ -1135,8 +1174,14 @@ export function createAnthropicExtension(
               });
             }
           }
-          // Propagate any error thrown by the tool loop
-          await sharedLoopPromise;
+          // Propagate any error thrown by the tool loop; a call cancelled by
+          // dispose() reports #DISPOSED.
+          try {
+            await sharedLoopPromise;
+          } catch (error: unknown) {
+            haltIfCancelledByDispose(ctx as RuntimeContext, error);
+            throw error;
+          }
         }
 
         // Resolve callback — builds final result dict
@@ -1183,6 +1228,7 @@ export function createAnthropicExtension(
 
             return result as unknown as RillValue;
           } catch (error: unknown) {
+            haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeError) {
               emitExtensionEvent(ctx as RuntimeContext, {
@@ -1326,7 +1372,9 @@ export function createAnthropicExtension(
           // Streaming is not supported for structured output (PROTOCOL)
           // The Anthropic API returns structured output synchronously; if we somehow
           // get a streaming response, that is an unexpected format.
-          const response = await client.messages.create(apiParams);
+          const response = await client.messages.create(apiParams, {
+            signal: abortController!.signal,
+          });
 
           // Validate response is not a stream
           if (
@@ -1402,6 +1450,7 @@ export function createAnthropicExtension(
 
           return result as unknown as RillValue;
         } catch (error: unknown) {
+          haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
           const duration = Date.now() - startTime;
           if (error instanceof RuntimeError) {
             emitExtensionEvent(ctx as RuntimeContext, {

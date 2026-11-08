@@ -498,6 +498,37 @@ describe('createSemaphore', () => {
     const semaphore = createSemaphore(0);
     expect(semaphore).toBeUndefined();
   });
+
+  describe('acquire with an abort signal', () => {
+    it('rejects immediately with an AbortError when the signal is already aborted', async () => {
+      const semaphore = createSemaphore(1)!;
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(semaphore.acquire(controller.signal)).rejects.toMatchObject({
+        name: 'AbortError',
+      });
+
+      // No permit was consumed: the next acquire succeeds without waiting.
+      await expect(semaphore.acquire()).resolves.toBeUndefined();
+    });
+
+    it('rejects a queued waiter on abort and leaves the queue empty', async () => {
+      const semaphore = createSemaphore(1)!;
+      await semaphore.acquire();
+      const controller = new AbortController();
+      const queued = semaphore.acquire(controller.signal);
+
+      controller.abort();
+
+      await expect(queued).rejects.toMatchObject({ name: 'AbortError' });
+
+      // The aborted waiter left the queue: release returns the permit rather
+      // than handing it to the dead waiter, so a new acquire is immediate.
+      semaphore.release();
+      await expect(semaphore.acquire()).resolves.toBeUndefined();
+    });
+  });
 });
 
 describe('executeRequest - concurrency control', () => {

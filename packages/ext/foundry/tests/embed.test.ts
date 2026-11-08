@@ -188,6 +188,9 @@ describe('embed() function', () => {
         model: 'text-embedding-3-small',
         input: 'hello world',
         encoding_format: 'float',
+      }),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal) as AbortSignal,
       })
     );
   });
@@ -308,6 +311,9 @@ describe('embed_batch() function', () => {
         model: 'text-embedding-3-small',
         input: ['alpha', 'beta', 'gamma'],
         encoding_format: 'float',
+      }),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal) as AbortSignal,
       })
     );
   });

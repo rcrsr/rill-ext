@@ -193,8 +193,12 @@ export function createTavilyExtension(
   });
 
   const disposeExtension = async (): Promise<void> => {
-    abortAll(inFlightState);
-    await dispose(disposalState);
+    // dispose() sets the flag before running cleanup, so aborted in-flight
+    // calls observe the extension as disposed.
+    await dispose(disposalState, () => {
+      abortAll(inFlightState);
+      return Promise.resolve();
+    });
   };
 
   // Rich return-type shapes per §EXT.8. Inner result and image entries are

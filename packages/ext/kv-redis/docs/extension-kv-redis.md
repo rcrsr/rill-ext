@@ -201,6 +201,10 @@ Provides the same 11 functions as the core kv extension:
 | Failure | Atom | `meta.raw.kind` |
 |---|---|---|
 | Called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
+| In-flight command cut off by `dispose()` (closed-connection or abort-shaped error, thrown) | `#DISPOSED` | `extension_disposed` |
+| Multi-step call (`set`, `merge`, `clear`, `get_all`, key scans) still running when `dispose()` runs (thrown before the next command) | `#DISPOSED` | `extension_disposed` |
+
+`dispose()` calls `disconnect()` so queued and in-flight commands stop at once. Commands already sent but unanswered when `dispose()` runs may or may not have been applied by the server. Any other error that settles after dispose keeps its own code.
 
 ## See Also
 

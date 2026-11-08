@@ -20,7 +20,8 @@ export type SpawnErrorKind =
   | 'binary_eacces'
   | 'spawn_failed'
   | 'cli_timeout'
-  | 'exit_nonzero';
+  | 'exit_nonzero'
+  | 'request_cancelled';
 
 /**
  * Typed error thrown by `spawnClaudeCli` and rejected from the exit promise.
@@ -51,6 +52,7 @@ export class SpawnError extends Error {
  * - `spawn_failed` → `#UNAVAILABLE`
  * - `cli_timeout` → `#TIMEOUT`
  * - `exit_nonzero` → `#UNAVAILABLE`
+ * - `request_cancelled` → `#TIMEOUT` (process killed by dispose or abort)
  * - `RuntimeHaltSignal` carrying `#TIMEOUT` → `#TIMEOUT` (cooperative cancel)
  * - anything else → `#UNAVAILABLE` with `kind: 'unknown_error'`.
  */
@@ -83,18 +85,6 @@ export function mapSpawnError(ctx: RuntimeContext, error: unknown): RillValue {
   });
 }
 
-/** Call made after the extension was disposed. */
-export function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
-  return new RuntimeHaltSignal(
-    ctx.invalidate(new Error('claude-code: extension disposed'), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed' },
-    }),
-    true
-  );
-}
-
 function codeForKind(
   kind: SpawnErrorKind
 ): 'UNAVAILABLE' | 'FORBIDDEN' | 'TIMEOUT' {
@@ -102,6 +92,7 @@ function codeForKind(
     case 'binary_eacces':
       return 'FORBIDDEN';
     case 'cli_timeout':
+    case 'request_cancelled':
       return 'TIMEOUT';
     default:
       return 'UNAVAILABLE';

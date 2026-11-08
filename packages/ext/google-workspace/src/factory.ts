@@ -16,7 +16,6 @@
  */
 
 import {
-  RuntimeHaltSignal,
   toCallable,
   structureToTypeValue,
   emitExtensionEvent,
@@ -30,6 +29,11 @@ import {
   type RuntimeContext,
   type TypeStructure,
 } from '@rcrsr/rill';
+import {
+  abortCauseOf,
+  createDisposedHalt,
+  disposedHaltFor,
+} from '@rcrsr/rill-ext-lifecycle-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import { validateConfig, mergeCapabilities } from './config.js';
 import { checkCapability } from './capabilities.js';
@@ -148,18 +152,8 @@ export function createGoogleWorkspaceExtension(
       args: Record<string, RillValue>,
       ctx: RuntimeContext
     ): Promise<RillValue> => {
-      const disposed = (): RillValue =>
-        ctx.invalidate(new Error('google: operation cancelled'), {
-          code: 'DISPOSED',
-          provider: PROVIDER,
-          raw: {
-            kind: 'extension_disposed',
-            message: 'google: operation cancelled',
-          },
-        });
-
       if (disposalState.isDisposed) {
-        throw new RuntimeHaltSignal(disposed(), true);
+        throw createDisposedHalt(ctx, PROVIDER);
       }
 
       if (capabilityCheck !== null) {
@@ -190,15 +184,23 @@ export function createGoogleWorkspaceExtension(
 
         return result;
       } catch (error: unknown) {
-        if (disposalState.isDisposed) {
-          const invalid = disposed();
+        // dispose() cancelled this request: an abort-shaped failure on a
+        // disposed extension throws #DISPOSED. Any other error, including
+        // one that settles after dispose, keeps its own code.
+        const halt = disposedHaltFor(
+          ctx,
+          PROVIDER,
+          abortCauseOf(error, controller.signal),
+          disposalState.isDisposed
+        );
+        if (halt !== undefined) {
           emitExtensionEvent(ctx, {
             event: `google:${service}:error`,
             subsystem: SUBSYSTEM,
             duration: Date.now() - startTime,
-            error: getStatus(invalid).message,
+            error: getStatus(halt.value).message,
           });
-          return invalid;
+          throw halt;
         }
         const invalid = isInvalid(error as RillValue)
           ? (error as RillValue)

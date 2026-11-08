@@ -188,6 +188,168 @@ describe('createLocalFsExtension - factory', () => {
       expect(threw).toBe(true);
       await expect(fs.stat(target)).rejects.toThrow(/ENOENT/);
     });
+
+    describe('in-flight calls', () => {
+      async function mountExt(): Promise<
+        Awaited<ReturnType<typeof createLocalFsExtension>>
+      > {
+        return createLocalFsExtension(
+          { mounts: { workspace: { path: testMount, mode: 'read-write' } } },
+          makeFactoryCtx()
+        );
+      }
+
+      /** Holds fs.stat for one path until release() is called. */
+      function holdStat(target: string): {
+        release: () => void;
+        calls: () => number;
+      } {
+        const realStat = fs.stat.bind(fs);
+        let release: () => void = () => {};
+        let held = 0;
+        vi.spyOn(fs, 'stat').mockImplementation(((p: string, o?: never) => {
+          if (p !== target) return realStat(p, o);
+          held += 1;
+          return new Promise((resolve) => {
+            release = () => {
+              resolve(realStat(p, o));
+            };
+          });
+        }) as never);
+        return { release: () => release(), calls: () => held };
+      }
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it('writes without the lifetime signal so dispose cannot truncate the file', async () => {
+        let seen: { signal?: AbortSignal } | undefined;
+        vi.spyOn(fs, 'writeFile').mockImplementation(((
+          _p: unknown,
+          _d: unknown,
+          o: { signal?: AbortSignal }
+        ) => {
+          seen = o;
+          return new Promise(() => {});
+        }) as never);
+        const ext = await mountExt();
+        void getCallable(ext, 'write').fn(
+          { path: '/workspace/a.txt', content: 'x' },
+          makeRuntimeCtx()
+        );
+        await vi.waitFor(() => expect(seen).toBeDefined());
+
+        expect(seen?.signal).toBeUndefined();
+      });
+
+      it('keeps the original error when a non-abort failure settles after dispose', async () => {
+        let rejectRead: (e: unknown) => void = () => {};
+        let readStarted = false;
+        const realOpen = fs.open.bind(fs);
+        // read() goes through a FileHandle; hold its readFile instead.
+        vi.spyOn(fs, 'open').mockImplementation((async (
+          ...args: Parameters<typeof fs.open>
+        ) => {
+          const handle = await realOpen(...args);
+          handle.readFile = (() => {
+            readStarted = true;
+            return new Promise((_, reject) => {
+              rejectRead = reject;
+            });
+          }) as never;
+          return handle;
+        }) as never);
+        await fs.writeFile(path.join(testMount, 'r.txt'), 'x');
+        const ext = await mountExt();
+        const pending = getCallable(ext, 'read').fn(
+          { path: '/workspace/r.txt' },
+          makeRuntimeCtx()
+        );
+        await vi.waitFor(() => expect(readStarted).toBe(true));
+        await ext.dispose?.();
+        rejectRead(Object.assign(new Error('EIO'), { code: 'EIO' }));
+
+        const { thrown, halt } = await captureThrown(() => pending);
+
+        expect(halt).toBeUndefined();
+        expect((thrown as Error).message).toBe('EIO');
+      });
+
+      it('throws #DISPOSED from copy without copying when dispose lands mid-call', async () => {
+        const src = path.join(testMount, 'src.txt');
+        await fs.writeFile(src, 'data');
+        const copySpy = vi.spyOn(fs, 'copyFile');
+        const held = holdStat(await fs.realpath(src));
+        const ext = await mountExt();
+        const pending = getCallable(ext, 'copy').fn(
+          { src: '/workspace/src.txt', dest: '/workspace/dst.txt' },
+          makeRuntimeCtx()
+        );
+        await vi.waitFor(() => expect(held.calls()).toBe(1));
+        await ext.dispose?.();
+        held.release();
+
+        const { halt } = await captureThrown(() => pending);
+
+        expect(getStatus(halt!.value).code.name).toBe('DISPOSED');
+        expect(copySpy).not.toHaveBeenCalled();
+        await expect(fs.stat(path.join(testMount, 'dst.txt'))).rejects.toThrow(
+          /ENOENT/
+        );
+      });
+
+      it('throws #DISPOSED from append without appending when dispose lands mid-call', async () => {
+        const target = path.join(testMount, 'log.txt');
+        await fs.writeFile(target, 'a');
+        const held = holdStat(await fs.realpath(target));
+        const ext = await mountExt();
+        const pending = getCallable(ext, 'append').fn(
+          { path: '/workspace/log.txt', content: 'b' },
+          makeRuntimeCtx()
+        );
+        await vi.waitFor(() => expect(held.calls()).toBe(1));
+        await ext.dispose?.();
+        held.release();
+
+        const { halt } = await captureThrown(() => pending);
+
+        expect(getStatus(halt!.value).code.name).toBe('DISPOSED');
+        expect(await fs.readFile(target, 'utf-8')).toBe('a');
+      });
+
+      it('stops listing once disposed between entries', async () => {
+        await fs.writeFile(path.join(testMount, 'one.txt'), '1');
+        await fs.writeFile(path.join(testMount, 'two.txt'), '2');
+        const first = await fs.realpath(path.join(testMount, 'one.txt'));
+        const second = await fs.realpath(path.join(testMount, 'two.txt'));
+        const realStat = fs.stat.bind(fs);
+        let release: () => void = () => {};
+        let statted = 0;
+        vi.spyOn(fs, 'stat').mockImplementation(((p: string, o?: never) => {
+          if (p !== first && p !== second) return realStat(p, o);
+          statted += 1;
+          return new Promise((resolve) => {
+            release = () => {
+              resolve(realStat(p, o));
+            };
+          });
+        }) as never);
+        const ext = await mountExt();
+        const pending = getCallable(ext, 'list').fn(
+          { path: '/workspace' },
+          makeRuntimeCtx()
+        );
+        await vi.waitFor(() => expect(statted).toBe(1));
+        await ext.dispose?.();
+        release();
+
+        const { halt } = await captureThrown(() => pending);
+
+        expect(getStatus(halt!.value).code.name).toBe('DISPOSED');
+        expect(statted).toBe(1);
+      });
+    });
   });
 });
 

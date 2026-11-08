@@ -21,7 +21,8 @@ import type { ClaudeCodeConfig, ClaudeMessage } from './types.js';
 import { spawnClaudeCli } from './process.js';
 import { createStreamParser } from './stream-parser.js';
 import { extractResult } from './result.js';
-import { failDisposed, mapSpawnError } from './errors.js';
+import { createDisposedHalt } from '@rcrsr/rill-ext-lifecycle-shared';
+import { PROVIDER, SpawnError, mapSpawnError } from './errors.js';
 
 // ============================================================
 // TYPES
@@ -120,13 +121,15 @@ interface PtyStreamEventOptions {
  * @param tracker - Active process tracker for cleanup registration
  * @param ctx - Runtime context for event emission
  * @param eventOpts - Event name and extra fields for emission on resolve
+ * @param isExtensionDisposed - Whether the owning extension was disposed
  * @returns RillStream value
  */
 function createPtyStream(
   spawn: import('./process.js').SpawnResult,
   tracker: ProcessTracker,
   ctx: RuntimeContext,
-  eventOpts: PtyStreamEventOptions
+  eventOpts: PtyStreamEventOptions,
+  isExtensionDisposed: () => boolean
 ): RillValue {
   // Accumulate parsed messages for the resolve callback
   const messages: ClaudeMessage[] = [];
@@ -174,6 +177,11 @@ function createPtyStream(
   // surface as an [error] chunk plus a captured `exitError`. resolve() turns
   // any captured error into an invalid RillValue.
   let exitError: unknown;
+  // Set when a request_cancelled exit was caused by the stream's own dispose
+  // while the extension stays alive; such cancels emit no error chunk or event.
+  let consumerCancelled = false;
+  // Set when the cancel came from extension dispose(); chunks() throws #DISPOSED.
+  let cancelledByExtensionDispose = false;
 
   const exitPromise = spawn.exitCode.then(
     () => {
@@ -186,7 +194,12 @@ function createPtyStream(
       done = true;
       exitError = error;
       errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      lineBuffer.push(`[error] ${errorMessage}`);
+      if (error instanceof SpawnError && error.kind === 'request_cancelled') {
+        cancelledByExtensionDispose = isExtensionDisposed();
+        consumerCancelled = !cancelledByExtensionDispose;
+      } else {
+        lineBuffer.push(`[error] ${errorMessage}`);
+      }
       wake();
     }
   );
@@ -209,6 +222,7 @@ function createPtyStream(
     }
 
     await exitPromise;
+    if (cancelledByExtensionDispose) throw createDisposedHalt(ctx, PROVIDER);
   }
 
   const retTypeStructure = {
@@ -244,14 +258,23 @@ function createPtyStream(
     // `mapSpawnError` so the host script sees a precise generic atom rather
     // than a thrown plain Error.
     if (exitError !== undefined) {
-      emitExtensionEvent(ctx, {
-        event: 'claude-code:error',
-        subsystem: 'extension:claude-code',
-        error: exitError instanceof Error ? exitError.message : 'Unknown error',
-        duration: 0,
-      });
+      if (!consumerCancelled) {
+        emitExtensionEvent(ctx, {
+          event: 'claude-code:error',
+          subsystem: 'extension:claude-code',
+          error:
+            exitError instanceof Error ? exitError.message : 'Unknown error',
+          duration: 0,
+        });
+      }
       tracker.disposers.delete(spawn.dispose);
       spawn.dispose();
+      // Only the abort caused by extension dispose() throws DISPOSED; every
+      // other exit error keeps its mapping. The flag is latched at exit time,
+      // so a dispose() that runs after an unrelated cancel does not flip it.
+      if (cancelledByExtensionDispose) {
+        throw createDisposedHalt(ctx, PROVIDER);
+      }
       return mapSpawnError(ctx, exitError);
     }
     const startTime = Date.now();
@@ -416,7 +439,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (args, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
-        if (disposed) throw failDisposed(ctx);
+        if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const text = args['text'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
@@ -449,10 +472,16 @@ export function createClaudeCodeExtension(
         tracker.disposers.add(spawn.dispose);
         ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx, {
-          event: 'claude-code:prompt',
-          eventData: { prompt: truncateText(text) },
-        });
+        return createPtyStream(
+          spawn,
+          tracker,
+          ctx,
+          {
+            event: 'claude-code:prompt',
+            eventData: { prompt: truncateText(text) },
+          },
+          () => disposed
+        );
       },
       annotations: {
         description:
@@ -500,7 +529,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (fnArgs, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
-        if (disposed) throw failDisposed(ctx);
+        if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
@@ -537,10 +566,16 @@ export function createClaudeCodeExtension(
         tracker.disposers.add(spawn.dispose);
         ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx, {
-          event: 'claude-code:skill',
-          eventData: { name, args },
-        });
+        return createPtyStream(
+          spawn,
+          tracker,
+          ctx,
+          {
+            event: 'claude-code:skill',
+            eventData: { name, args },
+          },
+          () => disposed
+        );
       },
       annotations: {
         description:
@@ -588,7 +623,7 @@ export function createClaudeCodeExtension(
       ],
       fn: (fnArgs, ctxLike): RillValue => {
         const ctx = ctxLike as RuntimeContext;
-        if (disposed) throw failDisposed(ctx);
+        if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
 
@@ -625,10 +660,16 @@ export function createClaudeCodeExtension(
         tracker.disposers.add(spawn.dispose);
         ctx.signal?.addEventListener('abort', spawn.dispose, { once: true });
 
-        return createPtyStream(spawn, tracker, ctx, {
-          event: 'claude-code:command',
-          eventData: { name, args },
-        });
+        return createPtyStream(
+          spawn,
+          tracker,
+          ctx,
+          {
+            event: 'claude-code:command',
+            eventData: { name, args },
+          },
+          () => disposed
+        );
       },
       annotations: {
         description:

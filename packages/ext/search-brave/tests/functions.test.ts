@@ -1001,13 +1001,30 @@ describe('Brave extension host functions', () => {
       // Dispose while request is in-flight
       await ext.dispose!();
 
-      // The in-flight request returns #DISPOSED, not a timeout
-      const result = await expectInvalidWithMessage(
-        promise,
-        'brave: operation cancelled'
-      );
-      expect(getStatus(result).code.name).toBe('DISPOSED');
-      expect(getStatus(result).raw['kind']).toBe('extension_disposed');
+      // The in-flight request throws #DISPOSED, not a timeout
+      await expectDisposedThrow(() => promise, 'brave');
+    });
+
+    it('keeps its own code for a non-abort error that settles after dispose', async () => {
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((_url: string, init?: RequestInit) => {
+          return new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new Error('socket hang up'));
+            });
+          });
+        });
+
+      const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
+      const ctx = createRuntimeContext();
+
+      const promise = getCallable(ext, 'search').fn({ query: 'test' }, ctx);
+      await ext.dispose!();
+
+      const result = await promise;
+      expect(isInvalid(result as RillValue)).toBe(true);
+      expect(getStatus(result as RillValue).code.name).toBe('UNAVAILABLE');
     });
   });
 });

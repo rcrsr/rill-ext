@@ -137,3 +137,5 @@ generic atoms. Host scripts match coarsely (`guard #INVALID_INPUT`) or finely
 | JSON store file cannot be parsed | `#UNAVAILABLE` | `store_corrupt` |
 | Filesystem read / write failure | `#UNAVAILABLE` | `io_error` |
 | Any call after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` |
+
+Flushes to a store file are serialized per store, so an `immediate`-policy `set()` still writing when `dispose()` runs finishes before the dispose flush starts; the two never write the `.tmp` file concurrently.

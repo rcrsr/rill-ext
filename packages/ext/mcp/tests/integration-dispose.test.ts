@@ -12,6 +12,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { getStatus, type RillValue } from '@rcrsr/rill';
 import { createMcpExtension } from '../src/factory.js';
 import {
@@ -46,7 +47,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
   });
 
   describe('BC-5: Dispose during active tool call', () => {
-    it('kills connection and pending call rejects with DISPOSED', async () => {
+    it('kills connection and pending call throws DISPOSED', async () => {
       // Mock a tool that simulates a long-running operation
       let toolCallController: {
         resolve: (value: unknown) => void;
@@ -59,7 +60,9 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
       vi.spyOn(Client.prototype, 'close').mockImplementation(async () => {
         // Simulate client.close() causing pending operations to fail
-        toolCallController.reject(new Error('connection lost'));
+        toolCallController.reject(
+          new McpError(ErrorCode.ConnectionClosed, 'Connection closed')
+        );
         return undefined;
       });
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
@@ -110,8 +113,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       // Immediately dispose while the tool call is pending
       await extension.dispose?.();
 
-      // The pending tool call reports the disposal, not the transport error
-      const pendingError = await toolCallPromise;
+      // The pending tool call throws the disposal, not the transport error
+      const pendingError = await expectRejectsHalt(toolCallPromise);
       expect(getStatus(pendingError).code.name).toBe('DISPOSED');
       expect(getStatus(pendingError).raw['kind']).toBe('extension_disposed');
     });
@@ -127,7 +130,9 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
       vi.spyOn(Client.prototype, 'close').mockImplementation(async () => {
         // Reject all pending calls when connection closes
         for (const call of pendingCalls) {
-          call.reject(new Error('connection lost'));
+          call.reject(
+            new McpError(ErrorCode.ConnectionClosed, 'Connection closed')
+          );
         }
         return undefined;
       });
@@ -186,7 +191,7 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
       // Both pending calls report the disposal
       for (const call of [call1, call2]) {
-        const error = await call;
+        const error = await expectRejectsHalt(call);
         expect(getStatus(error).code.name).toBe('DISPOSED');
       }
     });

@@ -310,7 +310,8 @@ describe('generate() function', () => {
       );
 
       expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ system: 'Factory system prompt.' })
+        expect.objectContaining({ system: 'Factory system prompt.' }),
+        { signal: expect.any(AbortSignal) as AbortSignal }
       );
     });
 
@@ -329,7 +330,8 @@ describe('generate() function', () => {
       );
 
       expect(mockCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ max_tokens: 512 })
+        expect.objectContaining({ max_tokens: 512 }),
+        { signal: expect.any(AbortSignal) as AbortSignal }
       );
     });
 

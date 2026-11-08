@@ -5,5 +5,5 @@ export default defineConfig({
   format: ['esm'],
   dts: false,
   clean: true,
-  noExternal: [],
+  noExternal: ['@rcrsr/rill-ext-lifecycle-shared'],
 });

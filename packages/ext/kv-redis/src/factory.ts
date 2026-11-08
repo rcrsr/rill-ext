@@ -16,16 +16,22 @@ import {
   type RillFunction,
   type RillValue,
   type RuntimeContext,
-  RuntimeHaltSignal,
 } from '@rcrsr/rill';
 import {
   mapKvError,
   type KvExtensionContract,
 } from '@rcrsr/rill-ext-kv-shared';
+import {
+  createDisposedHalt,
+  isAbortShaped,
+} from '@rcrsr/rill-ext-lifecycle-shared';
 import { p } from '@rcrsr/rill-ext-param-shared';
 import type { RedisKvMountConfig } from './types.js';
 
 const PROVIDER = 'kv-redis';
+
+/** ioredis rejects queued and in-flight commands with this message after disconnect(). */
+const CONNECTION_CLOSED_MESSAGE = 'Connection is closed.';
 
 /**
  * Configuration for Redis kv extension factory.
@@ -112,11 +118,10 @@ export function createRedisKvExtension(
   const dispose = async (): Promise<void> => {
     if (disposed) return;
     disposed = true;
-    try {
-      await client.quit();
-    } catch {
-      client.disconnect();
-    }
+    // disconnect() closes the socket now and rejects queued and in-flight
+    // commands. quit() would wait for every pending reply, so dispose() would
+    // not stop work already issued.
+    client.disconnect();
   };
 
   if (ctx?.signal) {
@@ -196,24 +201,37 @@ export function createRedisKvExtension(
   }
 
   /**
-   * Builds the halt for a call made after dispose(). Returns a catchable
-   * halt carrying #DISPOSED (raw.kind 'extension_disposed') for the caller to throw.
+   * Throws the #DISPOSED halt once dispose() has run. Multi-step functions call
+   * this between awaits so no further command is issued after dispose().
    */
-  function disposedInvalid(runCtx: RuntimeContext): RuntimeHaltSignal {
-    return new RuntimeHaltSignal(
-      runCtx.invalidate(new Error('Redis kv extension disposed'), {
-        code: 'DISPOSED',
-        provider: PROVIDER,
-        raw: { kind: 'extension_disposed' },
-      }),
-      true
-    );
+  function assertLive(runCtx: RuntimeContext): void {
+    if (disposed) throw createDisposedHalt(runCtx, PROVIDER);
   }
 
-  async function scanKeys(pattern: string): Promise<string[]> {
+  /**
+   * Maps a failed Redis call. After dispose(), an abort-shaped error or the
+   * closed-connection error ioredis raises for commands cut off by
+   * disconnect() throws #DISPOSED. Any other error keeps its own code.
+   */
+  function mapError(runCtx: RuntimeContext, error: unknown): RillValue {
+    if (
+      disposed &&
+      (isAbortShaped(error) ||
+        (error instanceof Error && error.message === CONNECTION_CLOSED_MESSAGE))
+    ) {
+      throw createDisposedHalt(runCtx, PROVIDER);
+    }
+    return mapKvError(runCtx, PROVIDER, error);
+  }
+
+  async function scanKeys(
+    runCtx: RuntimeContext,
+    pattern: string
+  ): Promise<string[]> {
     const keys: string[] = [];
     let cursor = '0';
     do {
+      assertLive(runCtx);
       const [nextCursor, foundKeys] = await client.scan(
         cursor,
         'MATCH',
@@ -233,7 +251,7 @@ export function createRedisKvExtension(
 
   const get: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -259,13 +277,13 @@ export function createRedisKvExtension(
       }
       return '';
     } catch (error) {
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const get_or: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const fallback = args['fallback'] as RillValue;
@@ -278,13 +296,13 @@ export function createRedisKvExtension(
       if (value !== null) return JSON.parse(value) as RillValue;
       return fallback;
     } catch (error) {
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const set: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const value = args['value'] as RillValue;
@@ -340,10 +358,11 @@ export function createRedisKvExtension(
       const maxEntries = mountConfig.maxEntries ?? 10000;
       const redisKey = buildKey(mountConfig.prefix, key);
       const exists = (await client.exists(redisKey)) === 1;
+      assertLive(runCtx);
 
       if (!exists) {
         const pattern = `${mountConfig.prefix}*`;
-        const keys = await scanKeys(pattern);
+        const keys = await scanKeys(runCtx, pattern);
         if (keys.length >= maxEntries) {
           return runCtx.invalidate(
             new Error(
@@ -363,6 +382,7 @@ export function createRedisKvExtension(
       }
 
       const serialized = JSON.stringify(value);
+      assertLive(runCtx);
       if (mountConfig.ttl) {
         await client.setex(redisKey, mountConfig.ttl, serialized);
       } else {
@@ -370,13 +390,13 @@ export function createRedisKvExtension(
       }
       return true;
     } catch (error) {
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const merge: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const partial = args['partial'] as Record<string, RillValue>;
@@ -392,8 +412,10 @@ export function createRedisKvExtension(
 
     try {
       for (let retries = 0; retries < MAX_RETRIES; retries++) {
+        assertLive(runCtx);
         await client.watch(redisKey);
         const currentValueStr = await client.get(redisKey);
+        assertLive(runCtx);
         let currentValue: RillValue | undefined;
 
         if (currentValueStr !== null) {
@@ -453,10 +475,12 @@ export function createRedisKvExtension(
         }
 
         const serialized = JSON.stringify(mergedValue);
+        assertLive(runCtx);
         const result = await client.multi().set(redisKey, serialized).exec();
 
         if (result !== null) {
           if (mountConfig.ttl) {
+            assertLive(runCtx);
             await client.expire(redisKey, mountConfig.ttl);
           }
           return true;
@@ -479,13 +503,13 @@ export function createRedisKvExtension(
       } catch {
         // ignore
       }
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const deleteKey: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -500,30 +524,30 @@ export function createRedisKvExtension(
       const result = await client.del(redisKey);
       return result > 0;
     } catch (error) {
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const keys: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
     if (!mountConfig) return unknownMount(runCtx, mountName);
 
     try {
       const pattern = `${mountConfig.prefix}*`;
-      const redisKeys = await scanKeys(pattern);
+      const redisKeys = await scanKeys(runCtx, pattern);
       const prefixLen = mountConfig.prefix.length;
       return redisKeys.map((k) => k.substring(prefixLen));
     } catch (error) {
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const has: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -534,13 +558,13 @@ export function createRedisKvExtension(
       const exists = await client.exists(redisKey);
       return exists === 1;
     } catch (error) {
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const clear: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
     if (!mountConfig) return unknownMount(runCtx, mountName);
@@ -551,12 +575,14 @@ export function createRedisKvExtension(
 
     try {
       const pattern = `${mountConfig.prefix}*`;
-      const redisKeys = await scanKeys(pattern);
+      const redisKeys = await scanKeys(runCtx, pattern);
+      assertLive(runCtx);
       if (redisKeys.length > 0) {
         await client.del(...redisKeys);
       }
 
       if (mountConfig.schema) {
+        assertLive(runCtx);
         const pipeline = client.pipeline();
         for (const [k, entry] of Object.entries(mountConfig.schema)) {
           const redisKey = buildKey(mountConfig.prefix, k);
@@ -567,27 +593,31 @@ export function createRedisKvExtension(
             pipeline.set(redisKey, serialized);
           }
         }
-        await pipeline.exec();
+        const replies = await pipeline.exec();
+        assertLive(runCtx);
+        const failed = replies?.find(([err]) => err !== null);
+        if (failed !== undefined) throw failed[0];
       }
 
       return true;
     } catch (error) {
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const getAll: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
     if (!mountConfig) return unknownMount(runCtx, mountName);
 
     try {
       const pattern = `${mountConfig.prefix}*`;
-      const redisKeys = await scanKeys(pattern);
+      const redisKeys = await scanKeys(runCtx, pattern);
       if (redisKeys.length === 0) return {};
 
+      assertLive(runCtx);
       const values = await client.mget(...redisKeys);
       const result: Record<string, RillValue> = {};
       const prefixLen = mountConfig.prefix.length;
@@ -601,13 +631,13 @@ export function createRedisKvExtension(
       }
       return result;
     } catch (error) {
-      return mapKvError(runCtx, PROVIDER, error);
+      return mapError(runCtx, error);
     }
   };
 
   const schema: CallableFn = async (args, runtimeCtx) => {
     const runCtx = runtimeCtx as RuntimeContext;
-    if (disposed) throw disposedInvalid(runCtx);
+    assertLive(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
     if (!mountConfig) return unknownMount(runCtx, mountName);
@@ -626,7 +656,7 @@ export function createRedisKvExtension(
   };
 
   const mountsList: CallableFn = async (_args, runtimeCtx) => {
-    if (disposed) throw disposedInvalid(runtimeCtx as RuntimeContext);
+    assertLive(runtimeCtx as RuntimeContext);
     const result: RillValue[] = [];
     for (const [name, mountConfig] of Object.entries(config.mounts)) {
       result.push({

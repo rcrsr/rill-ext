@@ -1,8 +1,9 @@
 /**
  * Test suite for search function wrapper factory.
  *
- * Operation errors surface as invalid RillValues; a call after dispose
- * throws a catchable halt signal wrapping the invalid DISPOSED value.
+ * Operation errors surface as invalid RillValues; a call after dispose, and
+ * an abort-shaped in-flight failure on a disposed extension, throw a
+ * catchable halt signal wrapping the invalid DISPOSED value.
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -71,7 +72,7 @@ describe('createSearchFunctionWrapper', () => {
       const status = getStatus(signal.value);
       expect(status.code.name).toBe('DISPOSED');
       expect(status.raw['kind']).toBe('extension_disposed');
-      expect(status.message).toBe(`${provider}: operation cancelled`);
+      expect(status.message).toBe(`${provider}: extension disposed`);
       expect(fn).not.toHaveBeenCalled();
     });
   });
@@ -260,7 +261,7 @@ describe('createSearchFunctionWrapper', () => {
   });
 
   describe('error mapping', () => {
-    it('maps an in-flight request aborted by dispose to DISPOSED', async () => {
+    it('throws a DISPOSED halt for an in-flight request aborted by dispose', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
       const wrap = createSearchFunctionWrapper(
@@ -268,6 +269,7 @@ describe('createSearchFunctionWrapper', () => {
         disposalState,
         inFlightState
       );
+      const events: unknown[] = [];
       const wrappedFn = wrap(
         'search',
         (_args, _ctx, signal) =>
@@ -280,16 +282,72 @@ describe('createSearchFunctionWrapper', () => {
           })
       );
 
+      const pending = wrappedFn(
+        {},
+        makeCtx({ onLogEvent: (e) => events.push(e) })
+      );
+      disposalState.isDisposed = true;
+      abortAll(inFlightState);
+      const thrown = await captureThrown(() => pending);
+
+      expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
+      const status = getStatus((thrown as RuntimeHaltSignal).value);
+      expect(status.code.name).toBe('DISPOSED');
+      expect(status.raw).toMatchObject({ kind: 'extension_disposed' });
+      expect(events).toHaveLength(1);
+      expect(inFlightState.controllers.size).toBe(0);
+    });
+
+    it('keeps its own code for a non-abort error that settles after dispose', async () => {
+      const disposalState = createDisposalState();
+      const inFlightState = createInFlightState();
+      const wrap = createSearchFunctionWrapper(
+        provider,
+        disposalState,
+        inFlightState
+      );
+      const wrappedFn = wrap(
+        'search',
+        () =>
+          new Promise((_resolve, reject) => {
+            setTimeout(() => {
+              reject(Object.assign(new Error('rate limited'), { status: 429 }));
+            }, 0);
+          })
+      );
+
       const pending = wrappedFn({}, makeCtx());
+      disposalState.isDisposed = true;
       abortAll(inFlightState);
       const result = await pending;
 
       expect(isInvalid(result)).toBe(true);
-      expect(getStatus(result).code.name).toBe('DISPOSED');
-      expect(getStatus(result).raw).toMatchObject({
-        kind: 'extension_disposed',
-      });
-      expect(inFlightState.controllers.size).toBe(0);
+      expect(getStatus(result).code.name).toBe('RATE_LIMIT');
+    });
+
+    it('returns the abort mapping when aborted without dispose', async () => {
+      const disposalState = createDisposalState();
+      const inFlightState = createInFlightState();
+      const wrap = createSearchFunctionWrapper(
+        provider,
+        disposalState,
+        inFlightState
+      );
+      const wrappedFn = wrap(
+        'search',
+        (_args, _ctx, signal) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              reject(new DOMException('aborted', 'AbortError'));
+            });
+          })
+      );
+
+      const pending = wrappedFn({}, makeCtx());
+      abortAll(inFlightState);
+      const result = await pending;
+
+      expect(getStatus(result).code.name).toBe('TIMEOUT');
     });
 
     it('maps a ctx.signal abort to TIMEOUT when not disposed', async () => {
@@ -314,6 +372,36 @@ describe('createSearchFunctionWrapper', () => {
       const hostAbort = new AbortController();
       const pending = wrappedFn({}, makeCtx({ signal: hostAbort.signal }));
       hostAbort.abort();
+      const result = await pending;
+
+      expect(getStatus(result).code.name).toBe('TIMEOUT');
+    });
+
+    it('keeps TIMEOUT when only ctx.signal aborted the request and dispose ran afterwards', async () => {
+      const disposalState = createDisposalState();
+      const inFlightState = createInFlightState();
+      const wrap = createSearchFunctionWrapper(
+        provider,
+        disposalState,
+        inFlightState
+      );
+      const wrappedFn = wrap(
+        'search',
+        (_args, _ctx, signal) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted');
+              err.name = 'AbortError';
+              // Settle after dispose flipped the flag, without the request
+              // controller having been aborted.
+              setTimeout(() => reject(err), 0);
+            });
+          })
+      );
+      const hostAbort = new AbortController();
+      const pending = wrappedFn({}, makeCtx({ signal: hostAbort.signal }));
+      hostAbort.abort();
+      disposalState.isDisposed = true;
       const result = await pending;
 
       expect(getStatus(result).code.name).toBe('TIMEOUT');
@@ -366,12 +454,8 @@ describe('createSearchFunctionWrapper', () => {
       expect(b).toBeInstanceOf(RuntimeHaltSignal);
       const aValue = (a as RuntimeHaltSignal).value;
       const bValue = (b as RuntimeHaltSignal).value;
-      expect(getStatus(aValue).message).toBe(
-        `${provider}: operation cancelled`
-      );
-      expect(getStatus(bValue).message).toBe(
-        `${provider}: operation cancelled`
-      );
+      expect(getStatus(aValue).message).toBe(`${provider}: extension disposed`);
+      expect(getStatus(bValue).message).toBe(`${provider}: extension disposed`);
       expect(getStatus(aValue).raw['kind']).toBe('extension_disposed');
       expect(getStatus(bValue).raw['kind']).toBe('extension_disposed');
     });

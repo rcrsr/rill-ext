@@ -185,8 +185,10 @@ generic atoms. Host scripts match coarsely (`guard #NOT_FOUND`) or finely
 | Vector dimension mismatch | `#TYPE_MISMATCH` | `dimension_mismatch` |
 | Collection already exists | `#CONFLICT` | `collection_exists` |
 | Invalid vector format from response | `#PROTOCOL` | `invalid_vector_format` |
-| Disposed extension / `ctx.signal` aborted | `#DISPOSED` | `extension_disposed` |
+| Disposed extension, `ctx.signal` aborted, or in-flight request cancelled by `dispose()` | `#DISPOSED` | `extension_disposed` |
 | Other SDK errors | `#UNAVAILABLE` | `sdk_error` |
+
+**Dispose behavior.** `dispose()` aborts in-flight requests through a lifetime `AbortSignal` passed to the SDK as a fetch option. Every `#DISPOSED` is thrown as a catchable halt with message `chroma: extension disposed`, never returned as a value. It covers calls made after `dispose()` and in-flight failures that are abort-shaped and caused by dispose; any other error settling after dispose keeps its own atom. `upsert_batch` and `delete_batch` re-check disposal before each item and throw `#DISPOSED` without sending further items; items already applied stay applied.
 
 ## Local ChromaDB Setup
 

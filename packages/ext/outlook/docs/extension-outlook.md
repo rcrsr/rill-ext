@@ -447,7 +447,7 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 | Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
 | Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
 | Request timeout / abort | `#TIMEOUT` | `request_timeout` |
-| In-flight request aborted by `dispose()` (returned) | `#DISPOSED` | `extension_disposed` |
+| In-flight request aborted by `dispose()` (thrown; abort-shaped failures only, any other error keeps its own code) | `#DISPOSED` | `extension_disposed` |
 | Cooperative cancellation via `ctx.signal` | `#TIMEOUT` | `request_cancelled` |
 | Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |

@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@rcrsr/rill": "~0.23.0",
+    "@rcrsr/rill-ext-lifecycle-shared": "workspace:*",
     "@rcrsr/rill-ext-param-shared": "workspace:*",
     "@types/node": "^26.6.6",
     "@types/which": "^3.0.4",

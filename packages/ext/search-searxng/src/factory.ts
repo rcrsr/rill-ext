@@ -152,7 +152,9 @@ export async function createSearxngExtension(
     };
     try {
       data = (await response.json()) as typeof data;
-    } catch {
+    } catch (err: unknown) {
+      // An abort or timeout while reading the body is not a malformed response.
+      if (requestSignal.aborted) throw err;
       throw failHttp(callCtx, 'unexpected response format', {
         kind: 'unexpected_response_format',
       });
@@ -214,7 +216,9 @@ export async function createSearxngExtension(
     };
     try {
       data = (await response.json()) as typeof data;
-    } catch {
+    } catch (err: unknown) {
+      // An abort or timeout while reading the body is not a malformed response.
+      if (requestSignal.aborted) throw err;
       throw failHttp(callCtx, 'unexpected response format', {
         kind: 'unexpected_response_format',
       });
@@ -235,8 +239,12 @@ export async function createSearxngExtension(
   });
 
   const disposeExtension = async (): Promise<void> => {
-    abortAll(inFlightState);
-    await dispose(disposalState);
+    // dispose() sets the flag before running cleanup, so aborted in-flight
+    // calls observe the extension as disposed.
+    await dispose(disposalState, () => {
+      abortAll(inFlightState);
+      return Promise.resolve();
+    });
   };
 
   // Rich return-type shapes per §EXT.8. Inner result/suggestion/answer/etc.

@@ -367,7 +367,7 @@ generic atoms. Host scripts match coarsely (`guard #UNAVAILABLE`) or finely
 | Tool / resource / prompt not found on server | `#NOT_FOUND` | `not_found` |
 | Malformed protocol response or schema mismatch | `#PROTOCOL` | `protocol_error` |
 | Operation exceeded configured timeout | `#TIMEOUT` | `tool_timeout` |
-| Called after or in flight during `dispose()` | `#DISPOSED` | `extension_disposed` |
+| Called after `dispose()`, or in flight when `dispose()` closes the connection (thrown; only a connection-closed or abort-shaped failure after dispose, any other error keeps its own code) | `#DISPOSED` | `extension_disposed` |
 | Transport disconnected mid-operation | `#UNAVAILABLE` | `connection_lost` |
 | Authentication failed / token expired | `#AUTH` | `auth_failed` |
 | Bad input from host script | `#INVALID_INPUT` | `invalid_input` |

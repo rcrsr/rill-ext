@@ -32,7 +32,8 @@
 #                       vendor SDK: crypto, exec, fetch, datetime.
 #     area:shared       cross-cutting foundations every extension depends on
 #                       that belong to no single domain: shared/ext-param (the
-#                       `p.*` RillParam helpers).
+#                       `p.*` RillParam helpers) and shared/ext-lifecycle (the
+#                       dispose-cancellation helpers).
 #     area:docs         documentation -- per-package docs/**, README, CHANGELOG.
 #                       Overlap with a domain area is intentional: a package's
 #                       docs are both docs and that domain's reference.
@@ -162,7 +163,9 @@
 
 'area:shared':
   - changed-files:
-      - any-glob-to-any-file: 'packages/shared/ext-param/**'
+      - any-glob-to-any-file:
+          - 'packages/shared/ext-param/**'
+          - 'packages/shared/ext-lifecycle/**'
 
 'area:docs':
   - changed-files:

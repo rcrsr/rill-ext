@@ -7,10 +7,16 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 import {
   createRuntimeContext,
   getStatus,
+  RuntimeError,
   RuntimeHaltSignal,
   type RuntimeContext,
 } from '@rcrsr/rill';
-import { createDisposalState, checkDisposed, dispose } from './disposal.js';
+import {
+  createDisposalState,
+  checkDisposed,
+  dispose,
+  isAbortShaped,
+} from './disposal.js';
 
 // Use the pre-registered generic atom for disposal in tests.
 
@@ -49,7 +55,7 @@ describe('checkDisposed', () => {
     expect(result!.catchable).toBe(true);
     const status = getStatus(result!.value);
     expect(status.code.name).toBe('DISPOSED');
-    expect(status.message).toBe(`${provider}: operation cancelled`);
+    expect(status.message).toBe(`${provider}: extension disposed`);
     expect(status.raw['kind']).toBe('extension_disposed');
   });
 });
@@ -110,5 +116,30 @@ describe('dispose', () => {
     await dispose(state, cleanup);
     expect(warnSpy).toHaveBeenCalledWith('Cleanup failed: Unknown error');
     warnSpy.mockRestore();
+  });
+});
+
+describe('isAbortShaped', () => {
+  it('returns true for an AbortError', () => {
+    expect(isAbortShaped(new DOMException('aborted', 'AbortError'))).toBe(true);
+  });
+
+  it('returns true for an error caused by an abort', () => {
+    const cause = new DOMException('aborted', 'AbortError');
+    expect(isAbortShaped(new Error('wrapped', { cause }))).toBe(true);
+  });
+
+  it('returns true for a RuntimeError whose context cause is an abort', () => {
+    const cause = new DOMException('aborted', 'AbortError');
+    const error = new RuntimeError('RILL-R001', 'wrapped', undefined, {
+      cause,
+    });
+    expect(isAbortShaped(error)).toBe(true);
+  });
+
+  it('returns false for a TimeoutError', () => {
+    expect(isAbortShaped(new DOMException('timed out', 'TimeoutError'))).toBe(
+      false
+    );
   });
 });

@@ -16,9 +16,14 @@ import {
   type RillValue,
   type RuntimeContext,
 } from '@rcrsr/rill';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import {
+  createDisposedHalt,
+  disposedHaltFor,
+} from '@rcrsr/rill-ext-lifecycle-shared';
 import type { McpLifecycleState } from './types.js';
 
-const PROVIDER = 'mcp';
+export const PROVIDER = 'mcp';
 
 // ============================================================
 // FACTORY-TIME ERRORS (sync, before any host fn runs)
@@ -175,18 +180,24 @@ export function isDisposed(state: McpLifecycleState): boolean {
 }
 
 /**
- * Call made after the extension was disposed. Returns a halt signal: entry
- * guards throw it; in-flight catch sites return its `.value`.
+ * Returns the `#DISPOSED` halt when an in-flight call failed because
+ * dispose() ran, otherwise undefined. dispose() closes the client, so the SDK
+ * rejects each pending request with an `McpError` carrying
+ * `ErrorCode.ConnectionClosed`; an abort-shaped error counts as well. Both
+ * count only once the extension is disposed: the same errors before dispose
+ * (server dropped the connection) and any other error, including one that
+ * settles after dispose, keep their own code.
  */
-export function failDisposed(ctx: RuntimeContext): RuntimeHaltSignal {
-  return new RuntimeHaltSignal(
-    ctx.invalidate(new Error('mcp: extension disposed'), {
-      code: 'DISPOSED',
-      provider: PROVIDER,
-      raw: { kind: 'extension_disposed' },
-    }),
-    true
-  );
+export function haltIfCancelledByDispose(
+  ctx: RuntimeContext,
+  state: McpLifecycleState,
+  error: unknown
+): RuntimeHaltSignal | undefined {
+  if (!isDisposed(state)) return undefined;
+  if (error instanceof McpError && error.code === ErrorCode.ConnectionClosed) {
+    return createDisposedHalt(ctx, PROVIDER);
+  }
+  return disposedHaltFor(ctx, PROVIDER, error, true);
 }
 
 // ============================================================

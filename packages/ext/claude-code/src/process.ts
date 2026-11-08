@@ -94,6 +94,9 @@ export function spawnClaudeCli(
     resolveExit = resolve;
     rejectExit = reject;
   });
+  // dispose() rejects this promise; callers still observe the rejection on the
+  // original promise, this only prevents an unhandled rejection without a handler.
+  exitCode.catch(() => {});
 
   // Spawn process
   let ptyProcess: pty.IPty;
@@ -192,6 +195,11 @@ export function spawnClaudeCli(
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
+
+    // Exit has not settled: report the cancellation to the exit promise
+    rejectExit(
+      new SpawnError('request_cancelled', 'Claude CLI process cancelled')
+    );
 
     // Cleanup failure warning
     try {

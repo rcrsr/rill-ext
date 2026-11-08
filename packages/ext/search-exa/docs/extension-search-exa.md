@@ -211,7 +211,7 @@ generic atoms. Host scripts match coarsely (`guard #QUOTA_EXCEEDED`) or finely
 | Rate limit exceeded (HTTP 429) | `#RATE_LIMIT` | `rate_limit_exceeded` |
 | Server error (HTTP 5xx) | `#UNAVAILABLE` | `server_error` |
 | Request timeout / `AbortError` | `#TIMEOUT` | `request_timeout` |
-| In-flight request aborted by `dispose()` (returned) | `#DISPOSED` | `extension_disposed` |
+| In-flight request aborted by `dispose()` (thrown; abort-shaped failures only, any other error keeps its own code) | `#DISPOSED` | `extension_disposed` |
 | Network connection failure (`TypeError`) | `#UNAVAILABLE` | `connection_failed` |
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` |
 | Called after `dispose()` | `#DISPOSED` | `extension_disposed` |

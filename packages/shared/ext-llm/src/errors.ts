@@ -84,6 +84,7 @@ export function mapProviderError(
       provider: providerId,
       raw: {
         kind: 'request_timeout',
+        aborted: true,
         message: `${provider} error: ${error.message}`,
       },
     });

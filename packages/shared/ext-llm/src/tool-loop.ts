@@ -517,6 +517,16 @@ export async function executeToolLoop(
       if (error instanceof RuntimeHaltSignal) {
         throw error;
       }
+      // A failure while the signal is aborted is a cancellation, whatever shape
+      // the provider SDK gave the error; report it before provider mapping.
+      if (signal?.aborted) {
+        throwToolLoopHalt(
+          context,
+          'TIMEOUT',
+          'tool_loop_cancelled',
+          'tool_loop cancelled'
+        );
+      }
       // Provider API errors surface via the optional detectError callback so
       // host scripts can `guard #AUTH`, `guard #RATE_LIMIT`, etc.
       if (context !== undefined && callbacks.detectError !== undefined) {
@@ -590,6 +600,17 @@ export async function executeToolLoop(
       };
     }
 
+    // Cancelled while the API call was in flight: run no tools. A completed
+    // final response (no tool calls) is still returned above.
+    if (signal?.aborted) {
+      throwToolLoopHalt(
+        context,
+        'TIMEOUT',
+        'tool_loop_cancelled',
+        'tool_loop cancelled'
+      );
+    }
+
     // Execute tool calls
     const toolResults: Array<{
       id: string;
@@ -599,6 +620,15 @@ export async function executeToolLoop(
     }> = [];
 
     for (const toolCall of toolCalls) {
+      // Cancelled between tool invocations: invoke no further tools.
+      if (signal?.aborted) {
+        throwToolLoopHalt(
+          context,
+          'TIMEOUT',
+          'tool_loop_cancelled',
+          'tool_loop cancelled'
+        );
+      }
       const { id, name, input } = toolCall;
 
       emitEvent('tool_call', { tool_name: name, args: input });

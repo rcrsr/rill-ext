@@ -133,6 +133,7 @@ describe('datetime extension factory', () => {
         expect(status.code.name).toBe('DISPOSED');
         expect(status.provider).toBe('datetime');
         expect(status.raw).toMatchObject({ kind: 'extension_disposed' });
+        expect(status.message).toBe('datetime: extension disposed');
       }
     });
   });
