@@ -375,7 +375,7 @@ export function generateStaticResourceFunctions(
     const prefixedName = prefixedNames[i]!;
     const sanitizedName = nameMap.get(prefixedName);
 
-    if (!sanitizedName) {
+    if (sanitizedName === undefined || sanitizedName === '') {
       // Should never happen: sanitizeNames processes all names
       continue;
     }
@@ -547,7 +547,7 @@ export function generateResourceTemplateFunctions(
     const prefixedName = prefixedNames[i]!;
     const sanitizedName = nameMap.get(prefixedName);
 
-    if (!sanitizedName) {
+    if (sanitizedName === undefined || sanitizedName === '') {
       // Should never happen: sanitizeNames processes all names
       continue;
     }

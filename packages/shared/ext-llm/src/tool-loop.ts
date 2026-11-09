@@ -11,12 +11,9 @@ import {
   isDict,
   RuntimeError,
   RuntimeHaltSignal,
-  type ApplicationCallable,
-  type RillCallable,
   type TypeStructure,
   type RillValue,
   type RuntimeContext,
-  type ScriptCallable,
 } from '@rcrsr/rill';
 import type { ToolLoopCallbacks, ToolLoopResult } from './types.js';
 import type { Message, Part } from './prompt.js';
@@ -172,7 +169,11 @@ async function executeToolCall(
       }
 
       let args: RillValue[];
-      if (callable.params && callable.params.length > 0) {
+      if (
+        callable.params !== undefined &&
+        callable.params !== null &&
+        callable.params.length > 0
+      ) {
         args = callable.params.map((param) => {
           const value = inputDict[param.name];
           return value !== undefined
@@ -242,7 +243,8 @@ function patchResponseToolCallNames(
   response: unknown,
   nameMap: Map<string, string>
 ): void {
-  if (nameMap.size === 0 || !response || typeof response !== 'object') return;
+  if (nameMap.size === 0 || typeof response !== 'object' || response === null)
+    return;
   const resp = response as Record<string, unknown>;
 
   // OpenAI: choices[N].message.tool_calls[N].function.name
@@ -254,7 +256,8 @@ function patchResponseToolCallNames(
         for (const tc of tcs as unknown[]) {
           const fn = (tc as Record<string, unknown>)?.['function'];
           if (
-            fn &&
+            typeof fn === 'object' &&
+            fn !== null &&
             typeof (fn as Record<string, unknown>)['name'] === 'string'
           ) {
             const orig = (fn as Record<string, unknown>)['name'] as string;
@@ -272,7 +275,7 @@ function patchResponseToolCallNames(
     for (const block of resp['content'] as unknown[]) {
       const b = block as Record<string, unknown>;
       if (b?.['type'] === 'tool_use' && typeof b?.['name'] === 'string') {
-        const orig = b['name'] as string;
+        const orig = b['name'];
         const san = nameMap.get(orig);
         if (san !== undefined) b['name'] = san;
       }
@@ -284,7 +287,7 @@ function patchResponseToolCallNames(
     for (const fc of resp['functionCalls'] as unknown[]) {
       const f = fc as Record<string, unknown>;
       if (typeof f?.['name'] === 'string') {
-        const orig = f['name'] as string;
+        const orig = f['name'];
         const san = nameMap.get(orig);
         if (san !== undefined) f['name'] = san;
       }
@@ -300,7 +303,8 @@ function patchResponseToolCallNames(
         for (const part of parts as unknown[]) {
           const fc = (part as Record<string, unknown>)?.['functionCall'];
           if (
-            fc &&
+            typeof fc === 'object' &&
+            fc !== null &&
             typeof (fc as Record<string, unknown>)['name'] === 'string'
           ) {
             const orig = (fc as Record<string, unknown>)['name'] as string;
@@ -361,7 +365,7 @@ export async function executeToolLoop(
   context?: RuntimeContextLike,
   yieldChunk?: (chunk: RillValue) => void,
   signal?: AbortSignal,
-  factoryMaxTurns?: number | undefined
+  factoryMaxTurns?: number
 ): Promise<ToolLoopResult> {
   // Validate tools parameter
   if (tools === undefined) {
@@ -399,7 +403,7 @@ export async function executeToolLoop(
     }
 
     // Extract description from callable annotations
-    const callable = fnValue as RillCallable;
+    const callable = fnValue;
     const description =
       (callable.annotations?.['description'] as string | undefined) ?? '';
 
@@ -412,9 +416,9 @@ export async function executeToolLoop(
 
     const params =
       callable.kind === 'application'
-        ? ((callable as ApplicationCallable).params ?? [])
+        ? (callable.params ?? [])
         : callable.kind === 'script'
-          ? (callable as ScriptCallable).params
+          ? callable.params
           : [];
 
     if (params.length > 0) {
@@ -425,7 +429,7 @@ export async function executeToolLoop(
         kind: 'closure',
         params: params.map((p) => ({
           name: p.name,
-          type: p.type ?? ({ kind: 'any' } as TypeStructure),
+          type: p.type ?? { kind: 'any' },
         })),
       };
       const builtSchema = buildJsonSchemaFromStructuralType(closureType, [
@@ -485,7 +489,7 @@ export async function executeToolLoop(
   // Multi-turn loop
   while (turnCount < resolvedMaxTurns) {
     // Check cancellation before each turn
-    if (signal?.aborted) {
+    if (signal !== undefined && signal.aborted) {
       throwToolLoopHalt(
         context,
         'TIMEOUT',
@@ -504,7 +508,7 @@ export async function executeToolLoop(
         callbacks.callAPIStreaming !== undefined
       ) {
         const onTextDelta = (text: string): void => {
-          yieldChunk({ type: 'text_delta', text } as RillValue);
+          yieldChunk({ type: 'text_delta', text });
         };
         response = await callbacks.callAPIStreaming(
           currentMessages,
@@ -528,7 +532,7 @@ export async function executeToolLoop(
       }
       // A failure while the signal is aborted is a cancellation, whatever shape
       // the provider SDK gave the error; report it before provider mapping.
-      if (signal?.aborted) {
+      if (signal !== undefined && signal.aborted) {
         throwToolLoopHalt(
           context,
           'TIMEOUT',
@@ -611,7 +615,7 @@ export async function executeToolLoop(
 
     // Cancelled while the API call was in flight: run no tools. A completed
     // final response (no tool calls) is still returned above.
-    if (signal?.aborted) {
+    if (signal !== undefined && signal.aborted) {
       throwToolLoopHalt(
         context,
         'TIMEOUT',
@@ -630,7 +634,7 @@ export async function executeToolLoop(
 
     for (const toolCall of toolCalls) {
       // Cancelled between tool invocations: invoke no further tools.
-      if (signal?.aborted) {
+      if (signal !== undefined && signal.aborted) {
         throwToolLoopHalt(
           context,
           'TIMEOUT',
@@ -647,17 +651,12 @@ export async function executeToolLoop(
           type: 'tool_call',
           name,
           args: input as Record<string, RillValue>,
-        } as RillValue);
+        });
       }
 
       const toolStartTime = Date.now();
       try {
-        const result = await executeToolCall(
-          name,
-          input,
-          tools as RillValue,
-          context
-        );
+        const result = await executeToolCall(name, input, tools, context);
         const duration = Date.now() - toolStartTime;
         toolResults.push({ id, name, result });
         executedToolCalls.push({ name, result });
@@ -666,7 +665,7 @@ export async function executeToolLoop(
         consecutiveErrors = 0;
 
         if (yieldChunk !== undefined) {
-          yieldChunk({ type: 'tool_result', name, result } as RillValue);
+          yieldChunk({ type: 'tool_result', name, result });
         }
 
         emitEvent('tool_result', { tool_name: name, duration });

@@ -8,7 +8,6 @@
  */
 
 import OpenAI from 'openai';
-import type { ResponseCreateParamsStreaming } from 'openai/resources/responses/responses.js';
 import {
   RuntimeHaltSignal,
   createRillStream,
@@ -202,25 +201,26 @@ export function createOpenAIExtension(
         },
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         const rawPrompt = args['prompt'] as RillValue;
 
         // Normalize prompt (string or message list) → canonical Message[]
-        const normalizedCC = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalizedCC = normalizePrompt(rawPrompt, ctx);
         if (!Array.isArray(normalizedCC)) {
           throw new RuntimeHaltSignal(normalizedCC, true);
         }
         const normalized = normalizedCC as Message[];
 
-        const inputMessages: Message[] = factorySystem
-          ? [
-              {
-                role: 'system',
-                parts: [{ type: 'text', text: factorySystem }],
-              },
-              ...normalized,
-            ]
-          : normalized;
+        const inputMessages: Message[] =
+          factorySystem !== undefined && factorySystem !== ''
+            ? [
+                {
+                  role: 'system',
+                  parts: [{ type: 'text', text: factorySystem }],
+                },
+                ...normalized,
+              ]
+            : normalized;
 
         const apiMessages = canonicalToCC(inputMessages);
 
@@ -242,19 +242,14 @@ export function createOpenAIExtension(
           try {
             for await (const chunk of runner) {
               const delta = chunk.choices[0]?.delta?.content;
-              if (delta) {
-                yield delta as RillValue;
+              if (delta !== undefined && delta !== null && delta !== '') {
+                yield delta;
               }
             }
           } catch (error: unknown) {
             // A call cancelled by dispose() reports #DISPOSED; other errors keep their class.
-            haltIfCancelledByDispose(ctx as RuntimeContext, error);
-            throwProviderHalt(
-              ctx as RuntimeContext,
-              'OpenAI',
-              error,
-              detectOpenAIError
-            );
+            haltIfCancelledByDispose(ctx, error);
+            throwProviderHalt(ctx, 'OpenAI', error, detectOpenAIError);
           }
         }
 
@@ -280,7 +275,7 @@ export function createOpenAIExtension(
             };
 
             const duration = Date.now() - startTime;
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'openai:message',
               subsystem: 'extension:openai',
               duration,
@@ -288,13 +283,13 @@ export function createOpenAIExtension(
               usage: result.usage,
             });
 
-            return result as RillValue;
+            return result;
           } catch (error: unknown) {
             // A call cancelled by dispose() reports #DISPOSED; other errors keep their class.
-            haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+            haltIfCancelledByDispose(ctx, error, startTime);
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'openai:error',
                 subsystem: 'extension:openai',
                 error: getStatus(error.value).message,
@@ -303,12 +298,12 @@ export function createOpenAIExtension(
               throw error;
             }
             const invalid = mapProviderError(
-              ctx as RuntimeContext,
+              ctx,
               'OpenAI',
               error,
               detectOpenAIError
             );
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'openai:error',
               subsystem: 'extension:openai',
               error: getStatus(invalid).message,
@@ -354,27 +349,25 @@ export function createOpenAIExtension(
         },
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         const rawPrompt = args['prompt'] as RillValue;
 
-        const normalizedRaw1 = normalizePrompt(
-          rawPrompt,
-          ctx as RuntimeContext
-        );
+        const normalizedRaw1 = normalizePrompt(rawPrompt, ctx);
         if (!Array.isArray(normalizedRaw1)) {
           throw new RuntimeHaltSignal(normalizedRaw1, true);
         }
         const normalized1 = normalizedRaw1 as Message[];
 
-        const inputMessages: Message[] = factorySystem
-          ? [
-              {
-                role: 'system',
-                parts: [{ type: 'text', text: factorySystem }],
-              },
-              ...normalized1,
-            ]
-          : normalized1;
+        const inputMessages: Message[] =
+          factorySystem !== undefined && factorySystem !== ''
+            ? [
+                {
+                  role: 'system',
+                  parts: [{ type: 'text', text: factorySystem }],
+                },
+                ...normalized1,
+              ]
+            : normalized1;
 
         const { input, instructions } = canonicalToResponsesAPI(inputMessages);
 
@@ -395,7 +388,7 @@ export function createOpenAIExtension(
           {
             ...baseParams,
             stream: true,
-          } as ResponseCreateParamsStreaming,
+          },
           { signal: abortController!.signal }
         );
 
@@ -403,19 +396,18 @@ export function createOpenAIExtension(
           try {
             for await (const event of runner) {
               const e = event as { type?: string; delta?: string };
-              if (e.type === 'response.output_text.delta' && e.delta) {
-                yield e.delta as RillValue;
+              if (
+                e.type === 'response.output_text.delta' &&
+                e.delta !== undefined &&
+                e.delta !== ''
+              ) {
+                yield e.delta;
               }
             }
           } catch (error: unknown) {
             // A call cancelled by dispose() reports #DISPOSED; other errors keep their class.
-            haltIfCancelledByDispose(ctx as RuntimeContext, error);
-            throwProviderHalt(
-              ctx as RuntimeContext,
-              'OpenAI',
-              error,
-              detectOpenAIError
-            );
+            haltIfCancelledByDispose(ctx, error);
+            throwProviderHalt(ctx, 'OpenAI', error, detectOpenAIError);
           }
         }
 
@@ -442,7 +434,7 @@ export function createOpenAIExtension(
             };
 
             const duration = Date.now() - startTime;
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'openai:message',
               subsystem: 'extension:openai',
               duration,
@@ -450,13 +442,13 @@ export function createOpenAIExtension(
               usage: result.usage,
             });
 
-            return result as RillValue;
+            return result;
           } catch (error: unknown) {
             // A call cancelled by dispose() reports #DISPOSED; other errors keep their class.
-            haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+            haltIfCancelledByDispose(ctx, error, startTime);
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeHaltSignal) {
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'openai:error',
                 subsystem: 'extension:openai',
                 error: getStatus(error.value).message,
@@ -465,12 +457,12 @@ export function createOpenAIExtension(
               throw error;
             }
             const invalid = mapProviderError(
-              ctx as RuntimeContext,
+              ctx,
               'OpenAI',
               error,
               detectOpenAIError
             );
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'openai:error',
               subsystem: 'extension:openai',
               error: getStatus(invalid).message,
@@ -506,7 +498,7 @@ export function createOpenAIExtension(
   const embedFn: RillFunction = {
     params: [p.str('text')],
     fn: async (args, ctx): Promise<RillValue> => {
-      assertNotDisposed(ctx as RuntimeContext);
+      assertNotDisposed(ctx);
       const startTime = Date.now();
 
       try {
@@ -527,7 +519,7 @@ export function createOpenAIExtension(
         const embeddingData = response.data[0]?.embedding;
         if (!embeddingData || embeddingData.length === 0) {
           throw haltInvalid(
-            ctx as RuntimeContext,
+            ctx,
             'PROTOCOL',
             'empty_embedding_response',
             'OpenAI: empty embedding returned'
@@ -538,7 +530,7 @@ export function createOpenAIExtension(
         const vector = createVector(float32Data, factoryEmbedModel);
 
         const duration = Date.now() - startTime;
-        emitExtensionEvent(ctx as RuntimeContext, {
+        emitExtensionEvent(ctx, {
           event: 'openai:embed',
           subsystem: 'extension:openai',
           duration,
@@ -546,14 +538,14 @@ export function createOpenAIExtension(
           dimensions: float32Data.length,
         });
 
-        return vector as RillValue;
+        return vector;
       } catch (error: unknown) {
         // A call cancelled by dispose() reports #DISPOSED; other errors keep their class.
-        haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+        haltIfCancelledByDispose(ctx, error, startTime);
         const duration = Date.now() - startTime;
 
         if (error instanceof RuntimeHaltSignal) {
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'openai:error',
             subsystem: 'extension:openai',
             error: getStatus(error.value).message,
@@ -563,12 +555,12 @@ export function createOpenAIExtension(
         }
 
         const invalid = mapProviderError(
-          ctx as RuntimeContext,
+          ctx,
           'OpenAI',
           error,
           detectOpenAIError
         );
-        emitExtensionEvent(ctx as RuntimeContext, {
+        emitExtensionEvent(ctx, {
           event: 'openai:error',
           subsystem: 'extension:openai',
           error: getStatus(invalid).message,
@@ -588,7 +580,7 @@ export function createOpenAIExtension(
   const embedBatchFn: RillFunction = {
     params: [p.list('texts')],
     fn: async (args, ctx): Promise<RillValue> => {
-      assertNotDisposed(ctx as RuntimeContext);
+      assertNotDisposed(ctx);
       const startTime = Date.now();
 
       try {
@@ -614,25 +606,29 @@ export function createOpenAIExtension(
         const vectors: RillValue[] = [];
         for (const embeddingItem of response.data) {
           const embeddingData = embeddingItem.embedding;
-          if (!embeddingData || embeddingData.length === 0) {
+          if (
+            embeddingData === undefined ||
+            embeddingData === null ||
+            embeddingData.length === 0
+          ) {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'PROTOCOL',
               'empty_embedding_response',
               'OpenAI: empty embedding returned'
             );
           }
           const float32Data = new Float32Array(embeddingData);
-          vectors.push(
-            createVector(float32Data, factoryEmbedModel) as RillValue
-          );
+          vectors.push(createVector(float32Data, factoryEmbedModel));
         }
 
         const duration = Date.now() - startTime;
         const firstVector = vectors[0];
         const dimensions =
-          firstVector && isVector(firstVector) ? firstVector.data.length : 0;
-        emitExtensionEvent(ctx as RuntimeContext, {
+          firstVector !== undefined && isVector(firstVector)
+            ? firstVector.data.length
+            : 0;
+        emitExtensionEvent(ctx, {
           event: 'openai:embed_batch',
           subsystem: 'extension:openai',
           duration,
@@ -641,14 +637,14 @@ export function createOpenAIExtension(
           count: vectors.length,
         });
 
-        return vectors as RillValue;
+        return vectors;
       } catch (error: unknown) {
         // A call cancelled by dispose() reports #DISPOSED; other errors keep their class.
-        haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+        haltIfCancelledByDispose(ctx, error, startTime);
         const duration = Date.now() - startTime;
 
         if (error instanceof RuntimeHaltSignal) {
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'openai:error',
             subsystem: 'extension:openai',
             error: getStatus(error.value).message,
@@ -658,12 +654,12 @@ export function createOpenAIExtension(
         }
 
         const invalid = mapProviderError(
-          ctx as RuntimeContext,
+          ctx,
           'OpenAI',
           error,
           detectOpenAIError
         );
-        emitExtensionEvent(ctx as RuntimeContext, {
+        emitExtensionEvent(ctx, {
           event: 'openai:error',
           subsystem: 'extension:openai',
           error: getStatus(invalid).message,

@@ -95,6 +95,6 @@ export function makeDriveList(
       created_time: f.createdTime ?? '',
       modified_time: f.modifiedTime ?? '',
     }));
-    return { files } as unknown as RillValue;
+    return { files };
   };
 }

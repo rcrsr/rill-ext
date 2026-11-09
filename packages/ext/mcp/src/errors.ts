@@ -90,7 +90,9 @@ export function failNotFound(
   detail?: string
 ): RillValue {
   return ctx.invalidate(
-    new Error(`mcp: not found "${callableName}"${detail ? `: ${detail}` : ''}`),
+    new Error(
+      `mcp: not found "${callableName}"${detail !== undefined && detail !== '' ? `: ${detail}` : ''}`
+    ),
     {
       code: 'NOT_FOUND',
       provider: PROVIDER,

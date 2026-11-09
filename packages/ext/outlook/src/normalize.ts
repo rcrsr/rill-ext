@@ -67,7 +67,7 @@ interface GraphSchedule {
  * Returns 0 when value is absent or unparseable.
  */
 function isoToEpochMs(value: string | undefined): number {
-  if (!value) {
+  if (value === undefined || value === '') {
     return 0;
   }
   const ms = Date.parse(value);

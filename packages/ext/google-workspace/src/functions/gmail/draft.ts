@@ -64,6 +64,6 @@ export function makeGmailDraft(
       { message: { raw } }
     );
     const data = response as { id?: string } | null;
-    return (data?.id ?? '') as unknown as RillValue;
+    return data?.id ?? '';
   };
 }

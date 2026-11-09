@@ -63,7 +63,7 @@ export async function resolvePath(
 
   // Step 2: Use mount's resolved physical path (set at creation time)
   const mountBase = mount.resolvedPath;
-  if (!mountBase) {
+  if (mountBase === undefined || mountBase === '') {
     return ctx.invalidate(
       new Error(`mount "${mountName}" not initialized (missing resolvedPath)`),
       {
@@ -121,8 +121,8 @@ export async function resolvePath(
         resolvedPath = await fs.realpath(candidate);
       } catch (linkError) {
         if (
-          linkError &&
           typeof linkError === 'object' &&
+          linkError !== null &&
           'code' in linkError &&
           (linkError as { code: string }).code === 'ENOENT'
         ) {
@@ -144,8 +144,8 @@ export async function resolvePath(
             );
           } catch (lstatError) {
             if (
-              lstatError &&
               typeof lstatError === 'object' &&
+              lstatError !== null &&
               'code' in lstatError &&
               (lstatError as { code: string }).code === 'ENOENT'
             ) {
@@ -163,7 +163,7 @@ export async function resolvePath(
       resolvedPath = await fs.realpath(normalized);
     }
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error) {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
       const code = (error as { code: string }).code;
       if (code === 'EACCES' || code === 'EPERM') {
         return ctx.invalidate(new Error(`permission denied: ${normalized}`), {
@@ -214,7 +214,7 @@ export async function resolvePath(
   }
 
   // Step 7: If glob set, verify filename matches pattern
-  if (mount.glob) {
+  if (mount.glob !== undefined && mount.glob !== '') {
     const filename = path.basename(resolvedPath);
     if (!matchesGlob(filename, mount.glob)) {
       return ctx.invalidate(
@@ -320,7 +320,7 @@ export async function initializeMount(mount: MountConfig): Promise<void> {
   try {
     mount.resolvedPath = await fs.realpath(mount.path);
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error) {
+    if (typeof error === 'object' && error !== null && 'code' in error) {
       const code = (error as { code: string }).code;
       if (code === 'ENOENT') {
         throw new RuntimeError(

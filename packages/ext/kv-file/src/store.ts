@@ -36,13 +36,14 @@ class LoadInvalid {
 
 export interface KvStore {
   loadError: RillValue | null;
-  get: (key: string, ctx: RuntimeContext) => RillValue | undefined | RillValue;
+  get: (key: string, ctx: RuntimeContext) => RillValue | undefined;
   set: (
     key: string,
     value: RillValue,
     ctx: RuntimeContext
   ) => Promise<void | RillValue>;
-  delete: (key: string, ctx: RuntimeContext) => boolean | RillValue;
+  /** Returns boolean on success, invalid RillValue on failure. */
+  delete: (key: string, ctx: RuntimeContext) => RillValue;
   keys: () => string[];
   has: (key: string) => boolean;
   clear: (ctx: RuntimeContext) => void | RillValue;
@@ -147,8 +148,8 @@ export async function createStore(
     if (error instanceof LoadInvalid) {
       loadError = error.value;
     } else if (
-      error &&
       typeof error === 'object' &&
+      error !== null &&
       'code' in error &&
       (error as { code: string }).code === 'ENOENT'
     ) {
@@ -231,10 +232,7 @@ export async function createStore(
   // Operations
   // ----------------------------------------------------------
 
-  function get(
-    key: string,
-    runCtx: RuntimeContext
-  ): RillValue | undefined | RillValue {
+  function get(key: string, runCtx: RuntimeContext): RillValue | undefined {
     if (schema && !(key in schema)) {
       return runCtx.invalidate(
         new Error(`key "${key}" not declared in schema`),
@@ -335,7 +333,8 @@ export async function createStore(
     }
   }
 
-  function deleteKey(key: string, runCtx: RuntimeContext): boolean | RillValue {
+  /** Returns boolean on success, invalid RillValue on failure. */
+  function deleteKey(key: string, runCtx: RuntimeContext): RillValue {
     const writeErr = checkWritePermission(runCtx);
     if (writeErr !== null) return writeErr;
     return data.delete(key);

@@ -114,6 +114,6 @@ export function makeCalendarFreeBusy(
       }));
       result[email] = { busy: busySlots };
     }
-    return result as unknown as RillValue;
+    return result;
   };
 }

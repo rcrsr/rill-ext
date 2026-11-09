@@ -47,7 +47,11 @@ export async function createLocalFsExtension(
   _ctx: ExtensionFactoryCtx
 ): Promise<ExtensionFactoryResult> {
   // Validate required configuration (factory-init: throw R001)
-  if (!config.mounts || Object.keys(config.mounts).length === 0) {
+  if (
+    config.mounts === undefined ||
+    config.mounts === null ||
+    Object.keys(config.mounts).length === 0
+  ) {
     throw new RuntimeError(
       'RILL-R001',
       'fs-local extension requires at least one mount in configuration'
@@ -75,12 +79,7 @@ export async function createLocalFsExtension(
       try {
         return await fn(args, ctxIn);
       } catch (error) {
-        throwIfCancelledByDispose(
-          ctxIn as RuntimeContext,
-          PROVIDER,
-          error,
-          disposed
-        );
+        throwIfCancelledByDispose(ctxIn, PROVIDER, error, disposed);
         throw error;
       }
     };
@@ -133,10 +132,10 @@ export async function createLocalFsExtension(
   // ============================================================
 
   const read: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return parsed as RillValue;
+    if (isInvalid(parsed)) return parsed;
     const { mountName, relativePath: filePath } = parsed as {
       mountName: string;
       relativePath: string;
@@ -149,7 +148,7 @@ export async function createLocalFsExtension(
       'read',
       runCtx
     );
-    if (isInvalid(resolved as RillValue)) return resolved as RillValue;
+    if (isInvalid(resolved)) return resolved;
     const resolvedPath = resolved as string;
 
     // Stat and read through one handle so the size check applies to the
@@ -168,10 +167,10 @@ export async function createLocalFsExtension(
   };
 
   const write: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return parsed as RillValue;
+    if (isInvalid(parsed)) return parsed;
     const { mountName, relativePath: filePath } = parsed as {
       mountName: string;
       relativePath: string;
@@ -186,7 +185,7 @@ export async function createLocalFsExtension(
       runCtx,
       true
     );
-    if (isInvalid(resolved as RillValue)) return resolved as RillValue;
+    if (isInvalid(resolved)) return resolved;
     const resolvedPath = resolved as string;
 
     const contentSize = Buffer.byteLength(content, encoding);
@@ -201,10 +200,10 @@ export async function createLocalFsExtension(
   };
 
   const append: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return parsed as RillValue;
+    if (isInvalid(parsed)) return parsed;
     const { mountName, relativePath: filePath } = parsed as {
       mountName: string;
       relativePath: string;
@@ -219,7 +218,7 @@ export async function createLocalFsExtension(
       runCtx,
       true
     );
-    if (isInvalid(resolved as RillValue)) return resolved as RillValue;
+    if (isInvalid(resolved)) return resolved;
     const resolvedPath = resolved as string;
 
     const contentSize = Buffer.byteLength(content, encoding);
@@ -235,7 +234,7 @@ export async function createLocalFsExtension(
       );
       if (sizeInvalid !== null) return sizeInvalid;
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) {
+      if (typeof error === 'object' && error !== null && 'code' in error) {
         if ((error as { code: string }).code === 'ENOENT') {
           const sizeInvalid = checkFileSize(
             contentSize,
@@ -258,10 +257,10 @@ export async function createLocalFsExtension(
   };
 
   const list: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return parsed as RillValue;
+    if (isInvalid(parsed)) return parsed;
     const { mountName, relativePath: dirPath } = parsed as {
       mountName: string;
       relativePath: string;
@@ -274,7 +273,7 @@ export async function createLocalFsExtension(
       'read',
       runCtx
     );
-    if (isInvalid(resolved as RillValue)) return resolved as RillValue;
+    if (isInvalid(resolved)) return resolved;
     const resolvedPath = resolved as string;
 
     const entries = await fs.readdir(resolvedPath, { withFileTypes: true });
@@ -296,10 +295,10 @@ export async function createLocalFsExtension(
   };
 
   const find: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return parsed as RillValue;
+    if (isInvalid(parsed)) return parsed;
     const { mountName, relativePath: searchBase } = parsed as {
       mountName: string;
       relativePath: string;
@@ -307,7 +306,11 @@ export async function createLocalFsExtension(
     const pattern = (args['pattern'] as string | undefined) ?? '*';
 
     const mount = mounts[mountName];
-    if (!mount || !mount.resolvedPath) {
+    if (
+      mount === undefined ||
+      mount.resolvedPath === undefined ||
+      mount.resolvedPath === ''
+    ) {
       return runCtx.invalidate(
         new Error(`mount "${mountName}" not configured`),
         {
@@ -327,7 +330,7 @@ export async function createLocalFsExtension(
         'read',
         runCtx
       );
-      if (isInvalid(resolved as RillValue)) return resolved as RillValue;
+      if (isInvalid(resolved)) return resolved;
       basePath = resolved as string;
     } else {
       basePath = mount.resolvedPath;
@@ -356,10 +359,10 @@ export async function createLocalFsExtension(
   };
 
   const exists: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return false;
+    if (isInvalid(parsed)) return false;
     const { mountName, relativePath: filePath } = parsed as {
       mountName: string;
       relativePath: string;
@@ -372,15 +375,15 @@ export async function createLocalFsExtension(
       'read',
       runCtx
     );
-    if (isInvalid(resolved as RillValue)) return false;
+    if (isInvalid(resolved)) return false;
     return true;
   };
 
   const remove: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return parsed as RillValue;
+    if (isInvalid(parsed)) return parsed;
     const { mountName, relativePath: filePath } = parsed as {
       mountName: string;
       relativePath: string;
@@ -393,11 +396,11 @@ export async function createLocalFsExtension(
       'write',
       runCtx
     );
-    if (isInvalid(resolved as RillValue)) {
+    if (isInvalid(resolved)) {
       // For remove(), file-not-found returns false; mode/path violations propagate.
-      const msg = getStatus(resolved as RillValue).message ?? '';
+      const msg = getStatus(resolved).message ?? '';
       if (msg.includes('file not found')) return false;
-      return resolved as RillValue;
+      return resolved;
     }
     const resolvedPath = resolved as string;
 
@@ -406,7 +409,7 @@ export async function createLocalFsExtension(
       await fs.rm(resolvedPath);
       return true;
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) {
+      if (typeof error === 'object' && error !== null && 'code' in error) {
         if ((error as { code: string }).code === 'ENOENT') {
           return false;
         }
@@ -416,10 +419,10 @@ export async function createLocalFsExtension(
   };
 
   const stat: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return parsed as RillValue;
+    if (isInvalid(parsed)) return parsed;
     const { mountName, relativePath: filePath } = parsed as {
       mountName: string;
       relativePath: string;
@@ -432,7 +435,7 @@ export async function createLocalFsExtension(
       'read',
       runCtx
     );
-    if (isInvalid(resolved as RillValue)) return resolved as RillValue;
+    if (isInvalid(resolved)) return resolved;
     const resolvedPath = resolved as string;
 
     const stats = await fs.stat(resolvedPath);
@@ -455,17 +458,21 @@ export async function createLocalFsExtension(
    * caught by the post-realpath boundary check before any directory is created.
    */
   const mkdir: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const parsed = parseMountPath(args['path'] as string, mounts, runCtx);
-    if (isInvalid(parsed as RillValue)) return parsed as RillValue;
+    if (isInvalid(parsed)) return parsed;
     const { mountName, relativePath: dirPath } = parsed as {
       mountName: string;
       relativePath: string;
     };
 
     const mount = mounts[mountName];
-    if (!mount || !mount.resolvedPath) {
+    if (
+      mount === undefined ||
+      mount.resolvedPath === undefined ||
+      mount.resolvedPath === ''
+    ) {
       return runCtx.invalidate(
         new Error(`mount "${mountName}" not configured`),
         {
@@ -521,8 +528,8 @@ export async function createLocalFsExtension(
         break;
       } catch (error) {
         if (
-          error &&
           typeof error === 'object' &&
+          error !== null &&
           'code' in error &&
           (error as { code: string }).code === 'ENOENT'
         ) {
@@ -562,8 +569,8 @@ export async function createLocalFsExtension(
       }
     } catch (error) {
       if (
-        error &&
         typeof error === 'object' &&
+        error !== null &&
         'code' in error &&
         (error as { code: string }).code !== 'ENOENT'
       ) {
@@ -576,7 +583,7 @@ export async function createLocalFsExtension(
       await fs.mkdir(normalized, { recursive: true });
       return true;
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) {
+      if (typeof error === 'object' && error !== null && 'code' in error) {
         if ((error as { code: string }).code === 'EEXIST') {
           return false;
         }
@@ -586,16 +593,16 @@ export async function createLocalFsExtension(
   };
 
   const copy: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const srcParsed = parseMountPath(args['src'] as string, mounts, runCtx);
-    if (isInvalid(srcParsed as RillValue)) return srcParsed as RillValue;
+    if (isInvalid(srcParsed)) return srcParsed;
     const { mountName: srcMountName, relativePath: srcPath } = srcParsed as {
       mountName: string;
       relativePath: string;
     };
     const destParsed = parseMountPath(args['dest'] as string, mounts, runCtx);
-    if (isInvalid(destParsed as RillValue)) return destParsed as RillValue;
+    if (isInvalid(destParsed)) return destParsed;
     const { mountName: destMountName, relativePath: destPath } = destParsed as {
       mountName: string;
       relativePath: string;
@@ -625,8 +632,7 @@ export async function createLocalFsExtension(
       'read',
       runCtx
     );
-    if (isInvalid(resolvedSrcVal as RillValue))
-      return resolvedSrcVal as RillValue;
+    if (isInvalid(resolvedSrcVal)) return resolvedSrcVal;
     const resolvedSrc = resolvedSrcVal as string;
 
     const resolvedDestVal = await resolvePath(
@@ -637,8 +643,7 @@ export async function createLocalFsExtension(
       runCtx,
       true
     );
-    if (isInvalid(resolvedDestVal as RillValue))
-      return resolvedDestVal as RillValue;
+    if (isInvalid(resolvedDestVal)) return resolvedDestVal;
     const resolvedDest = resolvedDestVal as string;
 
     const stats = await fs.stat(resolvedSrc);
@@ -651,7 +656,7 @@ export async function createLocalFsExtension(
       await fs.copyFile(resolvedSrc, resolvedDest);
       return true;
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) {
+      if (typeof error === 'object' && error !== null && 'code' in error) {
         if ((error as { code: string }).code === 'ENOENT') {
           return runCtx.invalidate(new Error(`file not found: ${srcPath}`), {
             code: 'UNAVAILABLE',
@@ -665,16 +670,16 @@ export async function createLocalFsExtension(
   };
 
   const move: CallableFn = async (args, ctxIn) => {
-    const runCtx = ctxIn as RuntimeContext;
+    const runCtx = ctxIn;
     assertLive(runCtx);
     const srcParsed = parseMountPath(args['src'] as string, mounts, runCtx);
-    if (isInvalid(srcParsed as RillValue)) return srcParsed as RillValue;
+    if (isInvalid(srcParsed)) return srcParsed;
     const { mountName: srcMountName, relativePath: srcPath } = srcParsed as {
       mountName: string;
       relativePath: string;
     };
     const destParsed = parseMountPath(args['dest'] as string, mounts, runCtx);
-    if (isInvalid(destParsed as RillValue)) return destParsed as RillValue;
+    if (isInvalid(destParsed)) return destParsed;
     const { mountName: destMountName, relativePath: destPath } = destParsed as {
       mountName: string;
       relativePath: string;
@@ -704,8 +709,7 @@ export async function createLocalFsExtension(
       'read',
       runCtx
     );
-    if (isInvalid(resolvedSrcVal as RillValue))
-      return resolvedSrcVal as RillValue;
+    if (isInvalid(resolvedSrcVal)) return resolvedSrcVal;
     const resolvedSrc = resolvedSrcVal as string;
 
     const resolvedDestVal = await resolvePath(
@@ -716,8 +720,7 @@ export async function createLocalFsExtension(
       runCtx,
       true
     );
-    if (isInvalid(resolvedDestVal as RillValue))
-      return resolvedDestVal as RillValue;
+    if (isInvalid(resolvedDestVal)) return resolvedDestVal;
     const resolvedDest = resolvedDestVal as string;
 
     try {
@@ -725,7 +728,7 @@ export async function createLocalFsExtension(
       await fs.rename(resolvedSrc, resolvedDest);
       return true;
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) {
+      if (typeof error === 'object' && error !== null && 'code' in error) {
         if ((error as { code: string }).code === 'ENOENT') {
           return runCtx.invalidate(new Error(`file not found: ${srcPath}`), {
             code: 'UNAVAILABLE',
@@ -740,7 +743,7 @@ export async function createLocalFsExtension(
 
   const mountsList: CallableFn = (_args, ctxIn): Promise<RillValue> => {
     const body = (): RillValue => {
-      assertLive(ctxIn as RuntimeContext);
+      assertLive(ctxIn);
       const result: RillValue[] = [];
 
       for (const [name, mount] of Object.entries(mounts)) {

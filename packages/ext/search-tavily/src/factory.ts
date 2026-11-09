@@ -7,7 +7,6 @@ import {
   RuntimeError,
   toCallable,
   structureToTypeValue,
-  type CallableFn,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
@@ -229,12 +228,12 @@ export function createTavilyExtension(
 
   const callableDict = {
     search: toCallable({
-      fn: search as CallableFn,
+      fn: search,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: SEARCH_RT,
     }),
     extract: toCallable({
-      fn: extract as CallableFn,
+      fn: extract,
       params: [
         {
           name: 'urls',

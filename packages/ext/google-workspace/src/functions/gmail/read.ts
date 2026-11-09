@@ -38,7 +38,7 @@ interface GmailMessage {
  * Returns empty string on missing or malformed input.
  */
 function decodeBase64Url(encoded: string | undefined): string {
-  if (!encoded) return '';
+  if (encoded === undefined || encoded === '') return '';
   try {
     return Buffer.from(encoded, 'base64url').toString('utf-8');
   } catch {
@@ -58,11 +58,11 @@ function extractBody(part: MessagePart | undefined): string {
   if (Array.isArray(part.parts)) {
     for (const subPart of part.parts) {
       const text = extractBody(subPart);
-      if (text) return text;
+      if (text !== '') return text;
     }
   }
   // Fall back to raw body data for simple messages
-  if (part.body?.data) {
+  if (part.body?.data !== undefined && part.body.data !== '') {
     return decodeBase64Url(part.body.data);
   }
   return '';
@@ -77,7 +77,7 @@ function extractAttachments(
   const results: Array<{ filename: string; mime_type: string; size: number }> =
     [];
   for (const part of parts) {
-    if (part.filename && part.filename !== '') {
+    if (part.filename !== undefined && part.filename !== '') {
       results.push({
         filename: part.filename,
         mime_type: part.mimeType ?? '',
@@ -147,7 +147,7 @@ export function makeGmailRead(
     };
     // Decode body from MIME payload
     const payload = msg?.payload;
-    const body = extractBody(payload as MessagePart | undefined);
+    const body = extractBody(payload);
     // Collect attachment metadata
     const attachments = extractAttachments(payload?.parts);
     return {
@@ -156,6 +156,6 @@ export function makeGmailRead(
       headers,
       body,
       attachments,
-    } as unknown as RillValue;
+    };
   };
 }

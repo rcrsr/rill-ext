@@ -80,7 +80,7 @@ export function createCryptoExtension(
   // ----------------------------------------------------------
 
   const hash: CallableFn = (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     const input = args['input'] as string;
     const algorithm =
       (args['algorithm'] as string | undefined) ?? defaultAlgorithm;
@@ -92,8 +92,8 @@ export function createCryptoExtension(
   };
 
   const hmac: CallableFn = (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
-    if (!hmacKey) {
+    const runCtx = ctx;
+    if (hmacKey === undefined || hmacKey === '') {
       return runCtx.invalidate(
         new Error('hmacKey required for hmac() — set in config'),
         {
@@ -120,7 +120,7 @@ export function createCryptoExtension(
   const MAX_RANDOM_BYTES = 1_048_576;
 
   const random: CallableFn = (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     const bytes = args['bytes'] as number;
     if (!Number.isInteger(bytes) || bytes < 0) {
       return runCtx.invalidate(

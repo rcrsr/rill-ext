@@ -153,7 +153,7 @@ export function createChromaExtension(
         p.dict('metadata', undefined, {}),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -180,7 +180,7 @@ export function createChromaExtension(
             duration,
             id,
           });
-          return { id, success: true } as RillValue;
+          return { id, success: true };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -200,7 +200,7 @@ export function createChromaExtension(
     upsert_batch: {
       params: [p.list('items')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -230,7 +230,7 @@ export function createChromaExtension(
                 count: items.length,
                 succeeded,
               });
-              return result as RillValue;
+              return result;
             }
 
             const id = item['id'] as string;
@@ -264,7 +264,7 @@ export function createChromaExtension(
                 count: items.length,
                 succeeded,
               });
-              return result as RillValue;
+              return result;
             }
           }
 
@@ -275,7 +275,7 @@ export function createChromaExtension(
             count: items.length,
             succeeded,
           });
-          return { succeeded } as RillValue;
+          return { succeeded };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -305,7 +305,7 @@ export function createChromaExtension(
         ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -346,7 +346,7 @@ export function createChromaExtension(
             result_count: results.length,
             k,
           });
-          return results as RillValue;
+          return results;
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -368,7 +368,7 @@ export function createChromaExtension(
     get: {
       params: [p.str('id')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -425,7 +425,7 @@ export function createChromaExtension(
             duration: Date.now() - startTime,
             id,
           });
-          return result as RillValue;
+          return result;
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -444,7 +444,7 @@ export function createChromaExtension(
     delete: {
       params: [p.str('id')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -463,7 +463,7 @@ export function createChromaExtension(
             duration: Date.now() - startTime,
             id,
           });
-          return { id, deleted: true } as RillValue;
+          return { id, deleted: true };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -481,7 +481,7 @@ export function createChromaExtension(
     delete_batch: {
       params: [p.list('ids')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -515,7 +515,7 @@ export function createChromaExtension(
                 count: ids.length,
                 succeeded,
               });
-              return result as RillValue;
+              return result;
             }
           }
 
@@ -526,7 +526,7 @@ export function createChromaExtension(
             count: ids.length,
             succeeded,
           });
-          return { succeeded } as RillValue;
+          return { succeeded };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -545,7 +545,7 @@ export function createChromaExtension(
     count: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -561,7 +561,7 @@ export function createChromaExtension(
             duration: Date.now() - startTime,
             count,
           });
-          return count as RillValue;
+          return count;
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -583,7 +583,7 @@ export function createChromaExtension(
         ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -607,7 +607,7 @@ export function createChromaExtension(
             duration: Date.now() - startTime,
             name,
           });
-          return { name, created: true } as RillValue;
+          return { name, created: true };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -625,7 +625,7 @@ export function createChromaExtension(
     delete_collection: {
       params: [p.str('name')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -639,7 +639,7 @@ export function createChromaExtension(
             duration: Date.now() - startTime,
             name,
           });
-          return { name, deleted: true } as RillValue;
+          return { name, deleted: true };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -657,7 +657,7 @@ export function createChromaExtension(
     list_collections: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -670,7 +670,7 @@ export function createChromaExtension(
             duration: Date.now() - startTime,
             count: names.length,
           });
-          return names as RillValue;
+          return names;
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -685,7 +685,7 @@ export function createChromaExtension(
     describe: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -701,7 +701,7 @@ export function createChromaExtension(
             duration: Date.now() - startTime,
             name: factoryCollection,
           });
-          return { name: factoryCollection, count } as RillValue;
+          return { name: factoryCollection, count };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }

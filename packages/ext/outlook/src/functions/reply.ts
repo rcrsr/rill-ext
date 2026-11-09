@@ -43,5 +43,5 @@ export async function reply(
     sent: true,
     to: [] as string[],
     subject: '',
-  } as unknown as RillValue;
+  };
 }

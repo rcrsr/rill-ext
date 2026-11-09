@@ -59,6 +59,6 @@ export function makeDriveDelete(
       fileId
     );
     // 204 → null from googleFetch; treat as success
-    return true as unknown as RillValue;
+    return true;
   };
 }

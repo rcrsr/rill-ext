@@ -70,19 +70,13 @@ export function makeDriveDownload(
         signal: combinedSignal,
       });
     } catch (error) {
-      throw mapFetchError(ctx, error, 'drive') as unknown as RillValue;
+      throw mapFetchError(ctx, error, 'drive');
     }
     if (!response.ok) {
-      throw mapGoogleError(
-        ctx,
-        response.status,
-        'drive',
-        'download',
-        fileId
-      ) as unknown as RillValue;
+      throw mapGoogleError(ctx, response.status, 'drive', 'download', fileId);
     }
     const buffer = await response.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
-    return base64 as unknown as RillValue;
+    return base64;
   };
 }

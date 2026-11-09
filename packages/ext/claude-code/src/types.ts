@@ -74,7 +74,7 @@ export interface ToolUseBlock {
 export interface ToolResultBlock {
   readonly type: 'tool_result';
   readonly tool_use_id: string;
-  readonly content: string | unknown;
+  readonly content: unknown;
   readonly is_error?: boolean | undefined;
 }
 

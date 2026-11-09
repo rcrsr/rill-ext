@@ -50,6 +50,11 @@ export interface RedisKvExtensionConfig {
   readonly writePolicy?: 'dispose' | 'immediate' | undefined;
 }
 
+/** True when ttl is a usable expiry: not undefined, 0, or NaN. */
+function hasTtl(ttl: number | undefined): ttl is number {
+  return ttl !== undefined && ttl !== 0 && !Number.isNaN(ttl);
+}
+
 /**
  * Creates a Redis kv backend extension for rill.
  */
@@ -58,7 +63,11 @@ export function createRedisKvExtension(
   ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
   // Factory-time config validation
-  if (!config.mounts || Object.keys(config.mounts).length === 0) {
+  if (
+    config.mounts === undefined ||
+    config.mounts === null ||
+    Object.keys(config.mounts).length === 0
+  ) {
     throw new RuntimeError(
       'RILL-R001',
       'Redis kv extension requires at least one mount in configuration'
@@ -127,7 +136,7 @@ export function createRedisKvExtension(
     });
   };
 
-  if (ctx?.signal) {
+  if (ctx?.signal !== undefined && ctx.signal !== null) {
     if (ctx.signal.aborted) {
       void dispose();
     } else {
@@ -253,7 +262,7 @@ export function createRedisKvExtension(
   // ============================================================
 
   const get: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -285,7 +294,7 @@ export function createRedisKvExtension(
   };
 
   const get_or: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -304,7 +313,7 @@ export function createRedisKvExtension(
   };
 
   const set: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -386,7 +395,7 @@ export function createRedisKvExtension(
 
       const serialized = JSON.stringify(value);
       assertLive(runCtx);
-      if (mountConfig.ttl) {
+      if (hasTtl(mountConfig.ttl)) {
         await client.setex(redisKey, mountConfig.ttl, serialized);
       } else {
         await client.set(redisKey, serialized);
@@ -398,7 +407,7 @@ export function createRedisKvExtension(
   };
 
   const merge: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -482,7 +491,7 @@ export function createRedisKvExtension(
         const result = await client.multi().set(redisKey, serialized).exec();
 
         if (result !== null) {
-          if (mountConfig.ttl) {
+          if (hasTtl(mountConfig.ttl)) {
             assertLive(runCtx);
             await client.expire(redisKey, mountConfig.ttl);
           }
@@ -511,7 +520,7 @@ export function createRedisKvExtension(
   };
 
   const deleteKey: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -532,7 +541,7 @@ export function createRedisKvExtension(
   };
 
   const keys: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -549,7 +558,7 @@ export function createRedisKvExtension(
   };
 
   const has: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -566,7 +575,7 @@ export function createRedisKvExtension(
   };
 
   const clear: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -590,7 +599,7 @@ export function createRedisKvExtension(
         for (const [k, entry] of Object.entries(mountConfig.schema)) {
           const redisKey = buildKey(mountConfig.prefix, k);
           const serialized = JSON.stringify(entry.default);
-          if (mountConfig.ttl) {
+          if (hasTtl(mountConfig.ttl)) {
             pipeline.setex(redisKey, mountConfig.ttl, serialized);
           } else {
             pipeline.set(redisKey, serialized);
@@ -609,7 +618,7 @@ export function createRedisKvExtension(
   };
 
   const getAll: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const mountName = args['mount'] as string;
     const mountConfig = getMountConfig(mountName);
@@ -640,7 +649,7 @@ export function createRedisKvExtension(
 
   const schema: CallableFn = (args, runtimeCtx): Promise<RillValue> => {
     const body = (): RillValue => {
-      const runCtx = runtimeCtx as RuntimeContext;
+      const runCtx = runtimeCtx;
       assertLive(runCtx);
       const mountName = args['mount'] as string;
       const mountConfig = getMountConfig(mountName);
@@ -665,7 +674,7 @@ export function createRedisKvExtension(
 
   const mountsList: CallableFn = (_args, runtimeCtx): Promise<RillValue> => {
     const body = (): RillValue => {
-      assertLive(runtimeCtx as RuntimeContext);
+      assertLive(runtimeCtx);
       const result: RillValue[] = [];
       for (const [name, mountConfig] of Object.entries(config.mounts)) {
         result.push({

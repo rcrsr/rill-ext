@@ -14,7 +14,6 @@ import {
   type ExtensionFactoryResult,
   type RillFunction,
   type RillValue,
-  type RuntimeContext,
 } from '@rcrsr/rill';
 import type {
   CommandConfig,
@@ -75,7 +74,7 @@ export function createExecExtension(
 
   for (const [commandName, commandConfig] of Object.entries(config.commands)) {
     const commandFn: CallableFn = async (args, runCtxLike) => {
-      const runCtx = runCtxLike as RuntimeContext;
+      const runCtx = runCtxLike;
       const argsParam = (args['args'] as RillValue[] | undefined) ?? [];
       const stdinParam = args['stdin'] as string | undefined;
       const stringArgs: string[] = [];
@@ -236,8 +235,7 @@ export function createExecExtension(
     const guarded: RillFunction = {
       ...def,
       fn: (args, runCtx, location) => {
-        if (disposed)
-          throw createDisposedHalt(runCtx as RuntimeContext, PROVIDER);
+        if (disposed) throw createDisposedHalt(runCtx, PROVIDER);
         return def.fn(args, runCtx, location);
       },
     };

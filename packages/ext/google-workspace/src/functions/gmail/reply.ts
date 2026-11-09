@@ -131,6 +131,6 @@ export function makeGmailReply(
       sendBody
     );
     const data = sendResponse as { id?: string } | null;
-    return (data?.id ?? '') as unknown as RillValue;
+    return data?.id ?? '';
   };
 }

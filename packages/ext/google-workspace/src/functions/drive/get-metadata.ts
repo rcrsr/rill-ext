@@ -77,6 +77,6 @@ export function makeDriveGetMetadata(
       })),
       created_time: data?.createdTime ?? '',
       modified_time: data?.modifiedTime ?? '',
-    } as unknown as RillValue;
+    };
   };
 }

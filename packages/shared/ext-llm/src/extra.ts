@@ -58,7 +58,7 @@ export function validateExtraKeys(
   }
 
   // extra contains one or more reserved keys
-  const extraKeys = Object.keys(extra as Record<string, unknown>);
+  const extraKeys = Object.keys(extra);
   const reservedSet = new Set(reservedKeys);
   const colliding = extraKeys.filter((k) => reservedSet.has(k)).sort();
 

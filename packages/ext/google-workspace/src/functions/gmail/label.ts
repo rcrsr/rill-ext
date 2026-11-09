@@ -112,7 +112,7 @@ export function makeGmailLabel(
     const labelsData = labelsResponse as { labels?: GmailLabel[] } | null;
     const labels = labelsData?.labels ?? [];
     const matched = labels.find((l) => l.name === labelName);
-    if (!matched?.id) {
+    if (matched?.id === undefined || matched.id === '') {
       throw ctx.invalidate(
         new Error(`google: label '${labelName}' not found`),
         {
@@ -142,6 +142,6 @@ export function makeGmailLabel(
       undefined,
       messageId
     );
-    return true as unknown as RillValue;
+    return true;
   };
 }

@@ -112,8 +112,9 @@ export class Semaphore {
    * Acquire a permit. When `signal` aborts while waiting, the waiter leaves
    * the queue and the promise rejects with an `AbortError`.
    */
-  acquire(signal?: AbortSignal | undefined): Promise<void> {
-    if (signal?.aborted) return Promise.reject(createAbortError());
+  acquire(signal?: AbortSignal): Promise<void> {
+    if (signal !== undefined && signal.aborted)
+      return Promise.reject(createAbortError());
     if (this.permits > 0) {
       this.permits--;
       return Promise.resolve();
@@ -222,9 +223,7 @@ function mergeHeaders(
  */
 const PARSE_FAILED = Symbol('parse_failed');
 
-async function parseJsonResponse(
-  response: Response
-): Promise<unknown | typeof PARSE_FAILED> {
+async function parseJsonResponse(response: Response): Promise<unknown> {
   const text = await response.text();
   try {
     return JSON.parse(text) as unknown;
@@ -255,7 +254,7 @@ function shouldRetryStatus(status: number): boolean {
 
 function getRetryAfterMs(response: Response): number | null {
   const retryAfter = response.headers.get('Retry-After');
-  if (!retryAfter) return null;
+  if (retryAfter === null || retryAfter === '') return null;
 
   const seconds = parseInt(retryAfter, 10);
   if (!isNaN(seconds)) {
@@ -279,8 +278,8 @@ function calculateBackoff(baseDelay: number, attempt: number): number {
  * An abort ends the wait early without rejecting: the retry loop's next
  * request attempt then fails on the aborted signal.
  */
-function sleep(ms: number, signal?: AbortSignal | undefined): Promise<void> {
-  if (signal?.aborted) return Promise.resolve();
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal !== undefined && signal.aborted) return Promise.resolve();
   return new Promise((resolve) => {
     const onAbort = (): void => {
       clearTimeout(timer);
@@ -311,7 +310,7 @@ export async function executeRequest(
   namespace: string,
   responseShape: ResponseShape,
   ctx: RuntimeContext,
-  semaphore?: Semaphore | undefined
+  semaphore?: Semaphore
 ): Promise<RillValue> {
   const retryLimit = config.retryLimit ?? 3;
   const retryDelay = config.retryDelay ?? 100;
@@ -329,7 +328,8 @@ export async function executeRequest(
 
   while (attempt <= retryLimit) {
     try {
-      if (cancelSignal?.aborted) throw createAbortError();
+      if (cancelSignal !== undefined && cancelSignal.aborted)
+        throw createAbortError();
 
       if (semaphore) {
         await semaphore.acquire(cancelSignal);
@@ -537,7 +537,7 @@ export async function executeRequest(
 export function createSemaphore(
   maxConcurrent: number | undefined
 ): Semaphore | undefined {
-  if (maxConcurrent && maxConcurrent > 0) {
+  if (maxConcurrent !== undefined && maxConcurrent > 0) {
     return new Semaphore(maxConcurrent);
   }
   return undefined;

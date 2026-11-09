@@ -35,7 +35,7 @@ export function mapGoogleError(
   status: number,
   service: 'gmail' | 'drive' | 'calendar',
   operation: string,
-  id?: string | undefined
+  id?: string
 ): RillValue {
   const svc = capitalizeService(service);
 
@@ -161,7 +161,7 @@ export function failInput(
     code: 'INVALID_INPUT',
     provider: PROVIDER,
     raw: { kind, message },
-  }) as unknown as RillValue;
+  });
 }
 
 /**
@@ -177,7 +177,7 @@ export function failForbidden(
     code: 'FORBIDDEN',
     provider: PROVIDER,
     raw: { kind, message },
-  }) as unknown as RillValue;
+  });
 }
 
 /**
@@ -194,5 +194,5 @@ export function failAuth(
     code: 'AUTH',
     provider: PROVIDER,
     raw: { kind, message, ...raw },
-  }) as unknown as RillValue;
+  });
 }

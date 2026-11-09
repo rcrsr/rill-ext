@@ -31,7 +31,7 @@ export async function freeBusy(
 
   const rawAttendees = args['attendees'];
   const attendees: string[] = Array.isArray(rawAttendees)
-    ? toAddressList(rawAttendees as RillValue[], ctx)
+    ? toAddressList(rawAttendees, ctx)
     : [];
 
   if (attendees.length === 0) {

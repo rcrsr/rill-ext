@@ -29,7 +29,7 @@ export async function draft(
   if (typeof rawTo === 'string') {
     toList = [rawTo];
   } else if (Array.isArray(rawTo)) {
-    toList = toAddressList(rawTo as RillValue[], ctx);
+    toList = toAddressList(rawTo, ctx);
   } else {
     toList = [];
   }

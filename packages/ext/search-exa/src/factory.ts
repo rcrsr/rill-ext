@@ -7,7 +7,6 @@ import {
   RuntimeError,
   toCallable,
   structureToTypeValue,
-  type CallableFn,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
@@ -364,12 +363,12 @@ export function createExaExtension(
 
   const callableDict = {
     search: toCallable({
-      fn: search as CallableFn,
+      fn: search,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: SEARCH_RT,
     }),
     contents: toCallable({
-      fn: contents as CallableFn,
+      fn: contents,
       params: [
         {
           name: 'urls',
@@ -382,12 +381,12 @@ export function createExaExtension(
       returnType: CONTENTS_RT,
     }),
     find_similar: toCallable({
-      fn: find_similar as CallableFn,
+      fn: find_similar,
       params: [p.str('url'), p.dict('options', undefined, {})],
       returnType: SEARCH_RT,
     }),
     answer: toCallable({
-      fn: answer as CallableFn,
+      fn: answer,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: ANSWER_RT,
     }),

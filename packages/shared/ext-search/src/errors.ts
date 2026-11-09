@@ -108,9 +108,9 @@ export function mapSearchError(
     typeof error === 'object' &&
     error !== null &&
     'status' in error &&
-    typeof (error as { status: unknown }).status === 'number'
+    typeof error.status === 'number'
   ) {
-    const status = (error as { status: number }).status;
+    const status = error.status;
     const code = atomForStatus(status);
     const kind = kindForStatus(status);
     const message =

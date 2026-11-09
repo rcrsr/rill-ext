@@ -605,7 +605,7 @@ export function normalizePrompt(
   }
 
   // List path
-  const list = rawPrompt as RillValue[];
+  const list = rawPrompt;
 
   // Empty list
   if (list.length === 0) {
@@ -675,5 +675,5 @@ export function normalizePrompt(
   }
 
   // Safe to cast — all validations passed
-  return expanded as unknown as Array<Message>;
+  return expanded;
 }

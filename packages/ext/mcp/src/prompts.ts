@@ -61,7 +61,7 @@ interface McpPromptArgument {
  * MCP prompt message content (text or image).
  */
 interface McpPromptMessageContent {
-  readonly type: 'text' | 'image' | string;
+  readonly type: string; // known values: 'text', 'image'
   readonly text?: string | undefined;
   readonly data?: string | undefined; // base64 for images
   readonly mimeType?: string | undefined;
@@ -71,7 +71,7 @@ interface McpPromptMessageContent {
  * MCP prompt message.
  */
 interface McpPromptMessage {
-  readonly role: 'user' | 'assistant' | string;
+  readonly role: string; // known values: 'user', 'assistant'
   readonly content: McpPromptMessageContent | McpPromptMessageContent[];
 }
 
@@ -317,7 +317,7 @@ export function generatePromptFunctions(
     const rawName = rawNames[i]!;
     const sanitizedName = nameMap.get(rawName);
 
-    if (!sanitizedName) {
+    if (sanitizedName === undefined || sanitizedName === '') {
       // Should never happen: sanitizeNames processes all names
       continue;
     }

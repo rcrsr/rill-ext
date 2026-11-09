@@ -193,11 +193,11 @@ export function createAnthropicExtension(
         },
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         // Normalize prompt: string → [{role:'user', parts:[{type:'text', text}]}]
         //                   list  → canonical Message[]
         const rawPrompt = args['prompt'] as RillValue;
-        const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalized = normalizePrompt(rawPrompt, ctx);
 
         // normalizePrompt returns an invalid RillValue on failure — halt immediately
         if (!Array.isArray(normalized)) {
@@ -245,13 +245,8 @@ export function createAnthropicExtension(
               }
             }
           } catch (error: unknown) {
-            haltIfCancelledByDispose(ctx as RuntimeContext, error);
-            throwProviderHalt(
-              ctx as RuntimeContext,
-              'Anthropic',
-              error,
-              detectAnthropicError
-            );
+            haltIfCancelledByDispose(ctx, error);
+            throwProviderHalt(ctx, 'Anthropic', error, detectAnthropicError);
           }
         }
 
@@ -262,9 +257,7 @@ export function createAnthropicExtension(
             const response = await sdkStream.finalMessage();
 
             // Build canonical assistant parts from response content
-            const assistantParts = anthropicContentToParts(
-              response.content as Anthropic.ContentBlock[]
-            );
+            const assistantParts = anthropicContentToParts(response.content);
 
             // Build canonical messages list: input + assistant reply
             const responseMessages = buildResponseMessages(
@@ -285,7 +278,7 @@ export function createAnthropicExtension(
 
             // Emit success event
             const duration = Date.now() - startTime;
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'anthropic:message',
               subsystem: 'extension:anthropic',
               duration,
@@ -296,16 +289,16 @@ export function createAnthropicExtension(
 
             return result as unknown as RillValue;
           } catch (error: unknown) {
-            haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+            haltIfCancelledByDispose(ctx, error, startTime);
             const duration = Date.now() - startTime;
             const invalid = mapProviderError(
-              ctx as RuntimeContext,
+              ctx,
               'Anthropic',
               error,
               detectAnthropicError
             );
 
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
               error: getStatus(invalid).message,
@@ -324,7 +317,7 @@ export function createAnthropicExtension(
           },
           chunkType: { kind: 'string' },
           retType: MESSAGE_RET_TYPE_STRUCTURE,
-        }) as RillValue;
+        });
       },
       annotations: {
         description: 'Send single or multi-turn message to Claude API',
@@ -341,7 +334,7 @@ export function createAnthropicExtension(
       params: [p.str('text')],
       fn: (args, ctx): Promise<RillValue> => {
         const run = (): RillValue => {
-          assertNotDisposed(ctx as RuntimeContext);
+          assertNotDisposed(ctx);
           const startTime = Date.now();
 
           try {
@@ -350,12 +343,12 @@ export function createAnthropicExtension(
 
             // Validate using shared validation functions; convert R001 → ctx.invalidate
             runInFnValidation(
-              ctx as RuntimeContext,
+              ctx,
               () => validateEmbedText(text),
               'invalid_embed_text'
             );
             runInFnValidation(
-              ctx as RuntimeContext,
+              ctx,
               () => validateEmbedModel(factoryEmbedModel),
               'invalid_embed_model'
             );
@@ -363,17 +356,17 @@ export function createAnthropicExtension(
             // NOTE: Anthropic does not currently provide a public embeddings API.
             // This implementation is prepared for when/if the API becomes available.
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'UNAVAILABLE',
               'feature_unavailable',
               'Anthropic: embeddings API not available'
             );
           } catch (error: unknown) {
-            haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+            haltIfCancelledByDispose(ctx, error, startTime);
             const duration = Date.now() - startTime;
 
             if (error instanceof RuntimeHaltSignal) {
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'anthropic:error',
                 subsystem: 'extension:anthropic',
                 error: getStatus(error.value).message,
@@ -383,7 +376,7 @@ export function createAnthropicExtension(
             }
 
             if (error instanceof RuntimeError) {
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'anthropic:error',
                 subsystem: 'extension:anthropic',
                 error: error.message,
@@ -393,12 +386,12 @@ export function createAnthropicExtension(
             }
 
             const invalid = mapProviderError(
-              ctx as RuntimeContext,
+              ctx,
               'Anthropic',
               error,
               detectAnthropicError
             );
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
               error: getStatus(invalid).message,
@@ -420,7 +413,7 @@ export function createAnthropicExtension(
       params: [p.list('texts')],
       fn: (args, ctx): Promise<RillValue> => {
         const run = (): RillValue => {
-          assertNotDisposed(ctx as RuntimeContext);
+          assertNotDisposed(ctx);
           const startTime = Date.now();
 
           try {
@@ -434,31 +427,31 @@ export function createAnthropicExtension(
 
             // Validate using shared validation functions; convert R001 → ctx.invalidate
             runInFnValidation(
-              ctx as RuntimeContext,
+              ctx,
               () => {
                 validateEmbedBatch(texts);
               },
               'invalid_embed_batch'
             );
             runInFnValidation(
-              ctx as RuntimeContext,
+              ctx,
               () => validateEmbedModel(factoryEmbedModel),
               'invalid_embed_model'
             );
 
             // NOTE: Anthropic does not currently provide a public embeddings API.
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'UNAVAILABLE',
               'feature_unavailable',
               'Anthropic: embeddings API not available'
             );
           } catch (error: unknown) {
-            haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+            haltIfCancelledByDispose(ctx, error, startTime);
             const duration = Date.now() - startTime;
 
             if (error instanceof RuntimeHaltSignal) {
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'anthropic:error',
                 subsystem: 'extension:anthropic',
                 error: getStatus(error.value).message,
@@ -468,7 +461,7 @@ export function createAnthropicExtension(
             }
 
             if (error instanceof RuntimeError) {
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'anthropic:error',
                 subsystem: 'extension:anthropic',
                 error: error.message,
@@ -478,12 +471,12 @@ export function createAnthropicExtension(
             }
 
             const invalid = mapProviderError(
-              ctx as RuntimeContext,
+              ctx,
               'Anthropic',
               error,
               detectAnthropicError
             );
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
               error: getStatus(invalid).message,
@@ -524,7 +517,7 @@ export function createAnthropicExtension(
         p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         // Extract arguments
         const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
@@ -533,7 +526,7 @@ export function createAnthropicExtension(
         // Negative per-call max_turns → INVALID_INPUT
         if (typeof maxTurnsArg === 'number' && maxTurnsArg < 0) {
           throw haltInvalid(
-            ctx as RuntimeContext,
+            ctx,
             'INVALID_INPUT',
             'invalid_max_turns',
             'max_turns must be >= 0 (use 0 for no per-call override)'
@@ -545,10 +538,10 @@ export function createAnthropicExtension(
           typeof toolsDict === 'object' &&
           toolsDict !== null &&
           !Array.isArray(toolsDict) &&
-          Object.keys(toolsDict as Record<string, unknown>).length === 0
+          Object.keys(toolsDict).length === 0
         ) {
           throw haltInvalid(
-            ctx as RuntimeContext,
+            ctx,
             'INVALID_INPUT',
             'empty_tools_dict',
             'tool_loop: tools dict must not be empty'
@@ -556,7 +549,7 @@ export function createAnthropicExtension(
         }
 
         // Normalize prompt
-        const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalized = normalizePrompt(rawPrompt, ctx);
 
         // normalizePrompt returns invalid RillValue on failure
         if (!Array.isArray(normalized)) {
@@ -646,8 +639,8 @@ export function createAnthropicExtension(
             response: unknown
           ): Array<{ id: string; name: string; input: object }> | null => {
             if (
-              !response ||
               typeof response !== 'object' ||
+              response === null ||
               !('content' in response)
             ) {
               return null;
@@ -680,15 +673,15 @@ export function createAnthropicExtension(
           // Extract assistant message from Anthropic response for conversation history
           formatAssistantMessage: (response: unknown): unknown => {
             if (
-              !response ||
               typeof response !== 'object' ||
+              response === null ||
               !('role' in response) ||
               !('content' in response)
             ) {
               return null;
             }
 
-            const r = response as { role: unknown; content: unknown };
+            const r = response;
             return { role: r.role, content: r.content };
           },
 
@@ -706,9 +699,10 @@ export function createAnthropicExtension(
               (tr) => ({
                 type: 'tool_result' as const,
                 tool_use_id: tr.id,
-                content: tr.error
-                  ? `Error: ${tr.error}`
-                  : JSON.stringify(tr.result),
+                content:
+                  tr.error !== undefined && tr.error !== ''
+                    ? `Error: ${tr.error}`
+                    : JSON.stringify(tr.result),
                 is_error: tr.error !== undefined,
               })
             );
@@ -730,8 +724,8 @@ export function createAnthropicExtension(
             tool_call: 'anthropic:tool_call',
             tool_result: 'anthropic:tool_result',
           };
-          emitExtensionEvent(ctx as RuntimeContext, {
-            event: eventMap[event] || event,
+          emitExtensionEvent(ctx, {
+            event: eventMap[event] ?? event,
             subsystem: 'extension:anthropic',
             ...data,
           });
@@ -754,7 +748,7 @@ export function createAnthropicExtension(
 
         const sharedLoopPromise = executeToolLoop(
           apiMessages,
-          toolsDict as RillValue,
+          toolsDict,
           factoryMaxErrors,
           callbacks,
           emitEventFn,
@@ -802,7 +796,7 @@ export function createAnthropicExtension(
           try {
             await sharedLoopPromise;
           } catch (error: unknown) {
-            haltIfCancelledByDispose(ctx as RuntimeContext, error);
+            haltIfCancelledByDispose(ctx, error);
             throw error;
           }
         }
@@ -818,9 +812,7 @@ export function createAnthropicExtension(
 
             // Build canonical assistant parts from final response
             const assistantParts = response
-              ? anthropicContentToParts(
-                  response.content as Anthropic.ContentBlock[]
-                )
+              ? anthropicContentToParts(response.content)
               : [{ type: 'text' as const, text: '' }];
 
             // Build full transcript: input canonical messages + assistant reply
@@ -840,7 +832,7 @@ export function createAnthropicExtension(
 
             // Emit tool_loop event
             const duration = Date.now() - startTime;
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'anthropic:tool_loop',
               subsystem: 'extension:anthropic',
               turns: result.turns,
@@ -851,10 +843,10 @@ export function createAnthropicExtension(
 
             return result as unknown as RillValue;
           } catch (error: unknown) {
-            haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+            haltIfCancelledByDispose(ctx, error, startTime);
             const duration = Date.now() - startTime;
             if (error instanceof RuntimeError) {
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'anthropic:error',
                 subsystem: 'extension:anthropic',
                 error: error.message,
@@ -863,7 +855,7 @@ export function createAnthropicExtension(
               throw error;
             }
             if (error instanceof RuntimeHaltSignal) {
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'anthropic:error',
                 subsystem: 'extension:anthropic',
                 error: getStatus(error.value).message,
@@ -872,12 +864,12 @@ export function createAnthropicExtension(
               throw error;
             }
             const invalid = mapProviderError(
-              ctx as RuntimeContext,
+              ctx,
               'Anthropic',
               error,
               detectAnthropicError
             );
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
               error: getStatus(invalid).message,
@@ -895,7 +887,7 @@ export function createAnthropicExtension(
           },
           chunkType: { kind: 'dict' },
           retType: TOOL_LOOP_RET_TYPE_STRUCTURE,
-        }) as RillValue;
+        });
       },
       annotations: { description: 'Execute tool-use loop with Claude API' },
       returnType: structureToTypeValue({
@@ -916,7 +908,7 @@ export function createAnthropicExtension(
         },
         {
           name: 'schema',
-          type: { kind: 'type' } as { kind: string },
+          type: { kind: 'type' },
           defaultValue: undefined,
           annotations: {
             description: 'Type expression for structured output schema',
@@ -924,7 +916,7 @@ export function createAnthropicExtension(
         },
       ],
       fn: async (args, ctx): Promise<RillValue> => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         const startTime = Date.now();
 
         try {
@@ -935,9 +927,13 @@ export function createAnthropicExtension(
             | undefined;
 
           // Validate schema is a type value with dict structure
-          if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
+          if (
+            schemaArg === undefined ||
+            schemaArg.__rill_type !== true ||
+            schemaArg.structure === undefined
+          ) {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'INVALID_INPUT',
               'invalid_schema',
               'generate requires a type expression as schema'
@@ -945,7 +941,7 @@ export function createAnthropicExtension(
           }
           if (schemaArg.structure.kind !== 'dict') {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'INVALID_INPUT',
               'invalid_schema_type',
               `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
@@ -958,7 +954,7 @@ export function createAnthropicExtension(
           );
 
           // Normalize prompt
-          const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+          const normalized = normalizePrompt(rawPrompt, ctx);
           if (!Array.isArray(normalized)) {
             throw new RuntimeHaltSignal(normalized, true);
           }
@@ -1005,7 +1001,7 @@ export function createAnthropicExtension(
             'function'
           ) {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'PROTOCOL',
               'unexpected_response_format',
               'generate: provider returned a streaming response for structured output'
@@ -1013,9 +1009,7 @@ export function createAnthropicExtension(
           }
 
           // Extract JSON string from response content text block
-          const raw = extractTextContent(
-            response.content as Array<{ type: string; text?: string }>
-          );
+          const raw = extractTextContent(response.content);
 
           // Parse JSON, throw on failure with schema_validation_failed kind
           let data: unknown;
@@ -1027,7 +1021,7 @@ export function createAnthropicExtension(
                 ? parseError.message
                 : String(parseError);
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'PROTOCOL',
               'schema_validation_failed',
               `generate: failed to parse response JSON: ${detail}`
@@ -1035,9 +1029,7 @@ export function createAnthropicExtension(
           }
 
           // Build canonical assistant parts from response
-          const assistantParts = anthropicContentToParts(
-            response.content as Anthropic.ContentBlock[]
-          );
+          const assistantParts = anthropicContentToParts(response.content);
 
           // Build messages: input + assistant reply (length ≥ 2, ends with assistant text part containing raw)
           const responseMessages = buildResponseMessages(
@@ -1061,7 +1053,7 @@ export function createAnthropicExtension(
 
           // Emit success event
           const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'anthropic:generate',
             subsystem: 'extension:anthropic',
             duration,
@@ -1073,10 +1065,10 @@ export function createAnthropicExtension(
 
           return result as unknown as RillValue;
         } catch (error: unknown) {
-          haltIfCancelledByDispose(ctx as RuntimeContext, error, startTime);
+          haltIfCancelledByDispose(ctx, error, startTime);
           const duration = Date.now() - startTime;
           if (error instanceof RuntimeError) {
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
               error: error.message,
@@ -1085,7 +1077,7 @@ export function createAnthropicExtension(
             throw error;
           }
           if (error instanceof RuntimeHaltSignal) {
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'anthropic:error',
               subsystem: 'extension:anthropic',
               error: getStatus(error.value).message,
@@ -1094,12 +1086,12 @@ export function createAnthropicExtension(
             throw error;
           }
           const invalid = mapProviderError(
-            ctx as RuntimeContext,
+            ctx,
             'Anthropic',
             error,
             detectAnthropicError
           );
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'anthropic:error',
             subsystem: 'extension:anthropic',
             error: getStatus(invalid).message,

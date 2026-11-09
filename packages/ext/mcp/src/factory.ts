@@ -148,17 +148,13 @@ export async function createMcpExtension(
     lifecycleState
   );
   const resourceTemplateFunctions = generateResourceTemplateFunctions(
-    capabilities.filteredResourceTemplates as Parameters<
-      typeof generateResourceTemplateFunctions
-    >[0],
+    capabilities.filteredResourceTemplates,
     client,
     timeout,
     lifecycleState
   );
   const staticResourceFunctions = generateStaticResourceFunctions(
-    capabilities.filteredResources as Parameters<
-      typeof generateStaticResourceFunctions
-    >[0],
+    capabilities.filteredResources,
     client,
     timeout,
     lifecycleState
@@ -190,7 +186,7 @@ export async function createMcpExtension(
   // ============================================================
   const dispose = async (): Promise<void> => {
     // Idempotent dispose - subsequent calls no-op
-    if (lifecycleState.disposed) {
+    if (lifecycleState.disposed === true) {
       return;
     }
     lifecycleState.disposed = true;
@@ -224,9 +220,9 @@ export async function createMcpExtension(
 
   // Build value dict from introspection dicts — capabilities are namespaced
   const value: Record<string, RillValue> = {
-    tools: introspectionDicts.tools as unknown as RillValue,
-    resources: introspectionDicts.resources as unknown as RillValue,
-    prompts: introspectionDicts.prompts as unknown as RillValue,
+    tools: introspectionDicts.tools,
+    resources: introspectionDicts.resources,
+    prompts: introspectionDicts.prompts,
   };
 
   return { value, dispose };
@@ -279,7 +275,7 @@ async function createTransport(config: McpExtensionConfig): Promise<Transport> {
       params.env = transport.env;
     }
 
-    return new StdioClientTransport(params) as Transport;
+    return new StdioClientTransport(params);
   } else {
     // Create HTTP transport with optional headers
     const url = new URL(transport.url);
@@ -297,11 +293,11 @@ async function createTransport(config: McpExtensionConfig): Promise<Transport> {
 
       return new StreamableHTTPClientTransport(url, {
         requestInit: { headers: new Headers(resolvedHeaders) },
-      }) as Transport;
+      });
     }
 
     // No headers - return without requestInit
-    return new StreamableHTTPClientTransport(url) as Transport;
+    return new StreamableHTTPClientTransport(url);
   }
 }
 
@@ -384,10 +380,10 @@ async function discoverCapabilities(
     ]);
 
   // Extract lists from results
-  const allTools = toolsResult.tools || [];
-  const allResources = resourcesResult.resources || [];
-  const allResourceTemplates = resourceTemplatesResult.resourceTemplates || [];
-  const allPrompts = promptsResult.prompts || [];
+  const allTools = toolsResult.tools ?? [];
+  const allResources = resourcesResult.resources ?? [];
+  const allResourceTemplates = resourceTemplatesResult.resourceTemplates ?? [];
+  const allPrompts = promptsResult.prompts ?? [];
 
   // Apply filters
   const filteredTools = filterCapabilities(
@@ -464,7 +460,7 @@ function mapConnectionError(
   }
   const message = error instanceof Error ? error.message : String(error);
   const code =
-    error && typeof error === 'object' && 'code' in error
+    typeof error === 'object' && error !== null && 'code' in error
       ? String(error.code)
       : '';
 

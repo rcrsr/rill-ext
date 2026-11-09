@@ -45,7 +45,7 @@ const SCOPE_COGNITIVE = 'https://cognitiveservices.azure.com/.default';
 export async function createAzureOpenAIClient(
   endpoint: string,
   auth: FoundryAuth,
-  inference?: FoundryInferenceConfig | undefined
+  inference?: FoundryInferenceConfig
 ): Promise<AzureOpenAI> {
   const apiVersion = inference?.apiVersion;
   const timeout = inference?.timeout ?? 30000;
@@ -105,7 +105,7 @@ export async function buildRestAuthHeaders(
   const { DefaultAzureCredential } = await import('@azure/identity');
   const credential = auth.credential ?? new DefaultAzureCredential();
   const tokenResponse = await credential.getToken(SCOPE_COGNITIVE);
-  if (!tokenResponse?.token) {
+  if (tokenResponse?.token === undefined || tokenResponse.token === '') {
     throw new RuntimeError(
       'RILL-R001',
       'foundry: failed to acquire Entra token'

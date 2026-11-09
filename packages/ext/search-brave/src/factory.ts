@@ -14,7 +14,6 @@ import {
   RuntimeError,
   toCallable,
   structureToTypeValue,
-  type CallableFn,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
@@ -234,7 +233,7 @@ export function createBraveExtension(
     };
 
     const summarizerKey = searchData.summarizer?.key;
-    if (!summarizerKey) {
+    if (summarizerKey === undefined || summarizerKey === '') {
       throw callCtx.invalidate(
         new Error(`${PROVIDER}: summarizer key not found`),
         {
@@ -334,17 +333,17 @@ export function createBraveExtension(
 
   const callableDict = {
     search: toCallable({
-      fn: search as CallableFn,
+      fn: search,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: SEARCH_RT,
     }),
     news: toCallable({
-      fn: news as CallableFn,
+      fn: news,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: NEWS_RT,
     }),
     summarize: toCallable({
-      fn: summarize as CallableFn,
+      fn: summarize,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: SUMMARIZE_RT,
     }),

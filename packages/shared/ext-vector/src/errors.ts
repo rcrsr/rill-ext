@@ -129,8 +129,10 @@ export function mapVectorError(
       /expected (\d+).*got (\d+)|(\d+).*?expected.*?(\d+)/i
     );
     if (match) {
-      const expected = match[1] || match[4];
-      const actual = match[2] || match[3];
+      const first = match[1];
+      const second = match[2];
+      const expected = first !== undefined && first !== '' ? first : match[4];
+      const actual = second !== undefined && second !== '' ? second : match[3];
       return ctx.invalidate(error, {
         code: 'TYPE_MISMATCH',
         provider,

@@ -72,7 +72,7 @@ export async function createFoundryExtension(
   }
 
   // Validate auth is present
-  if (!config.auth) {
+  if (config.auth === undefined || config.auth === null) {
     throw new RuntimeError('RILL-R001', 'foundry: auth is required');
   }
 
@@ -307,16 +307,13 @@ export async function createFoundryExtension(
         ),
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed(ctx as RuntimeContext);
-        assertInference(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
+        assertInference(ctx);
 
         const rawPrompt = args['prompt'] as RillValue;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
 
-        const normalizedResult = normalizePrompt(
-          rawPrompt,
-          ctx as RuntimeContext
-        );
+        const normalizedResult = normalizePrompt(rawPrompt, ctx);
         if (!Array.isArray(normalizedResult)) {
           throw new RuntimeHaltSignal(normalizedResult, true);
         }
@@ -331,12 +328,13 @@ export async function createFoundryExtension(
             ? options['max_tokens']
             : factoryMaxTokens;
 
-        const inputMessages: Message[] = system
-          ? [
-              { role: 'system', parts: [{ type: 'text', text: system }] },
-              ...normalizedPrompt,
-            ]
-          : normalizedPrompt;
+        const inputMessages: Message[] =
+          system !== undefined && system !== ''
+            ? [
+                { role: 'system', parts: [{ type: 'text', text: system }] },
+                ...normalizedPrompt,
+              ]
+            : normalizedPrompt;
 
         const apiMessages = messagesToOpenAI(inputMessages);
 
@@ -357,20 +355,15 @@ export async function createFoundryExtension(
           try {
             for await (const chunk of runner) {
               const delta = chunk.choices[0]?.delta?.content;
-              if (delta) {
-                yield delta as RillValue;
+              if (delta !== undefined && delta !== null && delta !== '') {
+                yield delta;
               }
             }
           } catch (error: unknown) {
-            const cancelled = cancelledByDispose(ctx as RuntimeContext, error);
+            const cancelled = cancelledByDispose(ctx, error);
             if (cancelled) throw cancelled;
             if (error instanceof RuntimeHaltSignal) throw error;
-            throwProviderHalt(
-              ctx as RuntimeContext,
-              'Foundry',
-              error,
-              detectFoundryError
-            );
+            throwProviderHalt(ctx, 'Foundry', error, detectFoundryError);
           }
         }
 
@@ -396,7 +389,7 @@ export async function createFoundryExtension(
             };
 
             const duration = Date.now() - startTime;
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'foundry:message',
               subsystem: 'extension:foundry',
               duration,
@@ -409,10 +402,10 @@ export async function createFoundryExtension(
           } catch (error: unknown) {
             const duration = Date.now() - startTime;
             const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
-              ctx as RuntimeContext,
+              ctx,
               error
             );
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'foundry:message:error',
               subsystem: 'extension:foundry',
               model: factoryModel ?? '',
@@ -495,8 +488,8 @@ export async function createFoundryExtension(
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
-        assertNotDisposed(ctx as RuntimeContext);
-        assertInference(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
+        assertInference(ctx);
 
         try {
           const text = args['text'] as string;
@@ -516,7 +509,7 @@ export async function createFoundryExtension(
           const embeddingData = response.data[0]?.embedding;
           if (!embeddingData || embeddingData.length === 0) {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'PROTOCOL',
               'empty_embedding',
               'foundry: empty embedding returned'
@@ -527,7 +520,7 @@ export async function createFoundryExtension(
           const vector = createVector(float32Data, factoryEmbedModel);
 
           const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
             duration,
@@ -535,14 +528,14 @@ export async function createFoundryExtension(
             tokenCount: response.usage?.total_tokens ?? 0,
           });
 
-          return vector as RillValue;
+          return vector;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
-            ctx as RuntimeContext,
+            ctx,
             error
           );
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
             error:
@@ -566,8 +559,8 @@ export async function createFoundryExtension(
       fn: async (args, ctx): Promise<RillValue> => {
         const startTime = Date.now();
 
-        assertNotDisposed(ctx as RuntimeContext);
-        assertInference(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
+        assertInference(ctx);
 
         try {
           const texts = args['texts'] as Array<RillValue>;
@@ -592,9 +585,13 @@ export async function createFoundryExtension(
           const vectors: RillValue[] = [];
           for (const embeddingItem of response.data) {
             const embeddingData = embeddingItem.embedding;
-            if (!embeddingData || embeddingData.length === 0) {
+            if (
+              embeddingData === undefined ||
+              embeddingData === null ||
+              embeddingData.length === 0
+            ) {
               throw haltInvalid(
-                ctx as RuntimeContext,
+                ctx,
                 'PROTOCOL',
                 'empty_embedding',
                 'foundry: empty embedding returned'
@@ -602,14 +599,16 @@ export async function createFoundryExtension(
             }
             const float32Data = new Float32Array(embeddingData);
             const vector = createVector(float32Data, factoryEmbedModel);
-            vectors.push(vector as RillValue);
+            vectors.push(vector);
           }
 
           const duration = Date.now() - startTime;
           const firstVector = vectors[0];
           const dimensions =
-            firstVector && isVector(firstVector) ? firstVector.data.length : 0;
-          emitExtensionEvent(ctx as RuntimeContext, {
+            firstVector !== undefined && isVector(firstVector)
+              ? firstVector.data.length
+              : 0;
+          emitExtensionEvent(ctx, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
             duration,
@@ -619,14 +618,14 @@ export async function createFoundryExtension(
             count: vectors.length,
           });
 
-          return vectors as RillValue;
+          return vectors;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
-            ctx as RuntimeContext,
+            ctx,
             error
           );
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'foundry:embed',
             subsystem: 'extension:foundry',
             error:
@@ -672,8 +671,8 @@ export async function createFoundryExtension(
       ...rillFn,
       fn: async (args, ctx): Promise<RillValue> => {
         return await shield(
-          args as Record<string, RillValue>,
-          ctx as RuntimeContext,
+          args,
+          ctx,
           async (shieldArgs, shieldCtx) => {
             const result = rillFn.fn(shieldArgs, shieldCtx);
             return result instanceof Promise ? await result : result;
@@ -703,11 +702,11 @@ export async function createFoundryExtension(
   const usageFn: RillFunction = {
     params: [],
     fn: (_args, _ctx): RillValue => {
-      assertNotDisposed(_ctx as RuntimeContext);
+      assertNotDisposed(_ctx);
       return {
         input_tokens: usageInputTokens,
         output_tokens: usageOutputTokens,
-      } as RillValue;
+      };
     },
     annotations: {
       description: 'Return accumulated token usage since factory creation',
@@ -734,7 +733,7 @@ export async function createFoundryExtension(
         stringDocs,
         config,
         config.auth,
-        ctx as RuntimeContext,
+        ctx,
         disposedRef
       );
     },
@@ -754,13 +753,7 @@ export async function createFoundryExtension(
     params: [p.str('query')],
     fn: async (args, ctx): Promise<RillValue> => {
       const query = args['query'] as string;
-      return await callGround(
-        query,
-        config,
-        client,
-        ctx as RuntimeContext,
-        disposedRef
-      );
+      return await callGround(query, config, client, ctx, disposedRef);
     },
     annotations: {
       description: 'Ground a query via Bing using Azure AI Foundry',
@@ -797,7 +790,7 @@ export async function createFoundryExtension(
         options,
         config,
         config.auth,
-        ctx as RuntimeContext,
+        ctx,
         disposedRef
       );
     },
