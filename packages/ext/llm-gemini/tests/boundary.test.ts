@@ -190,13 +190,16 @@ describe('Gemini boundary conditions', () => {
   // ──────────────────────────────────────────────────────────
 
   describe('AC-B4: tool_loop with empty tools dict', () => {
-    it('throws RuntimeHaltSignal with INVALID_INPUT / empty_tools_dict', () => {
+    it('throws RuntimeHaltSignal with INVALID_INPUT / empty_tools_dict', async () => {
       const ext = createGeminiExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
       let thrown: unknown;
       try {
-        getCallable(ext, 'tool_loop').fn({ prompt: 'hello', tools: {} }, ctx);
+        await getCallable(ext, 'tool_loop').fn(
+          { prompt: 'hello', tools: {} },
+          ctx
+        );
       } catch (e) {
         thrown = e;
       }
@@ -218,11 +221,14 @@ describe('Gemini boundary conditions', () => {
       const ext = createGeminiExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const calls = Array.from({ length: 10 }, (_, i) =>
-        getCallable(ext, 'message').fn({ prompt: `hello ${i}` }, ctx)
+      const streams = await Promise.all(
+        Array.from({ length: 10 }, async (_, i) => {
+          return await getCallable(ext, 'message').fn(
+            { prompt: `hello ${i}` },
+            ctx
+          );
+        })
       );
-
-      const streams = await Promise.all(calls);
       await Promise.all(streams.map((s) => collectStream(s, ctx)));
 
       // Every request carries the factory model and its own prompt (config not mutated)
@@ -276,7 +282,7 @@ describe('Gemini boundary error cases', () => {
   // ──────────────────────────────────────────────────────────
 
   describe('AC-E9: negative per-call max_turns', () => {
-    it('throws RuntimeHaltSignal with INVALID_INPUT / invalid_max_turns when max_turns is -1', () => {
+    it('throws RuntimeHaltSignal with INVALID_INPUT / invalid_max_turns when max_turns is -1', async () => {
       const ext = createGeminiExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
@@ -284,7 +290,7 @@ describe('Gemini boundary error cases', () => {
 
       let thrown: unknown;
       try {
-        getCallable(ext, 'tool_loop').fn(
+        await getCallable(ext, 'tool_loop').fn(
           { prompt: 'hello', tools, max_turns: -1 },
           ctx
         );
@@ -309,10 +315,7 @@ describe('Gemini boundary error cases', () => {
       const ext = createGeminiExtension(BASE_CONFIG);
       const ctx = createRuntimeContext();
 
-      const result = await getCallable(ext, 'message').fn(
-        { prompt: 123 as unknown as RillValue },
-        ctx
-      );
+      const result = await getCallable(ext, 'message').fn({ prompt: 123 }, ctx);
 
       expect(isInvalid(result)).toBe(true);
       const status = getStatus(result);

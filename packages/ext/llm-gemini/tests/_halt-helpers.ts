@@ -13,7 +13,7 @@ import { RuntimeError, RuntimeHaltSignal, getStatus } from '@rcrsr/rill';
 
 export interface HaltExpectation {
   readonly code?: string;
-  readonly message?: string | RegExp | unknown;
+  readonly message?: unknown;
   readonly provider?: string;
 }
 
@@ -30,8 +30,7 @@ function matchMessage(actual: string, expected: unknown): void {
     expected !== null &&
     typeof expected === 'object' &&
     'asymmetricMatch' in expected &&
-    typeof (expected as { asymmetricMatch: unknown }).asymmetricMatch ===
-      'function'
+    typeof expected.asymmetricMatch === 'function'
   ) {
     const matched = (
       expected as { asymmetricMatch: (v: unknown) => boolean }

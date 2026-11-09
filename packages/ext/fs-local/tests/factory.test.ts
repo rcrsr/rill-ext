@@ -56,7 +56,9 @@ describe('createLocalFsExtension - factory', () => {
       await expect(created).rejects.toBeInstanceOf(RuntimeError);
       await expect(created).rejects.toMatchObject({
         errorId: 'RILL-R001',
-        message: expect.stringContaining('mount path does not exist'),
+        message: expect.stringContaining(
+          'mount path does not exist'
+        ) as unknown,
       });
     });
   });
@@ -190,7 +192,7 @@ describe('createLocalFsExtension - factory', () => {
     });
 
     describe('in-flight calls', () => {
-      async function mountExt(): Promise<
+      function mountExt(): Promise<
         Awaited<ReturnType<typeof createLocalFsExtension>>
       > {
         return createLocalFsExtension(
@@ -248,18 +250,18 @@ describe('createLocalFsExtension - factory', () => {
         let readStarted = false;
         const realOpen = fs.open.bind(fs);
         // read() goes through a FileHandle; hold its readFile instead.
-        vi.spyOn(fs, 'open').mockImplementation((async (
-          ...args: Parameters<typeof fs.open>
-        ) => {
-          const handle = await realOpen(...args);
-          handle.readFile = (() => {
-            readStarted = true;
-            return new Promise((_, reject) => {
-              rejectRead = reject;
-            });
-          }) as never;
-          return handle;
-        }) as never);
+        vi.spyOn(fs, 'open').mockImplementation(
+          async (...args: Parameters<typeof fs.open>) => {
+            const handle = await realOpen(...args);
+            handle.readFile = (() => {
+              readStarted = true;
+              return new Promise((_, reject) => {
+                rejectRead = reject;
+              });
+            }) as never;
+            return handle;
+          }
+        );
         await fs.writeFile(path.join(testMount, 'r.txt'), 'x');
         const ext = await mountExt();
         const pending = getCallable(ext, 'read').fn(

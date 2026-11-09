@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { RuntimeError, type RillValue } from '@rcrsr/rill';
+import { RuntimeError } from '@rcrsr/rill';
 import {
   validateApiKey,
   validateModel,
@@ -34,6 +34,11 @@ function expectConfigError(fn: () => unknown, message: string): void {
 // API KEY VALIDATION
 // ============================================================
 
+/** Typed absent value; passing a literal `undefined` argument is flagged by lint. */
+function absent<T>(): T | undefined {
+  return new Map<string, T>().get('absent');
+}
+
 describe('validateApiKey', () => {
   it('passes with valid key', () => {
     expect(() => validateApiKey('valid-key')).not.toThrow();
@@ -41,7 +46,7 @@ describe('validateApiKey', () => {
 
   it('throws for undefined key', () => {
     // key is undefined → RuntimeError: "api_key is required"
-    expectConfigError(() => validateApiKey(undefined), 'api_key is required');
+    expectConfigError(() => validateApiKey(absent()), 'api_key is required');
   });
 
   it('throws for empty string key', () => {
@@ -61,7 +66,7 @@ describe('validateModel', () => {
 
   it('throws for undefined model', () => {
     // model is undefined → RuntimeError: "model is required"
-    expectConfigError(() => validateModel(undefined), 'model is required');
+    expectConfigError(() => validateModel(absent()), 'model is required');
   });
 
   it('throws for empty string model', () => {
@@ -94,7 +99,7 @@ describe('validateTemperature', () => {
   });
 
   it('skips validation for undefined', () => {
-    expect(() => validateTemperature(undefined)).not.toThrow();
+    expect(() => validateTemperature(absent())).not.toThrow();
   });
 
   it('throws for value above maximum', () => {
@@ -243,30 +248,26 @@ describe('validateEmbedBatch', () => {
 
   it('throws for non-string element', () => {
     // Batch contains non-string → RuntimeError
-    expect(() => validateEmbedBatch([123 as unknown as RillValue])).toThrow(
-      RuntimeError
-    );
-    expect(() => validateEmbedBatch([123 as unknown as RillValue])).toThrow(
+    expect(() => validateEmbedBatch([123])).toThrow(RuntimeError);
+    expect(() => validateEmbedBatch([123])).toThrow(
       'embed_batch requires list of strings'
     );
   });
 
   it('throws for mixed types array', () => {
     // Batch with mixed types → RuntimeError
-    expect(() =>
-      validateEmbedBatch(['valid', 42 as unknown as RillValue, 'text'])
-    ).toThrow(RuntimeError);
-    expect(() =>
-      validateEmbedBatch(['valid', 42 as unknown as RillValue, 'text'])
-    ).toThrow('embed_batch requires list of strings');
+    expect(() => validateEmbedBatch(['valid', 42, 'text'])).toThrow(
+      RuntimeError
+    );
+    expect(() => validateEmbedBatch(['valid', 42, 'text'])).toThrow(
+      'embed_batch requires list of strings'
+    );
   });
 
   it('throws for array with object', () => {
     // Non-string element (object) → RuntimeError
-    expect(() => validateEmbedBatch([{} as unknown as RillValue])).toThrow(
-      RuntimeError
-    );
-    expect(() => validateEmbedBatch([{} as unknown as RillValue])).toThrow(
+    expect(() => validateEmbedBatch([{}])).toThrow(RuntimeError);
+    expect(() => validateEmbedBatch([{}])).toThrow(
       'embed_batch requires list of strings'
     );
   });
@@ -317,8 +318,8 @@ describe('validateEmbedModel', () => {
 
   it('throws for undefined model', () => {
     // Embed model falsy → RuntimeError
-    expect(() => validateEmbedModel(undefined)).toThrow(RuntimeError);
-    expect(() => validateEmbedModel(undefined)).toThrow(
+    expect(() => validateEmbedModel(absent())).toThrow(RuntimeError);
+    expect(() => validateEmbedModel(absent())).toThrow(
       'embed_model not configured'
     );
   });

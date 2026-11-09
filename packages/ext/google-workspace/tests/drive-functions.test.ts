@@ -31,7 +31,7 @@ async function callDrive(
   name: string,
   args: Record<string, unknown>
 ): Promise<unknown> {
-  return getCallable(ext, name).fn(
+  return await getCallable(ext, name).fn(
     args as Record<string, import('@rcrsr/rill').RillValue>,
     createRuntimeContext()
   );
@@ -258,7 +258,7 @@ describe('drive_list success cases', () => {
       makeFactoryCtx()
     );
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -267,10 +267,7 @@ describe('drive_list success cases', () => {
       json: () => Promise.resolve({ files: [] }),
     }) as typeof fetch;
 
-    await getCallable(ext, 'drive_list').fn(
-      {} as Record<string, import('@rcrsr/rill').RillValue>,
-      ctx
-    );
+    await getCallable(ext, 'drive_list').fn({}, ctx);
 
     expect(onLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -335,7 +332,7 @@ describe('drive_upload success cases', () => {
       makeFactoryCtx()
     );
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -350,10 +347,7 @@ describe('drive_upload success cases', () => {
     }) as typeof fetch;
 
     await getCallable(ext, 'drive_upload').fn(
-      { content: BASE64_100, filename: 'f.txt' } as Record<
-        string,
-        import('@rcrsr/rill').RillValue
-      >,
+      { content: BASE64_100, filename: 'f.txt' },
       ctx
     );
 
@@ -379,7 +373,7 @@ describe('drive_download success cases', () => {
     const arrayBuf = srcBytes.buffer.slice(
       srcBytes.byteOffset,
       srcBytes.byteOffset + srcBytes.byteLength
-    ) as ArrayBuffer;
+    );
 
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -400,7 +394,7 @@ describe('drive_download success cases', () => {
       makeFactoryCtx()
     );
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     const emptyBuf = new ArrayBuffer(0);
@@ -410,10 +404,7 @@ describe('drive_download success cases', () => {
       arrayBuffer: () => Promise.resolve(emptyBuf),
     }) as typeof fetch;
 
-    await getCallable(ext, 'drive_download').fn(
-      { file_id: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
-      ctx
-    );
+    await getCallable(ext, 'drive_download').fn({ file_id: 'f1' }, ctx);
 
     expect(onLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'google:drive:download' })
@@ -451,7 +442,7 @@ describe('drive_share success cases', () => {
       makeFactoryCtx()
     );
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -461,10 +452,7 @@ describe('drive_share success cases', () => {
     }) as typeof fetch;
 
     await getCallable(ext, 'drive_share').fn(
-      { file_id: 'f1', email: 'u@example.com', role: 'writer' } as Record<
-        string,
-        import('@rcrsr/rill').RillValue
-      >,
+      { file_id: 'f1', email: 'u@example.com', role: 'writer' },
       ctx
     );
 
@@ -499,7 +487,7 @@ describe('drive_delete success cases', () => {
       makeFactoryCtx()
     );
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -507,10 +495,7 @@ describe('drive_delete success cases', () => {
       status: 204,
     }) as typeof fetch;
 
-    await getCallable(ext, 'drive_delete').fn(
-      { file_id: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
-      ctx
-    );
+    await getCallable(ext, 'drive_delete').fn({ file_id: 'f1' }, ctx);
 
     expect(onLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'google:drive:delete' })
@@ -564,7 +549,7 @@ describe('drive_get_metadata success cases', () => {
       makeFactoryCtx()
     );
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -574,10 +559,7 @@ describe('drive_get_metadata success cases', () => {
         Promise.resolve({ id: 'f1', name: 'doc.txt', mimeType: 'text/plain' }),
     }) as typeof fetch;
 
-    await getCallable(ext, 'drive_get_metadata').fn(
-      { file_id: 'f1' } as Record<string, import('@rcrsr/rill').RillValue>,
-      ctx
-    );
+    await getCallable(ext, 'drive_get_metadata').fn({ file_id: 'f1' }, ctx);
 
     expect(onLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'google:drive:get_metadata' })
@@ -732,7 +714,7 @@ describe('EC-9 / BC-8: maxUploadBytes enforcement', () => {
     })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught as RillValue).message).toBe(
+    expect(getStatus(caught).message).toBe(
       'google: file exceeds maximum upload size (100 bytes)'
     );
     expect(globalThis.fetch).not.toHaveBeenCalled();
@@ -779,7 +761,7 @@ describe('EC-10: invalid role for drive_share', () => {
     })) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
-    expect(getStatus(caught as RillValue).message).toBe(
+    expect(getStatus(caught).message).toBe(
       "google: drive.share role must be 'reader', 'commenter', or 'writer'"
     );
     expect(globalThis.fetch).not.toHaveBeenCalled();
@@ -898,7 +880,7 @@ describe('HTTP error mapping for drive_list', () => {
     const caught = (await callDrive(ext, 'drive_list', {})) as RillValue;
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('UNAVAILABLE');
-    expect(getStatus(caught as RillValue).message).toBe(
+    expect(getStatus(caught).message).toBe(
       'google: Drive server error (503); temporarily unavailable'
     );
   });

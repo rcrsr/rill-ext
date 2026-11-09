@@ -17,7 +17,6 @@ import {
   type ApplicationCallable,
   isInvalid,
   getStatus,
-  type RillValue,
 } from '@rcrsr/rill';
 import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
@@ -200,7 +199,7 @@ describe('draft() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'draft').fn(args, ctx)) as RillValue;
+    const caught = await getCallable(ext, 'draft').fn(args, ctx);
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain(message);
@@ -210,10 +209,10 @@ describe('draft() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'draft').fn(
+    const caught = await getCallable(ext, 'draft').fn(
       { subject: 'Subject', body: 'Body' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
   });
@@ -226,7 +225,7 @@ describe('draft() host function', () => {
     globalThis.fetch = mockFetchJson(201, GRAPH_DRAFT_MESSAGE);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'draft').fn(DRAFT_ARGS, ctx);

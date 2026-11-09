@@ -70,8 +70,10 @@ function createEventCollector(): ExtensionEvent[] {
 function createCtxWithEvents(events: ExtensionEvent[]) {
   return createRuntimeContext({
     callbacks: {
-      onLog: vi.fn(),
-      onLogEvent: (event) => events.push(event),
+      onLog: () => {},
+      onLogEvent: (event) => {
+        events.push(event);
+      },
     },
   });
 }
@@ -585,13 +587,11 @@ describe('generate() function', () => {
     it('has description string', () => {
       const ext = createAnthropicExtension(BASE_CONFIG);
 
-      expect(
-        typeof getCallable(ext, 'generate').annotations?.['description']
-      ).toBe('string');
-      expect(
-        (getCallable(ext, 'generate').annotations!['description'] as string)
-          .length
-      ).toBeGreaterThan(0);
+      const description = getCallable(ext, 'generate').annotations?.[
+        'description'
+      ];
+      expect(typeof description).toBe('string');
+      expect((description as string).length).toBeGreaterThan(0);
     });
   });
 });

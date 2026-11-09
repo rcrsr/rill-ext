@@ -41,7 +41,7 @@ async function callGmail(
   args: Record<string, unknown>
 ): Promise<unknown> {
   const ctx = createRuntimeContext();
-  return getCallable(ext, name).fn(
+  return await getCallable(ext, name).fn(
     args as Record<string, import('@rcrsr/rill').RillValue>,
     ctx
   );
@@ -210,10 +210,10 @@ describe('capability gating [AC-4, EC-3]', () => {
       );
       const ctx = createRuntimeContext();
 
-      const caught = (await getCallable(ext, callable).fn(
+      const caught = await getCallable(ext, callable).fn(
         args as Record<string, RillValue>,
         ctx
-      )) as RillValue;
+      );
 
       expect(isInvalid(caught)).toBe(true);
       expect(getStatus(caught).code.name).toBe('FORBIDDEN');
@@ -529,7 +529,7 @@ describe('gmail callables emit events [AC-13]', () => {
         makeFactoryCtx()
       );
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, callable).fn(
@@ -622,10 +622,10 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'gmail_label').fn(
+    const caught = await getCallable(ext, 'gmail_label').fn(
       { message_id: 'm1', label_name: 'Spam' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain(
@@ -648,10 +648,10 @@ describe('allowedLabels / deniedLabels [BC-9, BC-10, EC-6, EC-12]', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'gmail_label').fn(
+    const caught = await getCallable(ext, 'gmail_label').fn(
       { message_id: 'm1', label_name: 'Spam' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain("label 'Spam' in denied set");
@@ -706,10 +706,10 @@ describe('HTTP error mapping [EC-14, EC-15, EC-17, EC-18]', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'gmail_search').fn(
+    const caught = await getCallable(ext, 'gmail_search').fn(
       { query: 'test' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('AUTH');
     expect(getStatus(caught).message).toBe('google: invalid Gmail token');
@@ -802,10 +802,10 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
     const ctx = createRuntimeContext();
     // Intentionally do not set 'missing_token' in ctx.variables
 
-    const caught = (await getCallable(ext, 'gmail_read').fn(
+    const caught = await getCallable(ext, 'gmail_read').fn(
       { message_id: 'msg-x' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('AUTH');
     expect(getStatus(caught).message).toContain(
@@ -827,7 +827,7 @@ describe('gmail_send service-account auth [AC-9, AC-10, AC-12]', () => {
   const privateKeyPem = privateKey.export({
     type: 'pkcs8',
     format: 'pem',
-  }) as string;
+  });
 
   const SA_KEY_JSON = JSON.stringify({
     client_email: 'test-sa@test-project.iam.gserviceaccount.com',

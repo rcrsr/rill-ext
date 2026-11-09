@@ -122,7 +122,7 @@ describe('today() host function', () => {
     expect(url).toContain('endDateTime');
 
     // Verify the URL contains the correct UTC date for today
-    const todayUtcDate = before.toISOString().substring(0, 10);
+    const todayUtcDate = before.toISOString().slice(0, 10);
     expect(url).toContain(encodeURIComponent(todayUtcDate));
   });
 
@@ -135,7 +135,7 @@ describe('today() host function', () => {
     });
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'today').fn({}, ctx);

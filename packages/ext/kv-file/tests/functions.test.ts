@@ -63,7 +63,9 @@ describe('kv-file functions', () => {
       );
       await ext.dispose!();
 
-      const content = JSON.parse(await fs.readFile(storePath, 'utf-8'));
+      const content: unknown = JSON.parse(
+        await fs.readFile(storePath, 'utf-8')
+      );
       expect(content).toEqual({ k1: 'v1' });
     });
 

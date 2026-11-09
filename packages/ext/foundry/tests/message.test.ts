@@ -16,9 +16,9 @@ import { expectThrowHalt } from './_halt-helpers.js';
 // MOCK SETUP
 // ============================================================
 
-const mockCreate = vi.fn();
-const mockStream = vi.fn();
-const mockEmbeddingsCreate = vi.fn();
+const mockCreate = vi.fn<(...args: unknown[]) => unknown>();
+const mockStream = vi.fn<(...args: unknown[]) => unknown>();
+const mockEmbeddingsCreate = vi.fn<(...args: unknown[]) => unknown>();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {
@@ -140,11 +140,11 @@ interface StreamNode {
 async function collectStreamChunks(stream: unknown): Promise<string[]> {
   const chunks: string[] = [];
   let current = stream as StreamNode;
-  while (!current.done) {
+  while (current.done !== true) {
     const next = current.next;
     const fnToCall = typeof next === 'function' ? next : next.fn;
     current = await fnToCall({}, {});
-    if (!current.done && current.value !== undefined) {
+    if (current.done !== true && current.value !== undefined) {
       chunks.push(current.value as string);
     }
   }
@@ -272,14 +272,14 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
+    await getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
     expect(mockStream).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'gpt-4o',
         messages: expect.arrayContaining([
           expect.objectContaining({ role: 'user', content: 'What is 2+2?' }),
-        ]),
+        ]) as unknown,
       }),
       expect.objectContaining({
         signal: expect.any(AbortSignal) as AbortSignal,
@@ -306,7 +306,7 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(config);
     const ctx = createRuntimeContext();
 
-    getCallable(ext, 'message').fn({ prompt: 'Hi' }, ctx);
+    await getCallable(ext, 'message').fn({ prompt: 'Hi' }, ctx);
 
     expect(mockStream).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -329,11 +329,9 @@ describe('message() function', () => {
     const ext = await createFoundryExtension(baseConfig);
     const ctx = createRuntimeContext();
 
-    expectThrowHalt(
-      () => {
-        getCallable(ext, 'message').fn({ prompt: '' }, ctx);
-      },
-      { code: 'INVALID_INPUT', message: 'prompt string cannot be empty' }
-    );
+    expectThrowHalt(() => getCallable(ext, 'message').fn({ prompt: '' }, ctx), {
+      code: 'INVALID_INPUT',
+      message: 'prompt string cannot be empty',
+    });
   });
 });

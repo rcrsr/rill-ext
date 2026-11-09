@@ -4,7 +4,7 @@
  * Tests resource read and template functions per IR-3, IR-4, AC-9.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js';
 import { anyTypeValue } from '@rcrsr/rill';
@@ -70,10 +70,12 @@ describe('extractTemplateVariables', () => {
 
 describe('createReadResourceFunction', () => {
   let mockClient: Client;
+  let readResourceMock: Mock<Client['readResource']>;
 
   beforeEach(() => {
+    readResourceMock = vi.fn<Client['readResource']>();
     mockClient = {
-      readResource: vi.fn(),
+      readResource: readResourceMock,
     } as unknown as Client;
   });
 
@@ -106,14 +108,14 @@ describe('createReadResourceFunction', () => {
       ],
     };
 
-    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
+    readResourceMock.mockResolvedValue(mockResult);
 
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
     });
     await func.fn({ uri: 'config://app' }, makeRuntimeCtx());
 
-    expect(mockClient.readResource).toHaveBeenCalledWith({
+    expect(readResourceMock).toHaveBeenCalledWith({
       uri: 'config://app',
     });
   });
@@ -129,7 +131,7 @@ describe('createReadResourceFunction', () => {
       ],
     };
 
-    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
+    readResourceMock.mockResolvedValue(mockResult);
 
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
@@ -153,9 +155,7 @@ describe('createReadResourceFunction', () => {
 
   it('handles timeout during read operation', async () => {
     // Mock readResource to never resolve
-    vi.mocked(mockClient.readResource).mockImplementation(
-      () => new Promise(() => {})
-    );
+    readResourceMock.mockImplementation(() => new Promise(() => {}));
 
     const func = createReadResourceFunction(mockClient, 100, {
       connectEmitted: false,
@@ -168,9 +168,7 @@ describe('createReadResourceFunction', () => {
   });
 
   it('handles generic read error', async () => {
-    vi.mocked(mockClient.readResource).mockRejectedValue(
-      new Error('resource not found')
-    );
+    readResourceMock.mockRejectedValue(new Error('resource not found'));
 
     const func = createReadResourceFunction(mockClient, 30000, {
       connectEmitted: false,
@@ -189,14 +187,16 @@ describe('createReadResourceFunction', () => {
 
 describe('generateResourceTemplateFunctions', () => {
   let mockClient: Client;
+  let readResourceMock: Mock<Client['readResource']>;
 
   beforeEach(() => {
+    readResourceMock = vi.fn<Client['readResource']>();
     mockClient = {
-      readResource: vi.fn(),
+      readResource: readResourceMock,
     } as unknown as Client;
   });
 
-  it('generates function for single-variable template (AC-9)', async () => {
+  it('generates function for single-variable template (AC-9)', () => {
     const templates: McpResourceTemplate[] = [
       {
         uriTemplate: 'db://table/{tableName}',
@@ -277,7 +277,7 @@ describe('generateResourceTemplateFunctions', () => {
       ],
     };
 
-    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
+    readResourceMock.mockResolvedValue(mockResult);
 
     const functions = generateResourceTemplateFunctions(
       templates,
@@ -288,7 +288,7 @@ describe('generateResourceTemplateFunctions', () => {
     const func = functions['resource_database_row']!;
     await func.fn({ tableName: 'users', rowId: '123' }, makeRuntimeCtx());
 
-    expect(mockClient.readResource).toHaveBeenCalledWith({
+    expect(readResourceMock).toHaveBeenCalledWith({
       uri: 'db://table/users/row/123',
     });
   });
@@ -371,9 +371,7 @@ describe('generateResourceTemplateFunctions', () => {
       { uriTemplate: 'slow://{id}', name: 'slow_resource' },
     ];
 
-    vi.mocked(mockClient.readResource).mockImplementation(
-      () => new Promise(() => {})
-    );
+    readResourceMock.mockImplementation(() => new Promise(() => {}));
 
     const functions = generateResourceTemplateFunctions(
       templates,
@@ -393,9 +391,7 @@ describe('generateResourceTemplateFunctions', () => {
       { uriTemplate: 'db://table/{id}', name: 'table' },
     ];
 
-    vi.mocked(mockClient.readResource).mockRejectedValue(
-      new Error('template backend failed')
-    );
+    readResourceMock.mockRejectedValue(new Error('template backend failed'));
 
     const functions = generateResourceTemplateFunctions(
       templates,
@@ -437,10 +433,12 @@ describe('generateResourceTemplateFunctions', () => {
 
 describe('generateStaticResourceFunctions', () => {
   let mockClient: Client;
+  let readResourceMock: Mock<Client['readResource']>;
 
   beforeEach(() => {
+    readResourceMock = vi.fn<Client['readResource']>();
     mockClient = {
-      readResource: vi.fn(),
+      readResource: readResourceMock,
     } as unknown as Client;
   });
 
@@ -472,7 +470,7 @@ describe('generateStaticResourceFunctions', () => {
       contents: [{ uri: 'config://app', text: 'value=1' }],
     };
 
-    vi.mocked(mockClient.readResource).mockResolvedValue(mockResult);
+    readResourceMock.mockResolvedValue(mockResult);
 
     const functions = generateStaticResourceFunctions(
       resources,
@@ -483,7 +481,7 @@ describe('generateStaticResourceFunctions', () => {
 
     await func.fn({}, makeRuntimeCtx());
 
-    expect(mockClient.readResource).toHaveBeenCalledWith({
+    expect(readResourceMock).toHaveBeenCalledWith({
       uri: 'config://app',
     });
   });

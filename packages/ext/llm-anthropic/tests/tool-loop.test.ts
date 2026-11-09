@@ -129,14 +129,14 @@ function createMockMessageStream(
       eventHandlers[event].push(handler);
       return stream;
     },
-    finalMessage: vi.fn().mockImplementation(async () => {
+    finalMessage: vi.fn().mockImplementation(() => {
       // Emit text events before resolving finalMessage
       if (textContent && eventHandlers['text']) {
         for (const handler of eventHandlers['text']) {
           handler(textContent, textContent);
         }
       }
-      return response;
+      return Promise.resolve(response);
     }),
     abort: vi.fn(),
   };
@@ -184,12 +184,21 @@ function makeTool(
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream(
-  stream: unknown
-): Promise<Record<string, unknown>> {
+function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
   return (
     stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
   ).__rill_stream_resolve();
+}
+
+interface StreamStep {
+  readonly done?: boolean | undefined;
+  readonly value?: unknown;
+  readonly next?: {
+    readonly fn: (
+      args: Record<string, unknown>,
+      ctx: null
+    ) => Promise<StreamStep>;
+  };
 }
 
 /**
@@ -200,12 +209,10 @@ async function collectChunks(
   stream: unknown
 ): Promise<Record<string, unknown>[]> {
   const chunks: Record<string, unknown>[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = stream;
-  while (!current.done) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    current = await (current.next as any).fn({}, null);
-    if (!current.done && current.value !== undefined) {
+  let current = stream as StreamStep;
+  while (current.done !== true) {
+    current = await current.next!.fn({}, null);
+    if (current.done !== true && current.value !== undefined) {
       chunks.push(current.value as Record<string, unknown>);
     }
   }
@@ -355,9 +362,9 @@ describe('tool_loop() function', () => {
         role: string;
         parts: Array<{ type: string; text?: string }>;
       }>;
-      const lastText = msgs[msgs.length - 1]!.parts.filter(
-        (p) => p.type === 'text'
-      )
+      const lastText = msgs
+        .at(-1)!
+        .parts.filter((p) => p.type === 'text')
         .map((p) => p.text ?? '')
         .join('');
       expect(lastText).toBe('The weather in SF is sunny.');
@@ -400,9 +407,9 @@ describe('tool_loop() function', () => {
         role: string;
         parts: Array<{ type: string; text?: string }>;
       }>;
-      const lastText = msgs[msgs.length - 1]!.parts.filter(
-        (p) => p.type === 'text'
-      )
+      const lastText = msgs
+        .at(-1)!
+        .parts.filter((p) => p.type === 'text')
         .map((p) => p.text ?? '')
         .join('');
       expect(lastText).toBe('I can answer that directly: 42');
@@ -479,8 +486,12 @@ describe('tool_loop() function', () => {
           async () => {
             executionOrder.push(`${name}-start`);
             // Yield to the event loop so a concurrent runner would interleave
-            await new Promise<void>((resolve) => queueMicrotask(resolve));
-            await new Promise<void>((resolve) => queueMicrotask(resolve));
+            await new Promise<void>((resolve) => {
+              queueMicrotask(resolve);
+            });
+            await new Promise<void>((resolve) => {
+              queueMicrotask(resolve);
+            });
             executionOrder.push(`${name}-end`);
             return `${name} result`;
           },
@@ -668,9 +679,9 @@ describe('tool_loop() function', () => {
         role: string;
         parts: Array<{ type: string; text?: string }>;
       }>;
-      const lastText = msgs[msgs.length - 1]!.parts.filter(
-        (p) => p.type === 'text'
-      )
+      const lastText = msgs
+        .at(-1)!
+        .parts.filter((p) => p.type === 'text')
         .map((p) => p.text ?? '')
         .join('');
       expect(lastText).toBe('Recovered from tool error.');
@@ -776,15 +787,25 @@ describe('tool_loop() function', () => {
       await resolveStream(stream);
 
       // Check second API call (stream call) includes error in tool_result
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const secondCall = mockStream.mock.calls[1]?.[0] as any;
-      expect(secondCall.messages).toBeDefined();
-      const lastMessage = secondCall.messages[secondCall.messages.length - 1];
+      const secondCall = mockStream.mock.calls[1]?.[0] as
+        | {
+            messages?: Array<{
+              role: string;
+              content: Array<{
+                type: string;
+                is_error?: boolean;
+                content?: string;
+              }>;
+            }>;
+          }
+        | undefined;
+      expect(secondCall?.messages).toBeDefined();
+      const lastMessage = secondCall!.messages!.at(-1)!;
       expect(lastMessage.role).toBe('user');
       expect(lastMessage.content).toBeInstanceOf(Array);
-      expect(lastMessage.content[0].type).toBe('tool_result');
-      expect(lastMessage.content[0].is_error).toBe(true);
-      expect(lastMessage.content[0].content).toContain('Custom error message');
+      expect(lastMessage.content[0]!.type).toBe('tool_result');
+      expect(lastMessage.content[0]!.is_error).toBe(true);
+      expect(lastMessage.content[0]!.content).toContain('Custom error message');
     });
   });
 
@@ -819,8 +840,9 @@ describe('tool_loop() function', () => {
       );
       await resolveStream(stream);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const firstCall = mockStream.mock.calls[0]?.[0] as any;
+      const firstCall = mockStream.mock.calls[0]?.[0] as {
+        messages: unknown[];
+      };
       expect(firstCall.messages.length).toBe(3);
       expect(firstCall.messages[0]).toEqual({
         role: 'user',
@@ -986,9 +1008,9 @@ describe('tool_loop() function', () => {
         role: string;
         parts: Array<{ type: string; text?: string }>;
       }>;
-      const text1 = msgs1[msgs1.length - 1]!.parts.filter(
-        (p) => p.type === 'text'
-      )
+      const text1 = msgs1
+        .at(-1)!
+        .parts.filter((p) => p.type === 'text')
         .map((p) => p.text ?? '')
         .join('');
       expect(text1).toBe('Response 1');
@@ -996,9 +1018,9 @@ describe('tool_loop() function', () => {
         role: string;
         parts: Array<{ type: string; text?: string }>;
       }>;
-      const text2 = msgs2[msgs2.length - 1]!.parts.filter(
-        (p) => p.type === 'text'
-      )
+      const text2 = msgs2
+        .at(-1)!
+        .parts.filter((p) => p.type === 'text')
         .map((p) => p.text ?? '')
         .join('');
       expect(text2).toBe('Response 2');

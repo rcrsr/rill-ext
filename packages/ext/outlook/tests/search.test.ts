@@ -17,7 +17,6 @@ import {
   type ApplicationCallable,
   isInvalid,
   getStatus,
-  type RillValue,
 } from '@rcrsr/rill';
 import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
@@ -164,10 +163,7 @@ describe('search() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'search').fn(
-      { query: '' },
-      ctx
-    )) as RillValue;
+    const caught = await getCallable(ext, 'search').fn({ query: '' }, ctx);
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('query is required');
@@ -177,10 +173,7 @@ describe('search() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'search').fn(
-      { query: '   ' },
-      ctx
-    )) as RillValue;
+    const caught = await getCallable(ext, 'search').fn({ query: '   ' }, ctx);
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
   });
@@ -193,7 +186,7 @@ describe('search() host function', () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'search').fn({ query: 'meeting notes' }, ctx);

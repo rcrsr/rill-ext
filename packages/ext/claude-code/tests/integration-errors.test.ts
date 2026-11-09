@@ -44,7 +44,7 @@ beforeEach(() => {
 // STREAM HELPERS
 // ============================================================
 
-async function resolveStream(stream: unknown): Promise<RillValue> {
+function resolveStream(stream: unknown): Promise<RillValue> {
   return (
     stream as { __rill_stream_resolve: () => Promise<RillValue> }
   ).__rill_stream_resolve();
@@ -90,8 +90,8 @@ async function mockExitRejects(error: SpawnError): Promise<void> {
   const { createStreamParser } = await import('../src/stream-parser.js');
 
   vi.mocked(createStreamParser).mockReturnValue({
-    processChunk: vi.fn(),
-    flush: vi.fn(),
+    processChunk: vi.fn<() => void>(),
+    flush: vi.fn<() => void>(),
   });
   vi.mocked(spawnClaudeCli).mockReturnValue({
     ptyProcess: {
@@ -101,7 +101,7 @@ async function mockExitRejects(error: SpawnError): Promise<void> {
       kill: vi.fn(),
     } as unknown as IPty,
     exitCode: Promise.reject(error),
-    dispose: vi.fn(),
+    dispose: vi.fn<() => void>(),
   });
 }
 

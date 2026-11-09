@@ -21,7 +21,7 @@ function makeRillFn(
   params: ReturnType<typeof p.str>[] = []
 ): RillFunction {
   return {
-    fn: async () => 'result',
+    fn: () => 'result',
     params,
     annotations: { description },
     returnType: structureToTypeValue({ kind: 'string' }),
@@ -70,7 +70,7 @@ describe('createIntrospectionDicts', () => {
       // Arrange
       const toolFunctions: Record<string, RillFunction> = {
         no_desc: {
-          fn: async () => 'ok',
+          fn: () => 'ok',
           params: [],
           annotations: {},
           returnType: structureToTypeValue({ kind: 'string' }),

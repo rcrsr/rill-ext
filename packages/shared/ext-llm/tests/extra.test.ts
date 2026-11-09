@@ -30,6 +30,11 @@ const POSITIVE_INTEGER_MESSAGE = 'must be a positive integer or undefined.';
 // validateExtraKeys
 // ============================================================
 
+/** Typed absent value; passing a literal `undefined` argument is flagged by lint. */
+function absent<T>(): T | undefined {
+  return new Map<string, T>().get('absent');
+}
+
 describe('validateExtraKeys', () => {
   describe('undefined extra', () => {
     it('returns without throwing when extra is undefined', () => {
@@ -99,7 +104,7 @@ describe('validateExtraKeys', () => {
 describe('validateMaxTurns', () => {
   describe('undefined value', () => {
     it('returns without throwing for undefined (IR-8)', () => {
-      expect(() => validateMaxTurns(undefined)).not.toThrow();
+      expect(() => validateMaxTurns(absent())).not.toThrow();
     });
   });
 
@@ -140,7 +145,7 @@ describe('validateMaxTurns', () => {
 
 describe('validateMaxErrors', () => {
   it('returns without throwing for undefined', () => {
-    expect(() => validateMaxErrors(undefined)).not.toThrow();
+    expect(() => validateMaxErrors(absent())).not.toThrow();
   });
 
   it('returns without throwing for a positive integer', () => {

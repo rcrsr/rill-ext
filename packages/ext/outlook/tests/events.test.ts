@@ -9,7 +9,6 @@ import {
   type ApplicationCallable,
   isInvalid,
   getStatus,
-  type RillValue,
 } from '@rcrsr/rill';
 import { makeFactoryCtx, recordedRequest } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
@@ -149,7 +148,7 @@ describe('reply() host function', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 202 });
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'reply').fn(
@@ -170,10 +169,10 @@ describe('reply() host function', () => {
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'reply').fn(
+    const caught = await getCallable(ext, 'reply').fn(
       { message_id: '', body: 'Hello' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('message_id is required');
@@ -184,10 +183,10 @@ describe('reply() host function', () => {
     const ext = createOutlookExtension(REPLY_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'reply').fn(
+    const caught = await getCallable(ext, 'reply').fn(
       { message_id: 'msg-001', body: '' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('body is required');
@@ -246,7 +245,7 @@ describe('flag() host function', () => {
     });
     const ext = createOutlookExtension(FLAG_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'flag').fn({ message_id: 'msg-001' }, ctx);
@@ -264,10 +263,7 @@ describe('flag() host function', () => {
     const ext = createOutlookExtension(FLAG_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'flag').fn(
-      { message_id: '' },
-      ctx
-    )) as RillValue;
+    const caught = await getCallable(ext, 'flag').fn({ message_id: '' }, ctx);
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('message_id is required');
@@ -351,10 +347,10 @@ describe('events() host function', () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'events').fn(
+    const caught = await getCallable(ext, 'events').fn(
       { start: DAY_END_MS, end: DAY_START_MS },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('start must be before end');
@@ -369,7 +365,7 @@ describe('events() host function', () => {
     });
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'events').fn(
@@ -471,10 +467,10 @@ describe('free_busy() host function', () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'free_busy').fn(
+    const caught = await getCallable(ext, 'free_busy').fn(
       { start: DAY_START_MS, end: DAY_END_MS, attendees: [] },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('attendees is required');
@@ -485,14 +481,14 @@ describe('free_busy() host function', () => {
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'free_busy').fn(
+    const caught = await getCallable(ext, 'free_busy').fn(
       {
         start: DAY_END_MS,
         end: DAY_START_MS,
         attendees: ['alice@example.com'],
       },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('start must be before end');
@@ -507,7 +503,7 @@ describe('free_busy() host function', () => {
     });
     const ext = createOutlookExtension(CALENDAR_READ_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'free_busy').fn(
@@ -577,10 +573,10 @@ describe('create_event() host function', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'create_event').fn(
+    const caught = await getCallable(ext, 'create_event').fn(
       { title: '', start: DAY_START_MS, end: DAY_END_MS },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('title is required');
@@ -594,10 +590,10 @@ describe('create_event() host function', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'create_event').fn(
+    const caught = await getCallable(ext, 'create_event').fn(
       { title: 'Meeting', start: DAY_END_MS, end: DAY_START_MS },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('start must be before end');
@@ -615,7 +611,7 @@ describe('create_event() host function', () => {
       makeFactoryCtx()
     );
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'create_event').fn(

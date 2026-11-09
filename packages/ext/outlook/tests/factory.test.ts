@@ -314,10 +314,10 @@ describe('createOutlookExtension', () => {
     it('mail.send defaults to false — send emits #FORBIDDEN', async () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const result = (await getCallable(ext, 'send').fn(
+      const result = await getCallable(ext, 'send').fn(
         { to: ['a@b.com'], subject: 'Hi', body: 'Hello' },
         ctx
-      )) as RillValue;
+      );
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('FORBIDDEN');
       expect(getStatus(result).message).toContain('mail.send not enabled');
@@ -382,10 +382,10 @@ describe('createOutlookExtension', () => {
     it('calendar.create defaults to false — create_event emits #FORBIDDEN', async () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const result = (await getCallable(ext, 'create_event').fn(
+      const result = await getCallable(ext, 'create_event').fn(
         { title: 'Meeting', start: 0, end: 1000, options: {} },
         ctx
-      )) as RillValue;
+      );
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('FORBIDDEN');
       expect(getStatus(result).message).toContain(
@@ -460,7 +460,7 @@ describe('createOutlookExtension', () => {
 
       const pending = getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
       await ext.dispose!();
-      const result = (await pending) as RillValue;
+      const result = await pending;
 
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('UNAVAILABLE');

@@ -31,7 +31,7 @@ async function testParseToolResult(result: McpToolResult): Promise<RillValue> {
 
   // Mock client that returns our test result
   const mockClient = {
-    callTool: async () => result,
+    callTool: () => Promise.resolve(result),
   } as unknown as Client;
 
   const mockContext = makeRuntimeCtx();
@@ -148,7 +148,7 @@ describe('AC-8: Type conversion', () => {
         content: [
           {
             type: 'text',
-          } as McpToolContent,
+          },
         ],
       };
 
@@ -187,7 +187,7 @@ describe('AC-8: Type conversion', () => {
           {
             type: 'image',
             data: 'base64data',
-          } as McpToolContent,
+          },
         ],
       };
 
@@ -203,7 +203,7 @@ describe('AC-8: Type conversion', () => {
           {
             type: 'image',
             mimeType: 'image/jpeg',
-          } as McpToolContent,
+          },
         ],
       };
 
@@ -222,7 +222,7 @@ describe('AC-8: Type conversion', () => {
           {
             type: 'resource',
             text: 'Resource content',
-          } as McpToolContent,
+          },
         ],
       };
 
@@ -237,7 +237,7 @@ describe('AC-8: Type conversion', () => {
         content: [
           {
             type: 'resource',
-          } as McpToolContent,
+          },
         ],
       };
 
@@ -267,7 +267,7 @@ describe('AC-8: Type conversion', () => {
       const result: McpToolResult = {
         content: [
           { type: 'text', text: 'First' },
-          { type: 'text' } as McpToolContent,
+          { type: 'text' },
           { type: 'text', text: 'Third' },
         ],
       };

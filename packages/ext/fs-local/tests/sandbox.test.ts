@@ -9,12 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import {
-  RuntimeError,
-  getStatus,
-  isInvalid,
-  type RillValue,
-} from '@rcrsr/rill';
+import { RuntimeError, getStatus, isInvalid } from '@rcrsr/rill';
 import {
   resolvePath,
   matchesGlob,
@@ -157,8 +152,8 @@ describe('resolvePath - EC-1: unknown mount name', () => {
       'read',
       makeRuntimeCtx()
     );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    const status = getStatus(result as RillValue);
+    expect(isInvalid(result)).toBe(true);
+    const status = getStatus(result);
     expect(status.code.name).toBe('FORBIDDEN');
     expect(status.message).toMatch(/mount "unknown" not configured/);
   });
@@ -179,10 +174,8 @@ describe('resolvePath - EC-2: path escapes mount boundary', () => {
         'read',
         makeRuntimeCtx()
       );
-      expect(isInvalid(result as RillValue)).toBe(true);
-      expect(getStatus(result as RillValue).message).toMatch(
-        /path escapes mount boundary/
-      );
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).message).toMatch(/path escapes mount boundary/);
     }
   );
 });
@@ -211,8 +204,8 @@ describe('resolvePath - EC-3: glob mismatch', () => {
       'read',
       makeRuntimeCtx()
     );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).message).toMatch(
       /file type not permitted in mount "csv_only"/
     );
   });
@@ -242,8 +235,8 @@ describe('resolvePath - EC-4: mode violation', () => {
       'write',
       makeRuntimeCtx()
     );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).message).toMatch(
       /mount "readonly" does not permit write/
     );
   });
@@ -257,8 +250,8 @@ describe('resolvePath - EC-4: mode violation', () => {
       'read',
       makeRuntimeCtx()
     );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).message).toMatch(
       /mount "writeonly" does not permit read/
     );
   });
@@ -277,8 +270,8 @@ describe('resolvePath - EC-7: permission denied / not found', () => {
       'read',
       makeRuntimeCtx()
     );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(/file not found/);
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).message).toMatch(/file not found/);
   });
 
   it('returns invalid for missing parent directory in createMode', async () => {
@@ -290,8 +283,8 @@ describe('resolvePath - EC-7: permission denied / not found', () => {
       makeRuntimeCtx(),
       true
     );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).message).toMatch(
       /parent directory does not exist/
     );
   });
@@ -315,10 +308,8 @@ describe('resolvePath - symlink cannot escape sandbox', () => {
       'read',
       makeRuntimeCtx()
     );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    expect(getStatus(result as RillValue).message).toMatch(
-      /path escapes mount boundary/
-    );
+    expect(isInvalid(result)).toBe(true);
+    expect(getStatus(result).message).toMatch(/path escapes mount boundary/);
   });
 
   it('allows symlink pointing inside mount', async () => {
@@ -350,8 +341,8 @@ describe('resolvePath - symlink cannot escape sandbox', () => {
       makeRuntimeCtx(),
       true
     );
-    expect(isInvalid(result as RillValue)).toBe(true);
-    const status = getStatus(result as RillValue);
+    expect(isInvalid(result)).toBe(true);
+    const status = getStatus(result);
     expect(status.code.name).toBe('FORBIDDEN');
     expect(status.message).toMatch(/dangling symlink/);
 

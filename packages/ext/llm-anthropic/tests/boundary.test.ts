@@ -215,7 +215,7 @@ describe('boundary conditions', () => {
   //         without mutation
   // ──────────────────────────────────────────────────────────
   describe('AC-B8: repeated message() calls do not mutate shared factory extra', () => {
-    it('leaves the factory extra object unchanged after 10 calls', () => {
+    it('leaves the factory extra object unchanged after 10 calls', async () => {
       mockStream.mockImplementation(() => createMockStream('ok'));
 
       const extra = { top_k: 5 };
@@ -223,7 +223,7 @@ describe('boundary conditions', () => {
       const ctx = createRuntimeContext();
 
       for (let i = 0; i < 10; i++) {
-        getCallable(ext, 'message').fn({ prompt: `Question ${i}` }, ctx);
+        await getCallable(ext, 'message').fn({ prompt: `Question ${i}` }, ctx);
       }
 
       expect(mockStream).toHaveBeenCalledTimes(10);

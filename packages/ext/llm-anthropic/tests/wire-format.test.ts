@@ -114,9 +114,7 @@ function createMockStreamWithRedactedThinking() {
   };
 }
 
-async function resolveStream(
-  stream: unknown
-): Promise<Record<string, unknown>> {
+function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
   return (
     stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
   ).__rill_stream_resolve();
@@ -143,7 +141,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
   // ──────────────────────────────────────────────────────────
 
   describe('AC-3: system turn lifted to top-level system param', () => {
-    it('sends system text from canonical system turn, overriding factory system', () => {
+    it('sends system text from canonical system turn, overriding factory system', async () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
       const ext = createAnthropicExtension(baseConfig);
@@ -154,7 +152,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
         { role: 'user', parts: [{ type: 'text', text: 'Hello' }] },
       ];
 
-      getCallable(ext, 'message').fn({ prompt }, ctx);
+      await getCallable(ext, 'message').fn({ prompt }, ctx);
 
       expect(mockStream).toHaveBeenCalledOnce();
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
@@ -167,7 +165,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       expect(messages.every((m) => m.role !== 'system')).toBe(true);
     });
 
-    it('factory system is used when no system turn is in the message list', () => {
+    it('factory system is used when no system turn is in the message list', async () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
       const ext = createAnthropicExtension(baseConfig);
@@ -177,13 +175,13 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
         { role: 'user', parts: [{ type: 'text', text: 'Hello' }] },
       ];
 
-      getCallable(ext, 'message').fn({ prompt }, ctx);
+      await getCallable(ext, 'message').fn({ prompt }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       expect(callArgs['system']).toBe('factory system');
     });
 
-    it('system turn with multiple text parts concatenates text with newline', () => {
+    it('system turn with multiple text parts concatenates text with newline', async () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
       const ext = createAnthropicExtension(baseConfig);
@@ -200,7 +198,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
         { role: 'user', parts: [{ type: 'text', text: 'Hello' }] },
       ];
 
-      getCallable(ext, 'message').fn({ prompt }, ctx);
+      await getCallable(ext, 'message').fn({ prompt }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       expect(callArgs['system']).toBe('Line one\nLine two');
@@ -212,7 +210,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
   // ──────────────────────────────────────────────────────────
 
   describe('AC-11: image part mapping to Anthropic ImageBlockParam', () => {
-    it('base64 image part → SDK ImageBlockParam with source.type: "base64"', () => {
+    it('base64 image part → SDK ImageBlockParam with source.type: "base64"', async () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
       const ext = createAnthropicExtension({
@@ -237,7 +235,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
         },
       ];
 
-      getCallable(ext, 'message').fn({ prompt }, ctx);
+      await getCallable(ext, 'message').fn({ prompt }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       const messages = callArgs['messages'] as Array<{
@@ -263,7 +261,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       });
     });
 
-    it('url image part → SDK ImageBlockParam with source.type: "url"', () => {
+    it('url image part → SDK ImageBlockParam with source.type: "url"', async () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
       const ext = createAnthropicExtension({
@@ -288,7 +286,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
         },
       ];
 
-      getCallable(ext, 'message').fn({ prompt }, ctx);
+      await getCallable(ext, 'message').fn({ prompt }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       const messages = callArgs['messages'] as Array<{
@@ -355,7 +353,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
   // ──────────────────────────────────────────────────────────
 
   describe('tool_result placement: user-turn tool_result lands under user role', () => {
-    it('tool_result part in user turn maps to Anthropic ToolResultBlockParam under user role', () => {
+    it('tool_result part in user turn maps to Anthropic ToolResultBlockParam under user role', async () => {
       mockStream.mockReturnValue(createMockStreamForWire('Done'));
 
       const ext = createAnthropicExtension({
@@ -392,7 +390,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
         },
       ];
 
-      getCallable(ext, 'message').fn({ prompt }, ctx);
+      await getCallable(ext, 'message').fn({ prompt }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       const messages = callArgs['messages'] as Array<{
@@ -403,7 +401,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       }>;
 
       // The last message must be a user role
-      const lastMsg = messages[messages.length - 1]!;
+      const lastMsg = messages.at(-1)!;
       expect(lastMsg.role).toBe('user');
 
       // Its content must contain a tool_result block
@@ -427,7 +425,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
   // ──────────────────────────────────────────────────────────
 
   describe('user message content optimization', () => {
-    it('single text part in user message is sent as string shorthand', () => {
+    it('single text part in user message is sent as string shorthand', async () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
       const ext = createAnthropicExtension({
@@ -436,7 +434,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       });
       const ctx = createRuntimeContext();
 
-      getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
+      await getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       const messages = callArgs['messages'] as Array<{
@@ -448,7 +446,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
       expect(messages[0]!.content).toBe('Hello');
     });
 
-    it('multi-part user message is sent as content block array', () => {
+    it('multi-part user message is sent as content block array', async () => {
       mockStream.mockReturnValue(createMockStreamForWire('OK'));
 
       const ext = createAnthropicExtension({
@@ -474,7 +472,7 @@ describe('wire-format translation (canonical → Anthropic SDK params)', () => {
         },
       ];
 
-      getCallable(ext, 'message').fn({ prompt }, ctx);
+      await getCallable(ext, 'message').fn({ prompt }, ctx);
 
       const callArgs = mockStream.mock.calls[0]![0] as Record<string, unknown>;
       const messages = callArgs['messages'] as Array<{

@@ -11,8 +11,8 @@ import type { FoundryConfig } from '../src/types.js';
 // MODULE MOCK
 // ============================================================
 
-const mockStream = vi.fn();
-const mockCreate = vi.fn();
+const mockStream = vi.fn<(...args: unknown[]) => unknown>();
+const mockCreate = vi.fn<(...args: unknown[]) => unknown>();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {
@@ -139,7 +139,7 @@ function createErrorStreamRunner(error: unknown) {
 /**
  * Resolve a RillStream by calling its internal resolve callback to trigger event emission.
  */
-async function resolveStream(stream: unknown): Promise<unknown> {
+function resolveStream(stream: unknown): Promise<unknown> {
   return (
     stream as { __rill_stream_resolve: () => Promise<unknown> }
   ).__rill_stream_resolve();
@@ -168,7 +168,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: vi.fn<(message: string) => void>(),
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -206,7 +206,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: vi.fn<(message: string) => void>(),
           onLogEvent: (event) => {
             events.push(event);
           },

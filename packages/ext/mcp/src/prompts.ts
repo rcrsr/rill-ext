@@ -78,7 +78,7 @@ interface McpPromptMessage {
 /**
  * MCP prompt get result.
  */
-export interface McpPromptResult {
+interface McpPromptResult {
   readonly messages: McpPromptMessage[];
 }
 

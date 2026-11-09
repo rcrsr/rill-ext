@@ -20,8 +20,10 @@ import { spawnClaudeCli } from '../src/process.js';
 interface MockPtyProcess {
   write: ReturnType<typeof vi.fn>;
   kill: ReturnType<typeof vi.fn>;
-  onExit: ReturnType<typeof vi.fn>;
-  onData: ReturnType<typeof vi.fn>;
+  onExit: ReturnType<
+    typeof vi.fn<(cb: (event: { exitCode: number }) => void) => void>
+  >;
+  onData: ReturnType<typeof vi.fn<(cb: (data: string) => void) => void>>;
 }
 
 function createMockPty(): MockPtyProcess {
@@ -100,7 +102,8 @@ describe('Process Manager', () => {
     it('throws for unknown error type', () => {
       // EC-6: Non-Error objects handled
       vi.mocked(pty.spawn).mockImplementation(() => {
-        throw 'string error';
+        const nonError: unknown = 'string error';
+        throw nonError;
       });
 
       expect(() => spawnClaudeCli('test')).toThrow(
@@ -222,9 +225,11 @@ describe('Process Manager', () => {
       const mockPty = createMockPty();
       let exitCallback: ((event: { exitCode: number }) => void) | undefined;
 
-      mockPty.onExit.mockImplementation((cb) => {
-        exitCallback = cb;
-      });
+      mockPty.onExit.mockImplementation(
+        (cb: (event: { exitCode: number }) => void) => {
+          exitCallback = cb;
+        }
+      );
 
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 
@@ -247,9 +252,11 @@ describe('Process Manager', () => {
       const mockPty = createMockPty();
       let exitCallback: ((event: { exitCode: number }) => void) | undefined;
 
-      mockPty.onExit.mockImplementation((cb) => {
-        exitCallback = cb;
-      });
+      mockPty.onExit.mockImplementation(
+        (cb: (event: { exitCode: number }) => void) => {
+          exitCallback = cb;
+        }
+      );
 
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 
@@ -265,9 +272,11 @@ describe('Process Manager', () => {
       const mockPty = createMockPty();
       let exitCallback: ((event: { exitCode: number }) => void) | undefined;
 
-      mockPty.onExit.mockImplementation((cb) => {
-        exitCallback = cb;
-      });
+      mockPty.onExit.mockImplementation(
+        (cb: (event: { exitCode: number }) => void) => {
+          exitCallback = cb;
+        }
+      );
 
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 
@@ -343,9 +352,11 @@ describe('Process Manager', () => {
     it('keeps exitCode resolved when dispose is called after a clean exit', async () => {
       const mockPty = createMockPty();
       let exitCallback: ((event: { exitCode: number }) => void) | undefined;
-      mockPty.onExit.mockImplementation((cb) => {
-        exitCallback = cb;
-      });
+      mockPty.onExit.mockImplementation(
+        (cb: (event: { exitCode: number }) => void) => {
+          exitCallback = cb;
+        }
+      );
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 
       const result = spawnClaudeCli('test');
@@ -452,9 +463,11 @@ describe('Process Manager', () => {
       const mockPty = createMockPty();
       let exitCallback: ((event: { exitCode: number }) => void) | undefined;
 
-      mockPty.onExit.mockImplementation((cb) => {
-        exitCallback = cb;
-      });
+      mockPty.onExit.mockImplementation(
+        (cb: (event: { exitCode: number }) => void) => {
+          exitCallback = cb;
+        }
+      );
 
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 
@@ -478,9 +491,11 @@ describe('Process Manager', () => {
       const mockPty = createMockPty();
       let exitCallback: ((event: { exitCode: number }) => void) | undefined;
 
-      mockPty.onExit.mockImplementation((cb) => {
-        exitCallback = cb;
-      });
+      mockPty.onExit.mockImplementation(
+        (cb: (event: { exitCode: number }) => void) => {
+          exitCallback = cb;
+        }
+      );
 
       vi.mocked(pty.spawn).mockReturnValue(mockPty as unknown as pty.IPty);
 

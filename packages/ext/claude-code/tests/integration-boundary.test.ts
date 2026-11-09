@@ -58,9 +58,7 @@ beforeEach(() => {
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream(
-  stream: unknown
-): Promise<Record<string, unknown>> {
+function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
   return (
     stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
   ).__rill_stream_resolve();
@@ -106,7 +104,7 @@ describe('10K line output streams through the parser', () => {
           const lines = chunk.split('\n').filter((line) => line.trim());
           lines.forEach((line) => {
             try {
-              const msg = JSON.parse(line);
+              const msg = JSON.parse(line) as ClaudeMessage;
               callback(msg);
             } catch {
               // Ignore non-JSON lines
@@ -114,7 +112,7 @@ describe('10K line output streams through the parser', () => {
           });
         }
       ),
-      flush: vi.fn(),
+      flush: vi.fn<() => void>(),
     };
 
     vi.mocked(createStreamParser).mockReturnValue(mockParser);
@@ -140,10 +138,10 @@ describe('10K line output streams through the parser', () => {
 
     vi.mocked(spawnClaudeCli).mockReturnValue({
       ptyProcess: {
-        onData: vi.fn((cb) => {
+        onData: vi.fn((cb: (chunk: string) => void) => {
           onDataCallback = cb;
         }),
-        onExit: vi.fn((cb) => {
+        onExit: vi.fn((cb: (event: { exitCode: number }) => void) => {
           onExitCallback = cb;
         }),
         write: vi.fn(),
@@ -180,7 +178,7 @@ describe('10K line output streams through the parser', () => {
           resolve(0);
         }, 10);
       }),
-      dispose: vi.fn(),
+      dispose: vi.fn<() => void>(),
     });
 
     const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -241,10 +239,10 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
 
       return {
         ptyProcess: {
-          onData: vi.fn((cb) => {
+          onData: vi.fn((cb: (chunk: string) => void) => {
             onDataCallback = cb;
           }),
-          onExit: vi.fn((cb) => {
+          onExit: vi.fn((cb: (event: { exitCode: number }) => void) => {
             onExitCallback = cb;
           }),
           write: vi.fn(),
@@ -268,7 +266,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
             resolve(0);
           }, delay);
         }),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       };
     });
 
@@ -276,14 +274,14 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       processChunk: vi.fn(
         (chunk: string, callback: (msg: ClaudeMessage) => void) => {
           try {
-            const msg = JSON.parse(chunk.trim());
+            const msg = JSON.parse(chunk.trim()) as ClaudeMessage;
             callback(msg);
           } catch {
             // Ignore parse errors
           }
         }
       ),
-      flush: vi.fn(),
+      flush: vi.fn<() => void>(),
     }));
 
     // Mock extractResult to return results based on parsed message content
@@ -367,10 +365,10 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
 
       return {
         ptyProcess: {
-          onData: vi.fn((cb) => {
+          onData: vi.fn((cb: (chunk: string) => void) => {
             onDataCallback = cb;
           }),
-          onExit: vi.fn((cb) => {
+          onExit: vi.fn((cb: (event: { exitCode: number }) => void) => {
             onExitCallback = cb;
           }),
           write: vi.fn(),
@@ -392,7 +390,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
             resolve(0);
           }, 50);
         }),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       };
     });
 
@@ -400,13 +398,13 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       processChunk: vi.fn(
         (chunk: string, callback: (msg: ClaudeMessage) => void) => {
           try {
-            callback(JSON.parse(chunk.trim()));
+            callback(JSON.parse(chunk.trim()) as ClaudeMessage);
           } catch {
             // Ignore
           }
         }
       ),
-      flush: vi.fn(),
+      flush: vi.fn<() => void>(),
     }));
 
     // Derive each result from the parsed message so the assertion does not
@@ -478,10 +476,10 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
 
       return {
         ptyProcess: {
-          onData: vi.fn((cb) => {
+          onData: vi.fn((cb: (chunk: string) => void) => {
             onDataCallback = cb;
           }),
-          onExit: vi.fn((cb) => {
+          onExit: vi.fn((cb: (event: { exitCode: number }) => void) => {
             onExitCallback = cb;
           }),
           write: vi.fn(),
@@ -513,7 +511,7 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
             }
           }, 50);
         }),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       };
     });
 
@@ -521,13 +519,13 @@ describe('AC-15: Concurrent 10 calls each complete independently', () => {
       processChunk: vi.fn(
         (chunk: string, callback: (msg: ClaudeMessage) => void) => {
           try {
-            callback(JSON.parse(chunk.trim()));
+            callback(JSON.parse(chunk.trim()) as ClaudeMessage);
           } catch {
             // Ignore
           }
         }
       ),
-      flush: vi.fn(),
+      flush: vi.fn<() => void>(),
     }));
 
     vi.mocked(extractResult).mockImplementation((messages) => {
@@ -613,10 +611,10 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
 
       return {
         ptyProcess: {
-          onData: vi.fn((cb) => {
+          onData: vi.fn((cb: (chunk: string) => void) => {
             onDataCallback = cb;
           }),
-          onExit: vi.fn((cb) => {
+          onExit: vi.fn((cb: (event: { exitCode: number }) => void) => {
             onExitCallback = cb;
           }),
           write: vi.fn(),
@@ -642,13 +640,13 @@ describe('AC-16: 1000 sequential calls have no resource leaks', () => {
       processChunk: vi.fn(
         (chunk: string, callback: (msg: ClaudeMessage) => void) => {
           try {
-            callback(JSON.parse(chunk.trim()));
+            callback(JSON.parse(chunk.trim()) as ClaudeMessage);
           } catch {
             // Ignore
           }
         }
       ),
-      flush: vi.fn(),
+      flush: vi.fn<() => void>(),
     }));
 
     vi.mocked(extractResult).mockReturnValue({

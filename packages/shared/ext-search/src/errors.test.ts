@@ -30,7 +30,7 @@ describe('mapSearchError', () => {
   });
 
   it('maps RuntimeHaltSignal to TIMEOUT atom', () => {
-    const halt = new RuntimeHaltSignal(null as unknown as RillValue, true);
+    const halt = new RuntimeHaltSignal(null, true);
     const result = mapSearchError(ctx, provider, halt);
     const status = statusOf(result);
     expect(status.code.name).toBe('TIMEOUT');

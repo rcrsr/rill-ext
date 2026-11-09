@@ -34,11 +34,7 @@ function getCallable(
   return {
     fn: (args: Record<string, unknown>) => {
       const result = callable.fn(args, makeRuntimeCtx());
-      if (
-        result &&
-        typeof result === 'object' &&
-        'then' in (result as object)
-      ) {
+      if (typeof result === 'object' && result !== null && 'then' in result) {
         return (result as Promise<unknown>).then(checkInvalid);
       }
       return checkInvalid(result);
@@ -64,7 +60,7 @@ afterEach(() => {
 
 describe('Integration Tests', () => {
   describe('multiple connections to one database file', () => {
-    it('reads the same value through 10 separately opened connections', () => {
+    it('reads the same value through 10 separately opened connections', async () => {
       const dbPath = join(TEST_DATA_DIR, 'multi-reads.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -82,24 +78,26 @@ describe('Integration Tests', () => {
         key: 'data',
         value: 'test-value',
       });
-      ext.dispose?.();
+      await ext.dispose?.();
 
-      const results = Array.from({ length: 10 }, () => {
+      const results: unknown[] = [];
+      for (let i = 0; i < 10; i++) {
         const reader = createSqliteKvExtension(config, makeFactoryCtx());
-        const value = getCallable(reader, 'get').fn({
-          mount: 'state',
-          key: 'data',
-        });
-        reader.dispose?.();
-        return value;
-      });
+        results.push(
+          getCallable(reader, 'get').fn({
+            mount: 'state',
+            key: 'data',
+          })
+        );
+        await reader.dispose?.();
+      }
 
       expect(results).toEqual(Array.from({ length: 10 }, () => 'test-value'));
     });
   });
 
   describe('Unknown Mount Name', () => {
-    it('throws error with mount name for all kv functions', () => {
+    it('throws error with mount name for all kv functions', async () => {
       const dbPath = join(TEST_DATA_DIR, 'unknown-mount.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -162,10 +160,10 @@ describe('Integration Tests', () => {
         'not found'
       );
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
 
-    it('includes available mounts in error message', () => {
+    it('includes available mounts in error message', async () => {
       const dbPath = join(TEST_DATA_DIR, 'mount-list.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -194,12 +192,12 @@ describe('Integration Tests', () => {
         expect(message).toContain('cache');
       }
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
   });
 
   describe('Read-Only Mode Enforcement', () => {
-    it('throws PermissionError for write operations on read-only mount', () => {
+    it('throws PermissionError for write operations on read-only mount', async () => {
       const dbPath = join(TEST_DATA_DIR, 'readonly.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -235,10 +233,10 @@ describe('Integration Tests', () => {
         getCallable(ext, 'clear').fn({ mount: 'readonly-mount' })
       ).toThrow('read-only');
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
 
-    it('allows read operations on read-only mount', () => {
+    it('allows read operations on read-only mount', async () => {
       const dbPath = join(TEST_DATA_DIR, 'readonly-reads.db');
 
       // Setup: create database with write mode first
@@ -258,7 +256,7 @@ describe('Integration Tests', () => {
         key: 'name',
         value: 'Alice',
       });
-      writer.dispose?.();
+      await writer.dispose?.();
 
       // Open as read-only
       const readConfig: SqliteKvConfig = {
@@ -287,12 +285,12 @@ describe('Integration Tests', () => {
         getCallable(reader, 'getAll').fn({ mount: 'readonly-mount' })
       ).toEqual({ name: 'Alice' });
 
-      reader.dispose?.();
+      await reader.dispose?.();
     });
   });
 
   describe('Maximum Value Size Boundary', () => {
-    it('succeeds when value is exactly at size limit', () => {
+    it('succeeds when value is exactly at size limit', async () => {
       const dbPath = join(TEST_DATA_DIR, 'size-exact.db');
       const sizeLimit = 102400; // 100KB
       const config: SqliteKvConfig = {
@@ -323,10 +321,10 @@ describe('Integration Tests', () => {
         getCallable(ext, 'set').fn({ mount: 'test', key: 'key', value })
       ).not.toThrow();
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
 
-    it('throws SizeError when value exceeds limit by 1 byte', () => {
+    it('throws SizeError when value exceeds limit by 1 byte', async () => {
       const dbPath = join(TEST_DATA_DIR, 'size-over.db');
       const sizeLimit = 102400; // 100KB
       const config: SqliteKvConfig = {
@@ -356,10 +354,10 @@ describe('Integration Tests', () => {
         getCallable(ext, 'set').fn({ mount: 'test', key: 'key', value })
       ).toThrow('exceeds size limit');
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
 
-    it('validates size for complex objects', () => {
+    it('validates size for complex objects', async () => {
       const dbPath = join(TEST_DATA_DIR, 'size-object.db');
       const sizeLimit = 1000;
       const config: SqliteKvConfig = {
@@ -389,12 +387,12 @@ describe('Integration Tests', () => {
         })
       ).toThrow('exceeds size limit');
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
   });
 
   describe('sequential writes through separate connections', () => {
-    it('keeps the last written value after 5 writes to the same key', () => {
+    it('keeps the last written value after 5 writes to the same key', async () => {
       const dbPath = join(TEST_DATA_DIR, 'sequential-writes.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -413,7 +411,7 @@ describe('Integration Tests', () => {
           key: 'counter',
           value: index,
         });
-        writer.dispose?.();
+        await writer.dispose?.();
       }
 
       const reader = createSqliteKvExtension(config, makeFactoryCtx());
@@ -424,10 +422,10 @@ describe('Integration Tests', () => {
         'counter',
       ]);
 
-      reader.dispose?.();
+      await reader.dispose?.();
     });
 
-    it('persists writes to 5 different keys', () => {
+    it('persists writes to 5 different keys', async () => {
       const dbPath = join(TEST_DATA_DIR, 'sequential-different-keys.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -446,7 +444,7 @@ describe('Integration Tests', () => {
           key: `key-${index}`,
           value: `value-${index}`,
         });
-        writer.dispose?.();
+        await writer.dispose?.();
       }
 
       const reader = createSqliteKvExtension(config, makeFactoryCtx());
@@ -460,7 +458,7 @@ describe('Integration Tests', () => {
         ).toBe(`value-${i}`);
       }
 
-      reader.dispose?.();
+      await reader.dispose?.();
     });
   });
 
@@ -471,7 +469,7 @@ describe('Integration Tests', () => {
       { type: 'list', key: 'items', value: [1, 2, 3], partial: { extra: 4 } },
     ])(
       'throws when merging into $type value',
-      ({ type, key, value, partial }) => {
+      async ({ type, key, value, partial }) => {
         const dbPath = join(TEST_DATA_DIR, `merge-${type}.db`);
         const config: SqliteKvConfig = {
           mounts: {
@@ -491,7 +489,7 @@ describe('Integration Tests', () => {
           getCallable(ext, 'merge').fn({ mount: 'test', key, partial })
         ).toThrow('non-dict');
 
-        ext.dispose?.();
+        await ext.dispose?.();
       }
     );
   });

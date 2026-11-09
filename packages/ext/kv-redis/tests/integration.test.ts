@@ -36,10 +36,7 @@ function getCallable(
   const value = ext.value as Record<
     string,
     {
-      fn: (
-        args: Record<string, unknown>,
-        ctx: unknown
-      ) => unknown | Promise<unknown>;
+      fn: (args: Record<string, unknown>, ctx: unknown) => unknown;
     }
   >;
   const callable = value[name]!;
@@ -480,7 +477,7 @@ describe.skipIf(!redisAvailable)('Integration Tests', () => {
       });
 
       const competingClient = new Redis(REDIS_URL);
-      const originalGet = Reflect.get(Redis.prototype, 'get') as Redis['get'];
+      const originalGet = Reflect.get(Redis.prototype, 'get');
       let competed = false;
       // One-shot: after the first read (WATCH already issued), a competing
       // write lands before EXEC, forcing the merge to retry.

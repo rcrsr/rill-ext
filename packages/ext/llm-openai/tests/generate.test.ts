@@ -252,7 +252,7 @@ describe('generate() function', () => {
       const ext = createOpenAIExtension(baseConfig);
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },

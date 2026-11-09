@@ -117,12 +117,26 @@ function createPartialDisconnectStream(partialContent: string, error: unknown) {
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream(
-  stream: unknown
-): Promise<Record<string, unknown>> {
+function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
   return (
     stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
   ).__rill_stream_resolve();
+}
+
+function getStreamDispose(stream: unknown): () => void {
+  return (stream as { __rill_stream_dispose: () => void })
+    .__rill_stream_dispose;
+}
+
+interface StreamStep {
+  readonly done?: boolean | undefined;
+  readonly value?: unknown;
+  readonly next?: {
+    readonly fn: (
+      args: Record<string, unknown>,
+      ctx: null
+    ) => Promise<StreamStep>;
+  };
 }
 
 /**
@@ -131,13 +145,11 @@ async function resolveStream(
  */
 async function collectChunks(stream: unknown): Promise<string[]> {
   const chunks: string[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = stream;
-  while (!current.done) {
+  let current = stream as StreamStep;
+  while (current.done !== true) {
     // next is a callable marker — invoke its fn directly
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    current = await (current.next as any).fn({}, null);
-    if (!current.done && current.value !== undefined) {
+    current = await current.next!.fn({}, null);
+    if (current.done !== true && current.value !== undefined) {
       chunks.push(current.value as string);
     }
   }
@@ -186,7 +198,7 @@ function extractLastAssistantText(result: Record<string, unknown>): string {
     role: string;
     parts: Array<{ type: string; text?: string }>;
   }>;
-  const last = messages[messages.length - 1]!;
+  const last = messages.at(-1)!;
   return last.parts
     .filter((p) => p.type === 'text')
     .map((p) => p.text ?? '')
@@ -253,14 +265,14 @@ describe('message() function', () => {
       }>;
       expect(Array.isArray(messages)).toBe(true);
       expect(messages[0]!.role).toBe('user');
-      expect(messages[messages.length - 1]!.role).toBe('assistant');
+      expect(messages.at(-1)!.role).toBe('assistant');
       // content field removed from the resolution dict
       expect(Object.keys(result)).not.toContain('content');
     });
   });
 
   describe('success cases', () => {
-    it('sends correct parameters to Anthropic stream API', () => {
+    it('sends correct parameters to Anthropic stream API', async () => {
       mockStream.mockReturnValue(createMockStream('Response'));
 
       const config: AnthropicExtensionConfig = {
@@ -273,7 +285,7 @@ describe('message() function', () => {
       const ext = createAnthropicExtension(config);
       const ctx = createRuntimeContext();
 
-      getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
+      await getCallable(ext, 'message').fn({ prompt: 'What is 2+2?' }, ctx);
 
       expect(mockStream).toHaveBeenCalledWith(
         {
@@ -541,8 +553,7 @@ describe('boundary conditions', () => {
 
       // The stream was created and has a dispose callback attached
       // Manually invoke the hidden dispose callback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const disposeFn = (stream as any).__rill_stream_dispose;
+      const disposeFn = getStreamDispose(stream);
       expect(typeof disposeFn).toBe('function');
 
       // Invoke dispose — should call sdkStream.abort()
@@ -565,8 +576,7 @@ describe('boundary conditions', () => {
 
       const stream = getCallable(ext, 'message').fn({ prompt: 'Hello' }, ctx);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const disposeFn = (stream as any).__rill_stream_dispose;
+      const disposeFn = getStreamDispose(stream);
 
       disposeFn();
       disposeFn();

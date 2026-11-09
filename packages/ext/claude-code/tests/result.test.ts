@@ -4,13 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { extractResult } from '../src/result.js';
-import type {
-  ClaudeMessage,
-  AssistantMessage,
-  ResultMessage,
-  SystemMessage,
-  UserMessage,
-} from '../src/types.js';
+import type { ClaudeMessage } from '../src/types.js';
 
 describe('extractResult', () => {
   describe('basic extraction', () => {
@@ -26,14 +20,14 @@ describe('extractResult', () => {
               output_tokens: 5,
             },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0.001,
           duration_ms: 1500,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -54,7 +48,7 @@ describe('extractResult', () => {
           duration_ms: 1500,
           is_error: true,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -72,21 +66,21 @@ describe('extractResult', () => {
             content: [{ type: 'text', text: 'First part. ' }],
             usage: {},
           },
-        } as AssistantMessage,
+        },
         {
           type: 'assistant',
           message: {
             content: [{ type: 'text', text: 'Second part.' }],
             usage: {},
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 0,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -105,14 +99,14 @@ describe('extractResult', () => {
             ],
             usage: {},
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 0,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -137,14 +131,14 @@ describe('extractResult', () => {
             ],
             usage: {},
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 0,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -159,14 +153,14 @@ describe('extractResult', () => {
           type: 'system',
           subtype: 'init',
           model: 'claude-3-5-sonnet',
-        } as SystemMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 100,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -189,14 +183,14 @@ describe('extractResult', () => {
             ],
             usage: {},
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 100,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -223,14 +217,14 @@ describe('extractResult', () => {
               },
             },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 0,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -254,7 +248,7 @@ describe('extractResult', () => {
               output_tokens: 50,
             },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'assistant',
           message: {
@@ -265,14 +259,14 @@ describe('extractResult', () => {
               cache_read_input_tokens: 30,
             },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0.005,
           duration_ms: 2000,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -295,7 +289,7 @@ describe('extractResult', () => {
               },
             },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'assistant',
           message: {
@@ -307,14 +301,14 @@ describe('extractResult', () => {
               },
             },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 0,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -333,7 +327,7 @@ describe('extractResult', () => {
               input_tokens: 100,
             },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
@@ -343,7 +337,7 @@ describe('extractResult', () => {
             input_tokens: 50,
             output_tokens: 25,
           },
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -361,14 +355,14 @@ describe('extractResult', () => {
             content: [{ type: 'text', text: 'Hello' }],
             usage: undefined,
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 100,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -395,14 +389,14 @@ describe('extractResult', () => {
               },
             },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0,
           duration_ms: 0,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -424,7 +418,7 @@ describe('extractResult', () => {
           duration_ms: 5000,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -441,7 +435,7 @@ describe('extractResult', () => {
             content: [{ type: 'text', text: 'Hello' }],
             usage: {},
           },
-        } as AssistantMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -458,21 +452,21 @@ describe('extractResult', () => {
           type: 'system',
           subtype: 'init',
           model: 'claude-3-5-sonnet',
-        } as SystemMessage,
+        },
         {
           type: 'assistant',
           message: {
             content: [{ type: 'text', text: 'Response' }],
             usage: { input_tokens: 10, output_tokens: 5 },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0.001,
           duration_ms: 100,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);
@@ -488,21 +482,21 @@ describe('extractResult', () => {
           message: {
             content: [{ type: 'text', text: 'User input' }],
           },
-        } as UserMessage,
+        },
         {
           type: 'assistant',
           message: {
             content: [{ type: 'text', text: 'Assistant response' }],
             usage: { input_tokens: 20, output_tokens: 10 },
           },
-        } as AssistantMessage,
+        },
         {
           type: 'result',
           cost_usd: 0.002,
           duration_ms: 200,
           is_error: false,
           usage: {},
-        } as ResultMessage,
+        },
       ];
 
       const result = extractResult(messages);

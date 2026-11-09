@@ -116,7 +116,8 @@ async function call(
   if (callable === undefined) {
     throw new Error(`function ${name} missing from extension value`);
   }
-  return callable.fn(args, makeRuntimeCtx());
+  const result = await callable.fn(args, makeRuntimeCtx());
+  return result;
 }
 
 /**
@@ -212,16 +213,16 @@ describe.skipIf(!minioAvailable)('Integration Tests', () => {
       expect(files).toContainEqual({
         name: 'report.txt',
         type: 'file',
-        size: expect.any(Number),
+        size: expect.any(Number) as unknown,
       });
 
       // Verify stat operation
       const stat = await callOk(ext, 'stat', { path: '/storage/report.txt' });
       expect(stat).toEqual({
-        name: expect.any(String),
+        name: expect.any(String) as unknown,
         type: 'file',
-        size: expect.any(Number),
-        modified: expect.any(String),
+        size: expect.any(Number) as unknown,
+        modified: expect.any(String) as unknown,
       });
 
       // Verify remove operation
@@ -336,10 +337,10 @@ describe.skipIf(!minioAvailable)('Integration Tests', () => {
       // Test stat
       const stat = await callOk(ext, 'stat', { path: '/test/sample.txt' });
       expect(stat).toEqual({
-        name: expect.any(String),
+        name: expect.any(String) as unknown,
         type: 'file',
-        size: expect.any(Number),
-        modified: expect.any(String),
+        size: expect.any(Number) as unknown,
+        modified: expect.any(String) as unknown,
       });
 
       // Test copy
@@ -599,10 +600,10 @@ describe.skipIf(!minioAvailable)('Integration Tests', () => {
         path: '/readonly-mount/data.txt',
       });
       expect(stat).toEqual({
-        name: expect.any(String),
+        name: expect.any(String) as unknown,
         type: 'file',
-        size: expect.any(Number),
-        modified: expect.any(String),
+        size: expect.any(Number) as unknown,
+        modified: expect.any(String) as unknown,
       });
     });
   });

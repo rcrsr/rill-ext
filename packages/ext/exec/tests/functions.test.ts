@@ -31,7 +31,7 @@ describe('command execution', () => {
     );
 
     expect(result).toMatchObject({
-      stdout: expect.stringContaining('hello world'),
+      stdout: expect.stringContaining('hello world') as unknown,
       stderr: '',
       exit_code: 0,
     });
@@ -48,7 +48,7 @@ describe('command execution', () => {
     const result = await getCallable(ext, 'pwd').fn({}, makeRuntimeCtx());
 
     expect(result).toMatchObject({
-      stdout: expect.any(String),
+      stdout: expect.any(String) as unknown,
       stderr: '',
       exit_code: 0,
     });

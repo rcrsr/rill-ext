@@ -168,14 +168,14 @@ function createMockDescribeIndexResponse(
 }
 
 // Mock the Pinecone SDK at module level
-const mockUpsert = vi.fn();
+const mockUpsert = vi.fn<(...args: unknown[]) => Promise<void>>();
 const mockQuery = vi.fn();
 const mockFetch = vi.fn();
-const mockDeleteOne = vi.fn();
+const mockDeleteOne = vi.fn<(...args: unknown[]) => Promise<void>>();
 const mockDescribeIndexStats = vi.fn();
 const mockDescribeIndex = vi.fn();
-const mockCreateIndex = vi.fn();
-const mockDeleteIndex = vi.fn();
+const mockCreateIndex = vi.fn<(...args: unknown[]) => Promise<void>>();
+const mockDeleteIndex = vi.fn<(...args: unknown[]) => Promise<void>>();
 const mockListIndexes = vi.fn();
 
 // Create namespace mock that returns methods
@@ -274,7 +274,7 @@ describe('Vector CRUD operations', () => {
       const metadata = { city: 'Berlin', population: 3645000 };
 
       // Mock upsert success
-      mockUpsert.mockResolvedValue(undefined);
+      mockUpsert.mockResolvedValue();
 
       // Mock fetch response
       mockFetch.mockResolvedValue(
@@ -304,9 +304,11 @@ describe('Vector CRUD operations', () => {
         ],
       });
       // Verify values array is present (Float32Array conversion may have precision differences)
-      const callArgs = mockUpsert.mock.calls[0]?.[0];
+      const callArgs = mockUpsert.mock.calls[0]?.[0] as
+        | { records: Array<{ values?: unknown }> }
+        | undefined;
       expect(callArgs).toBeDefined();
-      expect(callArgs.records[0]?.values).toHaveLength(4);
+      expect(callArgs?.records[0]?.values).toHaveLength(4);
 
       // Get vector back
       const getResult = (await getCallable(ext, 'get').fn(
@@ -325,7 +327,7 @@ describe('Vector CRUD operations', () => {
         'test'
       );
 
-      mockUpsert.mockResolvedValue(undefined);
+      mockUpsert.mockResolvedValue();
       mockFetch.mockResolvedValue(
         createMockFetchResponse([
           {
@@ -361,7 +363,7 @@ describe('Vector CRUD operations', () => {
         nested: { level1: { level2: { level3: 'deep' } } },
       };
 
-      mockUpsert.mockResolvedValue(undefined);
+      mockUpsert.mockResolvedValue();
       mockFetch.mockResolvedValue(
         createMockFetchResponse([
           {
@@ -407,7 +409,7 @@ describe('Vector CRUD operations', () => {
         },
       ];
 
-      mockUpsert.mockResolvedValue(undefined);
+      mockUpsert.mockResolvedValue();
 
       const result = (await getCallable(ext, 'upsert_batch').fn(
         { items: items },
@@ -468,7 +470,7 @@ describe('Vector CRUD operations', () => {
 
       // Mock first 46 succeed
       for (let i = 0; i < 46; i++) {
-        mockUpsert.mockResolvedValueOnce(undefined);
+        mockUpsert.mockResolvedValueOnce();
       }
 
       // 47th fails with dimension error
@@ -501,7 +503,7 @@ describe('Vector CRUD operations', () => {
         },
       ];
 
-      mockUpsert.mockResolvedValueOnce(undefined);
+      mockUpsert.mockResolvedValueOnce();
       mockUpsert.mockRejectedValueOnce(
         new Error('dimension mismatch (expected 4, got 2)')
       );
@@ -528,8 +530,8 @@ describe('Vector CRUD operations', () => {
         },
       ];
 
-      mockUpsert.mockResolvedValueOnce(undefined);
-      mockUpsert.mockResolvedValueOnce(undefined);
+      mockUpsert.mockResolvedValueOnce();
+      mockUpsert.mockResolvedValueOnce();
 
       const secondResult = (await getCallable(ext, 'upsert_batch').fn(
         { items: fixedItems },
@@ -633,7 +635,7 @@ describe('Vector CRUD operations', () => {
 
   describe('delete + delete_batch (IR-5, IR-6)', () => {
     it('deletes single vector', async () => {
-      mockDeleteOne.mockResolvedValue(undefined);
+      mockDeleteOne.mockResolvedValue();
 
       const result = (await getCallable(ext, 'delete').fn(
         { id: 'doc-1' },
@@ -646,7 +648,7 @@ describe('Vector CRUD operations', () => {
     });
 
     it('deletes batch of vectors', async () => {
-      mockDeleteOne.mockResolvedValue(undefined);
+      mockDeleteOne.mockResolvedValue();
 
       const ids = ['doc-1', 'doc-2', 'doc-3'];
       const result = (await getCallable(ext, 'delete_batch').fn(
@@ -692,7 +694,7 @@ describe('Collection lifecycle operations', () => {
 
   describe('create_collection + describe + list_collections + delete_collection (IR-8, IR-9, IR-10, IR-11, AC-7, AC-29, AC-30)', () => {
     it('creates collection with dimensions (AC-7)', async () => {
-      mockCreateIndex.mockResolvedValue(undefined);
+      mockCreateIndex.mockResolvedValue();
 
       const result = (await getCallable(ext, 'create_collection').fn(
         {
@@ -810,7 +812,7 @@ describe('Collection lifecycle operations', () => {
     });
 
     it('deletes collection', async () => {
-      mockDeleteIndex.mockResolvedValue(undefined);
+      mockDeleteIndex.mockResolvedValue();
 
       const result = (await getCallable(ext, 'delete_collection').fn(
         { name: 'old_index' },
@@ -831,7 +833,7 @@ describe('Collection lifecycle operations', () => {
         'test'
       );
 
-      mockUpsert.mockResolvedValue(undefined);
+      mockUpsert.mockResolvedValue();
 
       const result = (await getCallable(ext, 'upsert').fn(
         { id: 'doc-max', vector: testVector, metadata: {} },
@@ -1027,7 +1029,7 @@ describe('Event emission', () => {
     const ctx = createRuntimeContext({
       callbacks: {
         onLogEvent: (event) => {
-          events.push(event as Record<string, unknown>);
+          events.push(event);
         },
       },
     });
@@ -1134,10 +1136,11 @@ describe('Concurrent operations', () => {
     const ctx = createRuntimeContext();
 
     // Mock different results for each search
-    mockQuery.mockImplementation(async (request) => {
-      const vector = request.vector as number[];
-      const id = Math.round(vector[0]! * 10);
-      return createMockQueryResponse([{ id: `doc-${id}`, score: 0.95 }]);
+    mockQuery.mockImplementation((request: { vector: number[] }) => {
+      const id = Math.round(request.vector[0]! * 10);
+      return Promise.resolve(
+        createMockQueryResponse([{ id: `doc-${id}`, score: 0.95 }])
+      );
     });
 
     // Launch 10 concurrent searches
@@ -1152,7 +1155,9 @@ describe('Concurrent operations', () => {
       );
     });
 
-    const results = await Promise.all(searches);
+    const results = await Promise.all(
+      searches.map(async (search) => await search)
+    );
 
     // Each search should have independent results
     expect(results).toHaveLength(10);

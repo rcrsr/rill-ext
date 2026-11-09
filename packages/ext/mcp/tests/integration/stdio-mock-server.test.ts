@@ -26,7 +26,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createMcpExtension } from '../../src/factory.js';
-import { getStatus, type RillValue } from '@rcrsr/rill';
+import { getStatus } from '@rcrsr/rill';
 import {
   expectRejectsHalt,
   makeFactoryCtx,
@@ -463,7 +463,7 @@ describe('Integration: stdio mock server', () => {
       const caught = await expectRejectsHalt(
         hostFn(v['tools'], 'echo').fn({ message: 'test' }, mockContext)
       );
-      const status = getStatus(caught as RillValue);
+      const status = getStatus(caught);
       expect(status.code.name).toBe('DISPOSED');
       expect(status.provider).toBe('mcp');
       expect((status.raw as { kind?: unknown }).kind).toBe(

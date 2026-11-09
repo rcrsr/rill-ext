@@ -340,7 +340,7 @@ describe('fs-local extension functions', () => {
       expect(file1).toMatchObject({
         name: 'file1.txt',
         type: 'file',
-        size: expect.any(Number),
+        size: expect.any(Number) as unknown,
       });
 
       const subdir = result.find((item) => item['name'] === 'subdir');

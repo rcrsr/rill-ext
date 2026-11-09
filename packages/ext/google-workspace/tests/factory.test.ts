@@ -271,7 +271,7 @@ describe('createGoogleWorkspaceExtension', () => {
             });
           }
         });
-      }) as unknown as typeof fetch;
+      });
 
       const ext = createGoogleWorkspaceExtension(
         ALL_CAPS_CONFIG,
@@ -308,7 +308,7 @@ describe('createGoogleWorkspaceExtension', () => {
             reject(new TypeError('fetch failed'));
           });
         });
-      }) as unknown as typeof fetch;
+      });
 
       const ext = createGoogleWorkspaceExtension(
         ALL_CAPS_CONFIG,
@@ -323,7 +323,7 @@ describe('createGoogleWorkspaceExtension', () => {
       await Promise.resolve();
       await disposeExt(ext);
 
-      const result = (await inflight) as RillValue;
+      const result = await inflight;
       expect(isInvalid(result)).toBe(true);
       expect(getStatus(result).code.name).toBe('UNAVAILABLE');
     });
@@ -347,7 +347,7 @@ describe('createGoogleWorkspaceExtension', () => {
             });
           }
         });
-      }) as unknown as typeof fetch;
+      });
 
       const ext = createGoogleWorkspaceExtension(
         ALL_CAPS_CONFIG,
@@ -357,9 +357,15 @@ describe('createGoogleWorkspaceExtension', () => {
 
       // Start 3 concurrent calls without awaiting
       const calls = [
-        getCallable(ext, 'gmail_search').fn({ query: 'query-1' }, ctx),
-        getCallable(ext, 'gmail_search').fn({ query: 'query-2' }, ctx),
-        getCallable(ext, 'gmail_search').fn({ query: 'query-3' }, ctx),
+        Promise.resolve(
+          getCallable(ext, 'gmail_search').fn({ query: 'query-1' }, ctx)
+        ),
+        Promise.resolve(
+          getCallable(ext, 'gmail_search').fn({ query: 'query-2' }, ctx)
+        ),
+        Promise.resolve(
+          getCallable(ext, 'gmail_search').fn({ query: 'query-3' }, ctx)
+        ),
       ];
 
       // Yield so all three advance past resolveToken and into fetch
@@ -402,7 +408,7 @@ describe('createGoogleWorkspaceExtension', () => {
             headers: { 'Content-Type': 'application/json' },
           })
         )
-      ) as unknown as typeof fetch;
+      );
 
       const ext = createGoogleWorkspaceExtension(
         BEARER_CONFIG,

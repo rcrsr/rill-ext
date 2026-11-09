@@ -69,7 +69,7 @@ async function collectStream(
   }
 
   await (
-    stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+    stream as { __rill_stream_resolve: () => Promise<unknown> }
   ).__rill_stream_resolve();
 }
 
@@ -137,7 +137,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -178,7 +178,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -218,7 +218,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -252,7 +252,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -294,7 +294,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -330,7 +330,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -384,7 +384,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -460,7 +460,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -523,7 +523,7 @@ describe('extension event emission', () => {
       const events: Array<Record<string, unknown>> = [];
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },

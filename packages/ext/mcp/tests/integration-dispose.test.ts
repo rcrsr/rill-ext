@@ -57,13 +57,13 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         toolCallController = { resolve, reject };
       });
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
-      vi.spyOn(Client.prototype, 'close').mockImplementation(async () => {
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+      vi.spyOn(Client.prototype, 'close').mockImplementation(() => {
         // Simulate client.close() causing pending operations to fail
         toolCallController.reject(
           new McpError(ErrorCode.ConnectionClosed, 'Connection closed')
         );
-        return undefined;
+        return Promise.resolve();
       });
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [
@@ -126,15 +126,15 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
         reject: (reason: unknown) => void;
       }> = [];
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
-      vi.spyOn(Client.prototype, 'close').mockImplementation(async () => {
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+      vi.spyOn(Client.prototype, 'close').mockImplementation(() => {
         // Reject all pending calls when connection closes
         for (const call of pendingCalls) {
           call.reject(
             new McpError(ErrorCode.ConnectionClosed, 'Connection closed')
           );
         }
-        return undefined;
+        return Promise.resolve();
       });
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [
@@ -199,8 +199,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
   describe('BC-5: Idempotent dispose', () => {
     it('second dispose call is no-op', async () => {
-      const mockClose = vi.fn().mockResolvedValue(undefined);
-      const mockConnect = vi.fn().mockResolvedValue(undefined);
+      const mockClose = vi.fn<() => Promise<void>>().mockResolvedValue();
+      const mockConnect = vi.fn<() => Promise<void>>().mockResolvedValue();
 
       vi.spyOn(Client.prototype, 'connect').mockImplementation(mockConnect);
       vi.spyOn(Client.prototype, 'close').mockImplementation(mockClose);
@@ -242,15 +242,15 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
     it('handles errors during first dispose without affecting idempotency', async () => {
       let disposeAttempts = 0;
-      const mockClose = vi.fn().mockImplementation(async () => {
+      const mockClose = vi.fn().mockImplementation(() => {
         disposeAttempts++;
         if (disposeAttempts === 1) {
-          throw new Error('disposal failed');
+          return Promise.reject(new Error('disposal failed'));
         }
-        return undefined;
+        return Promise.resolve();
       });
 
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
       vi.spyOn(Client.prototype, 'close').mockImplementation(mockClose);
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [],
@@ -287,8 +287,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
   describe('BC-5: Calls after dispose halt with #DISPOSED', () => {
     it('halts tool calls after dispose with #DISPOSED', async () => {
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
-      vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+      vi.spyOn(Client.prototype, 'close').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [
           {
@@ -355,8 +355,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
     });
 
     it('halts resource reads after dispose with #DISPOSED', async () => {
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
-      vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+      vi.spyOn(Client.prototype, 'close').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [],
       });
@@ -434,8 +434,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
     });
 
     it('halts prompt calls after dispose with #DISPOSED', async () => {
-      vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
-      vi.spyOn(Client.prototype, 'close').mockResolvedValue(undefined);
+      vi.spyOn(Client.prototype, 'connect').mockResolvedValue();
+      vi.spyOn(Client.prototype, 'close').mockResolvedValue();
       vi.spyOn(Client.prototype, 'listTools').mockResolvedValue({
         tools: [],
       });
@@ -501,8 +501,8 @@ describe('Integration: Dispose and Connection Lifecycle', () => {
 
   describe('Integration: Real connection lifecycle', () => {
     it('completes full lifecycle: connect -> use -> dispose', async () => {
-      const mockConnect = vi.fn().mockResolvedValue(undefined);
-      const mockClose = vi.fn().mockResolvedValue(undefined);
+      const mockConnect = vi.fn<() => Promise<void>>().mockResolvedValue();
+      const mockClose = vi.fn<() => Promise<void>>().mockResolvedValue();
       const mockCallTool = vi.fn().mockResolvedValue({
         content: [{ type: 'text', text: 'result' }],
       });

@@ -70,8 +70,9 @@ describe('dispose', () => {
   it('calls cleanup once and sets disposed flag before it runs', async () => {
     const state = createDisposalState();
     let flagDuringCleanup: boolean | undefined;
-    const cleanup = vi.fn(async () => {
+    const cleanup = vi.fn(() => {
       flagDuringCleanup = state.isDisposed;
+      return Promise.resolve();
     });
     await dispose(state, cleanup);
     expect(cleanup).toHaveBeenCalledTimes(1);
@@ -97,9 +98,7 @@ describe('dispose', () => {
 
   it('logs warning and still disposes when cleanup throws', async () => {
     const state = createDisposalState();
-    const cleanup = vi.fn(async () => {
-      throw new Error('Cleanup failed');
-    });
+    const cleanup = vi.fn(() => Promise.reject(new Error('Cleanup failed')));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await dispose(state, cleanup);
     expect(warnSpy).toHaveBeenCalledWith('Cleanup failed: Cleanup failed');
@@ -109,9 +108,7 @@ describe('dispose', () => {
 
   it('handles non-Error cleanup throws', async () => {
     const state = createDisposalState();
-    const cleanup = vi.fn(async () => {
-      throw 'string error';
-    });
+    const cleanup = vi.fn(() => Promise.reject('string error'));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await dispose(state, cleanup);
     expect(warnSpy).toHaveBeenCalledWith('Cleanup failed: Unknown error');

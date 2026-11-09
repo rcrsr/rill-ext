@@ -30,14 +30,14 @@ describe('withEventEmission', () => {
 
   describe('success path', () => {
     it('emits success event with provider:operation, metadata, and duration, returning fn result unmodified', async () => {
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(e: unknown) => void>();
       const expectedResult = { data: 'complex', nested: { value: 42 } };
       const result = await withEventEmission(
         makeCtx({ onLogEvent }),
         provider,
         operation,
         { id: 'vec-1', count: 10 },
-        async () => expectedResult as unknown as RillValue
+        () => Promise.resolve(expectedResult as unknown as RillValue)
       );
       expect(result).toEqual(expectedResult);
       expect(onLogEvent).toHaveBeenCalledTimes(1);
@@ -52,7 +52,7 @@ describe('withEventEmission', () => {
 
   describe('error path', () => {
     it('returns invalid RillValue and emits error event when fn throws', async () => {
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(e: unknown) => void>();
       const result = await withEventEmission(
         makeCtx({ onLogEvent }),
         provider,
@@ -91,7 +91,7 @@ describe('withEventEmission', () => {
       Object.assign(new Error('aborted'), { name: 'AbortError' });
 
     it('throws DISPOSED halt when disposed and fn fails abort-shaped', async () => {
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(e: unknown) => void>();
       const thrown = await withEventEmission(
         makeCtx({ onLogEvent }),
         provider,

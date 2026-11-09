@@ -12,7 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getStatus, structureToTypeValue } from '@rcrsr/rill';
-import type { McpPrompt, McpPromptResult } from '../../src/prompts.js';
+import type { McpPrompt } from '../../src/prompts.js';
 import { generatePromptFunctions } from '../../src/prompts.js';
 import {
   makeRuntimeCtx,
@@ -134,7 +134,7 @@ describe('Prompt Function Generation', () => {
             content: { type: 'text', text: 'Test message' },
           },
         ],
-      } as McpPromptResult);
+      });
 
       mockClient.getPrompt = mockGetPrompt;
 
@@ -167,7 +167,7 @@ describe('Prompt Function Generation', () => {
     it('omits optional arguments when not provided', async () => {
       const mockGetPrompt = vi.fn().mockResolvedValue({
         messages: [],
-      } as McpPromptResult);
+      });
 
       mockClient.getPrompt = mockGetPrompt;
 
@@ -239,7 +239,7 @@ describe('Prompt Function Generation', () => {
             content: { type: 'text', text: 'Hi there!' },
           },
         ],
-      } as McpPromptResult);
+      });
 
       mockClient.getPrompt = mockGetPrompt;
 
@@ -264,7 +264,7 @@ describe('Prompt Function Generation', () => {
     it('handles empty message list', async () => {
       const mockGetPrompt = vi.fn().mockResolvedValue({
         messages: [],
-      } as McpPromptResult);
+      });
 
       mockClient.getPrompt = mockGetPrompt;
 
@@ -291,7 +291,7 @@ describe('Prompt Function Generation', () => {
             ],
           },
         ],
-      } as McpPromptResult);
+      });
 
       mockClient.getPrompt = mockGetPrompt;
 
@@ -313,7 +313,7 @@ describe('Prompt Function Generation', () => {
             content: { type: 'text', text: 'Single content' },
           },
         ],
-      } as McpPromptResult);
+      });
 
       mockClient.getPrompt = mockGetPrompt;
 
@@ -339,7 +339,7 @@ describe('Prompt Function Generation', () => {
             ],
           },
         ],
-      } as McpPromptResult);
+      });
 
       mockClient.getPrompt = mockGetPrompt;
 
@@ -362,7 +362,7 @@ describe('Prompt Function Generation', () => {
             content: { type: 'image', data: 'base64', mimeType: 'image/png' },
           },
         ],
-      } as McpPromptResult);
+      });
 
       mockClient.getPrompt = mockGetPrompt;
 

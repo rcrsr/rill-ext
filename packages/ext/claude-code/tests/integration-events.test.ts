@@ -34,9 +34,7 @@ vi.mock('../src/result.js');
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  * The resolve callback is where events are emitted.
  */
-async function resolveStream(
-  stream: unknown
-): Promise<Record<string, unknown>> {
+function resolveStream(stream: unknown): Promise<Record<string, unknown>> {
   return (
     stream as { __rill_stream_resolve: () => Promise<Record<string, unknown>> }
   ).__rill_stream_resolve();
@@ -72,8 +70,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
 
       // Setup mocks
       const mockParser = {
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       };
 
       vi.mocked(createStreamParser).mockReturnValue(mockParser);
@@ -100,7 +98,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       // Create event collector
@@ -108,8 +106,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -138,8 +138,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -164,7 +164,7 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const longPrompt = 'a'.repeat(150);
@@ -172,8 +172,10 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -197,8 +199,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -223,15 +225,17 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const events = createEventCollector();
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -260,8 +264,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -286,15 +290,17 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const events = createEventCollector();
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -317,8 +323,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -343,15 +349,17 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const events = createEventCollector();
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -381,8 +389,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const { createStreamParser } = await import('../src/stream-parser.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       // Mock spawn to reject with error
@@ -394,15 +402,17 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.reject(new Error('Process timeout')),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const events = createEventCollector();
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -430,8 +440,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const { createStreamParser } = await import('../src/stream-parser.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -442,15 +452,17 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.reject(new Error('Skill execution failed')),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const events = createEventCollector();
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -472,8 +484,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const { createStreamParser } = await import('../src/stream-parser.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -484,15 +496,17 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.reject(new Error('Command failed')),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const events = createEventCollector();
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -514,8 +528,8 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
       const { createStreamParser } = await import('../src/stream-parser.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       // Mock with non-Error rejection
@@ -527,15 +541,17 @@ describe('Claude Code Extension Integration Tests - Event Emission', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.reject('String error'),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const events = createEventCollector();
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 

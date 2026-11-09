@@ -21,6 +21,7 @@ import {
   isInvalid,
   RuntimeHaltSignal,
   type ApplicationCallable,
+  type ExtensionEvent,
   type ExtensionFactoryCtx,
   type RillValue,
 } from '@rcrsr/rill';
@@ -65,7 +66,7 @@ async function expectInvalidWithMessage(
   promise: RillValue | Promise<RillValue>,
   needle: string
 ): Promise<RillValue> {
-  const result = (await promise) as RillValue;
+  const result = await promise;
   expect(isInvalid(result)).toBe(true);
   expect(getStatus(result).message).toContain(needle);
   return result;
@@ -305,10 +306,7 @@ describe('Serper extension host functions', () => {
       const ctx = createRuntimeContext();
 
       {
-        const __r = (await getCallable(ext, 'search').fn(
-          { query: '' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -405,7 +403,7 @@ describe('Serper extension host functions', () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, 'search').fn({ query: 'TypeScript' }, ctx);
@@ -424,14 +422,11 @@ describe('Serper extension host functions', () => {
       globalThis.fetch = mockFetchJson(401, {});
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       {
-        const __r = (await getCallable(ext, 'search').fn(
-          { query: 'test' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -439,7 +434,7 @@ describe('Serper extension host functions', () => {
         expect.objectContaining({
           event: 'serper:error',
           subsystem: 'extension:serper',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -516,10 +511,7 @@ describe('Serper extension host functions', () => {
       const ctx = createRuntimeContext();
 
       {
-        const __r = (await getCallable(ext, 'news').fn(
-          { query: '' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'news').fn({ query: '' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -601,7 +593,7 @@ describe('Serper extension host functions', () => {
       globalThis.fetch = mockFetchJson(200, NEWS_RESPONSE);
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, 'news').fn({ query: 'TypeScript news' }, ctx);
@@ -620,14 +612,11 @@ describe('Serper extension host functions', () => {
       globalThis.fetch = mockFetchJson(500, {});
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       {
-        const __r = (await getCallable(ext, 'news').fn(
-          { query: 'test' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'news').fn({ query: 'test' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -635,7 +624,7 @@ describe('Serper extension host functions', () => {
         expect.objectContaining({
           event: 'serper:error',
           subsystem: 'extension:serper',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -702,10 +691,7 @@ describe('Serper extension host functions', () => {
       const ctx = createRuntimeContext();
 
       {
-        const __r = (await getCallable(ext, 'images').fn(
-          { query: '' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'images').fn({ query: '' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -787,7 +773,7 @@ describe('Serper extension host functions', () => {
       globalThis.fetch = mockFetchJson(200, IMAGES_RESPONSE);
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, 'images').fn({ query: 'TypeScript logo' }, ctx);
@@ -806,14 +792,11 @@ describe('Serper extension host functions', () => {
       globalThis.fetch = mockFetchJson(500, {});
       const ext = createSerperExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       {
-        const __r = (await getCallable(ext, 'images').fn(
-          { query: 'test' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'images').fn({ query: 'test' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -821,7 +804,7 @@ describe('Serper extension host functions', () => {
         expect.objectContaining({
           event: 'serper:error',
           subsystem: 'extension:serper',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -896,8 +879,8 @@ describe('Serper extension host functions', () => {
       await ext.dispose!();
 
       const result = await promise;
-      expect(isInvalid(result as RillValue)).toBe(true);
-      expect(getStatus(result as RillValue).code.name).toBe('UNAVAILABLE');
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
     });
   });
 });

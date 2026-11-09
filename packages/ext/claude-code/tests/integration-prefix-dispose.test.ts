@@ -56,7 +56,7 @@ beforeEach(() => {
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream<T = Record<string, unknown>>(
+function resolveStream<T = Record<string, unknown>>(
   stream: unknown
 ): Promise<T> {
   return (
@@ -78,7 +78,7 @@ describe('IR-5: dispose terminates active child processes', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     // Track dispose calls
-    const disposeFn = vi.fn();
+    const disposeFn = vi.fn<() => void>();
 
     vi.mocked(spawnClaudeCli).mockReturnValue({
       ptyProcess: {
@@ -96,8 +96,8 @@ describe('IR-5: dispose terminates active child processes', () => {
     });
 
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
 
     vi.mocked(extractResult).mockReturnValue({
@@ -121,13 +121,15 @@ describe('IR-5: dispose terminates active child processes', () => {
     const stream = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
 
     // Wait briefly for process to start
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // Verify dispose not called yet
     expect(disposeFn).not.toHaveBeenCalled();
 
     // Call extension dispose
-    ext.dispose!();
+    await ext.dispose!();
 
     // Verify dispose was called
     expect(disposeFn).toHaveBeenCalledTimes(1);
@@ -147,7 +149,7 @@ describe('IR-5: dispose terminates active child processes', () => {
     const disposeFns: Array<Mock<() => void>> = [];
 
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      const disposeFn = vi.fn();
+      const disposeFn = vi.fn<() => void>();
       disposeFns.push(disposeFn);
 
       return {
@@ -165,8 +167,8 @@ describe('IR-5: dispose terminates active child processes', () => {
     });
 
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
 
     vi.mocked(extractResult).mockReturnValue({
@@ -192,7 +194,9 @@ describe('IR-5: dispose terminates active child processes', () => {
     );
 
     // Wait briefly for processes to start
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // Verify all dispose functions created
     expect(disposeFns).toHaveLength(5);
@@ -203,7 +207,7 @@ describe('IR-5: dispose terminates active child processes', () => {
     });
 
     // Call extension dispose
-    ext.dispose!();
+    await ext.dispose!();
 
     // Verify all dispose functions called
     disposeFns.forEach((fn) => {
@@ -211,7 +215,9 @@ describe('IR-5: dispose terminates active child processes', () => {
     });
 
     // Cleanup: ensure streams don't hang test
-    streams.forEach((s) => resolveStream(s).catch(() => {}));
+    streams.forEach((s) => {
+      resolveStream(s).catch(() => {});
+    });
   });
 });
 
@@ -231,7 +237,7 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     const disposeFns: Array<Mock<() => void>> = [];
 
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      const disposeFn = vi.fn();
+      const disposeFn = vi.fn<() => void>();
       disposeFns.push(disposeFn);
 
       return {
@@ -247,8 +253,8 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     });
 
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
 
     vi.mocked(extractResult).mockReturnValue({
@@ -275,10 +281,12 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
       extValue(ext).prompt.fn({ text: 'Test 3', options: {} }, ctx),
     ];
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // First dispose
-    ext.dispose!();
+    await ext.dispose!();
 
     // Verify all 3 disposed
     expect(disposeFns).toHaveLength(3);
@@ -287,17 +295,21 @@ describe('IR-5: dispose is idempotent (multiple calls safe)', () => {
     });
 
     // Reset mock call counts
-    disposeFns.forEach((fn) => fn.mockClear());
+    disposeFns.forEach((fn) => {
+      fn.mockClear();
+    });
 
     // Second dispose should not call any dispose functions (tracker cleared)
-    ext.dispose!();
+    await ext.dispose!();
 
     disposeFns.forEach((fn) => {
       expect(fn).not.toHaveBeenCalled();
     });
 
     // Cleanup
-    streams.forEach((s) => resolveStream(s).catch(() => {}));
+    streams.forEach((s) => {
+      resolveStream(s).catch(() => {});
+    });
   });
 });
 
@@ -333,8 +345,8 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     });
 
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
 
     vi.mocked(extractResult).mockReturnValue({
@@ -356,7 +368,9 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
 
     // Start process — fn() returns RillStream synchronously
     const stream = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // Call dispose - should not throw despite error
     expect(() => ext.dispose!()).not.toThrow();
@@ -383,7 +397,8 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
 
     // Throw non-Error object
     const disposeFn = vi.fn(() => {
-      throw 'String error';
+      const nonError: unknown = 'String error';
+      throw nonError;
     });
 
     vi.mocked(spawnClaudeCli).mockReturnValue({
@@ -398,8 +413,8 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     });
 
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
 
     vi.mocked(extractResult).mockReturnValue({
@@ -420,7 +435,9 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     const ctx = createRuntimeContext();
 
     const stream = extValue(ext).prompt.fn({ text: 'Test', options: {} }, ctx);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // Call dispose
     expect(() => ext.dispose!()).not.toThrow();
@@ -469,8 +486,8 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     });
 
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
 
     vi.mocked(extractResult).mockReturnValue({
@@ -497,7 +514,9 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
       extValue(ext).prompt.fn({ text: 'Test 3', options: {} }, ctx),
     ];
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // Dispose all
     expect(() => ext.dispose!()).not.toThrow();
@@ -514,7 +533,9 @@ describe('EC-16: dispose cleanup failure logs warning, does not throw', () => {
     );
 
     warnSpy.mockRestore();
-    streams.forEach((s) => resolveStream(s).catch(() => {}));
+    streams.forEach((s) => {
+      resolveStream(s).catch(() => {});
+    });
   });
 });
 
@@ -532,7 +553,7 @@ describe('IR-1: Factory creation is idempotent', () => {
     vi.mocked(which.default.sync).mockReturnValue('claude');
 
     vi.mocked(spawnClaudeCli).mockImplementation(() => {
-      const disposeFn = vi.fn();
+      const disposeFn = vi.fn<() => void>();
       // Store dispose function for verification
       return {
         ptyProcess: {
@@ -547,8 +568,8 @@ describe('IR-1: Factory creation is idempotent', () => {
     });
 
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
 
     vi.mocked(extractResult).mockReturnValue({
@@ -584,14 +605,16 @@ describe('IR-1: Factory creation is idempotent', () => {
       ctx
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // Dispose first instance only
-    ext1.dispose!();
+    await ext1.dispose!();
 
     // Track which dispose was called
     const disposeCalls = vi.mocked(spawnClaudeCli).mock.results.map((r) => {
-      const proc = r.value;
+      const proc = r.value as { dispose: Mock<() => void> };
       return proc.dispose.mock.calls.length;
     });
 
@@ -601,10 +624,10 @@ describe('IR-1: Factory creation is idempotent', () => {
     expect(disposeCalls[2]).toBe(0); // ext3 process (not disposed)
 
     // Dispose second instance
-    ext2.dispose!();
+    await ext2.dispose!();
 
     const disposeCalls2 = vi.mocked(spawnClaudeCli).mock.results.map((r) => {
-      const proc = r.value;
+      const proc = r.value as { dispose: Mock<() => void> };
       return proc.dispose.mock.calls.length;
     });
 
@@ -613,9 +636,9 @@ describe('IR-1: Factory creation is idempotent', () => {
     expect(disposeCalls2[2]).toBe(0); // ext3 (still not disposed)
 
     // Cleanup
-    [stream1, stream2, stream3].forEach((s) =>
-      resolveStream(s).catch(() => {})
-    );
+    [stream1, stream2, stream3].forEach((s) => {
+      resolveStream(s).catch(() => {});
+    });
   });
 
   it('applies each instance defaultTimeout independently', async () => {
@@ -626,8 +649,8 @@ describe('IR-1: Factory creation is idempotent', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
     vi.mocked(extractResult).mockReturnValue({
       result: 'Test',
@@ -650,7 +673,7 @@ describe('IR-1: Factory creation is idempotent', () => {
         kill: vi.fn(),
       } as unknown as IPty,
       exitCode: Promise.resolve(0),
-      dispose: vi.fn(),
+      dispose: vi.fn<() => void>(),
     }));
 
     const timeouts = [10000, 20000, 30000];
@@ -695,8 +718,8 @@ describe('In-flight call cancelled by dispose', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
     vi.mocked(extractResult).mockReturnValue({
       result: 'Test',
@@ -716,7 +739,9 @@ describe('In-flight call cancelled by dispose', () => {
     const exitCode = new Promise<number>((_resolve, reject) => {
       rejectExit = reject;
     });
-    const disposeFn = vi.fn(() => rejectExit(exitError()));
+    const disposeFn = vi.fn(() => {
+      rejectExit(exitError());
+    });
     vi.mocked(spawnClaudeCli).mockReturnValue({
       ptyProcess: {
         onData: vi.fn(),
@@ -742,8 +767,10 @@ describe('In-flight call cancelled by dispose', () => {
       { text: 'Test', options: {} },
       createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: vi.fn<() => void>(),
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       })
     );
@@ -866,7 +893,7 @@ describe('In-flight call cancelled by dispose', () => {
       { text: 'Test', options: {} },
       createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: vi.fn<() => void>(),
           onLogEvent: (event) => {
             events.push(event);
           },

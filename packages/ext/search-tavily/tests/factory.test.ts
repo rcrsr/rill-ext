@@ -215,7 +215,9 @@ describe('createTavilyExtension', () => {
       const calls: Array<[string, string]> = [];
       const ctx: ExtensionFactoryCtx = {
         signal: new AbortController().signal,
-        registerErrorCode: (name, kind) => calls.push([name, kind]),
+        registerErrorCode: (name, kind) => {
+          calls.push([name, kind]);
+        },
       };
       createTavilyExtension({ apiKey: 'tvly-test-key' }, ctx);
       expect(calls).toEqual([]);

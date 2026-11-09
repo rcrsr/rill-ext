@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { MockInstance } from 'vitest';
 import {
   getStatus,
   isInvalid,
@@ -183,15 +184,17 @@ describe('createClaudeCodeExtension', () => {
   });
 
   describe('dispose function', () => {
-    it('dispose is idempotent (multiple calls safe)', () => {
+    it('dispose is idempotent (multiple calls safe)', async () => {
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
 
       // Should not throw on multiple calls
-      expect(() => {
-        ext.dispose?.();
-        ext.dispose?.();
-        ext.dispose?.();
-      }).not.toThrow();
+      await expect(
+        (async (): Promise<void> => {
+          await ext.dispose?.();
+          await ext.dispose?.();
+          await ext.dispose?.();
+        })()
+      ).resolves.toBeUndefined();
     });
 
     it('dispose completes successfully on clean instance', () => {
@@ -287,7 +290,7 @@ describe('createClaudeCodeExtension', () => {
   });
 
   describe('cleanup failure handling (EC-16)', () => {
-    let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+    let consoleWarnSpy: MockInstance<typeof console.warn>;
 
     beforeEach(() => {
       consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});

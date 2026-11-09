@@ -4,7 +4,7 @@
  * Tests tool function generation, result parsing, and error handling.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { anyTypeValue, structureToTypeValue } from '@rcrsr/rill';
 import { generateToolFunctions } from '../../src/tools.js';
@@ -17,12 +17,12 @@ import type { OutputJsonSchema } from '../../src/parsing.js';
 // ============================================================
 
 interface MockClient {
-  callTool: ReturnType<typeof vi.fn>;
+  callTool: Mock<() => Promise<McpToolResult>>;
 }
 
 function createMockClient(): MockClient {
   return {
-    callTool: vi.fn(),
+    callTool: vi.fn<() => Promise<McpToolResult>>(),
   };
 }
 
@@ -204,9 +204,11 @@ describe('generateToolFunctions', () => {
       const mockClient = createMockClient();
       mockClient.callTool.mockImplementation(
         () =>
-          new Promise((resolve) =>
-            setTimeout(() => resolve(textResult('ok')), 10)
-          )
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve(textResult('ok'));
+            }, 10);
+          })
       );
 
       const functions = generateToolFunctions(

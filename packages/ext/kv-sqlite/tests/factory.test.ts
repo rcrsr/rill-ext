@@ -43,7 +43,7 @@ describe('createSqliteKvExtension', () => {
       );
     });
 
-    it('creates directory if database path parent does not exist', () => {
+    it('creates directory if database path parent does not exist', async () => {
       const dbPath = join(TEST_DATA_DIR, 'nested', 'dir', 'test.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -57,7 +57,7 @@ describe('createSqliteKvExtension', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
       expect(existsSync(join(TEST_DATA_DIR, 'nested', 'dir'))).toBe(true);
-      ext.dispose?.();
+      await ext.dispose?.();
     });
 
     it('throws RILL-R001 when a file blocks the database directory', () => {
@@ -94,7 +94,7 @@ describe('createSqliteKvExtension', () => {
   });
 
   describe('database initialization', () => {
-    it('creates database file if not exists', () => {
+    it('creates database file if not exists', async () => {
       const dbPath = join(TEST_DATA_DIR, 'new.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -108,10 +108,10 @@ describe('createSqliteKvExtension', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
       expect(existsSync(dbPath)).toBe(true);
-      ext.dispose?.();
+      await ext.dispose?.();
     });
 
-    it('opens existing database file', () => {
+    it('opens existing database file', async () => {
       const dbPath = join(TEST_DATA_DIR, 'existing.db');
       mkdirSync(TEST_DATA_DIR, { recursive: true });
 
@@ -145,10 +145,10 @@ describe('createSqliteKvExtension', () => {
       expect(tableNames).toContain('existing');
       expect(tableNames).toContain('kv_test');
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
 
-    it('supports multiple mounts sharing same database', () => {
+    it('supports multiple mounts sharing same database', async () => {
       const dbPath = join(TEST_DATA_DIR, 'shared.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -180,10 +180,10 @@ describe('createSqliteKvExtension', () => {
       expect(tableNames).toContain('users_kv');
       expect(tableNames).toContain('settings_kv');
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
 
-    it('supports multiple mounts with different databases', () => {
+    it('supports multiple mounts with different databases', async () => {
       const db1Path = join(TEST_DATA_DIR, 'db1.db');
       const db2Path = join(TEST_DATA_DIR, 'db2.db');
       const config: SqliteKvConfig = {
@@ -206,12 +206,12 @@ describe('createSqliteKvExtension', () => {
       expect(existsSync(db1Path)).toBe(true);
       expect(existsSync(db2Path)).toBe(true);
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
   });
 
   describe('WAL mode', () => {
-    it('enables WAL mode on database initialization', () => {
+    it('enables WAL mode on database initialization', async () => {
       const dbPath = join(TEST_DATA_DIR, 'wal.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -224,7 +224,7 @@ describe('createSqliteKvExtension', () => {
       };
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      ext.dispose?.();
+      await ext.dispose?.();
 
       // Verify WAL mode persists
       const db = new Database(dbPath, { readonly: true });
@@ -236,7 +236,7 @@ describe('createSqliteKvExtension', () => {
   });
 
   describe('table creation', () => {
-    it('creates table with correct schema', () => {
+    it('creates table with correct schema', async () => {
       const dbPath = join(TEST_DATA_DIR, 'schema.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -249,7 +249,7 @@ describe('createSqliteKvExtension', () => {
       };
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      ext.dispose?.();
+      await ext.dispose?.();
 
       // Verify table schema
       const db = new Database(dbPath, { readonly: true });
@@ -275,7 +275,7 @@ describe('createSqliteKvExtension', () => {
       });
     });
 
-    it('does not recreate existing table', () => {
+    it('does not recreate existing table', async () => {
       const dbPath = join(TEST_DATA_DIR, 'existing-table.db');
       mkdirSync(TEST_DATA_DIR, { recursive: true });
 
@@ -304,7 +304,7 @@ describe('createSqliteKvExtension', () => {
       };
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      ext.dispose?.();
+      await ext.dispose?.();
 
       // Verify existing data preserved
       const verifyDb = new Database(dbPath, { readonly: true });
@@ -319,7 +319,7 @@ describe('createSqliteKvExtension', () => {
   });
 
   describe('dispose lifecycle', () => {
-    it('closes the database connection once on dispose', () => {
+    it('closes the database connection once on dispose', async () => {
       const dbPath = join(TEST_DATA_DIR, 'dispose.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -334,7 +334,7 @@ describe('createSqliteKvExtension', () => {
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
       expect(closeSpy).not.toHaveBeenCalled();
-      ext.dispose?.();
+      await ext.dispose?.();
 
       expect(closeSpy).toHaveBeenCalledOnce();
       // Should be able to open database again (not locked)
@@ -343,7 +343,7 @@ describe('createSqliteKvExtension', () => {
       db.close();
     });
 
-    it('closes each mount database exactly once on dispose', () => {
+    it('closes each mount database exactly once on dispose', async () => {
       const db1Path = join(TEST_DATA_DIR, 'dispose1.db');
       const db2Path = join(TEST_DATA_DIR, 'dispose2.db');
       const config: SqliteKvConfig = {
@@ -363,13 +363,13 @@ describe('createSqliteKvExtension', () => {
       const closeSpy = vi.spyOn(Database.prototype, 'close');
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      ext.dispose?.();
+      await ext.dispose?.();
 
       expect(closeSpy).toHaveBeenCalledTimes(2);
       expect(new Set(closeSpy.mock.contexts).size).toBe(2);
     });
 
-    it('closes databases only once when disposed twice', () => {
+    it('closes databases only once when disposed twice', async () => {
       const dbPath = join(TEST_DATA_DIR, 'double-dispose.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -383,8 +383,8 @@ describe('createSqliteKvExtension', () => {
       const closeSpy = vi.spyOn(Database.prototype, 'close');
 
       const ext = createSqliteKvExtension(config, makeFactoryCtx());
-      ext.dispose?.();
-      ext.dispose?.();
+      await ext.dispose?.();
+      await ext.dispose?.();
 
       expect(closeSpy).toHaveBeenCalledOnce();
     });
