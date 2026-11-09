@@ -311,7 +311,7 @@ function createPtyStream(
     return {
       ...result,
       tokens: { ...result.tokens } as { [key: string]: RillValue },
-    } as RillValue;
+    };
   };
 
   return createRillStream({
@@ -323,7 +323,7 @@ function createPtyStream(
     },
     chunkType: { kind: 'string' },
     retType: retTypeStructure,
-  }) as RillValue;
+  });
 }
 
 // ============================================================
@@ -446,7 +446,7 @@ export function createClaudeCodeExtension(
         ),
       ],
       fn: (args, ctxLike): RillValue => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const text = args['text'] as string;
         const options = (args['options'] ?? {}) as Record<string, unknown>;
@@ -457,7 +457,7 @@ export function createClaudeCodeExtension(
             code: 'INVALID_INPUT',
             provider: 'claude-code',
             raw: { kind: 'empty_text' },
-          }) as unknown as RillValue;
+          });
         }
 
         const timeout =
@@ -474,7 +474,7 @@ export function createClaudeCodeExtension(
             settingSources,
           });
         } catch (error: unknown) {
-          throw mapSpawnError(ctx, error) as unknown as RillValue;
+          throw mapSpawnError(ctx, error);
         }
 
         tracker.disposers.add(spawn.dispose);
@@ -536,7 +536,7 @@ export function createClaudeCodeExtension(
         ),
       ],
       fn: (fnArgs, ctxLike): RillValue => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
@@ -547,7 +547,7 @@ export function createClaudeCodeExtension(
             code: 'INVALID_INPUT',
             provider: 'claude-code',
             raw: { kind: 'empty_skill_name' },
-          }) as unknown as RillValue;
+          });
         }
 
         const flags = serializeArgsToFlags(args);
@@ -568,7 +568,7 @@ export function createClaudeCodeExtension(
             settingSources,
           });
         } catch (error: unknown) {
-          throw mapSpawnError(ctx, error) as unknown as RillValue;
+          throw mapSpawnError(ctx, error);
         }
 
         tracker.disposers.add(spawn.dispose);
@@ -630,7 +630,7 @@ export function createClaudeCodeExtension(
         ),
       ],
       fn: (fnArgs, ctxLike): RillValue => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         if (disposed) throw createDisposedHalt(ctx, PROVIDER);
         const name = fnArgs['name'] as string;
         const args = (fnArgs['args'] ?? {}) as Record<string, unknown>;
@@ -641,7 +641,7 @@ export function createClaudeCodeExtension(
             code: 'INVALID_INPUT',
             provider: 'claude-code',
             raw: { kind: 'empty_command_name' },
-          }) as unknown as RillValue;
+          });
         }
 
         const flags = serializeArgsToFlags(args);
@@ -662,7 +662,7 @@ export function createClaudeCodeExtension(
             settingSources,
           });
         } catch (error: unknown) {
-          throw mapSpawnError(ctx, error) as unknown as RillValue;
+          throw mapSpawnError(ctx, error);
         }
 
         tracker.disposers.add(spawn.dispose);

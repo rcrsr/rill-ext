@@ -234,9 +234,7 @@ afterEach(async () => {
   await Promise.all(
     tempDirs
       .splice(0)
-      .map((d) =>
-        fs.rm(d, { recursive: true, force: true }).catch(() => undefined)
-      )
+      .map((d) => fs.rm(d, { recursive: true, force: true }).catch(() => {}))
   );
   mockAnthropicStream.mockReset();
   mockOpenAIStream.mockReset();

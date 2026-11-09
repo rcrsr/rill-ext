@@ -74,6 +74,6 @@ export function makeGmailSearch(
       id: m.id ?? '',
       thread_id: m.threadId ?? '',
     }));
-    return { messages } as unknown as RillValue;
+    return { messages };
   };
 }

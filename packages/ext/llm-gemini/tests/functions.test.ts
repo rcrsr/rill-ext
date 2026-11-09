@@ -36,7 +36,7 @@ function extractLastMessageText(resolved: Record<string, unknown>): string {
     role: string;
     parts: Array<{ type: string; text?: string }>;
   }>;
-  const last = messages[messages.length - 1];
+  const last = messages.at(-1);
   if (!last) return '';
   return last.parts
     .filter((p) => p.type === 'text' && p.text !== undefined)
@@ -121,6 +121,13 @@ async function collectStreamUntilError(
     return { chunks, error };
   }
 }
+
+/** Typed wrapper so asymmetric matchers can nest inside expected objects. */
+function containing(expected: Record<string, unknown>): unknown {
+  return expect.objectContaining(expected);
+}
+
+const ANY_ABORT_SIGNAL: unknown = expect.any(AbortSignal);
 
 // Mock the Google GenAI SDK at module level
 const mockGenerateContent = vi.fn();
@@ -212,7 +219,7 @@ describe('message() function', () => {
         parts: unknown[];
       }>;
       expect(Array.isArray(messages)).toBe(true);
-      const last = messages[messages.length - 1]!;
+      const last = messages.at(-1)!;
       expect(last.role).toBe('assistant');
     });
 
@@ -244,7 +251,7 @@ describe('message() function', () => {
             parts: [{ text: 'What is 2+2?' }],
           },
         ],
-        config: expect.objectContaining({
+        config: containing({
           maxOutputTokens: 8192,
           temperature: 0.7,
         }),
@@ -280,7 +287,7 @@ describe('message() function', () => {
             parts: [{ text: 'What is 2+2?' }],
           },
         ],
-        config: expect.objectContaining({
+        config: containing({
           systemInstruction: 'You are helpful.',
           maxOutputTokens: 8192,
           temperature: 0.7,
@@ -607,7 +614,7 @@ describe('embed() function', () => {
       expect(mockEmbedContent).toHaveBeenCalledWith({
         model: 'text-embedding-004',
         contents: ['Test text'],
-        config: { abortSignal: expect.any(AbortSignal) },
+        config: { abortSignal: ANY_ABORT_SIGNAL },
       });
     });
   });

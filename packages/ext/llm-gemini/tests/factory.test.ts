@@ -16,6 +16,9 @@ import { createGeminiExtension } from '../src/factory.js';
 import type { GeminiExtensionConfig } from '../src/types.js';
 import type { LLMExtensionConfig } from '../src/index.js';
 
+const ANY_FUNCTION: unknown = expect.any(Function);
+const ANY_STRING: unknown = expect.any(String);
+
 // ============================================================
 // VALIDATION TESTS
 // ============================================================
@@ -146,8 +149,8 @@ describe('createGeminiExtension', () => {
 
         expect(value[name]).toMatchObject({
           params,
-          fn: expect.any(Function),
-          annotations: { description: expect.any(String) },
+          fn: ANY_FUNCTION,
+          annotations: { description: ANY_STRING },
           returnType: { typeName: returnTypeName },
         });
       }

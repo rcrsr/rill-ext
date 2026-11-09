@@ -106,7 +106,7 @@ export function createTextExtension(
         p.num('word_wrap_width', 'Line wrap width in characters', 80),
       ],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const html = args['html'];
         if (typeof html !== 'string') {
           return runCtx.invalidate(new Error('html must be a string'), {
@@ -167,7 +167,7 @@ export function createTextExtension(
     html_to_markdown: {
       params: [p.str('html', 'HTML string to convert')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const html = args['html'];
         if (typeof html !== 'string') {
           return runCtx.invalidate(new Error('html must be a string'), {
@@ -185,7 +185,7 @@ export function createTextExtension(
     extract_content: {
       params: [p.str('html', 'HTML document to extract main content from')],
       fn: async (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const html = args['html'];
         if (typeof html !== 'string') {
           return runCtx.invalidate(new Error('html must be a string'), {
@@ -205,7 +205,7 @@ export function createTextExtension(
     decode_entities: {
       params: [p.str('text', 'Text containing HTML entities to decode')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -223,7 +223,7 @@ export function createTextExtension(
     decode_quoted_printable: {
       params: [p.str('text', 'Quoted-printable encoded text to decode')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -241,7 +241,7 @@ export function createTextExtension(
     strip_diacritics: {
       params: [p.str('text', 'Text from which to remove diacritics')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -262,7 +262,7 @@ export function createTextExtension(
         p.bool('preserve_newlines', 'Keep newline characters', false),
       ],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -295,7 +295,7 @@ export function createTextExtension(
     dedent: {
       params: [p.str('text', 'Indented text to dedent')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -315,7 +315,7 @@ export function createTextExtension(
     trim_lines: {
       params: [p.str('text', 'Text whose lines should be trimmed')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -335,7 +335,7 @@ export function createTextExtension(
     extract_urls: {
       params: [p.str('text', 'Text to extract URLs from')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -353,7 +353,7 @@ export function createTextExtension(
     extract_emails: {
       params: [p.str('text', 'Text to extract email addresses from')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -371,7 +371,7 @@ export function createTextExtension(
     split_paragraphs: {
       params: [p.str('text', 'Text to split into paragraphs')],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -396,7 +396,7 @@ export function createTextExtension(
         ),
       ],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {
@@ -445,7 +445,7 @@ export function createTextExtension(
         ellipsisParam,
       ],
       fn: (args, ctx) => {
-        const runCtx = ctx as RuntimeContext;
+        const runCtx = ctx;
         const text = args['text'];
         if (typeof text !== 'string') {
           return runCtx.invalidate(new Error('text must be a string'), {

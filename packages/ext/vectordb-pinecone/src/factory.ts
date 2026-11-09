@@ -145,7 +145,7 @@ export function createPineconeExtension(
         p.dict('metadata', undefined, {}),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -159,7 +159,7 @@ export function createPineconeExtension(
           await index.namespace(factoryNamespace).upsert({
             records: [{ id, values: Array.from(vector.data), metadata }],
           });
-          return { id, success: true } as RillValue;
+          return { id, success: true };
         });
       },
       annotations: {
@@ -177,7 +177,7 @@ export function createPineconeExtension(
     upsert_batch: {
       params: [p.list('items')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -204,7 +204,7 @@ export function createPineconeExtension(
                 count: items.length,
                 succeeded,
               });
-              return result as RillValue;
+              return result;
             }
 
             const id = item['id'] as string;
@@ -235,7 +235,7 @@ export function createPineconeExtension(
                 count: items.length,
                 succeeded,
               });
-              return result as RillValue;
+              return result;
             }
           }
 
@@ -246,7 +246,7 @@ export function createPineconeExtension(
             count: items.length,
             succeeded,
           });
-          return { succeeded } as RillValue;
+          return { succeeded };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -277,7 +277,7 @@ export function createPineconeExtension(
         ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -365,7 +365,7 @@ export function createPineconeExtension(
     get: {
       params: [p.str('id')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -377,7 +377,11 @@ export function createPineconeExtension(
             .namespace(factoryNamespace)
             .fetch({ ids: [id] });
 
-          if (!response.records || response.records[id] === undefined) {
+          if (
+            response.records === undefined ||
+            response.records === null ||
+            response.records[id] === undefined
+          ) {
             // Throw so withEventEmission catches and maps via mapVectorError,
             // whose "id not found" clause yields #NOT_FOUND.
             throw new Error('pinecone: id not found');
@@ -398,7 +402,7 @@ export function createPineconeExtension(
             id,
             vector,
             metadata: record.metadata ?? {},
-          } as RillValue;
+          };
         });
       },
       annotations: { description: 'Fetch vector by ID' },
@@ -415,7 +419,7 @@ export function createPineconeExtension(
     delete: {
       params: [p.str('id')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -423,7 +427,7 @@ export function createPineconeExtension(
         return await withEvents(ctx, 'delete', { id }, async () => {
           const index = client.index({ name: factoryIndex });
           await index.namespace(factoryNamespace || '').deleteOne({ id });
-          return { id, deleted: true } as RillValue;
+          return { id, deleted: true };
         });
       },
       annotations: { description: 'Delete vector by ID' },
@@ -439,7 +443,7 @@ export function createPineconeExtension(
     delete_batch: {
       params: [p.list('ids')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -470,7 +474,7 @@ export function createPineconeExtension(
                 count: ids.length,
                 succeeded,
               });
-              return result as RillValue;
+              return result;
             }
           }
 
@@ -481,7 +485,7 @@ export function createPineconeExtension(
             count: ids.length,
             succeeded,
           });
-          return { succeeded } as RillValue;
+          return { succeeded };
         } catch (error: unknown) {
           return emitError(ctx, error, startTime);
         }
@@ -500,7 +504,7 @@ export function createPineconeExtension(
     count: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -508,7 +512,7 @@ export function createPineconeExtension(
           const index = client.index({ name: factoryIndex });
           const stats = await index.describeIndexStats();
           const count = stats.namespaces?.[factoryNamespace]?.recordCount ?? 0;
-          return count as RillValue;
+          return count;
         });
       },
       annotations: { description: 'Return total vector count in collection' },
@@ -529,7 +533,7 @@ export function createPineconeExtension(
         ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -569,7 +573,7 @@ export function createPineconeExtension(
               metric: pineconeMetric,
               spec: { serverless: { cloud: 'aws', region: 'us-east-1' } },
             });
-            return { name, created: true } as RillValue;
+            return { name, created: true };
           }
         );
       },
@@ -586,7 +590,7 @@ export function createPineconeExtension(
     delete_collection: {
       params: [p.str('name')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -597,7 +601,7 @@ export function createPineconeExtension(
           { name },
           async () => {
             await client.deleteIndex(name);
-            return { name, deleted: true } as RillValue;
+            return { name, deleted: true };
           }
         );
       },
@@ -614,7 +618,7 @@ export function createPineconeExtension(
     list_collections: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -622,7 +626,7 @@ export function createPineconeExtension(
           const response = await client.listIndexes();
           const names =
             response.indexes?.map((index) => index.name ?? '') ?? [];
-          return names as RillValue;
+          return names;
         });
       },
       annotations: { description: 'List all collection names' },
@@ -635,7 +639,7 @@ export function createPineconeExtension(
     describe: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -670,7 +674,7 @@ export function createPineconeExtension(
               count,
               dimensions,
               distance,
-            } as RillValue;
+            };
           }
         );
       },

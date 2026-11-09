@@ -34,11 +34,7 @@ function getCallable(
   return {
     fn: (args: Record<string, unknown>) => {
       const result = callable.fn(args, makeRuntimeCtx());
-      if (
-        result &&
-        typeof result === 'object' &&
-        'then' in (result as object)
-      ) {
+      if (typeof result === 'object' && result !== null && 'then' in result) {
         return (result as Promise<unknown>).then(checkInvalid);
       }
       return checkInvalid(result);
@@ -58,7 +54,7 @@ afterEach(() => {
 
 describe('kv functions', () => {
   describe('set()', () => {
-    it('validates type in declared mode', () => {
+    it('validates type in declared mode', async () => {
       const dbPath = join(TEST_DATA_DIR, 'set-type.db');
       const config: SqliteKvConfig = {
         mounts: {
@@ -82,12 +78,12 @@ describe('kv functions', () => {
           value: 'not-a-number',
         })
       ).toThrow('expects number');
-      ext.dispose?.();
+      await ext.dispose?.();
     });
   });
 
   describe('mounts()', () => {
-    it('returns list of mount metadata', () => {
+    it('returns list of mount metadata', async () => {
       const db1Path = join(TEST_DATA_DIR, 'mounts1.db');
       const db2Path = join(TEST_DATA_DIR, 'mounts2.db');
       const config: SqliteKvConfig = {
@@ -134,7 +130,7 @@ describe('kv functions', () => {
         table: 'cache_kv',
       });
 
-      ext.dispose?.();
+      await ext.dispose?.();
     });
   });
 });

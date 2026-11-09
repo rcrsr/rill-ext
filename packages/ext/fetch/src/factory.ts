@@ -206,13 +206,8 @@ export function createFetchExtension(
     const params = endpointConfig.params ?? [];
 
     const endpointFn: CallableFn = async (args, runCtxLike) => {
-      const runCtx = runCtxLike as RuntimeContext;
-      const processed = processArguments(
-        runCtx,
-        args as Record<string, RillValue>,
-        params,
-        endpointName
-      );
+      const runCtx = runCtxLike;
+      const processed = processArguments(runCtx, args, params, endpointName);
       if (!processed.ok) return processed.invalid;
       const processedArgs = processed.args;
 
@@ -261,14 +256,14 @@ export function createFetchExtension(
     const rillParams = params.map((param) => {
       const rillType =
         param.type !== 'dict'
-          ? { kind: param.type as 'string' | 'number' | 'bool' }
+          ? { kind: param.type }
           : { kind: 'dict' as const };
 
       return {
         name: param.name,
         type: rillType,
-        defaultValue: param.defaultValue as RillValue | undefined,
-        annotations: {} as Record<string, RillValue>,
+        defaultValue: param.defaultValue,
+        annotations: {},
       };
     });
 

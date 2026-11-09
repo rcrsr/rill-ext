@@ -17,7 +17,6 @@ import {
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
-  type RuntimeContext,
 } from '@rcrsr/rill';
 import type { PromptExtensionContract } from '@rcrsr/rill-ext-prompt-shared';
 import type { PromptMdExtensionConfig } from './types.js';
@@ -130,7 +129,7 @@ export async function createPromptMdExtension(
     // Wrap the closure fn to check the disposed flag before executing.
     const wrappedFn: CallableFn = (args, ctxLike, location) => {
       if (disposed) {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         throw new RuntimeHaltSignal(
           ctx.invalidate(
             new Error(

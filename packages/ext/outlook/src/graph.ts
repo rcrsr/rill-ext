@@ -7,7 +7,7 @@
  * mapFetchError); the wrap()'s catch passes it through unchanged.
  */
 
-import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import type { RuntimeContext } from '@rcrsr/rill';
 import { resolveToken } from './config.js';
 import { mapFetchError, mapGraphError } from './errors.js';
 import type { OutlookAuth } from './types.js';
@@ -66,20 +66,16 @@ export async function graphFetch(
   try {
     response = await fetch(url, init);
   } catch (error) {
-    throw mapFetchError(ctx, error) as unknown as RillValue;
+    throw mapFetchError(ctx, error);
   }
 
   if (!response.ok) {
-    throw mapGraphError(
-      ctx,
-      response.status,
-      path.split('?')[0] ?? path
-    ) as unknown as RillValue;
+    throw mapGraphError(ctx, response.status, path.split('?')[0] ?? path);
   }
 
   if (response.status === 202 || response.status === 204) {
     return null;
   }
 
-  return response.json() as Promise<unknown>;
+  return response.json();
 }

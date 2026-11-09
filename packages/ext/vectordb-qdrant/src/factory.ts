@@ -131,7 +131,7 @@ export function createQdrantExtension(
         p.dict('metadata', undefined, {}),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -146,7 +146,7 @@ export function createQdrantExtension(
               { id, vector: Array.from(vector.data), payload: metadata },
             ],
           });
-          return { id, success: true } as RillValue;
+          return { id, success: true };
         });
       },
       annotations: {
@@ -164,7 +164,7 @@ export function createQdrantExtension(
     upsert_batch: {
       params: [p.list('items')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -185,7 +185,7 @@ export function createQdrantExtension(
                   succeeded,
                   failed: `index ${i}`,
                   error: 'invalid item structure',
-                } as RillValue;
+                };
               }
 
               const id = item['id'] as string;
@@ -210,11 +210,11 @@ export function createQdrantExtension(
                   succeeded,
                   failed: id,
                   error: getStatus(invalid).message,
-                } as RillValue;
+                };
               }
             }
 
-            return { succeeded } as RillValue;
+            return { succeeded };
           }
         );
       },
@@ -244,7 +244,7 @@ export function createQdrantExtension(
         ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -304,7 +304,7 @@ export function createQdrantExtension(
     get: {
       params: [p.str('id')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -362,7 +362,7 @@ export function createQdrantExtension(
     delete: {
       params: [p.str('id')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -370,9 +370,9 @@ export function createQdrantExtension(
         return await withEvents(ctx, 'delete', { id }, async () => {
           await client.delete(factoryCollection, {
             wait: true,
-            points: [id as string | number],
+            points: [id],
           });
-          return { id, deleted: true } as RillValue;
+          return { id, deleted: true };
         });
       },
       annotations: { description: 'Delete vector by ID' },
@@ -388,7 +388,7 @@ export function createQdrantExtension(
     delete_batch: {
       params: [p.list('ids')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -419,7 +419,7 @@ export function createQdrantExtension(
                 } as RillValue;
               }
             }
-            return { succeeded } as RillValue;
+            return { succeeded };
           }
         );
       },
@@ -437,13 +437,13 @@ export function createQdrantExtension(
     count: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
         return await withEvents(ctx, 'count', {}, async () => {
           const response = await client.getCollection(factoryCollection);
-          return (response.points_count ?? 0) as RillValue;
+          return response.points_count ?? 0;
         });
       },
       annotations: { description: 'Return total vector count in collection' },
@@ -464,7 +464,7 @@ export function createQdrantExtension(
         ),
       ],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -487,7 +487,7 @@ export function createQdrantExtension(
             await client.createCollection(name, {
               vectors: { size: dimensions, distance: qdrantDistance },
             });
-            return { name, created: true } as RillValue;
+            return { name, created: true };
           }
         );
       },
@@ -504,7 +504,7 @@ export function createQdrantExtension(
     delete_collection: {
       params: [p.str('name')],
       fn: async (args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -515,7 +515,7 @@ export function createQdrantExtension(
           { name },
           async () => {
             await client.deleteCollection(name);
-            return { name, deleted: true } as RillValue;
+            return { name, deleted: true };
           }
         );
       },
@@ -532,13 +532,13 @@ export function createQdrantExtension(
     list_collections: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
         return await withEvents(ctx, 'list_collections', {}, async () => {
           const response = await client.getCollections();
-          return response.collections.map((col) => col.name) as RillValue;
+          return response.collections.map((col) => col.name);
         });
       },
       annotations: { description: 'List all collection names' },
@@ -551,7 +551,7 @@ export function createQdrantExtension(
     describe: {
       params: [],
       fn: async (_args, ctxLike): Promise<RillValue> => {
-        const ctx = ctxLike as RuntimeContext;
+        const ctx = ctxLike;
         const disposed = checkDisposed(ctx, disposalState, PROVIDER);
         if (disposed !== null) throw disposed;
 
@@ -582,7 +582,7 @@ export function createQdrantExtension(
               count: response.points_count ?? 0,
               dimensions,
               distance,
-            } as RillValue;
+            };
           }
         );
       },

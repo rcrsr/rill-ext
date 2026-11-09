@@ -40,7 +40,11 @@ export function createSqliteKvExtension(
   config: SqliteKvConfig,
   ctx: ExtensionFactoryCtx
 ): ExtensionFactoryResult {
-  if (!config.mounts || Object.keys(config.mounts).length === 0) {
+  if (
+    config.mounts === undefined ||
+    config.mounts === null ||
+    Object.keys(config.mounts).length === 0
+  ) {
     throw new RuntimeError(
       'RILL-R001',
       'SQLite kv extension requires at least one mount in configuration'
@@ -111,7 +115,7 @@ export function createSqliteKvExtension(
     databases.clear();
   };
 
-  if (ctx?.signal) {
+  if (ctx?.signal !== undefined && ctx.signal !== null) {
     if (ctx.signal.aborted) {
       dispose();
     } else {
@@ -203,7 +207,7 @@ export function createSqliteKvExtension(
   // ============================================================
 
   const get: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -238,7 +242,7 @@ export function createSqliteKvExtension(
   };
 
   const get_or: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -259,7 +263,7 @@ export function createSqliteKvExtension(
   };
 
   const set: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -353,7 +357,7 @@ export function createSqliteKvExtension(
   };
 
   const merge: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -446,7 +450,7 @@ export function createSqliteKvExtension(
   };
 
   const deleteKey: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -469,7 +473,7 @@ export function createSqliteKvExtension(
   };
 
   const keys: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mount = getMountDb(mountName);
@@ -487,7 +491,7 @@ export function createSqliteKvExtension(
   };
 
   const has: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const key = args['key'] as string;
@@ -506,7 +510,7 @@ export function createSqliteKvExtension(
   };
 
   const clear: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mount = getMountDb(mountName);
@@ -535,7 +539,7 @@ export function createSqliteKvExtension(
   };
 
   const getAll: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mount = getMountDb(mountName);
@@ -557,7 +561,7 @@ export function createSqliteKvExtension(
   };
 
   const schema: CallableFn = (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     if (disposed) throw disposedInvalid(runCtx);
     const mountName = args['mount'] as string;
     const mount = getMountDb(mountName);
@@ -578,7 +582,7 @@ export function createSqliteKvExtension(
   };
 
   const mountsList: CallableFn = (_args, runtimeCtx) => {
-    if (disposed) throw disposedInvalid(runtimeCtx as RuntimeContext);
+    if (disposed) throw disposedInvalid(runtimeCtx);
     const result: RillValue[] = [];
     for (const [name, mountConfig] of Object.entries(config.mounts)) {
       result.push({

@@ -152,7 +152,7 @@ export async function parseFile(
         }
       );
     }
-    raw = parsed as PromptFrontmatter;
+    raw = parsed;
   } catch (err) {
     if (err instanceof RuntimeError) {
       throw err;

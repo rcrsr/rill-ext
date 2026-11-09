@@ -21,6 +21,7 @@ import {
   isInvalid,
   RuntimeHaltSignal,
   type ApplicationCallable,
+  type ExtensionEvent,
   type ExtensionFactoryCtx,
   type RillValue,
 } from '@rcrsr/rill';
@@ -346,7 +347,7 @@ describe('Tavily extension host functions', () => {
     it('emits success event on successful search [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       const ctx = createRuntimeContext({ callbacks: { onLogEvent } });
 
       await getCallable(ext, 'search').fn({ query: 'TypeScript' }, ctx);
@@ -364,7 +365,7 @@ describe('Tavily extension host functions', () => {
     it('emits error event on failed search [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(401, {});
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       const ctx = createRuntimeContext({ callbacks: { onLogEvent } });
 
       await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
@@ -373,7 +374,7 @@ describe('Tavily extension host functions', () => {
         expect.objectContaining({
           event: 'tavily:error',
           subsystem: 'extension:tavily',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -573,7 +574,7 @@ describe('Tavily extension host functions', () => {
     it('emits success event on success [AC-11]', async () => {
       globalThis.fetch = mockFetchJson(200, EXTRACT_RESPONSE);
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       const ctx = createRuntimeContext({ callbacks: { onLogEvent } });
 
       await getCallable(ext, 'extract').fn(
@@ -592,7 +593,7 @@ describe('Tavily extension host functions', () => {
     it('emits error event on failure [AC-24]', async () => {
       globalThis.fetch = mockFetchJson(500, {});
       const ext = createTavilyExtension(VALID_CONFIG, makeFactoryCtx());
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       const ctx = createRuntimeContext({ callbacks: { onLogEvent } });
 
       await getCallable(ext, 'extract').fn(
@@ -604,7 +605,7 @@ describe('Tavily extension host functions', () => {
         expect.objectContaining({
           event: 'tavily:error',
           subsystem: 'extension:tavily',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -674,8 +675,8 @@ describe('Tavily extension host functions', () => {
       await ext.dispose!();
 
       const result = await promise;
-      expect(isInvalid(result as RillValue)).toBe(true);
-      expect(getStatus(result as RillValue).code.name).toBe('UNAVAILABLE');
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
     });
   });
 

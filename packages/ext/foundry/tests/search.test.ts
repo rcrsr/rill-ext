@@ -507,7 +507,7 @@ describe('search() host function', () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithSearch('my-index'));
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getHostFn(ext, 'search').fn({ query: 'test', options: {} }, ctx);
@@ -528,7 +528,7 @@ describe('search() host function', () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithSearch('my-index'));
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await expect(
@@ -540,7 +540,7 @@ describe('search() host function', () => {
           event: 'foundry:search:error',
           subsystem: 'extension:foundry',
           index: 'my-index',
-          error: expect.any(String),
+          error: expect.any(String) as unknown,
         })
       );
     });

@@ -57,11 +57,13 @@ describe('createSearchFunctionWrapper', () => {
         disposalState,
         inFlightState
       );
-      const fn = vi.fn(async () => ({
-        result: 'ok' as RillValue,
-        query: 'test',
-        resultCount: 1,
-      }));
+      const fn = vi.fn(() =>
+        Promise.resolve({
+          result: 'ok',
+          query: 'test',
+          resultCount: 1,
+        })
+      );
       const wrappedFn = wrap('search', fn);
 
       const thrown = await captureThrown(() => wrappedFn({}, makeCtx()));
@@ -90,11 +92,13 @@ describe('createSearchFunctionWrapper', () => {
         functions: {
           search: {
             params: [],
-            fn: wrap('search', async () => ({
-              result: 'ok' as RillValue,
-              query: 'test',
-              resultCount: 1,
-            })),
+            fn: wrap('search', () =>
+              Promise.resolve({
+                result: 'ok',
+                query: 'test',
+                resultCount: 1,
+              })
+            ),
             annotations: { description: 'Test search' },
             returnType: anyTypeValue,
           },
@@ -133,9 +137,13 @@ describe('createSearchFunctionWrapper', () => {
         disposalState,
         inFlightState
       );
-      const wrappedFn = wrap('search', async () => {
+      const wrappedFn = wrap('search', () => {
         capturedSize = inFlightState.controllers.size;
-        return { result: 'ok' as RillValue, query: 'q', resultCount: 1 };
+        return Promise.resolve({
+          result: 'ok',
+          query: 'q',
+          resultCount: 1,
+        });
       });
       await wrappedFn({}, makeCtx());
       expect(capturedSize).toBe(1);
@@ -150,9 +158,9 @@ describe('createSearchFunctionWrapper', () => {
         disposalState,
         inFlightState
       );
-      const wrappedFn = wrap('search', async () => {
-        throw new Error('fetch failed');
-      });
+      const wrappedFn = wrap('search', () =>
+        Promise.reject(new Error('fetch failed'))
+      );
       const result = await wrappedFn({}, makeCtx());
       expect(isInvalid(result)).toBe(true);
       expect(inFlightState.controllers.size).toBe(0);
@@ -170,9 +178,13 @@ describe('createSearchFunctionWrapper', () => {
         inFlightState
       );
       let capturedSignal: AbortSignal | undefined;
-      const wrappedFn = wrap('search', async (_args, _ctx, signal) => {
+      const wrappedFn = wrap('search', (_args, _ctx, signal) => {
         capturedSignal = signal;
-        return { result: 'ok' as RillValue, query: 'q', resultCount: 1 };
+        return Promise.resolve({
+          result: 'ok',
+          query: 'q',
+          resultCount: 1,
+        });
       });
       await wrappedFn({}, makeCtx({ signal: outer.signal }));
       expect(capturedSignal).toBeDefined();
@@ -181,9 +193,13 @@ describe('createSearchFunctionWrapper', () => {
       // a fresh wrapped call with a pre-aborted outer signal yields an aborted fn signal.
       outer.abort();
       let secondSignal: AbortSignal | undefined;
-      const wrappedFn2 = wrap('search', async (_args, _ctx, signal) => {
+      const wrappedFn2 = wrap('search', (_args, _ctx, signal) => {
         secondSignal = signal;
-        return { result: 'ok' as RillValue, query: 'q', resultCount: 1 };
+        return Promise.resolve({
+          result: 'ok',
+          query: 'q',
+          resultCount: 1,
+        });
       });
       await wrappedFn2({}, makeCtx({ signal: outer.signal }));
       expect(secondSignal!.aborted).toBe(true);
@@ -198,9 +214,13 @@ describe('createSearchFunctionWrapper', () => {
         inFlightState
       );
       let captured: AbortSignal | undefined;
-      const wrappedFn = wrap('search', async (_args, _ctx, signal) => {
+      const wrappedFn = wrap('search', (_args, _ctx, signal) => {
         captured = signal;
-        return { result: 'ok' as RillValue, query: 'q', resultCount: 1 };
+        return Promise.resolve({
+          result: 'ok',
+          query: 'q',
+          resultCount: 1,
+        });
       });
       await wrappedFn({}, makeCtx());
       expect(captured).toBeDefined();
@@ -212,23 +232,25 @@ describe('createSearchFunctionWrapper', () => {
     it('emits success event with duration, query, result_count', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(e: unknown) => void>();
       const wrap = createSearchFunctionWrapper(
         provider,
         disposalState,
         inFlightState
       );
-      const wrappedFn = wrap('search', async () => ({
-        result: ['r1', 'r2'] as RillValue,
-        query: 'TypeScript',
-        resultCount: 2,
-      }));
+      const wrappedFn = wrap('search', () =>
+        Promise.resolve({
+          result: ['r1', 'r2'] as RillValue,
+          query: 'TypeScript',
+          resultCount: 2,
+        })
+      );
       await wrappedFn({}, makeCtx({ onLogEvent }));
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           event: `${provider}:search`,
           subsystem: `extension:${provider}`,
-          duration: expect.any(Number),
+          duration: expect.any(Number) as number,
           query: 'TypeScript',
           result_count: 2,
         })
@@ -238,23 +260,23 @@ describe('createSearchFunctionWrapper', () => {
     it('emits error event with duration and error message on failure', async () => {
       const disposalState = createDisposalState();
       const inFlightState = createInFlightState();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(e: unknown) => void>();
       const wrap = createSearchFunctionWrapper(
         provider,
         disposalState,
         inFlightState
       );
-      const wrappedFn = wrap('search', async () => {
-        throw new Error('fetch error');
-      });
+      const wrappedFn = wrap('search', () =>
+        Promise.reject(new Error('fetch error'))
+      );
       const result = await wrappedFn({}, makeCtx({ onLogEvent }));
       expect(isInvalid(result)).toBe(true);
       expect(onLogEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           event: `${provider}:error`,
           subsystem: `extension:${provider}`,
-          duration: expect.any(Number),
-          error: expect.any(String),
+          duration: expect.any(Number) as number,
+          error: expect.any(String) as string,
         })
       );
     });
@@ -284,7 +306,11 @@ describe('createSearchFunctionWrapper', () => {
 
       const pending = wrappedFn(
         {},
-        makeCtx({ onLogEvent: (e) => events.push(e) })
+        makeCtx({
+          onLogEvent: (e) => {
+            events.push(e);
+          },
+        })
       );
       disposalState.isDisposed = true;
       abortAll(inFlightState);
@@ -418,11 +444,13 @@ describe('createSearchFunctionWrapper', () => {
         inFlightState
       );
       const expected = { items: ['a', 'b'], count: 2 };
-      const wrappedFn = wrap('search', async () => ({
-        result: expected as unknown as RillValue,
-        query: 'test',
-        resultCount: 2,
-      }));
+      const wrappedFn = wrap('search', () =>
+        Promise.resolve({
+          result: expected,
+          query: 'test',
+          resultCount: 2,
+        })
+      );
       const result = await wrappedFn({}, makeCtx());
       expect(result).toEqual(expected);
     });
@@ -437,16 +465,20 @@ describe('createSearchFunctionWrapper', () => {
         disposalState,
         inFlightState
       );
-      const search = wrap('search', async () => ({
-        result: 'ok' as RillValue,
-        query: 'q',
-        resultCount: 1,
-      }));
-      const suggest = wrap('suggest', async () => ({
-        result: 'ok' as RillValue,
-        query: 'q',
-        resultCount: 1,
-      }));
+      const search = wrap('search', () =>
+        Promise.resolve({
+          result: 'ok',
+          query: 'q',
+          resultCount: 1,
+        })
+      );
+      const suggest = wrap('suggest', () =>
+        Promise.resolve({
+          result: 'ok',
+          query: 'q',
+          resultCount: 1,
+        })
+      );
       disposalState.isDisposed = true;
       const a = await captureThrown(() => search({}, makeCtx()));
       const b = await captureThrown(() => suggest({}, makeCtx()));

@@ -7,7 +7,6 @@ import {
   RuntimeError,
   toCallable,
   structureToTypeValue,
-  type CallableFn,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
@@ -293,12 +292,12 @@ export async function createSearxngExtension(
 
   const callableDict = {
     search: toCallable({
-      fn: search as CallableFn,
+      fn: search,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: SEARCH_RT,
     }),
     config: toCallable({
-      fn: configFn as CallableFn,
+      fn: configFn,
       params: [],
       returnType: CONFIG_RT,
     }),

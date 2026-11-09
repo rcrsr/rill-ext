@@ -159,7 +159,7 @@ export interface ToolLoopCallbacks {
       result: RillValue;
       error?: string;
     }>
-  ) => unknown | unknown[];
+  ) => unknown;
 }
 
 /**

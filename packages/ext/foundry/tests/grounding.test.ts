@@ -16,7 +16,7 @@ import { expectRejectedHalt } from './_halt-helpers.js';
 // ============================================================
 
 // mockResponsesCreate is module-scoped so per-test configuration works.
-const mockResponsesCreate = vi.fn();
+const mockResponsesCreate = vi.fn<(...args: unknown[]) => unknown>();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {
@@ -394,7 +394,7 @@ describe('ground() host function', () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithGrounding());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getHostFn(ext, 'ground').fn({ query: 'azure ai' }, ctx);
@@ -414,7 +414,7 @@ describe('ground() host function', () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithGrounding());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await expect(
@@ -425,7 +425,7 @@ describe('ground() host function', () => {
         expect.objectContaining({
           event: 'foundry:ground:error',
           subsystem: 'extension:foundry',
-          error: expect.any(String),
+          error: expect.any(String) as unknown,
         })
       );
     });

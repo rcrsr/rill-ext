@@ -55,6 +55,11 @@ function typeVal(structure: TypeStructure): RillTypeValue {
   } as unknown as RillTypeValue;
 }
 
+/** Typed wrapper so asymmetric matchers can nest inside expected objects. */
+function containing(expected: Record<string, unknown>): unknown {
+  return expect.objectContaining(expected);
+}
+
 // Mock the Google GenAI SDK at module level
 const mockGenerateContent = vi.fn();
 
@@ -223,7 +228,7 @@ describe('generate() function', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          config: expect.objectContaining({
+          config: containing({
             systemInstruction: 'Factory system prompt.',
           }),
         })
@@ -257,7 +262,7 @@ describe('generate() function', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          config: expect.objectContaining({
+          config: containing({
             maxOutputTokens: 512,
           }),
         })
@@ -303,7 +308,7 @@ describe('generate() function', () => {
         parts: [{ text: 'Acknowledged.' }],
       });
       // Final user turn
-      const lastContent = callArgs.contents[callArgs.contents.length - 1];
+      const lastContent = callArgs.contents.at(-1);
       expect(lastContent).toMatchObject({
         role: 'user',
         parts: [{ text: 'final prompt' }],
@@ -455,7 +460,7 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -498,7 +503,7 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },
@@ -527,7 +532,7 @@ describe('generate() function', () => {
       const ext = createGeminiExtension(baseConfig);
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
+          onLog: () => {},
           onLogEvent: (event) => {
             events.push(event);
           },

@@ -15,6 +15,9 @@ import { createOpenAIExtension } from '../src/factory.js';
 import type { OpenAIExtensionConfig } from '../src/index.js';
 import type { LLMExtensionConfig } from '../src/index.js';
 
+const ANY_FUNCTION: unknown = expect.any(Function);
+const ANY_STRING: unknown = expect.any(String);
+
 const mockStream = vi.fn();
 
 vi.mock('openai', () => {
@@ -138,8 +141,8 @@ describe('createOpenAIExtension', () => {
         name: 'message',
         expected: {
           params: [PROMPT_PARAM],
-          fn: expect.any(Function),
-          annotations: { description: expect.any(String) },
+          fn: ANY_FUNCTION,
+          annotations: { description: ANY_STRING },
           returnType: { typeName: 'stream' },
         },
       },
@@ -154,8 +157,8 @@ describe('createOpenAIExtension', () => {
               annotations: {},
             },
           ],
-          fn: expect.any(Function),
-          annotations: { description: expect.any(String) },
+          fn: ANY_FUNCTION,
+          annotations: { description: ANY_STRING },
           returnType: { typeName: 'vector' },
         },
       },
@@ -170,8 +173,8 @@ describe('createOpenAIExtension', () => {
               annotations: {},
             },
           ],
-          fn: expect.any(Function),
-          annotations: { description: expect.any(String) },
+          fn: ANY_FUNCTION,
+          annotations: { description: ANY_STRING },
           returnType: { typeName: 'list' },
         },
       },
@@ -193,8 +196,8 @@ describe('createOpenAIExtension', () => {
               annotations: {},
             },
           ],
-          fn: expect.any(Function),
-          annotations: { description: expect.any(String) },
+          fn: ANY_FUNCTION,
+          annotations: { description: ANY_STRING },
           returnType: { typeName: 'stream' },
         },
       },
@@ -212,8 +215,8 @@ describe('createOpenAIExtension', () => {
               },
             },
           ],
-          fn: expect.any(Function),
-          annotations: { description: expect.any(String) },
+          fn: ANY_FUNCTION,
+          annotations: { description: ANY_STRING },
           returnType: { typeName: 'dict' },
         },
       },

@@ -21,6 +21,7 @@ import {
   isInvalid,
   RuntimeHaltSignal,
   type ApplicationCallable,
+  type ExtensionEvent,
   type ExtensionFactoryCtx,
   type RillValue,
 } from '@rcrsr/rill';
@@ -65,7 +66,7 @@ async function expectInvalidWithMessage(
   promise: RillValue | Promise<RillValue>,
   needle: string
 ): Promise<RillValue> {
-  const result = (await promise) as RillValue;
+  const result = await promise;
   expect(isInvalid(result)).toBe(true);
   expect(getStatus(result).message).toContain(needle);
   return result;
@@ -265,10 +266,7 @@ describe('Brave extension host functions', () => {
       const ctx = createRuntimeContext();
 
       {
-        const __r = (await getCallable(ext, 'search').fn(
-          { query: '' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -384,7 +382,7 @@ describe('Brave extension host functions', () => {
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, 'search').fn({ query: 'TypeScript' }, ctx);
@@ -402,14 +400,11 @@ describe('Brave extension host functions', () => {
       globalThis.fetch = mockFetchJson(401, {});
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       {
-        const __r = (await getCallable(ext, 'search').fn(
-          { query: 'test' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -417,7 +412,7 @@ describe('Brave extension host functions', () => {
         expect.objectContaining({
           event: 'brave:error',
           subsystem: 'extension:brave',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -490,10 +485,7 @@ describe('Brave extension host functions', () => {
       const ctx = createRuntimeContext();
 
       {
-        const __r = (await getCallable(ext, 'news').fn(
-          { query: '' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'news').fn({ query: '' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -594,7 +586,7 @@ describe('Brave extension host functions', () => {
       globalThis.fetch = mockFetchJson(200, NEWS_RESPONSE);
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, 'news').fn({ query: 'TypeScript news' }, ctx);
@@ -613,14 +605,11 @@ describe('Brave extension host functions', () => {
       globalThis.fetch = mockFetchJson(500, {});
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       {
-        const __r = (await getCallable(ext, 'news').fn(
-          { query: 'test' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'news').fn({ query: 'test' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -628,7 +617,7 @@ describe('Brave extension host functions', () => {
         expect.objectContaining({
           event: 'brave:error',
           subsystem: 'extension:brave',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -739,10 +728,7 @@ describe('Brave extension host functions', () => {
       const ctx = createRuntimeContext();
 
       {
-        const __r = (await getCallable(ext, 'summarize').fn(
-          { query: '' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'summarize').fn({ query: '' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -911,7 +897,7 @@ describe('Brave extension host functions', () => {
         });
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, 'summarize').fn(
@@ -932,14 +918,14 @@ describe('Brave extension host functions', () => {
       globalThis.fetch = mockFetchJson(401, {});
       const ext = createBraveExtension(VALID_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       {
-        const __r = (await getCallable(ext, 'summarize').fn(
+        const __r = await getCallable(ext, 'summarize').fn(
           { query: 'test' },
           ctx
-        )) as RillValue;
+        );
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -947,7 +933,7 @@ describe('Brave extension host functions', () => {
         expect.objectContaining({
           event: 'brave:error',
           subsystem: 'extension:brave',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -978,8 +964,8 @@ describe('Brave extension host functions', () => {
           ctx
         );
 
-        expect(isInvalid(thrown as RillValue)).toBe(true);
-        const status = getStatus(thrown as RillValue);
+        expect(isInvalid(thrown)).toBe(true);
+        const status = getStatus(thrown);
         expect(status.code.name).toBe('INVALID_INPUT');
         expect(status.raw['kind']).toBe('invalid_option_type');
         expect(status.raw['option']).toBe('count');
@@ -1047,8 +1033,8 @@ describe('Brave extension host functions', () => {
       await ext.dispose!();
 
       const result = await promise;
-      expect(isInvalid(result as RillValue)).toBe(true);
-      expect(getStatus(result as RillValue).code.name).toBe('UNAVAILABLE');
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
     });
   });
 });

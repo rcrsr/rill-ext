@@ -63,6 +63,6 @@ export function makeGmailFlag(
       undefined,
       messageId
     );
-    return true as unknown as RillValue;
+    return true;
   };
 }

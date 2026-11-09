@@ -22,7 +22,7 @@ import { makeFactoryCtx } from './_helpers.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-async function makeTempDir(): Promise<string> {
+function makeTempDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'rill-prompt-md-role-test-'));
 }
 
@@ -49,7 +49,7 @@ afterEach(async () => {
     tempDirs
       .splice(0)
       .map((dir) =>
-        fs.rm(dir, { recursive: true, force: true }).catch(() => undefined)
+        fs.rm(dir, { recursive: true, force: true }).catch(() => {})
       )
   );
 });

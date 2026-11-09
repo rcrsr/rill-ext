@@ -8,7 +8,6 @@ import type {
   ClaudeCodeResult,
   TokenCounts,
   TokenUsage,
-  TextBlock,
 } from './types.js';
 
 /**
@@ -45,7 +44,7 @@ export function extractResult(
       // Extract text content from content blocks
       for (const block of msg.message.content) {
         if (block.type === 'text') {
-          textParts.push((block as TextBlock).text);
+          textParts.push(block.text);
         }
       }
     } else if (msg.type === 'result') {

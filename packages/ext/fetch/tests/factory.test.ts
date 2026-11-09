@@ -59,7 +59,7 @@ function mockFetch(
     mockResponse.ignoreAbort === true ? undefined : options?.signal;
 
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
+    if (signal?.aborted === true) {
       const abortError = new Error('AbortError: The operation was aborted');
       abortError.name = 'AbortError';
       reject(abortError);
@@ -82,8 +82,8 @@ function mockFetch(
         ok: mockResponse.status >= 200 && mockResponse.status < 300,
         status: mockResponse.status,
         headers,
-        text: async () => mockResponse.body,
-        json: async () => JSON.parse(mockResponse.body) as unknown,
+        text: () => Promise.resolve(mockResponse.body),
+        json: () => Promise.resolve(JSON.parse(mockResponse.body) as unknown),
       } as Response;
 
       resolve(response);
@@ -551,7 +551,7 @@ describe('createFetchExtension', () => {
 
       // Abort all in-flight requests via dispose
       expect(ext.dispose).toBeDefined();
-      ext.dispose!();
+      await ext.dispose!();
 
       const thrown = await Promise.resolve(requestPromise).catch(
         (e: unknown) => e
@@ -592,7 +592,7 @@ describe('createFetchExtension', () => {
       expect(fetchCallCount).toBe(1);
 
       const started = Date.now();
-      ext.dispose!();
+      await ext.dispose!();
       const [runningResult, queuedResult] = await Promise.all([
         running,
         queued,
@@ -633,7 +633,7 @@ describe('createFetchExtension', () => {
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 20);
       });
-      ext.dispose!();
+      await ext.dispose!();
 
       const started = Date.now();
       const thrown = await Promise.resolve(requestPromise).catch(
@@ -670,7 +670,7 @@ describe('createFetchExtension', () => {
         { id: '123' },
         makeRuntimeCtx()
       );
-      ext.dispose!();
+      await ext.dispose!();
 
       const status = getStatus(await requestPromise);
       expect(status.code.name).toBe('NOT_FOUND');

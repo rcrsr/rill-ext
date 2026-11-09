@@ -35,10 +35,10 @@ export function buildRawMime(opts: MimeOptions): string {
     `Subject: ${sanitizeHeaderValue(opts.subject)}`,
   ];
 
-  if (opts.inReplyTo) {
+  if (opts.inReplyTo !== undefined && opts.inReplyTo !== '') {
     lines.push(`In-Reply-To: ${sanitizeHeaderValue(opts.inReplyTo)}`);
   }
-  if (opts.references) {
+  if (opts.references !== undefined && opts.references !== '') {
     lines.push(`References: ${sanitizeHeaderValue(opts.references)}`);
   }
 

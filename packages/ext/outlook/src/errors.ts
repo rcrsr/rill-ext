@@ -35,7 +35,7 @@ export function failInput(
     code: 'INVALID_INPUT',
     provider: PROVIDER,
     raw: { kind, message },
-  }) as unknown as RillValue;
+  });
 }
 
 /**
@@ -46,7 +46,7 @@ export function mapGraphError(
   ctx: RuntimeContext,
   status: number,
   operation: string,
-  id?: string | undefined
+  id?: string
 ): RillValue {
   if (status === 401) {
     const message = 'outlook: authentication failed (401)';

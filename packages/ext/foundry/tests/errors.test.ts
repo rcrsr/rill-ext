@@ -207,7 +207,10 @@ describe('resolveVariables', () => {
     const ctx = createRuntimeContext();
 
     expectThrowHalt(
-      () => resolveVariables(ctx, 'Hello @{NAME}', () => undefined),
+      () =>
+        resolveVariables(ctx, 'Hello @{NAME}', (name) =>
+          new Map<string, string>().get(name)
+        ),
       {
         code: 'INVALID_INPUT',
         provider: 'foundry',
@@ -223,7 +226,9 @@ describe('resolveVariables', () => {
 
     let caught: unknown;
     try {
-      resolveVariables(ctx, 'Query: @{QUERY}', () => undefined);
+      resolveVariables(ctx, 'Query: @{QUERY}', (name) =>
+        new Map<string, string>().get(name)
+      );
     } catch (e) {
       caught = e;
     }

@@ -7,7 +7,7 @@
  * the wrap()'s catch block passes it through unchanged.
  */
 
-import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import type { RuntimeContext } from '@rcrsr/rill';
 
 const PROVIDER = 'outlook';
 
@@ -26,7 +26,7 @@ export function checkCapability(
       code: 'FORBIDDEN',
       provider: PROVIDER,
       raw: { kind: 'capability_disabled', capability: name, message },
-    }) as unknown as RillValue;
+    });
   }
 }
 
@@ -45,6 +45,6 @@ export function checkFolder(
       code: 'FORBIDDEN',
       provider: PROVIDER,
       raw: { kind: 'folder_not_allowed', folder: name, message },
-    }) as unknown as RillValue;
+    });
   }
 }

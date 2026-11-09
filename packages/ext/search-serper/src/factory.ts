@@ -7,7 +7,6 @@ import {
   RuntimeError,
   toCallable,
   structureToTypeValue,
-  type CallableFn,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
@@ -287,17 +286,17 @@ export function createSerperExtension(
 
   const callableDict = {
     search: toCallable({
-      fn: search as CallableFn,
+      fn: search,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: SEARCH_RT,
     }),
     news: toCallable({
-      fn: news as CallableFn,
+      fn: news,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: NEWS_RT,
     }),
     images: toCallable({
-      fn: images as CallableFn,
+      fn: images,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: IMAGES_RT,
     }),

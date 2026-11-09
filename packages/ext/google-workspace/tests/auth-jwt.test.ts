@@ -37,8 +37,8 @@ const { privateKey: TEST_PRIVATE_KEY_OBJ, publicKey: TEST_PUBLIC_KEY_OBJ } =
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
   });
 
-const TEST_PRIVATE_KEY = TEST_PRIVATE_KEY_OBJ as unknown as string;
-const TEST_PUBLIC_KEY = TEST_PUBLIC_KEY_OBJ as unknown as string;
+const TEST_PRIVATE_KEY = TEST_PRIVATE_KEY_OBJ;
+const TEST_PUBLIC_KEY = TEST_PUBLIC_KEY_OBJ;
 
 /** Build a ServiceAccountKey using the test private key. */
 function makeTestKey(
@@ -311,14 +311,16 @@ describe('exchangeJwtForToken — fetch contract', () => {
     let capturedUrl: string | URL | Request | undefined;
 
     globalThis.fetch = vi.fn(
-      async (url: string | URL | Request, _init?: RequestInit) => {
+      (url: string | URL | Request, _init?: RequestInit) => {
         capturedUrl = url;
-        return new Response(
-          JSON.stringify({ access_token: 'tok123', expires_in: 3600 }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ access_token: 'tok123', expires_in: 3600 }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
         );
       }
-    ) as unknown as typeof fetch;
+    );
 
     await exchangeJwtForToken(
       makeTestCtx(),
@@ -333,16 +335,18 @@ describe('exchangeJwtForToken — fetch contract', () => {
     let capturedMethod: string | undefined;
     let capturedContentType: string | undefined;
 
-    globalThis.fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    globalThis.fetch = vi.fn((_url: unknown, init?: RequestInit) => {
       capturedMethod = init?.method;
       capturedContentType = (init?.headers as Record<string, string>)?.[
         'Content-Type'
       ];
-      return new Response(
-        JSON.stringify({ access_token: 'tok123', expires_in: 3600 }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ access_token: 'tok123', expires_in: 3600 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
       );
-    }) as unknown as typeof fetch;
+    });
 
     await exchangeJwtForToken(
       makeTestCtx(),
@@ -357,13 +361,15 @@ describe('exchangeJwtForToken — fetch contract', () => {
   it('body contains grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer and assertion', async () => {
     let capturedBody: string | undefined;
 
-    globalThis.fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    globalThis.fetch = vi.fn((_url: unknown, init?: RequestInit) => {
       capturedBody = init?.body as string;
-      return new Response(
-        JSON.stringify({ access_token: 'tok123', expires_in: 3600 }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ access_token: 'tok123', expires_in: 3600 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
       );
-    }) as unknown as typeof fetch;
+    });
 
     await exchangeJwtForToken(
       makeTestCtx(),
@@ -378,13 +384,14 @@ describe('exchangeJwtForToken — fetch contract', () => {
   });
 
   it('returns accessToken and expiresIn from JSON response', async () => {
-    globalThis.fetch = vi.fn(
-      async () =>
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
         new Response(
           JSON.stringify({ access_token: 'returned-token', expires_in: 7200 }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
-    ) as unknown as typeof fetch;
+      )
+    );
 
     const result = await exchangeJwtForToken(
       makeTestCtx(),
@@ -399,13 +406,15 @@ describe('exchangeJwtForToken — fetch contract', () => {
   it('propagates the AbortSignal to fetch', async () => {
     let capturedSignal: AbortSignal | undefined;
 
-    globalThis.fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    globalThis.fetch = vi.fn((_url: unknown, init?: RequestInit) => {
       capturedSignal = init?.signal ?? undefined;
-      return new Response(
-        JSON.stringify({ access_token: 'tok', expires_in: 3600 }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ access_token: 'tok', expires_in: 3600 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
       );
-    }) as unknown as typeof fetch;
+    });
 
     const controller = new AbortController();
     await exchangeJwtForToken(makeTestCtx(), 'test', controller.signal);
@@ -414,13 +423,14 @@ describe('exchangeJwtForToken — fetch contract', () => {
   });
 
   it('emits #AUTH on non-OK HTTP response', async () => {
-    globalThis.fetch = vi.fn(
-      async () =>
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
         new Response('{"error":"invalid_grant"}', {
           status: 401,
           headers: { 'Content-Type': 'application/json' },
         })
-    ) as unknown as typeof fetch;
+      )
+    );
 
     let caught: unknown;
     try {
@@ -437,8 +447,8 @@ describe('exchangeJwtForToken — fetch contract', () => {
   });
 
   it('error message on non-OK response does not contain any token material', async () => {
-    globalThis.fetch = vi.fn(
-      async () =>
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
         new Response(
           '{"error":"invalid_grant","access_token":"leaked-token"}',
           {
@@ -446,7 +456,8 @@ describe('exchangeJwtForToken — fetch contract', () => {
             headers: { 'Content-Type': 'application/json' },
           }
         )
-    ) as unknown as typeof fetch;
+      )
+    );
 
     let caught: unknown;
     try {
@@ -478,13 +489,14 @@ describe('exchangeJwtForAccessToken — returns only access_token string', () =>
   });
 
   it('returns the access_token string from the exchange response', async () => {
-    globalThis.fetch = vi.fn(
-      async () =>
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
         new Response(
           JSON.stringify({ access_token: 'wrapper-token', expires_in: 3600 }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )
-    ) as unknown as typeof fetch;
+      )
+    );
 
     const token = await exchangeJwtForAccessToken(
       makeTestCtx(),
@@ -496,13 +508,14 @@ describe('exchangeJwtForAccessToken — returns only access_token string', () =>
   });
 
   it('emits #AUTH on non-OK response (same as exchangeJwtForToken)', async () => {
-    globalThis.fetch = vi.fn(
-      async () =>
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
         new Response('', {
           status: 403,
           headers: { 'Content-Type': 'application/json' },
         })
-    ) as unknown as typeof fetch;
+      )
+    );
 
     let caught: unknown;
     try {

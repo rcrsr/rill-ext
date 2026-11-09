@@ -50,15 +50,15 @@ describe('crypto extension factory', () => {
       const ext = createCryptoExtensionT();
 
       expect(fnOf(ext, 'hash')).toMatchObject({
-        params: expect.any(Array),
-        fn: expect.any(Function),
+        params: expect.any(Array) as unknown,
+        fn: expect.any(Function) as unknown,
         annotations: expect.objectContaining({
-          description: expect.any(String),
-        }),
+          description: expect.any(String) as unknown,
+        }) as unknown,
         returnType: expect.objectContaining({
           __rill_type: true,
           structure: { kind: 'string' },
-        }),
+        }) as unknown,
       });
     });
   });

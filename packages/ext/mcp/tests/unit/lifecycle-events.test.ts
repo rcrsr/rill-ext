@@ -621,11 +621,12 @@ describe('mcp:prompt_get event', () => {
 describe('mcp:error event', () => {
   it('emits on timeout error', async () => {
     const mockClient = {
-      callTool: vi
-        .fn()
-        .mockImplementation(
-          () => new Promise((resolve) => setTimeout(resolve, 100000))
-        ),
+      callTool: vi.fn().mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            setTimeout(resolve, 100000);
+          })
+      ),
     } as unknown as Client;
 
     const tools: McpTool[] = [
@@ -866,7 +867,7 @@ describe('disposed guard', () => {
     const closure = closures['resource_template']!;
 
     const caught = await expectRejectsInvalid(
-      closure.fn({ tableName: 42 } as never, createMockContext())
+      closure.fn({ tableName: 42 }, createMockContext())
     );
 
     expect(getStatus(caught).code.name).toBe('DISPOSED');

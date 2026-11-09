@@ -71,8 +71,8 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
 
       vi.mocked(which.default.sync).mockReturnValue('claude');
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Response',
@@ -95,7 +95,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -135,8 +135,8 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
 
       vi.mocked(which.default.sync).mockReturnValue('custom-claude');
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Response',
@@ -159,7 +159,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension(
@@ -187,8 +187,8 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
 
       vi.mocked(which.default.sync).mockReturnValue('claude');
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Response',
@@ -211,7 +211,7 @@ describe('IR-1: createClaudeCodeExtension factory configuration', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension(
@@ -244,8 +244,8 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
     vi.mocked(extractResult).mockReturnValue({
       result: 'Skill result',
@@ -268,7 +268,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
         kill: vi.fn(),
       } as unknown as IPty,
       exitCode: Promise.resolve(0),
-      dispose: vi.fn(),
+      dispose: vi.fn<() => void>(),
     });
 
     const ext = createClaudeCodeExtension(
@@ -297,8 +297,8 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
 
     vi.mocked(which.default.sync).mockReturnValue('claude');
     vi.mocked(createStreamParser).mockReturnValue({
-      processChunk: vi.fn(),
-      flush: vi.fn(),
+      processChunk: vi.fn<() => void>(),
+      flush: vi.fn<() => void>(),
     });
     vi.mocked(extractResult).mockReturnValue({
       result: 'Command result',
@@ -321,7 +321,7 @@ describe('AC-3: Custom timeout respects timeout option value', () => {
         kill: vi.fn(),
       } as unknown as IPty,
       exitCode: Promise.resolve(0),
-      dispose: vi.fn(),
+      dispose: vi.fn<() => void>(),
     });
 
     const ext = createClaudeCodeExtension(

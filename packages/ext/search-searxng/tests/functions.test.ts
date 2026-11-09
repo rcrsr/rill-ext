@@ -21,6 +21,7 @@ import {
   isInvalid,
   RuntimeHaltSignal,
   type ApplicationCallable,
+  type ExtensionEvent,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillValue,
@@ -122,7 +123,7 @@ function mockFetchNonJson(status = 200): Mock<typeof fetch> {
  * Create a test extension with the probe mocked to succeed.
  * After creation, globalThis.fetch is reset so each test can set its own mock.
  */
-async function createTestExtension(
+function createTestExtension(
   config?: Partial<SearxngConfig>
 ): Promise<ExtensionFactoryResult> {
   globalThis.fetch = vi.fn<typeof fetch>().mockResolvedValueOnce(
@@ -282,10 +283,7 @@ describe('SearXNG extension host functions', () => {
       const ctx = createRuntimeContext();
 
       {
-        const __r = (await getCallable(ext, 'search').fn(
-          { query: '' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'search').fn({ query: '' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -442,7 +440,7 @@ describe('SearXNG extension host functions', () => {
       const ext = await createTestExtension();
       globalThis.fetch = mockFetchJson(200, SEARCH_RESPONSE);
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, 'search').fn({ query: 'TypeScript' }, ctx);
@@ -461,14 +459,11 @@ describe('SearXNG extension host functions', () => {
       const ext = await createTestExtension();
       globalThis.fetch = mockFetchJson(500, {});
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       {
-        const __r = (await getCallable(ext, 'search').fn(
-          { query: 'test' },
-          ctx
-        )) as RillValue;
+        const __r = await getCallable(ext, 'search').fn({ query: 'test' }, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -476,7 +471,7 @@ describe('SearXNG extension host functions', () => {
         expect.objectContaining({
           event: 'searxng:error',
           subsystem: 'extension:searxng',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -594,7 +589,7 @@ describe('SearXNG extension host functions', () => {
       const ext = await createTestExtension();
       globalThis.fetch = mockFetchJson(200, CONFIG_RESPONSE);
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getCallable(ext, 'config').fn({}, ctx);
@@ -611,11 +606,11 @@ describe('SearXNG extension host functions', () => {
       const ext = await createTestExtension();
       globalThis.fetch = mockFetchJson(503, {});
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: ExtensionEvent) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       {
-        const __r = (await getCallable(ext, 'config').fn({}, ctx)) as RillValue;
+        const __r = await getCallable(ext, 'config').fn({}, ctx);
         expect(isInvalid(__r)).toBe(true);
       }
 
@@ -623,7 +618,7 @@ describe('SearXNG extension host functions', () => {
         expect.objectContaining({
           event: 'searxng:error',
           subsystem: 'extension:searxng',
-          error: expect.any(String),
+          error: expect.any(String) as string,
         })
       );
     });
@@ -652,8 +647,8 @@ describe('SearXNG extension host functions', () => {
         ctx
       );
 
-      expect(isInvalid(thrown as RillValue)).toBe(true);
-      const status = getStatus(thrown as RillValue);
+      expect(isInvalid(thrown)).toBe(true);
+      const status = getStatus(thrown);
       expect(status.raw['kind']).toBe('invalid_option_type');
       expect(status.raw['option']).toBe('engines');
       expect(mockFetch).not.toHaveBeenCalled();
@@ -670,8 +665,8 @@ describe('SearXNG extension host functions', () => {
         ctx
       );
 
-      expect(isInvalid(thrown as RillValue)).toBe(true);
-      const status = getStatus(thrown as RillValue);
+      expect(isInvalid(thrown)).toBe(true);
+      const status = getStatus(thrown);
       expect(status.raw['kind']).toBe('invalid_time_range');
       expect(mockFetch).not.toHaveBeenCalled();
     });
@@ -764,8 +759,8 @@ describe('SearXNG extension host functions', () => {
       await ext.dispose!();
 
       const result = await promise;
-      expect(isInvalid(result as RillValue)).toBe(true);
-      expect(getStatus(result as RillValue).code.name).toBe('UNAVAILABLE');
+      expect(isInvalid(result)).toBe(true);
+      expect(getStatus(result).code.name).toBe('UNAVAILABLE');
     });
   });
 });

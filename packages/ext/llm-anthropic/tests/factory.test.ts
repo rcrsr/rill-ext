@@ -14,6 +14,9 @@ import { createAnthropicExtension } from '../src/factory.js';
 import type { AnthropicExtensionConfig } from '../src/types.js';
 import { expectThrowHalt } from './_halt-helpers.js';
 
+const ANY_FUNCTION: unknown = expect.any(Function);
+const ANY_STRING: unknown = expect.any(String);
+
 // ============================================================
 // VALIDATION TESTS
 // ============================================================
@@ -97,8 +100,8 @@ describe('createAnthropicExtension', () => {
         params: [
           { name: 'prompt', type: { kind: 'any' }, defaultValue: undefined },
         ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
+        fn: ANY_FUNCTION,
+        annotations: { description: ANY_STRING },
         returnType: { typeName: 'stream' },
       });
     });
@@ -121,8 +124,8 @@ describe('createAnthropicExtension', () => {
             annotations: {},
           },
         ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
+        fn: ANY_FUNCTION,
+        annotations: { description: ANY_STRING },
         returnType: {
           typeName: 'vector',
           structure: { kind: 'vector' },
@@ -148,8 +151,8 @@ describe('createAnthropicExtension', () => {
             annotations: {},
           },
         ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
+        fn: ANY_FUNCTION,
+        annotations: { description: ANY_STRING },
         returnType: {
           typeName: 'list',
           structure: { kind: 'list', element: { kind: 'vector' } },
@@ -177,8 +180,8 @@ describe('createAnthropicExtension', () => {
           },
           { name: 'max_turns', type: { kind: 'number' }, defaultValue: 0 },
         ],
-        fn: expect.any(Function),
-        annotations: { description: expect.any(String) },
+        fn: ANY_FUNCTION,
+        annotations: { description: ANY_STRING },
       });
     });
   });

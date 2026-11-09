@@ -88,11 +88,10 @@ describe('Transport Creation', () => {
       headers: NonNullable<McpHttpTransportConfig['headers']>
     ): Promise<Headers> {
       let captured: Transport | undefined;
-      vi.spyOn(Client.prototype, 'connect').mockImplementation(
-        async (transport) => {
-          captured = transport;
-        }
-      );
+      vi.spyOn(Client.prototype, 'connect').mockImplementation((transport) => {
+        captured = transport;
+        return Promise.resolve();
+      });
       vi.spyOn(Client.prototype, 'getServerCapabilities').mockReturnValue({});
 
       const ext = await createMcpExtension(
@@ -130,9 +129,11 @@ describe('Transport Creation', () => {
     });
 
     it('awaits async function headers and passes the result to the transport', async () => {
-      const headerFn = vi.fn(async () => ({
-        Authorization: 'Bearer async-token-1',
-      }));
+      const headerFn = vi.fn(() =>
+        Promise.resolve({
+          Authorization: 'Bearer async-token-1',
+        })
+      );
 
       const resolved = await connectAndCaptureHeaders(headerFn);
 

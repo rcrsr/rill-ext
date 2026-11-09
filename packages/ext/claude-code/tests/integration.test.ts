@@ -45,7 +45,7 @@ vi.mock('../src/result.js');
 /**
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  */
-async function resolveStream<T = Record<string, unknown>>(
+function resolveStream<T = Record<string, unknown>>(
   stream: unknown
 ): Promise<T> {
   return (
@@ -86,8 +86,8 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Hello!',
@@ -110,7 +110,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -130,8 +130,8 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
       vi.mocked(extractResult).mockReturnValue({
         result: 'Hello!',
@@ -152,10 +152,10 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
 
       vi.mocked(spawnClaudeCli).mockReturnValue({
         ptyProcess: {
-          onData: vi.fn((cb) => {
+          onData: vi.fn((cb: (chunk: string) => void) => {
             onDataCallback = cb;
           }),
-          onExit: vi.fn((cb) => {
+          onExit: vi.fn((cb: (event: { exitCode: number }) => void) => {
             onExitCallback = cb;
           }),
           write: vi.fn(),
@@ -172,7 +172,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
             resolve(0);
           }, 5);
         }),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -199,8 +199,8 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -225,7 +225,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -249,7 +249,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
         expect.objectContaining({ binaryPath: 'claude' })
       );
 
-      const result = (await resolveStream(stream)) as Record<string, unknown>;
+      const result = await resolveStream(stream);
       expect(result['result']).toBe('Skill executed');
       expect(result['exit_code']).toBe(0);
     });
@@ -262,8 +262,8 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -288,7 +288,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension(
@@ -316,8 +316,8 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -342,7 +342,7 @@ describe('Claude Code Extension Integration Tests - Success Cases', () => {
           kill: vi.fn(),
         } as unknown as IPty,
         exitCode: Promise.resolve(0),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension(
@@ -402,8 +402,8 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -432,7 +432,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
             timeoutMs: 5000,
           })
         ),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -457,8 +457,8 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
       const { extractResult } = await import('../src/result.js');
 
       vi.mocked(createStreamParser).mockReturnValue({
-        processChunk: vi.fn(),
-        flush: vi.fn(),
+        processChunk: vi.fn<() => void>(),
+        flush: vi.fn<() => void>(),
       });
 
       vi.mocked(extractResult).mockReturnValue({
@@ -487,7 +487,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
 
       vi.mocked(spawnClaudeCli).mockReturnValue({
         ptyProcess: {
-          onData: vi.fn((cb) => {
+          onData: vi.fn((cb: (chunk: string) => void) => {
             onDataCallback = cb;
           }),
           onExit: vi.fn(),
@@ -502,7 +502,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
             reject(exitError);
           }, 5);
         }),
-        dispose: vi.fn(),
+        dispose: vi.fn<() => void>(),
       });
 
       const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -613,8 +613,8 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         let onExitCb: ((event: { exitCode: number }) => void) | undefined;
 
         vi.mocked(createStreamParser).mockReturnValue({
-          processChunk: vi.fn(),
-          flush: vi.fn(),
+          processChunk: vi.fn<() => void>(),
+          flush: vi.fn<() => void>(),
         });
         vi.mocked(extractResult).mockReturnValue({
           result: 'Done',
@@ -631,10 +631,10 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         });
         vi.mocked(spawnClaudeCli).mockReturnValue({
           ptyProcess: {
-            onData: vi.fn((cb) => {
+            onData: vi.fn((cb: (chunk: string) => void) => {
               onDataCb = cb;
             }),
-            onExit: vi.fn((cb) => {
+            onExit: vi.fn((cb: (event: { exitCode: number }) => void) => {
               onExitCb = cb;
             }),
             write: vi.fn(),
@@ -647,7 +647,7 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
               resolve(0);
             }, 5);
           }),
-          dispose: vi.fn(),
+          dispose: vi.fn<() => void>(),
         });
 
         const ext = createClaudeCodeExtension({}, makeFactoryCtx());
@@ -679,11 +679,11 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         const { createStreamParser } = await import('../src/stream-parser.js');
         const { extractResult } = await import('../src/result.js');
 
-        const mockDispose = vi.fn();
+        const mockDispose = vi.fn<() => void>();
 
         vi.mocked(createStreamParser).mockReturnValue({
-          processChunk: vi.fn(),
-          flush: vi.fn(),
+          processChunk: vi.fn<() => void>(),
+          flush: vi.fn<() => void>(),
         });
         vi.mocked(extractResult).mockReturnValue({
           result: 'Done',
@@ -735,11 +735,11 @@ describe('Claude Code Extension Integration Tests - Error Contracts', () => {
         const { createStreamParser } = await import('../src/stream-parser.js');
         const { extractResult } = await import('../src/result.js');
 
-        const mockDispose = vi.fn();
+        const mockDispose = vi.fn<() => void>();
 
         vi.mocked(createStreamParser).mockReturnValue({
-          processChunk: vi.fn(),
-          flush: vi.fn(),
+          processChunk: vi.fn<() => void>(),
+          flush: vi.fn<() => void>(),
         });
         vi.mocked(extractResult).mockReturnValue({
           result: 'Done',

@@ -44,7 +44,7 @@ function buildCallableDict(
         description: rillFn.annotations?.['description'] ?? '',
       },
     };
-    dict[name] = toCallable(withDescription) as unknown as RillValue;
+    dict[name] = toCallable(withDescription);
   }
   return dict;
 }

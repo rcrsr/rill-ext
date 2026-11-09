@@ -101,7 +101,7 @@ export async function callGround(
 
   // Falls back to inference.model if grounding.model is unset
   const model = groundingConfig.model ?? config.inference?.model;
-  if (!model) {
+  if (model === undefined || model === '') {
     throw haltInvalidInput(
       ctx,
       'model_missing',
@@ -154,7 +154,7 @@ export async function callGround(
     return {
       answer: answer as RillValue,
       citations: citations as RillValue,
-    } as RillValue;
+    };
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
 
@@ -267,10 +267,10 @@ function extractCitations(
         }
 
         citations.push({
-          url: annotation.url as RillValue,
-          title: annotation.title as RillValue,
-          start_index: annotation.start_index as RillValue,
-          end_index: annotation.end_index as RillValue,
+          url: annotation.url,
+          title: annotation.title,
+          start_index: annotation.start_index,
+          end_index: annotation.end_index,
         });
       }
     }

@@ -318,7 +318,7 @@ describe('shield() host function', () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithSafety());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getHostFn(ext, 'shield').fn({ text: 'hello' }, ctx);
@@ -338,7 +338,7 @@ describe('shield() host function', () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(configWithSafety());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getHostFn(ext, 'shield').fn({ text: 'attack' }, ctx);

@@ -65,7 +65,7 @@ export function createFileKvExtension(
 
   if (config.mounts) {
     mounts = { ...config.mounts };
-  } else if (config.store) {
+  } else if (config.store !== undefined && config.store !== '') {
     mounts = {
       default: {
         mode: config.mode ?? 'read-write',
@@ -169,31 +169,31 @@ export function createFileKvExtension(
   // ----------------------------------------------------------
 
   const get: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const value = r.store.get(args['key'] as string, runCtx);
-    if (value !== undefined && isInvalid(value)) return value as RillValue;
-    return value !== undefined ? (value as RillValue) : '';
+    if (value !== undefined && isInvalid(value)) return value;
+    return value !== undefined ? value : '';
   };
 
   const get_or: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const key = args['key'] as string;
     if (r.store.has(key)) {
       const v = r.store.get(key, runCtx);
-      if (v !== undefined && isInvalid(v)) return v as RillValue;
+      if (v !== undefined && isInvalid(v)) return v;
       return v as RillValue;
     }
     return args['fallback'] as RillValue;
   };
 
   const set: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
@@ -202,12 +202,12 @@ export function createFileKvExtension(
       args['value'] as RillValue,
       runCtx
     );
-    if (setResult !== undefined) return setResult as RillValue;
+    if (setResult !== undefined) return setResult;
     return true;
   };
 
   const merge: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
@@ -215,7 +215,7 @@ export function createFileKvExtension(
     const partial = args['partial'] as Record<string, RillValue>;
     const currentValue = r.store.get(key, runCtx);
     if (currentValue !== undefined && isInvalid(currentValue)) {
-      return currentValue as RillValue;
+      return currentValue;
     }
 
     if (currentValue !== undefined && !isDict(currentValue)) {
@@ -234,26 +234,26 @@ export function createFileKvExtension(
     }
 
     const mergedValue = {
-      ...(currentValue as Record<string, RillValue> | undefined),
+      ...currentValue,
       ...partial,
     };
     const setResult = await r.store.set(key, mergedValue, runCtx);
-    if (setResult !== undefined) return setResult as RillValue;
+    if (setResult !== undefined) return setResult;
     return true;
   };
 
   const deleteKey: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const result = r.store.delete(args['key'] as string, runCtx);
-    if (typeof result !== 'boolean') return result as RillValue;
+    if (typeof result !== 'boolean') return result;
     return result;
   };
 
   const keys: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
@@ -261,7 +261,7 @@ export function createFileKvExtension(
   };
 
   const has: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
@@ -269,17 +269,17 @@ export function createFileKvExtension(
   };
 
   const clear: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
     const result = r.store.clear(runCtx);
-    if (result !== undefined) return result as RillValue;
+    if (result !== undefined) return result;
     return true;
   };
 
   const getAll: CallableFn = async (args, ctx) => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) throw failDisposed(runCtx);
     const r = await getStore(args['mount'] as string, runCtx);
     if (!r.ok) return r.invalid;
@@ -287,7 +287,7 @@ export function createFileKvExtension(
   };
 
   const schema: CallableFn = (args, ctx): Promise<RillValue> => {
-    const runCtx = ctx as RuntimeContext;
+    const runCtx = ctx;
     if (disposed) return Promise.reject(failDisposed(runCtx));
     const mountName = args['mount'] as string;
     const mountConfig = mounts[mountName];
@@ -320,7 +320,7 @@ export function createFileKvExtension(
   };
 
   const mountsList: CallableFn = (_args, ctx): Promise<RillValue> => {
-    if (disposed) return Promise.reject(failDisposed(ctx as RuntimeContext));
+    if (disposed) return Promise.reject(failDisposed(ctx));
     const result: RillValue[] = [];
     for (const [name, cfg] of Object.entries(mounts)) {
       result.push({

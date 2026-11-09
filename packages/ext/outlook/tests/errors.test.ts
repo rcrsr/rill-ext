@@ -348,7 +348,7 @@ describe('session token resolution', () => {
     ctx.variables.set('MY_TOKEN', 'bearer-value-from-session');
 
     const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
-    expect(isInvalid(result as RillValue)).toBe(false);
+    expect(isInvalid(result)).toBe(false);
   });
 
   it('session token error does not call fetch', async () => {

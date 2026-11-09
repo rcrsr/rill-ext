@@ -132,13 +132,13 @@ export async function callShield(
     });
 
     const analysis: Record<string, RillValue> = {
-      attack_type: result.attackType as RillValue,
+      attack_type: result.attackType,
     };
 
     return {
       safe: result.safe as RillValue,
       analysis: analysis as RillValue,
-    } as RillValue;
+    };
   } catch (error: unknown) {
     // A request cancelled by dispose() reports #DISPOSED; other errors keep their class.
     throwIfCancelledByDispose(ctx, PROVIDER, error, disposed.value);
@@ -178,7 +178,7 @@ export function createAutoShieldMiddleware(
 ): ShieldMiddleware {
   return async (args, ctx, inner, triggeredBy) => {
     // Only run when autoShield is enabled and contentSafety is configured
-    if (!config.contentSafety?.autoShield || disposed.value) {
+    if (config.contentSafety?.autoShield !== true || disposed.value) {
       return inner(args, ctx);
     }
 

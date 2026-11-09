@@ -135,7 +135,7 @@ export async function callSearch(
       duration,
     });
 
-    return results as RillValue;
+    return results;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
 
@@ -301,9 +301,9 @@ async function runSearchRequest(
     const content = buildContentDict(item);
 
     return {
-      id: id as RillValue,
-      score: score as RillValue,
-      content: content as RillValue,
+      id,
+      score,
+      content,
     };
   });
 }
@@ -331,11 +331,11 @@ function extractDocumentId(item: Record<string, unknown>): string {
   for (const key of Object.keys(item)) {
     if (!key.startsWith('@')) {
       const value = item[key];
-      const isScalar =
-        typeof value === 'string' ||
-        typeof value === 'number' ||
-        typeof value === 'boolean';
-      if (isScalar && value) {
+      const isTruthyScalar =
+        (typeof value === 'string' && value !== '') ||
+        (typeof value === 'number' && value !== 0 && !Number.isNaN(value)) ||
+        value === true;
+      if (isTruthyScalar) {
         return String(value);
       }
     }

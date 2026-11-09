@@ -245,7 +245,7 @@ function generateToolFunction(
         timeoutPromise,
       ])) as McpToolResult;
 
-      if (result.isError) {
+      if (result.isError === true) {
         const errorText = result.content
           .filter((block) => block.type === 'text')
           .map((block) => block.text ?? '')
@@ -311,7 +311,7 @@ export function generateToolFunctions(
 
   for (const tool of tools) {
     const sanitizedName = nameMap.get(tool.name);
-    if (!sanitizedName) {
+    if (sanitizedName === undefined || sanitizedName === '') {
       // Should never happen: sanitizeNames processes all names
       continue;
     }

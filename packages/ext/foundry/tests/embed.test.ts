@@ -16,9 +16,9 @@ import { expectRejectedHalt } from './_halt-helpers.js';
 // MOCK SETUP
 // ============================================================
 
-const mockCreate = vi.fn();
-const mockStream = vi.fn();
-const mockEmbeddingsCreate = vi.fn();
+const mockCreate = vi.fn<(...args: unknown[]) => unknown>();
+const mockStream = vi.fn<(...args: unknown[]) => unknown>();
+const mockEmbeddingsCreate = vi.fn<(...args: unknown[]) => unknown>();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {

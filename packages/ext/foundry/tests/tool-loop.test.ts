@@ -21,9 +21,9 @@ import { expectThrowHalt, expectRejectedHalt } from './_halt-helpers.js';
 // MOCK SETUP
 // ============================================================
 
-const mockCreate = vi.fn();
-const mockStream = vi.fn();
-const mockEmbeddingsCreate = vi.fn();
+const mockCreate = vi.fn<(...args: unknown[]) => unknown>();
+const mockStream = vi.fn<(...args: unknown[]) => unknown>();
+const mockEmbeddingsCreate = vi.fn<(...args: unknown[]) => unknown>();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {
@@ -157,14 +157,14 @@ function createMockStreamRunner(
       eventHandlers[event].push(handler);
       return runner;
     },
-    finalChatCompletion: vi.fn().mockImplementation(async () => {
+    finalChatCompletion: vi.fn().mockImplementation(() => {
       // Emit content events before resolving to simulate streaming
       if (textContent && eventHandlers['content']) {
         for (const handler of eventHandlers['content']) {
           handler(textContent);
         }
       }
-      return response;
+      return Promise.resolve(response);
     }),
     abort: vi.fn(),
   };
@@ -187,16 +187,24 @@ async function resolveStream(
 /**
  * Collect all dict chunks from a RillStream via next() iteration.
  */
+type StreamFn = (
+  args: Record<string, unknown>,
+  ctx: unknown
+) => Promise<StreamNode>;
+interface StreamNode {
+  done?: boolean;
+  value?: unknown;
+  next: { fn: StreamFn };
+}
+
 async function collectChunks(
   stream: unknown
 ): Promise<Record<string, unknown>[]> {
   const chunks: Record<string, unknown>[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let current: any = stream;
-  while (!current.done) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    current = await (current.next as any).fn({}, null);
-    if (!current.done && current.value !== undefined) {
+  let current = stream as StreamNode;
+  while (current.done !== true) {
+    current = await current.next.fn({}, null);
+    if (current.done !== true && current.value !== undefined) {
       chunks.push(current.value as Record<string, unknown>);
     }
   }
@@ -576,12 +584,11 @@ describe('tool_loop() function', () => {
       };
 
       expectThrowHalt(
-        () => {
+        () =>
           getCallable(ext, 'tool_loop').fn(
             { prompt: '', tools, options: {} },
             ctx
-          );
-        },
+          ),
         { code: 'INVALID_INPUT', message: 'prompt string cannot be empty' }
       );
     });

@@ -48,7 +48,7 @@ const PROVIDER = 'outlook';
  * Throws RuntimeError(RILL-R001) on any invalid field.
  */
 export function validateConfig(config: OutlookConfig): void {
-  if (!config.auth) {
+  if (config.auth === undefined || config.auth === null) {
     throw new RuntimeError('RILL-R001', 'outlook: auth is required');
   }
 
@@ -159,7 +159,7 @@ export function resolveToken(auth: OutlookAuth, ctx: RuntimeContext): string {
             tokenVar,
             message: invalidMessage,
           },
-        }) as unknown as RillValue;
+        });
       }
       return value;
     }
@@ -171,7 +171,7 @@ export function resolveToken(auth: OutlookAuth, ctx: RuntimeContext): string {
     code: 'AUTH',
     provider: PROVIDER,
     raw: { kind: 'session_token_missing', tokenVar, message },
-  }) as unknown as RillValue;
+  });
 }
 
 /**

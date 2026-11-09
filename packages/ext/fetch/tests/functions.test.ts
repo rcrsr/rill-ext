@@ -42,7 +42,7 @@ function mockFetch(_url: string, options?: FetchOptions): Promise<Response> {
   const signal = options?.signal;
 
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
+    if (signal?.aborted === true) {
       const abortError = new Error('AbortError: The operation was aborted');
       abortError.name = 'AbortError';
       reject(abortError);
@@ -59,7 +59,7 @@ function mockFetch(_url: string, options?: FetchOptions): Promise<Response> {
     setTimeout(() => {
       signal?.removeEventListener('abort', abortHandler);
 
-      if (signal?.aborted) {
+      if (signal?.aborted === true) {
         const abortError = new Error('AbortError: The operation was aborted');
         abortError.name = 'AbortError';
         reject(abortError);
@@ -71,8 +71,8 @@ function mockFetch(_url: string, options?: FetchOptions): Promise<Response> {
         ok: mockResponse.status >= 200 && mockResponse.status < 300,
         status: mockResponse.status,
         headers,
-        text: async () => mockResponse.body,
-        json: async () => JSON.parse(mockResponse.body) as unknown,
+        text: () => Promise.resolve(mockResponse.body),
+        json: () => Promise.resolve(JSON.parse(mockResponse.body) as unknown),
       } as Response);
     }, delay);
   });
@@ -411,19 +411,19 @@ describe('executeRequest - retry logic', () => {
     let callCount = 0;
     const callTimes: number[] = [];
 
-    vi.stubGlobal('fetch', async () => {
+    vi.stubGlobal('fetch', () => {
       callTimes.push(Date.now());
       callCount++;
       if (callCount < 3) {
-        throw new TypeError('Network error');
+        return Promise.reject(new TypeError('Network error'));
       }
-      return {
+      return Promise.resolve({
         ok: true,
         status: 200,
         headers: new Headers(),
-        text: async () => '{"success": true}',
-        json: async () => ({ success: true }),
-      } as Response;
+        text: () => Promise.resolve('{"success": true}'),
+        json: () => Promise.resolve({ success: true }),
+      } as Response);
     });
 
     const promise = executeRequest(
@@ -490,7 +490,8 @@ describe('executeRequest - timeout', () => {
 
 describe('createSemaphore', () => {
   it('returns undefined when maxConcurrent not set', () => {
-    const semaphore = createSemaphore(undefined);
+    const config: { maxConcurrent?: number | undefined } = {};
+    const semaphore = createSemaphore(config.maxConcurrent);
     expect(semaphore).toBeUndefined();
   });
 
@@ -541,14 +542,16 @@ describe('executeRequest - concurrency control', () => {
     vi.stubGlobal('fetch', async () => {
       activeCalls++;
       maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 50);
+      });
       activeCalls--;
       return {
         ok: true,
         status: 200,
         headers: new Headers(),
-        text: async () => '{"success": true}',
-        json: async () => ({ success: true }),
+        text: () => Promise.resolve('{"success": true}'),
+        json: () => Promise.resolve({ success: true }),
       } as Response;
     });
 

@@ -16,7 +16,6 @@ import {
   type CallableFn,
   type RillTypeValue,
   type RillValue,
-  type RuntimeContext,
 } from '@rcrsr/rill';
 import {
   interpolate,
@@ -83,7 +82,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
   const inputList: RillValue[] = parsed.params.map((param) => {
     const typeLabel: string =
       param.type === undefined ? 'any' : param.type.kind;
-    return { name: param.name, type: typeLabel } as Record<string, RillValue>;
+    return { name: param.name, type: typeLabel };
   });
 
   // ── Annotations dict ────────────────────────────────────────
@@ -97,12 +96,12 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
 
   // ── Closure fn ────────────────────────────────────────────────────────────
   const fn: CallableFn = (args, ctxLike): Promise<RillValue> => {
-    const ctx = ctxLike as RuntimeContext;
+    const ctx = ctxLike;
     try {
       // Build interpolation values via rill's canonical formatValue; null/undefined → empty string.
       const values: Record<string, string> = {};
       for (const param of parsed.params) {
-        const raw = args[param.name] as RillValue | undefined;
+        const raw = args[param.name];
         // Missing arg treated as empty string (interpolate already handles '' for missing keys).
         if (raw === undefined || raw === null) {
           values[param.name] = '';
@@ -145,7 +144,7 @@ export function buildClosure(parsed: ParsedPrompt): ApplicationCallable {
             name: parsed.name,
             detail: err instanceof Error ? err.message : String(err),
           },
-        }) as unknown as RillValue
+        })
       );
     }
   };

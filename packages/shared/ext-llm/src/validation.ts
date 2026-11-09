@@ -54,7 +54,7 @@ export function validateModel(
   model: string | undefined
 ): asserts model is string {
   // model is undefined or empty → RuntimeError: "model is required"
-  if (!model) {
+  if (model === undefined || model === '') {
     throw new RuntimeError('RILL-R001', 'model is required');
   }
 }
@@ -110,7 +110,16 @@ export function validateMessages(
   // Validate each message
   for (const message of messages) {
     // Message lacks `role` → RuntimeError: "message missing required 'role' field"
-    if (!('role' in message) || !message['role']) {
+    const roleField = message['role'];
+    if (
+      !('role' in message) ||
+      roleField === undefined ||
+      roleField === null ||
+      roleField === false ||
+      roleField === '' ||
+      (typeof roleField === 'number' &&
+        (roleField === 0 || Number.isNaN(roleField)))
+    ) {
       throw new RuntimeError(
         'RILL-R001',
         "message missing required 'role' field"
@@ -214,7 +223,7 @@ export function validateEmbedModel(
   model: string | undefined
 ): asserts model is string {
   // Embed model falsy → RuntimeError: "embed_model not configured"
-  if (!model) {
+  if (model === undefined || model === '') {
     throw new RuntimeError('RILL-R001', 'embed_model not configured');
   }
 }

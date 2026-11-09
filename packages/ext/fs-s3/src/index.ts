@@ -175,7 +175,11 @@ export function createS3FsExtension(
     );
   }
 
-  if (!config.mounts || Object.keys(config.mounts).length === 0) {
+  if (
+    config.mounts === undefined ||
+    config.mounts === null ||
+    Object.keys(config.mounts).length === 0
+  ) {
     throw new RuntimeError(
       'RILL-R001',
       'S3 configuration requires at least one mount'
@@ -228,7 +232,7 @@ export function createS3FsExtension(
     });
   };
 
-  if (ctx?.signal) {
+  if (ctx?.signal !== undefined && ctx.signal !== null) {
     if (ctx.signal.aborted) {
       void dispose();
     } else {
@@ -244,7 +248,7 @@ export function createS3FsExtension(
 
   /** Aborts on dispose() or when the host context signal aborts. */
   function requestSignal(): AbortSignal {
-    return ctx?.signal
+    return ctx?.signal !== undefined && ctx.signal !== null
       ? AbortSignal.any([lifetime.signal, ctx.signal])
       : lifetime.signal;
   }
@@ -430,13 +434,13 @@ export function createS3FsExtension(
   // ============================================================
 
   const read: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
     const modeCheck = checkMode(runCtx, mount, 'read');
-    if (modeCheck) return modeCheck;
+    if (modeCheck !== null) return modeCheck;
 
     try {
       const headResult = await s3Client.send(
@@ -445,7 +449,7 @@ export function createS3FsExtension(
       );
       const size = headResult.ContentLength ?? 0;
       const sizeCheck = checkFileSize(runCtx, size, mount, key);
-      if (sizeCheck) return sizeCheck;
+      if (sizeCheck !== null) return sizeCheck;
 
       assertLive(runCtx);
       const getResult = await s3Client.send(
@@ -460,17 +464,17 @@ export function createS3FsExtension(
   };
 
   const write: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
     const content = args['content'] as string;
     const modeCheck = checkMode(runCtx, mount, 'write');
-    if (modeCheck) return modeCheck;
+    if (modeCheck !== null) return modeCheck;
     const contentSize = Buffer.byteLength(content, 'utf-8');
     const sizeCheck = checkFileSize(runCtx, contentSize, mount, key);
-    if (sizeCheck) return sizeCheck;
+    if (sizeCheck !== null) return sizeCheck;
 
     try {
       await s3Client.send(
@@ -489,14 +493,14 @@ export function createS3FsExtension(
   };
 
   const append: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
     const content = args['content'] as string;
     const modeCheck = checkMode(runCtx, mount, 'write');
-    if (modeCheck) return modeCheck;
+    if (modeCheck !== null) return modeCheck;
 
     let existingContent = '';
     try {
@@ -517,7 +521,7 @@ export function createS3FsExtension(
     const newContent = existingContent + content;
     const contentSize = Buffer.byteLength(newContent, 'utf-8');
     const sizeCheck = checkFileSize(runCtx, contentSize, mount, key);
-    if (sizeCheck) return sizeCheck;
+    if (sizeCheck !== null) return sizeCheck;
 
     try {
       assertLive(runCtx);
@@ -537,13 +541,13 @@ export function createS3FsExtension(
   };
 
   const list: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
     const modeCheck = checkMode(runCtx, mount, 'read');
-    if (modeCheck) return modeCheck;
+    if (modeCheck !== null) return modeCheck;
 
     const prefix = key;
     const normalizedPrefix = prefix.endsWith('/') ? prefix : prefix + '/';
@@ -562,16 +566,26 @@ export function createS3FsExtension(
 
       if (result.Contents) {
         for (const obj of result.Contents) {
-          if (!obj.Key || obj.Key === normalizedPrefix) continue;
+          if (
+            obj.Key === undefined ||
+            obj.Key === '' ||
+            obj.Key === normalizedPrefix
+          )
+            continue;
           const filename = getFilename(obj.Key);
-          if (mount.glob && !matchesGlob(filename, mount.glob)) continue;
+          if (
+            mount.glob !== undefined &&
+            mount.glob !== '' &&
+            !matchesGlob(filename, mount.glob)
+          )
+            continue;
           items.push({ name: filename, type: 'file', size: obj.Size ?? 0 });
         }
       }
 
       if (result.CommonPrefixes) {
         for (const cp of result.CommonPrefixes) {
-          if (!cp.Prefix) continue;
+          if (cp.Prefix === undefined || cp.Prefix === '') continue;
           const dirName = cp.Prefix.slice(normalizedPrefix.length).replace(
             /\/$/,
             ''
@@ -587,14 +601,14 @@ export function createS3FsExtension(
   };
 
   const find: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
     const pattern = (args['pattern'] as string | undefined) ?? '*';
     const modeCheck = checkMode(runCtx, mount, 'read');
-    if (modeCheck) return modeCheck;
+    if (modeCheck !== null) return modeCheck;
 
     const results: string[] = [];
     let continuationToken: string | undefined;
@@ -613,10 +627,14 @@ export function createS3FsExtension(
 
         if (result.Contents) {
           for (const obj of result.Contents) {
-            if (!obj.Key) continue;
+            if (obj.Key === undefined || obj.Key === '') continue;
             const filename = getFilename(obj.Key);
             if (matchesGlob(filename, pattern)) {
-              if (!mount.glob || matchesGlob(filename, mount.glob)) {
+              if (
+                mount.glob === undefined ||
+                mount.glob === '' ||
+                matchesGlob(filename, mount.glob)
+              ) {
                 const relativePath = obj.Key.slice(mount.prefix.length);
                 results.push(relativePath);
               }
@@ -625,7 +643,7 @@ export function createS3FsExtension(
         }
 
         continuationToken = result.NextContinuationToken;
-      } while (continuationToken);
+      } while (continuationToken !== undefined && continuationToken !== '');
 
       return results;
     } catch (error) {
@@ -634,13 +652,13 @@ export function createS3FsExtension(
   };
 
   const exists: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
     const modeCheck = checkMode(runCtx, mount, 'read');
-    if (modeCheck) return modeCheck;
+    if (modeCheck !== null) return modeCheck;
 
     try {
       await s3Client.send(
@@ -659,13 +677,13 @@ export function createS3FsExtension(
   };
 
   const remove: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
     const modeCheck = checkMode(runCtx, mount, 'write');
-    if (modeCheck) return modeCheck;
+    if (modeCheck !== null) return modeCheck;
 
     try {
       try {
@@ -694,13 +712,13 @@ export function createS3FsExtension(
   };
 
   const stat: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const parsed = parseMountPath(runCtx, args['path'] as string);
     if (!parsed.ok) return parsed.invalid;
     const { mount, key } = parsed;
     const modeCheck = checkMode(runCtx, mount, 'read');
-    if (modeCheck) return modeCheck;
+    if (modeCheck !== null) return modeCheck;
 
     try {
       const result = await s3Client.send(
@@ -721,7 +739,7 @@ export function createS3FsExtension(
 
   const mkdir: CallableFn = (args, runtimeCtx): Promise<RillValue> => {
     const body = (): RillValue => {
-      const runCtx = runtimeCtx as RuntimeContext;
+      const runCtx = runtimeCtx;
       assertLive(runCtx);
       const parsed = parseMountPath(runCtx, args['path'] as string);
       if (!parsed.ok) return parsed.invalid;
@@ -733,7 +751,7 @@ export function createS3FsExtension(
   };
 
   const copy: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const src = parseMountPath(runCtx, args['src'] as string);
     if (!src.ok) return src.invalid;
@@ -758,9 +776,9 @@ export function createS3FsExtension(
     }
 
     const srcMode = checkMode(runCtx, src.mount, 'read');
-    if (srcMode) return srcMode;
+    if (srcMode !== null) return srcMode;
     const destMode = checkMode(runCtx, dest.mount, 'write');
-    if (destMode) return destMode;
+    if (destMode !== null) return destMode;
 
     try {
       const headResult = await s3Client.send(
@@ -769,7 +787,7 @@ export function createS3FsExtension(
       );
       const size = headResult.ContentLength ?? 0;
       const sizeCheck = checkFileSize(runCtx, size, dest.mount, dest.key);
-      if (sizeCheck) return sizeCheck;
+      if (sizeCheck !== null) return sizeCheck;
 
       assertLive(runCtx);
       await s3Client.send(
@@ -787,7 +805,7 @@ export function createS3FsExtension(
   };
 
   const move: CallableFn = async (args, runtimeCtx) => {
-    const runCtx = runtimeCtx as RuntimeContext;
+    const runCtx = runtimeCtx;
     assertLive(runCtx);
     const copied = await copy(args, runtimeCtx);
     if (copied !== true) return copied;
@@ -809,7 +827,7 @@ export function createS3FsExtension(
 
   const mountsList: CallableFn = (_args, runtimeCtx): Promise<RillValue> => {
     const body = (): RillValue => {
-      assertLive(runtimeCtx as RuntimeContext);
+      assertLive(runtimeCtx);
       const result: RillValue[] = [];
       for (const [name, mount] of Object.entries(config.mounts)) {
         result.push({

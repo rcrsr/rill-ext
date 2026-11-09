@@ -28,7 +28,7 @@ export async function send(
   if (typeof rawTo === 'string') {
     toList = [rawTo];
   } else if (Array.isArray(rawTo)) {
-    toList = toAddressList(rawTo as RillValue[], ctx);
+    toList = toAddressList(rawTo, ctx);
   } else {
     toList = [];
   }
@@ -70,5 +70,5 @@ export async function send(
     requestBody
   );
 
-  return { sent: true, to: toList, subject } as unknown as RillValue;
+  return { sent: true, to: toList, subject };
 }

@@ -53,13 +53,12 @@ export async function createEvent(
     typeof options === 'object'
   ) {
     if (Array.isArray(options['attendees'])) {
-      eventBody['attendees'] = toAddressList(
-        options['attendees'] as RillValue[],
-        ctx
-      ).map((address) => ({
-        emailAddress: { address },
-        type: 'required',
-      }));
+      eventBody['attendees'] = toAddressList(options['attendees'], ctx).map(
+        (address) => ({
+          emailAddress: { address },
+          type: 'required',
+        })
+      );
     }
 
     if (typeof options['location'] === 'string' && options['location'] !== '') {

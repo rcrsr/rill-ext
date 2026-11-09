@@ -21,8 +21,8 @@ function getHostFns(ext: { value: unknown }): HostFns {
 // MODULE MOCK
 // ============================================================
 
-const mockStream = vi.fn();
-const mockCreate = vi.fn();
+const mockStream = vi.fn<(...args: unknown[]) => unknown>();
+const mockCreate = vi.fn<(...args: unknown[]) => unknown>();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {
@@ -126,7 +126,7 @@ function createMockStreamRunner(
 /**
  * Resolve a RillStream by calling its internal resolve callback.
  */
-async function resolveStream(stream: unknown): Promise<unknown> {
+function resolveStream(stream: unknown): Promise<unknown> {
   return (
     stream as { __rill_stream_resolve: () => Promise<unknown> }
   ).__rill_stream_resolve();
@@ -163,7 +163,10 @@ describe('usage accumulator', () => {
     const ext = await createFoundryExtension(validConfig());
 
     const ctx = createRuntimeContext({
-      callbacks: { onLog: vi.fn(), onLogEvent: vi.fn() },
+      callbacks: {
+        onLog: vi.fn<(message: string) => void>(),
+        onLogEvent: vi.fn<(event: unknown) => void>(),
+      },
     });
     const value = getHostFns(ext);
 
@@ -187,7 +190,10 @@ describe('usage accumulator', () => {
     const ext = await createFoundryExtension(validConfig());
 
     const ctx = createRuntimeContext({
-      callbacks: { onLog: vi.fn(), onLogEvent: vi.fn() },
+      callbacks: {
+        onLog: vi.fn<(message: string) => void>(),
+        onLogEvent: vi.fn<(event: unknown) => void>(),
+      },
     });
     const value = getHostFns(ext);
 

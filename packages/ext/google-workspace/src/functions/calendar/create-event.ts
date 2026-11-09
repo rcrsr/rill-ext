@@ -164,6 +164,6 @@ export function makeCalendarCreateEvent(
     // Return event ID string
     const data = response as { id?: string } | null;
     const eventId = data?.id ?? '';
-    return eventId as unknown as RillValue;
+    return eventId;
   };
 }

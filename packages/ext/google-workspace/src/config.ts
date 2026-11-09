@@ -75,21 +75,21 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
 
   const obj = parsed as Record<string, unknown>;
 
-  if (!obj['client_email'] || typeof obj['client_email'] !== 'string') {
+  if (typeof obj['client_email'] !== 'string' || obj['client_email'] === '') {
     throw new RuntimeError(
       'RILL-R001',
       "google: auth.keyJson is invalid: missing field 'client_email'"
     );
   }
 
-  if (!obj['private_key'] || typeof obj['private_key'] !== 'string') {
+  if (typeof obj['private_key'] !== 'string' || obj['private_key'] === '') {
     throw new RuntimeError(
       'RILL-R001',
       "google: auth.keyJson is invalid: missing field 'private_key'"
     );
   }
 
-  if (!obj['token_uri'] || typeof obj['token_uri'] !== 'string') {
+  if (typeof obj['token_uri'] !== 'string' || obj['token_uri'] === '') {
     throw new RuntimeError(
       'RILL-R001',
       "google: auth.keyJson is invalid: missing field 'token_uri'"
@@ -97,9 +97,9 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
   }
 
   return {
-    client_email: obj['client_email'] as string,
-    private_key: obj['private_key'] as string,
-    token_uri: obj['token_uri'] as string,
+    client_email: obj['client_email'],
+    private_key: obj['private_key'],
+    token_uri: obj['token_uri'],
   };
 }
 
@@ -116,7 +116,7 @@ export function parseServiceAccountKey(keyJson: string): ServiceAccountKey {
  */
 export function validateConfig(config: GoogleWorkspaceConfig): void {
   // Missing auth
-  if (!config.auth) {
+  if (config.auth === undefined || config.auth === null) {
     throw new RuntimeError('RILL-R001', 'google: auth is required');
   }
 

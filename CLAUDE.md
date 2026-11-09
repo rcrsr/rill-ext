@@ -112,14 +112,12 @@ Both custom oxlint rules, `rill/no-spec-id-reference` and `rill/no-duplicate-err
 `pnpm check:standards` currently reports `CONFORMANT` against rill-dev 0.3.0:
 every checked element passes, and the remainder are not machine-checkable.
 
-`STD-LINT-10`, `STD-LINT-11` and `STD-LINT-12` are met by configuration, not
-yet by clean code. Every package `lint` script passes `--type-aware`, and the
-baseline rules sit at `error` in the top-level `rules` of `.oxlintrc.json`.
-Files that violated a rule when it was enabled are relaxed to `warn` for that
-rule in per-rule `overrides` blocks, so `check:lint` prints warnings and
-exits 0. A file not listed gets the `error`. Clearing the warnings
-and shrinking those lists is tracked in rcrsr/rill-ext#138; drop a path from
-its block once the file is clean.
+`STD-LINT-10`, `STD-LINT-11` and `STD-LINT-12` are met by clean code. Every
+package `lint` script passes `--type-aware`, the baseline rules sit at `error`
+in the top-level `rules` of `.oxlintrc.json`, and no per-file `warn`
+relaxations remain, so `check:lint` exits 0 with zero warnings. Fix a new
+finding in the code; never add a per-file override to silence it. A severity
+override must repeat the rule's options, or oxlint resets them to defaults.
 
 `STD-DEP-5` treats `publishedVersions` in rill-dev's `baseline.json` as a
 floor: an extension's `@rcrsr/rill` peer range fails only when its major.minor

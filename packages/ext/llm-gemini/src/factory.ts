@@ -102,7 +102,7 @@ export function createGeminiExtension(
   // Vertex Express auth modes, ahead of model/temperature/etc, so error
   // ordering is mode-independent. Vertex ADC has api_key === undefined and
   // is correctly skipped.
-  if (!config.vertexai || config.api_key !== undefined) {
+  if (config.vertexai !== true || config.api_key !== undefined) {
     validateApiKey(config.api_key);
   }
 
@@ -257,11 +257,11 @@ export function createGeminiExtension(
       ],
       fn: (args, ctx): Promise<RillValue> => {
         const run = (): RillValue => {
-          assertNotDisposed(ctx as RuntimeContext);
+          assertNotDisposed(ctx);
           const rawPrompt = args['prompt'] as RillValue;
 
           // Normalize prompt to canonical Message[]
-          const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+          const normalized = normalizePrompt(rawPrompt, ctx);
 
           // If normalizePrompt returned an invalid RillValue, surface it
           if (!Array.isArray(normalized)) {
@@ -310,13 +310,13 @@ export function createGeminiExtension(
                 const delta = chunk.text ?? '';
                 if (delta) {
                   collectedChunks.push(delta);
-                  yield delta as RillValue;
+                  yield delta;
                 }
               }
             } catch (error: unknown) {
-              streamError = classifyError(ctx as RuntimeContext, error);
+              streamError = classifyError(ctx, error);
               const duration = Date.now() - messageStartTime;
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'gemini:error',
                 subsystem: 'extension:gemini',
                 error: streamErrorMessage(streamError),
@@ -351,7 +351,7 @@ export function createGeminiExtension(
                 id: '',
               };
 
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'gemini:message',
                 subsystem: 'extension:gemini',
                 duration,
@@ -361,7 +361,7 @@ export function createGeminiExtension(
                 content: textContent,
               });
 
-              return result as RillValue;
+              return result;
             };
             return new Promise<RillValue>((settle) => {
               settle(resolveBody());
@@ -376,7 +376,7 @@ export function createGeminiExtension(
             },
             chunkType: { kind: 'string' },
             retType: MESSAGE_RET_STRUCTURE,
-          }) as RillValue;
+          });
         };
         return new Promise<RillValue>((settle) => {
           settle(run());
@@ -392,7 +392,7 @@ export function createGeminiExtension(
     embed: {
       params: [p.str('text')],
       fn: async (args, ctx): Promise<RillValue> => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         const startTime = Date.now();
 
         try {
@@ -414,7 +414,7 @@ export function createGeminiExtension(
             embedding.values.length === 0
           ) {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'PROTOCOL',
               'empty_embedding_response',
               'Gemini: empty embedding returned'
@@ -425,7 +425,7 @@ export function createGeminiExtension(
           const vector = createVector(float32Data, factoryEmbedModel);
 
           const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'gemini:embed',
             subsystem: 'extension:gemini',
             duration,
@@ -433,15 +433,15 @@ export function createGeminiExtension(
             dimensions: float32Data.length,
           });
 
-          return vector as RillValue;
+          return vector;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
-            ctx as RuntimeContext,
+            ctx,
             error
           );
 
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'gemini:error',
             subsystem: 'extension:gemini',
             error: streamErrorMessage(rillError),
@@ -459,7 +459,7 @@ export function createGeminiExtension(
     embed_batch: {
       params: [p.list('texts')],
       fn: async (args, ctx): Promise<RillValue> => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         const startTime = Date.now();
 
         try {
@@ -481,7 +481,7 @@ export function createGeminiExtension(
           const vectors: RillValue[] = [];
           if (!response.embeddings || response.embeddings.length === 0) {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'PROTOCOL',
               'empty_embeddings_response',
               'Gemini: empty embeddings returned'
@@ -490,12 +490,13 @@ export function createGeminiExtension(
 
           for (const embedding of response.embeddings) {
             if (
-              !embedding ||
+              embedding === undefined ||
+              embedding === null ||
               !embedding.values ||
               embedding.values.length === 0
             ) {
               throw haltInvalid(
-                ctx as RuntimeContext,
+                ctx,
                 'PROTOCOL',
                 'empty_embedding_response',
                 'Gemini: empty embedding returned'
@@ -503,14 +504,16 @@ export function createGeminiExtension(
             }
             const float32Data = new Float32Array(embedding.values);
             const vector = createVector(float32Data, factoryEmbedModel);
-            vectors.push(vector as RillValue);
+            vectors.push(vector);
           }
 
           const duration = Date.now() - startTime;
           const firstVector = vectors[0];
           const dimensions =
-            firstVector && isVector(firstVector) ? firstVector.data.length : 0;
-          emitExtensionEvent(ctx as RuntimeContext, {
+            firstVector !== undefined && isVector(firstVector)
+              ? firstVector.data.length
+              : 0;
+          emitExtensionEvent(ctx, {
             event: 'gemini:embed_batch',
             subsystem: 'extension:gemini',
             duration,
@@ -519,15 +522,15 @@ export function createGeminiExtension(
             count: vectors.length,
           });
 
-          return vectors as RillValue;
+          return vectors;
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
-            ctx as RuntimeContext,
+            ctx,
             error
           );
 
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'gemini:error',
             subsystem: 'extension:gemini',
             error: streamErrorMessage(rillError),
@@ -564,7 +567,7 @@ export function createGeminiExtension(
         p.num('max_turns', undefined, 0),
       ],
       fn: (args, ctx): RillValue => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         const rawPrompt = args['prompt'] as RillValue;
         const toolsDict = args['tools'] as RillValue;
         const perCallMaxTurns = (args['max_turns'] as number) ?? 0;
@@ -572,7 +575,7 @@ export function createGeminiExtension(
         // Negative per-call max_turns → INVALID_INPUT
         if (perCallMaxTurns < 0) {
           throw haltInvalid(
-            ctx as RuntimeContext,
+            ctx,
             'INVALID_INPUT',
             'invalid_max_turns',
             'max_turns must be >= 0'
@@ -585,10 +588,10 @@ export function createGeminiExtension(
           typeof toolsDict === 'object' &&
           toolsDict !== null &&
           !Array.isArray(toolsDict) &&
-          Object.keys(toolsDict as Record<string, unknown>).length === 0
+          Object.keys(toolsDict).length === 0
         ) {
           throw haltInvalid(
-            ctx as RuntimeContext,
+            ctx,
             'INVALID_INPUT',
             'empty_tools_dict',
             'tool_loop: tools dict cannot be empty'
@@ -596,7 +599,7 @@ export function createGeminiExtension(
         }
 
         // Normalize prompt to canonical Message[]
-        const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+        const normalized = normalizePrompt(rawPrompt, ctx);
         if (!Array.isArray(normalized)) {
           // Return the invalid RillValue — caller will see it as an error
           return normalized;
@@ -732,8 +735,8 @@ export function createGeminiExtension(
             response: unknown
           ): Array<{ id: string; name: string; input: object }> | null => {
             if (
-              !response ||
               typeof response !== 'object' ||
+              response === null ||
               !('functionCalls' in response)
             ) {
               return null;
@@ -761,8 +764,8 @@ export function createGeminiExtension(
 
           formatAssistantMessage: (response: unknown): unknown => {
             if (
-              !response ||
               typeof response !== 'object' ||
+              response === null ||
               !('candidates' in response)
             ) {
               return null;
@@ -776,14 +779,14 @@ export function createGeminiExtension(
 
             const candidate = candidates[0];
             if (
-              !candidate ||
               typeof candidate !== 'object' ||
+              candidate === null ||
               !('content' in candidate)
             ) {
               return null;
             }
 
-            return (candidate as { content: unknown }).content;
+            return candidate.content;
           },
 
           formatToolResult: (
@@ -800,11 +803,12 @@ export function createGeminiExtension(
                 functionResponse: {
                   name: tr.name,
                   response: {
-                    result: tr.error
-                      ? `Error: ${tr.error}`
-                      : typeof tr.result === 'string'
-                        ? tr.result
-                        : JSON.stringify(tr.result),
+                    result:
+                      tr.error !== undefined && tr.error !== ''
+                        ? `Error: ${tr.error}`
+                        : typeof tr.result === 'string'
+                          ? tr.result
+                          : JSON.stringify(tr.result),
                   },
                 },
               })
@@ -830,8 +834,12 @@ export function createGeminiExtension(
               tool_result: 'gemini:tool_result',
             };
 
-            emitExtensionEvent(ctx as RuntimeContext, {
-              event: eventMap[event] || event,
+            const mappedEvent = eventMap[event];
+            emitExtensionEvent(ctx, {
+              event:
+                mappedEvent !== undefined && mappedEvent !== ''
+                  ? mappedEvent
+                  : event,
               subsystem: 'extension:gemini',
               ...data,
             });
@@ -844,7 +852,7 @@ export function createGeminiExtension(
               chunkRecord['type'] === 'text_delta' &&
               typeof chunkRecord['text'] === 'string'
             ) {
-              accumulatedTextDeltas.push(chunkRecord['text'] as string);
+              accumulatedTextDeltas.push(chunkRecord['text']);
             }
             chunkQueue.push(chunk);
             if (resolveNext) {
@@ -869,7 +877,7 @@ export function createGeminiExtension(
             }
           })
           .catch((error: unknown) => {
-            streamError = classifyError(ctx as RuntimeContext, error);
+            streamError = classifyError(ctx, error);
             streamDone = true;
             if (resolveNext) {
               const r = resolveNext;
@@ -904,7 +912,7 @@ export function createGeminiExtension(
               !isDisposedHalt(streamError)
             ) {
               const partialContent = accumulatedTextDeltas.join('');
-              emitExtensionEvent(ctx as RuntimeContext, {
+              emitExtensionEvent(ctx, {
                 event: 'gemini:error',
                 subsystem: 'extension:gemini',
                 error: streamErrorMessage(streamError),
@@ -922,10 +930,10 @@ export function createGeminiExtension(
                 usage: { input: 0, output: 0 },
                 stop_reason: 'error',
                 id: '',
-              } as RillValue;
+              };
             }
             const duration = Date.now();
-            emitExtensionEvent(ctx as RuntimeContext, {
+            emitExtensionEvent(ctx, {
               event: 'gemini:error',
               subsystem: 'extension:gemini',
               error: streamErrorMessage(streamError),
@@ -937,29 +945,35 @@ export function createGeminiExtension(
           const result = loopResultHolder!;
           const response = result.response;
           const textContent =
-            response && typeof response === 'object' && 'text' in response
+            typeof response === 'object' &&
+            response !== null &&
+            'text' in response
               ? ((response as { text?: string }).text ?? '')
               : '';
 
           // Build parts-shaped assistant reply
           const assistantParts: Part[] = [{ type: 'text', text: textContent }];
-          const messages = response
-            ? (buildResponseMessages(
-                inputMessages,
-                assistantParts
-              ) as unknown as RillValue)
-            : (inputMessages as unknown as RillValue);
+          const messages =
+            typeof response === 'object' && response !== null
+              ? (buildResponseMessages(
+                  inputMessages,
+                  assistantParts
+                ) as unknown as RillValue)
+              : (inputMessages as unknown as RillValue);
 
           const resolvedResult = {
             messages,
             model: factoryModel,
             usage: result.totalTokens,
-            stop_reason: response ? 'stop' : 'max_turns',
+            stop_reason:
+              typeof response === 'object' && response !== null
+                ? 'stop'
+                : 'max_turns',
             id: '',
           };
 
           const total_duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'gemini:tool_loop',
             subsystem: 'extension:gemini',
             turns: result.turns,
@@ -969,7 +983,7 @@ export function createGeminiExtension(
             content: textContent,
           });
 
-          return resolvedResult as RillValue;
+          return resolvedResult;
         };
 
         return createRillStream({
@@ -980,7 +994,7 @@ export function createGeminiExtension(
           },
           chunkType: { kind: 'dict' },
           retType: MESSAGE_RET_STRUCTURE,
-        }) as RillValue;
+        });
       },
       annotations: { description: 'Execute tool-use loop with Gemini API' },
       returnType: TOOL_LOOP_VERB_RETURN_TYPE,
@@ -997,7 +1011,7 @@ export function createGeminiExtension(
         },
         {
           name: 'schema',
-          type: { kind: 'type' } as { kind: string },
+          type: { kind: 'type' },
           defaultValue: undefined,
           annotations: {
             description: 'Type expression for structured output schema',
@@ -1005,7 +1019,7 @@ export function createGeminiExtension(
         },
       ],
       fn: async (args, ctx): Promise<RillValue> => {
-        assertNotDisposed(ctx as RuntimeContext);
+        assertNotDisposed(ctx);
         const startTime = Date.now();
 
         try {
@@ -1015,9 +1029,14 @@ export function createGeminiExtension(
             | undefined;
 
           // Validate schema is a type value with dict structure
-          if (!schemaArg || !schemaArg.__rill_type || !schemaArg.structure) {
+          if (
+            schemaArg === undefined ||
+            schemaArg === null ||
+            schemaArg.__rill_type !== true ||
+            schemaArg.structure === undefined
+          ) {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'INVALID_INPUT',
               'invalid_schema',
               'generate requires a type expression as schema'
@@ -1025,7 +1044,7 @@ export function createGeminiExtension(
           }
           if (schemaArg.structure.kind !== 'dict') {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'INVALID_INPUT',
               'invalid_schema_type',
               `generate requires a dict type as schema, got ${schemaArg.structure.kind}`
@@ -1033,7 +1052,7 @@ export function createGeminiExtension(
           }
 
           // Normalize prompt to canonical Message[]
-          const normalized = normalizePrompt(rawPrompt, ctx as RuntimeContext);
+          const normalized = normalizePrompt(rawPrompt, ctx);
           if (!Array.isArray(normalized)) {
             return normalized;
           }
@@ -1079,7 +1098,7 @@ export function createGeminiExtension(
           // Reject streaming response shape
           if (!('text' in response) && !('candidates' in response)) {
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'PROTOCOL',
               'unexpected_response_format',
               'generate: unexpected response format from Gemini API'
@@ -1098,7 +1117,7 @@ export function createGeminiExtension(
                 ? parseError.message
                 : String(parseError);
             throw haltInvalid(
-              ctx as RuntimeContext,
+              ctx,
               'PROTOCOL',
               'schema_validation_failed',
               `generate: failed to parse response JSON: ${detail}`
@@ -1133,7 +1152,7 @@ export function createGeminiExtension(
           };
 
           const duration = Date.now() - startTime;
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'gemini:generate',
             subsystem: 'extension:gemini',
             duration,
@@ -1147,11 +1166,11 @@ export function createGeminiExtension(
         } catch (error: unknown) {
           const duration = Date.now() - startTime;
           const rillError: RuntimeError | RuntimeHaltSignal = classifyError(
-            ctx as RuntimeContext,
+            ctx,
             error
           );
 
-          emitExtensionEvent(ctx as RuntimeContext, {
+          emitExtensionEvent(ctx, {
             event: 'gemini:error',
             subsystem: 'extension:gemini',
             error: streamErrorMessage(rillError),
@@ -1176,5 +1195,5 @@ export function createGeminiExtension(
     generate: toCallable(fnDict.generate),
   } satisfies LlmExtensionContract;
 
-  return { value: callableDict as unknown as RillValue, dispose };
+  return { value: callableDict, dispose };
 }

@@ -17,7 +17,6 @@ import {
   type ApplicationCallable,
   isInvalid,
   getStatus,
-  type RillValue,
 } from '@rcrsr/rill';
 import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
@@ -292,7 +291,7 @@ describe('inbox() host function', () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE_LIST);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'inbox').fn({}, ctx);
@@ -332,10 +331,10 @@ describe('inbox() host function', () => {
       const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
       const ctx = createRuntimeContext();
 
-      const caught = (await getCallable(ext, 'inbox').fn(
+      const caught = await getCallable(ext, 'inbox').fn(
         { folder: 'drafts' },
         ctx
-      )) as RillValue;
+      );
       expect(isInvalid(caught)).toBe(true);
       expect(getStatus(caught).code.name).toBe('FORBIDDEN');
       expect(getStatus(caught).message).toContain(
@@ -425,10 +424,7 @@ describe('read() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'read').fn(
-      { message_id: '' },
-      ctx
-    )) as RillValue;
+    const caught = await getCallable(ext, 'read').fn({ message_id: '' }, ctx);
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain('message_id is required');
@@ -438,7 +434,7 @@ describe('read() host function', () => {
     globalThis.fetch = mockFetchJson(200, GRAPH_MESSAGE);
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'read').fn({ message_id: 'msg-001' }, ctx);

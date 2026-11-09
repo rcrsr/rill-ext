@@ -3,7 +3,7 @@
  * Implements token resolution, signal combination, error mapping.
  */
 
-import type { RillValue, RuntimeContext } from '@rcrsr/rill';
+import type { RuntimeContext } from '@rcrsr/rill';
 import type { GoogleAuth } from './types.js';
 import type { TokenCache } from './auth/resolve.js';
 import { resolveToken } from './auth/resolve.js';
@@ -96,17 +96,11 @@ export async function googleFetch(
   try {
     response = await fetch(url, init);
   } catch (error) {
-    throw mapFetchError(ctx, error, service) as unknown as RillValue;
+    throw mapFetchError(ctx, error, service);
   }
 
   if (!response.ok) {
-    throw mapGoogleError(
-      ctx,
-      response.status,
-      service,
-      operation,
-      resourceId
-    ) as unknown as RillValue;
+    throw mapGoogleError(ctx, response.status, service, operation, resourceId);
   }
 
   // 202 Accepted and 204 No Content carry no response body
@@ -114,5 +108,5 @@ export async function googleFetch(
     return null;
   }
 
-  return response.json() as Promise<unknown>;
+  return response.json();
 }

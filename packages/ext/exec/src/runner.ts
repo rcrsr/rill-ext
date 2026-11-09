@@ -81,7 +81,7 @@ function validateStdin(
   hasStdin: boolean,
   ctx: RuntimeContext
 ): RillValue | null {
-  if (hasStdin && !config.stdin) {
+  if (hasStdin && config.stdin !== true) {
     return ctx.invalidate(
       new Error(`command "${commandName}" does not support stdin`),
       {
@@ -174,7 +174,7 @@ export async function runCommand(
       throw err;
     }
 
-    if (err && typeof err === 'object') {
+    if (typeof err === 'object' && err !== null) {
       const execError = err as {
         code?: string;
         killed?: boolean;
@@ -200,7 +200,8 @@ export async function runCommand(
       const isMaxBufferError =
         execError.code === 'ERR_CHILD_PROCESS_STDOUT_MAXBUFFER' ||
         execError.code === 'ERR_CHILD_PROCESS_STDERR_MAXBUFFER' ||
-        (execError.message &&
+        (execError.message !== undefined &&
+          execError.message !== '' &&
           execError.message.toLowerCase().includes('maxbuffer')) ||
         (execError.killed === true &&
           execError.signal === 'SIGTERM' &&
@@ -219,7 +220,10 @@ export async function runCommand(
       }
 
       if (execError.killed === true && execError.signal === 'SIGTERM') {
-        const timeoutMs = config.timeout || 0;
+        const timeoutMs =
+          config.timeout !== undefined && !Number.isNaN(config.timeout)
+            ? config.timeout
+            : 0;
         return ctx.invalidate(
           new Error(`command "${commandName}" timed out (${timeoutMs}ms)`),
           {
@@ -241,9 +245,7 @@ export async function runCommand(
 
       if ('stdout' in execError && 'stderr' in execError) {
         const exitCode =
-          'code' in err && typeof (err as { code: unknown }).code === 'number'
-            ? ((err as { code: number }).code as number)
-            : 1;
+          'code' in err && typeof err.code === 'number' ? err.code : 1;
 
         return {
           stdout: String(execError.stdout || ''),

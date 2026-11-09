@@ -17,7 +17,6 @@ import {
   type ApplicationCallable,
   isInvalid,
   getStatus,
-  type RillValue,
 } from '@rcrsr/rill';
 import { makeFactoryCtx } from './_helpers.js';
 import { createOutlookExtension } from '../src/factory.js';
@@ -153,7 +152,7 @@ describe('send() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'send').fn(args, ctx)) as RillValue;
+    const caught = await getCallable(ext, 'send').fn(args, ctx);
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain(message);
@@ -165,10 +164,10 @@ describe('send() host function', () => {
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'send').fn(
+    const caught = await getCallable(ext, 'send').fn(
       { ...SEND_ARGS, to: [{ address: 'x@example.com' }] },
       ctx
-    )) as RillValue;
+    );
 
     expect(isInvalid(caught)).toBe(true);
     const status = getStatus(caught);
@@ -186,10 +185,7 @@ describe('send() host function', () => {
     );
     const ctx = createRuntimeContext({ variables: { TOK: 42 } });
 
-    const caught = (await getCallable(ext, 'send').fn(
-      SEND_ARGS,
-      ctx
-    )) as RillValue;
+    const caught = await getCallable(ext, 'send').fn(SEND_ARGS, ctx);
 
     expect(isInvalid(caught)).toBe(true);
     const status = getStatus(caught);
@@ -206,7 +202,7 @@ describe('send() host function', () => {
     globalThis.fetch = mockFetch202();
     const ext = createOutlookExtension(BEARER_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    const onLogEvent = vi.fn();
+    const onLogEvent = vi.fn<(event: unknown) => void>();
     ctx.callbacks.onLogEvent = onLogEvent;
 
     await getCallable(ext, 'send').fn(SEND_ARGS, ctx);

@@ -121,6 +121,6 @@ export function makeCalendarToday(
       status: item.status ?? '',
     }));
 
-    return { events } as unknown as RillValue;
+    return { events };
   };
 }

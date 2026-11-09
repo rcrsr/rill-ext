@@ -80,6 +80,6 @@ export function makeDriveShare(
       undefined,
       fileId
     );
-    return true as unknown as RillValue;
+    return true;
   };
 }

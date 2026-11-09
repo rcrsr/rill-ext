@@ -60,7 +60,7 @@ function makeTool(
  * Resolve a RillStream by calling its hidden __rill_stream_resolve property.
  * This triggers the resolve callback which emits extension events.
  */
-async function resolveStream(stream: unknown): Promise<unknown> {
+function resolveStream(stream: unknown): Promise<unknown> {
   return (
     stream as { __rill_stream_resolve: () => Promise<unknown> }
   ).__rill_stream_resolve();
@@ -99,14 +99,14 @@ function createMockMessageStream(response: {
       // Return the stream object for chaining
       return eventHandlers;
     },
-    finalMessage: vi.fn().mockImplementation(async () => {
+    finalMessage: vi.fn().mockImplementation(() => {
       // Emit text events when finalMessage is awaited (used by callAPIStreaming)
       if (text && eventHandlers['text']) {
         for (const handler of eventHandlers['text']) {
           handler(text, text);
         }
       }
-      return response;
+      return Promise.resolve(response);
     }),
     abort: vi.fn(),
   };
@@ -183,8 +183,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -222,8 +224,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -256,8 +260,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -321,8 +327,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -408,8 +416,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -488,8 +498,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -544,8 +556,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -636,8 +650,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -706,8 +722,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -734,8 +752,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 
@@ -759,8 +779,10 @@ describe('Anthropic Extension Integration Tests - Event Emission', () => {
 
       const ctx = createRuntimeContext({
         callbacks: {
-          onLog: vi.fn(),
-          onLogEvent: (event) => events.push(event),
+          onLog: () => {},
+          onLogEvent: (event) => {
+            events.push(event);
+          },
         },
       });
 

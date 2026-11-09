@@ -57,11 +57,11 @@ describe('datetime extension factory', () => {
         expect(fn, `${key} should be a callable`).toMatchObject({
           __type: 'callable',
           kind: 'application',
-          fn: expect.any(Function),
+          fn: expect.any(Function) as unknown,
           annotations: expect.objectContaining({
-            description: expect.any(String),
-          }),
-          returnType: expect.objectContaining({ __rill_type: true }),
+            description: expect.any(String) as unknown,
+          }) as unknown,
+          returnType: expect.objectContaining({ __rill_type: true }) as unknown,
         });
       }
     });

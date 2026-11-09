@@ -25,10 +25,10 @@ import { expectRejectedHalt } from './_halt-helpers.js';
 
 // mockStream and mockCreate are per-test mutable references
 // so we keep them module-scoped and reset via beforeEach.
-const mockStream = vi.fn();
-const mockCreate = vi.fn();
-const mockEmbeddingsCreate = vi.fn();
-const mockResponsesCreate = vi.fn();
+const mockStream = vi.fn<(...args: unknown[]) => unknown>();
+const mockCreate = vi.fn<(...args: unknown[]) => unknown>();
+const mockEmbeddingsCreate = vi.fn<(...args: unknown[]) => unknown>();
+const mockResponsesCreate = vi.fn<(...args: unknown[]) => unknown>();
 
 vi.mock('openai', () => {
   class MockAPIError extends Error {
@@ -84,10 +84,7 @@ vi.mock('openai', () => {
 // HELPERS
 // ============================================================
 
-type SyncOrAsyncFn = (
-  args: Record<string, unknown>,
-  ctx: unknown
-) => unknown | Promise<unknown>;
+type SyncOrAsyncFn = (args: Record<string, unknown>, ctx: unknown) => unknown;
 type ExtValue = Record<string, { fn: SyncOrAsyncFn }>;
 
 function getHostFn(ext: { value: unknown }, name: string) {
@@ -254,7 +251,7 @@ describe('auto-shield middleware', () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(autoShieldConfig());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await getHostFn(ext, 'message').fn({ prompt: 'hello' }, ctx);
@@ -303,7 +300,7 @@ describe('auto-shield middleware', () => {
       const { createFoundryExtension } = await import('../src/factory.js');
       const ext = await createFoundryExtension(autoShieldConfig());
       const ctx = createRuntimeContext();
-      const onLogEvent = vi.fn();
+      const onLogEvent = vi.fn<(event: unknown) => void>();
       ctx.callbacks.onLogEvent = onLogEvent;
 
       await expect(
@@ -520,7 +517,7 @@ describe('auto-shield middleware', () => {
 
       // Build a callable tool for the tool loop using the callable() helper
       const toolFn = callable(
-        async (_args: Record<string, RillValue>) => 'tool result' as RillValue
+        (_args: Record<string, RillValue>) => 'tool result'
       );
 
       // Call tool_loop and resolve the stream
@@ -531,7 +528,7 @@ describe('auto-shield middleware', () => {
 
       // Resolve the stream to execute the loop
       const resolve = (
-        stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+        stream as { __rill_stream_resolve: () => Promise<unknown> }
       ).__rill_stream_resolve;
       await resolve();
 
@@ -546,9 +543,7 @@ describe('auto-shield middleware', () => {
       const ext = await createFoundryExtension(autoShieldConfig());
       const ctx = createRuntimeContext();
 
-      const toolFn = callable(
-        async (_args: Record<string, RillValue>) => 'result' as RillValue
-      );
+      const toolFn = callable((_args: Record<string, RillValue>) => 'result');
 
       const stream = getHostFn(ext, 'tool_loop').fn(
         { prompt: 'attack prompt', tools: { my_tool: toolFn } },
@@ -556,7 +551,7 @@ describe('auto-shield middleware', () => {
       );
 
       const resolve = (
-        stream as unknown as { __rill_stream_resolve: () => Promise<unknown> }
+        stream as { __rill_stream_resolve: () => Promise<unknown> }
       ).__rill_stream_resolve;
 
       await expectRejectedHalt(resolve(), {

@@ -21,7 +21,6 @@ import {
   emitExtensionEvent,
   isInvalid,
   getStatus,
-  type CallableFn,
   type ExtensionFactoryCtx,
   type ExtensionFactoryResult,
   type RillParam,
@@ -575,17 +574,17 @@ export function createGoogleWorkspaceExtension(
   const callableDict = {
     // Gmail (7)
     gmail_search: toCallable({
-      fn: gmailSearchWrapped as CallableFn,
+      fn: gmailSearchWrapped,
       params: [p.str('query'), p.dict('options', undefined, {})],
       returnType: GMAIL_SEARCH_RT,
     }),
     gmail_read: toCallable({
-      fn: gmailReadWrapped as CallableFn,
+      fn: gmailReadWrapped,
       params: [p.str('message_id')],
       returnType: GMAIL_READ_RT,
     }),
     gmail_send: toCallable({
-      fn: gmailSendWrapped as CallableFn,
+      fn: gmailSendWrapped,
       params: [
         p.str('to'),
         p.str('subject'),
@@ -595,7 +594,7 @@ export function createGoogleWorkspaceExtension(
       returnType: stringReturnType,
     }),
     gmail_draft: toCallable({
-      fn: gmailDraftWrapped as CallableFn,
+      fn: gmailDraftWrapped,
       params: [
         p.str('to'),
         p.str('subject'),
@@ -605,7 +604,7 @@ export function createGoogleWorkspaceExtension(
       returnType: stringReturnType,
     }),
     gmail_reply: toCallable({
-      fn: gmailReplyWrapped as CallableFn,
+      fn: gmailReplyWrapped,
       params: [
         p.str('message_id'),
         p.str('body'),
@@ -614,23 +613,23 @@ export function createGoogleWorkspaceExtension(
       returnType: stringReturnType,
     }),
     gmail_flag: toCallable({
-      fn: gmailFlagWrapped as CallableFn,
+      fn: gmailFlagWrapped,
       params: [p.str('message_id'), p.bool('flagged')],
       returnType: boolReturnType,
     }),
     gmail_label: toCallable({
-      fn: gmailLabelWrapped as CallableFn,
+      fn: gmailLabelWrapped,
       params: [p.str('message_id'), p.str('label_name')],
       returnType: boolReturnType,
     }),
     // Drive (6)
     drive_list: toCallable({
-      fn: driveListWrapped as CallableFn,
+      fn: driveListWrapped,
       params: [folderIdOptionalParam, p.dict('options', undefined, {})],
       returnType: DRIVE_LIST_RT,
     }),
     drive_upload: toCallable({
-      fn: driveUploadWrapped as CallableFn,
+      fn: driveUploadWrapped,
       params: [
         p.str('content'),
         p.str('filename'),
@@ -640,28 +639,28 @@ export function createGoogleWorkspaceExtension(
       returnType: DRIVE_UPLOAD_RT,
     }),
     drive_download: toCallable({
-      fn: driveDownloadWrapped as CallableFn,
+      fn: driveDownloadWrapped,
       params: [p.str('file_id')],
       returnType: stringReturnType,
     }),
     drive_share: toCallable({
-      fn: driveShareWrapped as CallableFn,
+      fn: driveShareWrapped,
       params: [p.str('file_id'), p.str('email'), p.str('role')],
       returnType: boolReturnType,
     }),
     drive_delete: toCallable({
-      fn: driveDeleteWrapped as CallableFn,
+      fn: driveDeleteWrapped,
       params: [p.str('file_id')],
       returnType: boolReturnType,
     }),
     drive_get_metadata: toCallable({
-      fn: driveGetMetadataWrapped as CallableFn,
+      fn: driveGetMetadataWrapped,
       params: [p.str('file_id')],
       returnType: DRIVE_GET_METADATA_RT,
     }),
     // Calendar (4)
     calendar_events: toCallable({
-      fn: calendarEventsWrapped as CallableFn,
+      fn: calendarEventsWrapped,
       params: [
         p.str('start_date'),
         p.str('end_date'),
@@ -670,12 +669,12 @@ export function createGoogleWorkspaceExtension(
       returnType: CALENDAR_EVENTS_RT,
     }),
     calendar_today: toCallable({
-      fn: calendarTodayWrapped as CallableFn,
+      fn: calendarTodayWrapped,
       params: [p.dict('options', undefined, {})],
       returnType: CALENDAR_EVENTS_RT,
     }),
     calendar_create_event: toCallable({
-      fn: calendarCreateEventWrapped as CallableFn,
+      fn: calendarCreateEventWrapped,
       params: [
         p.str('title'),
         p.str('start_time'),
@@ -685,7 +684,7 @@ export function createGoogleWorkspaceExtension(
       returnType: stringReturnType,
     }),
     calendar_free_busy: toCallable({
-      fn: calendarFreeBusyWrapped as CallableFn,
+      fn: calendarFreeBusyWrapped,
       params: [
         p.list('emails', { kind: 'string' }),
         p.str('start_time'),

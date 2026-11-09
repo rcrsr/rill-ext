@@ -11,7 +11,6 @@ import {
   type ApplicationCallable,
   isInvalid,
   getStatus,
-  type RillValue,
 } from '@rcrsr/rill';
 import { makeFactoryCtx, expectCombinedFetchSignal } from './_helpers.js';
 import { createGoogleWorkspaceExtension } from '../src/factory.js';
@@ -242,10 +241,10 @@ describe('AC-4: capability gating', () => {
     const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_events').fn(
+    const caught = await getCallable(ext, 'calendar_events').fn(
       { start_date: '2026-04-01', end_date: '2026-04-30' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain('calendar.read');
@@ -260,10 +259,7 @@ describe('AC-4: capability gating', () => {
     const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_today').fn(
-      {},
-      ctx
-    )) as RillValue;
+    const caught = await getCallable(ext, 'calendar_today').fn({}, ctx);
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain('calendar.read');
@@ -278,10 +274,10 @@ describe('AC-4: capability gating', () => {
     const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_create_event').fn(
+    const caught = await getCallable(ext, 'calendar_create_event').fn(
       { title: 'Meeting', start_time: START_Z, end_time: END_Z },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain('calendar.create');
@@ -296,10 +292,10 @@ describe('AC-4: capability gating', () => {
     const ext = createGoogleWorkspaceExtension(NO_CAL_CONFIG, makeFactoryCtx());
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_free_busy').fn(
+    const caught = await getCallable(ext, 'calendar_free_busy').fn(
       { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain('calendar.freeBusy');
@@ -367,10 +363,10 @@ describe('BC-4: empty emails list rejected before fetch', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_free_busy').fn(
+    const caught = await getCallable(ext, 'calendar_free_busy').fn(
       { emails: [], start_time: START_Z, end_time: END_Z },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(mockFetch).not.toHaveBeenCalled();
@@ -386,10 +382,10 @@ describe('BC-4: empty emails list rejected before fetch', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_free_busy').fn(
+    const caught = await getCallable(ext, 'calendar_free_busy').fn(
       { emails: 'a@x.com', start_time: START_Z, end_time: END_Z },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(mockFetch).not.toHaveBeenCalled();
@@ -411,14 +407,14 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_events').fn(
+    const caught = await getCallable(ext, 'calendar_events').fn(
       {
         start_date: '2026-04-01',
         end_date: '2026-04-30',
         options: { calendar_id: 'other-cal' },
       },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain(
@@ -480,10 +476,10 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_today').fn(
+    const caught = await getCallable(ext, 'calendar_today').fn(
       { options: { calendar_id: 'other-cal' } },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain(
@@ -502,7 +498,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_create_event').fn(
+    const caught = await getCallable(ext, 'calendar_create_event').fn(
       {
         title: 'Meeting',
         start_time: START_Z,
@@ -510,7 +506,7 @@ describe('EC-11: allowedCalendarIds restriction', () => {
         options: { calendar_id: 'other-cal' },
       },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain(
@@ -531,7 +527,7 @@ describe('calendar_create_event attendee validation', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_create_event').fn(
+    const caught = await getCallable(ext, 'calendar_create_event').fn(
       {
         title: 'Meeting',
         start_time: START_Z,
@@ -539,7 +535,7 @@ describe('calendar_create_event attendee validation', () => {
         options: { attendees: [{ email: 42 }] },
       },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     const status = getStatus(caught);
     expect(status.code.name).toBe('INVALID_INPUT');
@@ -563,7 +559,7 @@ describe('EC-12/EC-13: denyAllDay blocks all-day events', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_create_event').fn(
+    const caught = await getCallable(ext, 'calendar_create_event').fn(
       {
         title: 'Holiday',
         start_time: START_Z,
@@ -571,7 +567,7 @@ describe('EC-12/EC-13: denyAllDay blocks all-day events', () => {
         options: { all_day: true },
       },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toBe(
@@ -596,10 +592,10 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_create_event').fn(
+    const caught = await getCallable(ext, 'calendar_create_event').fn(
       { title: 'Meeting', start_time: START_NAIVE, end_time: END_Z },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain(
@@ -618,10 +614,10 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_create_event').fn(
+    const caught = await getCallable(ext, 'calendar_create_event').fn(
       { title: 'Meeting', start_time: START_Z, end_time: END_NAIVE },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain(
@@ -678,10 +674,10 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_free_busy').fn(
+    const caught = await getCallable(ext, 'calendar_free_busy').fn(
       { emails: ['a@x.com'], start_time: START_NAIVE, end_time: END_Z },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain(
@@ -700,10 +696,10 @@ describe('EC-13: naive ISO timestamp rejection', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_free_busy').fn(
+    const caught = await getCallable(ext, 'calendar_free_busy').fn(
       { emails: ['a@x.com'], start_time: START_Z, end_time: END_NAIVE },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('INVALID_INPUT');
     expect(getStatus(caught).message).toContain(
@@ -1166,10 +1162,10 @@ describe('HTTP error mapping for calendar operations', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_events').fn(
+    const caught = await getCallable(ext, 'calendar_events').fn(
       { start_date: '2026-04-01', end_date: '2026-04-30' },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('AUTH');
     expect(getStatus(caught).message).toBe('google: invalid Calendar token');
@@ -1184,10 +1180,10 @@ describe('HTTP error mapping for calendar operations', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_create_event').fn(
+    const caught = await getCallable(ext, 'calendar_create_event').fn(
       { title: 'Meeting', start_time: START_Z, end_time: END_Z },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('FORBIDDEN');
     expect(getStatus(caught).message).toContain('insufficient Calendar scopes');
@@ -1203,10 +1199,7 @@ describe('HTTP error mapping for calendar operations', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_today').fn(
-      {},
-      ctx
-    )) as RillValue;
+    const caught = await getCallable(ext, 'calendar_today').fn({}, ctx);
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('RATE_LIMIT');
     expect(getStatus(caught).message).toBe(
@@ -1223,10 +1216,10 @@ describe('HTTP error mapping for calendar operations', () => {
     );
     const ctx = createRuntimeContext();
 
-    const caught = (await getCallable(ext, 'calendar_free_busy').fn(
+    const caught = await getCallable(ext, 'calendar_free_busy').fn(
       { emails: ['a@x.com'], start_time: START_Z, end_time: END_Z },
       ctx
-    )) as RillValue;
+    );
     expect(isInvalid(caught)).toBe(true);
     expect(getStatus(caught).code.name).toBe('UNAVAILABLE');
     expect(getStatus(caught).message).toBe(

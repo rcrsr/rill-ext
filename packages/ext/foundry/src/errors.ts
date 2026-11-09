@@ -92,7 +92,7 @@ function extractBodyMessage(body: unknown): string | null {
     body !== null &&
     typeof body === 'object' &&
     'error' in body &&
-    typeof (body as { error: unknown }).error === 'object' &&
+    typeof body.error === 'object' &&
     (body as { error: { message?: unknown } }).error !== null &&
     typeof (body as { error: { message?: unknown } }).error?.message ===
       'string'

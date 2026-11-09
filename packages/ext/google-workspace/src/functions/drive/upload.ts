@@ -169,15 +169,10 @@ export function makeDriveUpload(
         signal: combinedSignal,
       });
     } catch (error) {
-      throw mapFetchError(ctx, error, 'drive') as unknown as RillValue;
+      throw mapFetchError(ctx, error, 'drive');
     }
     if (!uploadResponse.ok) {
-      throw mapGoogleError(
-        ctx,
-        uploadResponse.status,
-        'drive',
-        'upload'
-      ) as unknown as RillValue;
+      throw mapGoogleError(ctx, uploadResponse.status, 'drive', 'upload');
     }
     const data = (await uploadResponse.json()) as {
       id?: string;
@@ -194,6 +189,6 @@ export function makeDriveUpload(
       size: data.size !== undefined ? Number(data.size) : byteLength,
       owner:
         data.owners?.[0]?.emailAddress ?? data.owners?.[0]?.displayName ?? null,
-    } as unknown as RillValue;
+    };
   };
 }

@@ -43,7 +43,7 @@ server.registerTool(
   {
     description: 'Get server status as JSON',
   },
-  async () => {
+  () => {
     return {
       content: [
         {
@@ -64,7 +64,7 @@ server.registerTool(
       message: z.string(),
     },
   },
-  async (args) => {
+  (args) => {
     return {
       content: [
         {
@@ -82,7 +82,7 @@ server.registerTool(
   {
     description: 'Get a test image',
   },
-  async () => {
+  () => {
     // Return base64-encoded 1x1 PNG
     return {
       content: [
@@ -106,7 +106,7 @@ server.registerTool(
       b: z.number(),
     },
   },
-  async (args) => {
+  (args) => {
     const result = args.a + args.b;
     return {
       content: [
@@ -131,7 +131,7 @@ server.registerResource(
     description: 'Test document',
     mimeType: 'text/plain',
   },
-  async () => {
+  () => {
     return {
       contents: [
         {
@@ -152,8 +152,8 @@ server.registerResource(
     description: 'User profile by ID',
     mimeType: 'application/json',
   },
-  async (uri, variables) => {
-    const userId = variables.id;
+  (uri, variables) => {
+    const userId = String(variables.id);
     return {
       contents: [
         {
@@ -180,7 +180,7 @@ server.registerPrompt(
   {
     description: 'Generate a greeting',
   },
-  async () => {
+  () => {
     return {
       messages: [
         {
@@ -205,7 +205,7 @@ server.registerPrompt(
       code: z.string().describe('Code to review'),
     },
   },
-  async (args) => {
+  (args) => {
     return {
       messages: [
         {

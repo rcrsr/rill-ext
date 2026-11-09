@@ -58,7 +58,7 @@ export function typeRefToStructure(ref: TypeRef): TypeStructure {
 
   if (!args || args.length === 0) {
     // bare type name
-    return { kind: typeName } as TypeStructure;
+    return { kind: typeName };
   }
 
   // parameterized

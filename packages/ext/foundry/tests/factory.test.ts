@@ -420,10 +420,7 @@ describe('createFoundryExtension', () => {
 
         const thrown = sync
           ? expectThrowHalt(() => fn.fn(args, ctx), expected)
-          : await expectRejectedHalt(
-              fn.fn(args, ctx) as Promise<unknown>,
-              expected
-            );
+          : await expectRejectedHalt(fn.fn(args, ctx), expected);
 
         expect(thrown).toBeInstanceOf(RuntimeHaltSignal);
         const value = (thrown as RuntimeHaltSignal).value;

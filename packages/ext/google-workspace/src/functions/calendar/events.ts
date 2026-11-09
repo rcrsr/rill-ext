@@ -85,7 +85,7 @@ export function makeCalendarEvents(
     }
     // start equal to end → empty result, no fetch
     if (timeMin === timeMax) {
-      return { events: [] } as unknown as RillValue;
+      return { events: [] };
     }
     // Extract options
     const options = args['options'];
@@ -148,6 +148,6 @@ export function makeCalendarEvents(
       location: item.location ?? '',
       status: item.status ?? '',
     }));
-    return { events } as unknown as RillValue;
+    return { events };
   };
 }

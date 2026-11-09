@@ -231,7 +231,7 @@ describe('Vector CRUD operations', () => {
               id: 'doc-1',
               payload: metadata,
             }),
-          ]),
+          ]) as unknown[],
         })
       );
 
@@ -696,7 +696,7 @@ describe('Event emission', () => {
     const ctx = createRuntimeContext({
       callbacks: {
         onLogEvent: (event) => {
-          events.push(event as Record<string, unknown>);
+          events.push(event);
         },
       },
     });
@@ -772,10 +772,11 @@ describe('Concurrent operations', () => {
     const ctx = createRuntimeContext();
 
     // Mock different results for each search
-    mockQuery.mockImplementation(async (_, request) => {
-      const vector = request.query as number[];
-      const id = Math.round(vector[0]! * 10);
-      return createMockSearchResponse([{ id: `doc-${id}`, score: 0.95 }]);
+    mockQuery.mockImplementation((_: string, request: { query: number[] }) => {
+      const id = Math.round(request.query[0]! * 10);
+      return Promise.resolve(
+        createMockSearchResponse([{ id: `doc-${id}`, score: 0.95 }])
+      );
     });
 
     // Launch 10 concurrent searches
@@ -790,7 +791,9 @@ describe('Concurrent operations', () => {
       );
     });
 
-    const results = await Promise.all(searches);
+    const results = await Promise.all(
+      searches.map(async (search) => await search)
+    );
 
     // Each search should have independent results
     expect(results).toHaveLength(10);
