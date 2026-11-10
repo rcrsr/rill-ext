@@ -51,7 +51,7 @@ Four auth modes are supported. Pick one based on the deployment context:
 | Mode | When to use |
 |------|-------------|
 | `bearer` | Static OAuth access token. Scripts, CI, local development. |
-| `session` | Bearer token resolved per call from `RuntimeContext`. Multi-tenant web apps. |
+| `session` | Bearer token resolved per call from `RuntimeContext.hostContext`. Multi-tenant web apps. |
 | `service-account` | GCP service account JSON key, optional domain-wide delegation. Server automation. |
 | `oauth-refresh` | OAuth client ID/secret plus long-lived refresh token, auto-exchanged for access tokens. Desktop apps, personal Gmail/Drive/Calendar. |
 

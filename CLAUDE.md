@@ -49,6 +49,7 @@ rill-ext is a pnpm workspace containing official extensions for the rill languag
 | `packages/shared/ext-param` | `@rcrsr/rill-ext-param-shared` (private) | -- |
 | `packages/shared/ext-search` | `@rcrsr/rill-ext-search-shared` (private) | -- |
 | `packages/shared/ext-lifecycle` | `@rcrsr/rill-ext-lifecycle-shared` (private) | -- |
+| `packages/shared/ext-auth` | `@rcrsr/rill-ext-auth-shared` (private) | -- |
 | `packages/shared/ext-prompt` | `@rcrsr/rill-ext-prompt-shared` (private) | -- |
 
 ## Commands
@@ -246,6 +247,7 @@ Shared packages (`packages/shared/`) are private and **bundled into** the consum
 - **ext-param-shared**: Parameter construction helpers (`p.*`) for building `RillParam` objects. All extensions that declare typed host function parameters depend on this.
 - **ext-search-shared**: Validation (`assertRequired`, `validateBaseUrl`), error mapping (`mapSearchError`, `mapProviderSearchError`), event emission, function wrapper (`createSearchFunctionWrapper`), disposal and in-flight request tracking. Every search extension depends on this.
 - **ext-lifecycle-shared**: Dispose-cancellation helpers for non-LLM extensions (`isAbortShaped`, `createDisposedHalt`, `disposedHaltFor`, `throwIfCancelledByDispose`). `outlook`, `google-workspace`, `fetch`, `exec`, `mcp`, `claude-code`, `datetime`, `fs-local`, `fs-s3` and `kv-redis` depend on it; `ext-search` keeps a local copy of the abort-shape check because shared packages never import each other.
+- **ext-auth-shared**: Host-credential reader (`readHostCredential`) that reads per-run credentials from `ctx.hostContext`, never script variables, plus a cross-caller isolation suite (`describeCredentialIsolation` in `tests/isolation-suite.ts`) wired through a vitest `resolve.alias`. `google-workspace` and `outlook` depend on it.
 - **ext-prompt-shared**: Prompt template frontmatter parsing, role splitting, interpolation, and the prompt contract type. `prompt-md` depends on this.
 
 ### LLM Extension Call Flow

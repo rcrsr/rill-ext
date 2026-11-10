@@ -107,15 +107,15 @@ Where `<Service>` is `Gmail`, `Drive`, or `Calendar`; `<operation>` is the funct
 | Condition | Atom | `meta.raw.kind` | Message |
 |-----------|------|---|---------|
 | Request exceeds 30 s timeout | `#TIMEOUT` | `request_timeout` | `google: request timeout` |
-| Session token variable absent from RuntimeContext | `#AUTH` | `session_token_missing` | `google: session token '<var>' not found` |
-| Session token variable is not a string | `#AUTH` | `invalid_session_token` | `google: session token '<var>' must be a string` |
+| Session token key absent from `hostContext` | `#AUTH` | `session_token_missing` | `google: session token '<var>' not found` |
+| Session token in `hostContext` is not a non-empty string | `#AUTH` | `invalid_session_token` | `google: session token '<var>' must be a non-empty string` |
 | Calendar `create_event` attendee whose `email` is present but not a string | `#INVALID_INPUT` | `invalid_attendee` | `google: attendee email must be a string` |
 | Host function called after `dispose()` (thrown, not returned) | `#DISPOSED` | `extension_disposed` | `google-workspace: extension disposed` |
 | In-flight request aborted by `dispose()` (thrown; abort-shaped failures only, any other error keeps its own code) | `#DISPOSED` | `extension_disposed` | `google-workspace: extension disposed` |
 | Network connection failure (DNS, refused) | `#UNAVAILABLE` | `connection_failed` | `google: <service> connection failed` |
 | Unexpected response format (`SyntaxError`) | `#PROTOCOL` | `unexpected_response_format` | `google: unexpected response format` |
 
-Where `<var>` is the `tokenVar` name from config and `<service>` is `gmail`, `drive`, or `calendar`.
+Where `<var>` is the `tokenVar` key from config and `<service>` is `gmail`, `drive`, or `calendar`.
 
 ## Retry Guidance
 
@@ -144,7 +144,7 @@ Google API 5xx errors are transient. Retry with exponential backoff:
 A 401 means the token is expired or invalid. Do not retry without refreshing the token first:
 
 - Bearer mode: Obtain a new access token via your OAuth flow, then recreate the extension with the new token.
-- Session mode: Update the RuntimeContext variable with a fresh token before retrying.
+- Session mode: Update the `hostContext` value with a fresh token before retrying.
 - Service account mode: The extension refreshes JWT tokens automatically. A 401 in service account mode indicates a key revocation or clock skew; recreate the extension.
 
 **`#TIMEOUT`:**

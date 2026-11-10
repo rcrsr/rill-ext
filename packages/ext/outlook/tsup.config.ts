@@ -6,6 +6,7 @@ export default defineConfig({
   dts: false,
   clean: true,
   noExternal: [
+    '@rcrsr/rill-ext-auth-shared',
     '@rcrsr/rill-ext-lifecycle-shared',
     '@rcrsr/rill-ext-param-shared',
   ],

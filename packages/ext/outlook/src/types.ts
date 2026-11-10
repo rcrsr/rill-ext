@@ -21,11 +21,11 @@ interface OutlookAuthBearer {
 
 /**
  * Session token authentication.
- * Resolves the Bearer token from RuntimeContext at call time.
+ * Resolves the Bearer token from the host-supplied `RuntimeContext.hostContext` at call time.
  */
 interface OutlookAuthSession {
   readonly type: 'session';
-  /** Name of the RuntimeContext variable holding the Bearer token. */
+  /** Key in `RuntimeContext.hostContext` holding the Bearer token (never a script variable). */
   readonly tokenVar: string;
 }
 

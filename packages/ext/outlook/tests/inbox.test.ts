@@ -238,8 +238,9 @@ describe('inbox() host function', () => {
       },
       makeFactoryCtx()
     );
-    const ctx = createRuntimeContext();
-    ctx.variables.set('myToken', 'session-token-abc');
+    const ctx = createRuntimeContext({
+      hostContext: { myToken: 'session-token-abc' },
+    });
 
     await getCallable(ext, 'inbox').fn({}, ctx);
 

@@ -28,7 +28,7 @@ Pipe the resulting token into the extension config as `${GOOGLE_TOKEN}` (bearer)
 
 | | bearer | session | service-account | oauth-refresh |
 |--|--------|---------|-----------------|---------------|
-| Token source | Config (static) | RuntimeContext (per-call) | GCP key JSON (auto-refreshed) | OAuth refresh token (auto-refreshed) |
+| Token source | Config (static) | Host context (per-call) | GCP key JSON (auto-refreshed) | OAuth refresh token (auto-refreshed) |
 | Token lifetime | Until expiry | Until expiry | Short-lived JWT (1 hour, cached) | Short-lived access token (1 hour, cached) |
 | Multi-user support | No | Yes | Yes (via `subject`) | No |
 | Requires GCP project | No | No | Yes | Yes (OAuth client only) |
@@ -71,7 +71,7 @@ Supply a static OAuth 2.0 Bearer token obtained from your own OAuth flow or the 
 
 ## Session Token
 
-Resolve the Bearer token from a named `RuntimeContext` variable at each call. This supports per-user tokens in multi-tenant scripts.
+Resolve the Bearer token from a named key in the host-supplied `RuntimeContext.hostContext` at each call. This supports per-user tokens in multi-tenant applications without exposing the token to scripts.
 
 ```json
 {
@@ -85,13 +85,25 @@ Resolve the Bearer token from a named `RuntimeContext` variable at each call. Th
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `type` | string | Yes | Must be `"session"`. |
-| `tokenVar` | string | Yes | Name of the RuntimeContext variable that holds the Bearer token. Must be non-empty. |
+| `tokenVar` | string | Yes | Key in `hostContext` that holds the Bearer token. Must be non-empty. |
 
-**When to use:** Multi-tenant applications where each user has their own OAuth token. The host application sets the variable in the RuntimeContext before invoking the script.
+**When to use:** Multi-tenant applications where each user has their own OAuth token. The host application sets the token in `hostContext` when it creates the runtime context for the script run.
 
-**Token resolution:** At each call, the extension reads `ctx.getVariable(tokenVar)`. If the variable is absent, the call returns an invalid value carrying `#AUTH` (`raw.kind == 'session_token_missing'`).
+**Token resolution:** At each call, the extension reads `ctx.hostContext[tokenVar]`. If the key is absent, the call returns an invalid value carrying `#AUTH` (`raw.kind == 'session_token_missing'`). If the value is not a non-empty string, it returns `#AUTH` with `raw.kind == 'invalid_session_token'`. Failures carry `raw.token_var` with the key name. The extension never falls back to script variables.
 
-**Token lifetime:** Same as bearer. The host application is responsible for refreshing the token before it expires and updating the RuntimeContext variable.
+```typescript
+import { createRuntimeContext } from '@rcrsr/rill';
+
+const ctx = createRuntimeContext({
+  hostContext: { user_google_token: tokenForThisUser },
+});
+```
+
+**Migration:** Earlier versions read the token from a script variable (`ctx.variables`). Script variables are no longer read; move the token into `hostContext`.
+
+**Exposure:** `hostContext` is not visible to scripts, but it is visible to every host function running in the same run, including other extensions. ADR-0021 allows this; treat it as leftover exposure and supply only tokens for the current user.
+
+**Token lifetime:** Same as bearer. The host application is responsible for refreshing the token before it expires and updating the `hostContext` value.
 
 ## Service Account
 

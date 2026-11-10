@@ -183,7 +183,7 @@ describe('send() host function', () => {
       { ...BEARER_CONFIG, auth: { type: 'session' as const, tokenVar: 'TOK' } },
       makeFactoryCtx()
     );
-    const ctx = createRuntimeContext({ variables: { TOK: 42 } });
+    const ctx = createRuntimeContext({ hostContext: { TOK: 42 } });
 
     const caught = await getCallable(ext, 'send').fn(SEND_ARGS, ctx);
 

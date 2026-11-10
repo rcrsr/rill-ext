@@ -246,7 +246,7 @@ The extension evaluates gates in this order for every call:
 1. **Disposal check** — throws `google-workspace: extension disposed` if `dispose()` was called.
 2. **Capability gate** — throws `google: <service>.<capability> not enabled` if the flag is `false`.
 3. **Allowlist/denylist check** — throws the relevant label, folder, MIME type, or calendar error.
-4. **Token resolution** — resolves the bearer token from config or RuntimeContext.
+4. **Token resolution** — resolves the bearer token from config or `hostContext`.
 5. **Network call** — sends the HTTP request to the Google API.
 
 This ordering means capability errors are fast and produce no network traffic. Token values are never touched for disabled capabilities.

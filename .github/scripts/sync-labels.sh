@@ -29,7 +29,7 @@ declare -a AREAS=(
   "area:search|web search (Brave, Exa, SearXNG, Serper, Tavily) and shared/ext-search"
   "area:mcp|the Model Context Protocol client extension"
   "area:prompt|prompt/content processing: prompt-md, text, shared/ext-prompt"
-  "area:integrations|third-party integrations: Outlook, Google Workspace, Claude Code"
+  "area:integrations|third-party integrations: Outlook, Google Workspace, Claude Code and shared/ext-auth"
   "area:utils|native-primitive extensions: crypto, exec, fetch, datetime"
   "area:shared|cross-cutting foundations: shared/ext-param (p.* helpers), shared/ext-lifecycle (dispose helpers)"
   "area:docs|documentation content: per-package docs, README, CHANGELOG"

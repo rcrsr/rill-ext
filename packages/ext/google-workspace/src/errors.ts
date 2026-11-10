@@ -18,7 +18,7 @@ import {
   type RuntimeContext,
 } from '@rcrsr/rill';
 
-const PROVIDER = 'google-workspace';
+export const PROVIDER = 'google-workspace';
 
 function capitalizeService(service: 'gmail' | 'drive' | 'calendar'): string {
   if (service === 'gmail') return 'Gmail';
