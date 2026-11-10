@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Post-dispose calls throw:** every extension's host functions throw `#DISPOSED` with `raw.kind` `extension_disposed` after `dispose()`. exec, fetch, kv-file, claude-code, fs-local, crypto and text gain the guard, and the wrong kind is fixed elsewhere ([#149](https://github.com/rcrsr/rill-ext/issues/149)). ([#152](https://github.com/rcrsr/rill-ext/pull/152))
 - **In-flight dispose:** cancelled calls report `#DISPOSED` in claude-code, llm-openai, llm-gemini and fs-s3 ([#151](https://github.com/rcrsr/rill-ext/issues/151)). ([#153](https://github.com/rcrsr/rill-ext/pull/153))
 - **Non-scalar inputs:** exec, search, outlook and google-workspace return a typed error, not `"[object Object]"`. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
+- **Session credentials (breaking for hosts):** google-workspace and outlook `session` auth read the token from `ctx.hostContext`, not script variables, so scripts can no longer read it. Hosts must pass it through `RuntimeOptions.hostContext`. google-workspace also keys its token cache by credential and scope set, and a private `ext-auth` shared package holds the read. ([#158](https://github.com/rcrsr/rill-ext/pull/158))
 
 ## [0.23.0] - 2026-11-06
 
