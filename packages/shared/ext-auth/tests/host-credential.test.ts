@@ -99,18 +99,17 @@ describe('readHostCredential', () => {
   });
 
   describe('when a script references the key as a variable', () => {
-    it('does not expose the host context token', async () => {
+    it('halts as an undefined variable without exposing the token', async () => {
       const ctx = createRuntimeContext({ hostContext: { tok: 'h0st-t0ken' } });
-      let output: unknown;
-      try {
-        const result = await execute(parse('$tok'), ctx);
-        output = result.result;
-      } catch (e) {
-        output = e;
-      }
-      const text =
-        typeof output === 'string' ? output : (JSON.stringify(output) ?? '');
-      expect(text).not.toContain('h0st-t0ken');
+      const error: unknown = await execute(parse('$tok'), ctx).then(
+        () => null,
+        (e: unknown) => e
+      );
+      expect(error).toMatchObject({
+        errorId: 'RILL-R005',
+        context: { variable: 'tok' },
+      });
+      expect(JSON.stringify(error)).not.toContain('h0st-t0ken');
     });
   });
 });
