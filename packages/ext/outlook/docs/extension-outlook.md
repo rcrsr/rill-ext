@@ -121,7 +121,7 @@ The value must be a non-empty string. A missing key or a non-string or empty val
 
 **Migration:** script variables are no longer read for session mode. A token set with `ctx.variables.set(...)` or passed as a script variable is ignored. Move it to `RuntimeOptions.hostContext`.
 
-**Leftover exposure:** `hostContext` is invisible to scripts but visible to every host function in the run, including other extensions. ADR-0021 allows this.
+**Leftover exposure:** `hostContext` is invisible to scripts but visible to every host function in the run, including other extensions. Supply only tokens for the current user.
 
 ### Default Capabilities
 

@@ -101,7 +101,7 @@ const ctx = createRuntimeContext({
 
 **Migration:** Earlier versions read the token from a script variable (`ctx.variables`). Script variables are no longer read; move the token into `hostContext`.
 
-**Exposure:** `hostContext` is not visible to scripts, but it is visible to every host function running in the same run, including other extensions. ADR-0021 allows this; treat it as leftover exposure and supply only tokens for the current user.
+**Exposure:** `hostContext` is not visible to scripts, but it is visible to every host function running in the same run, including other extensions. Treat it as leftover exposure and supply only tokens for the current user.
 
 **Token lifetime:** Same as bearer. The host application is responsible for refreshing the token before it expires and updating the `hostContext` value.
 
