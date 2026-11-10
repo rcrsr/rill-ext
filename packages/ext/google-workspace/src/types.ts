@@ -21,11 +21,11 @@ export interface GoogleAuthBearer {
 
 /**
  * Session token authentication.
- * Resolves the Bearer token from RuntimeContext at call time.
+ * Resolves the Bearer token from the host context at call time.
  */
 export interface GoogleAuthSession {
   readonly type: 'session';
-  /** Name of the RuntimeContext variable holding the Bearer token. */
+  /** Key in `RuntimeContext.hostContext` holding the Bearer token. Script variables are never read. */
   readonly tokenVar: string;
 }
 

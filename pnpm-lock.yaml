@@ -414,6 +414,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-auth-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-auth
       '@rcrsr/rill-ext-lifecycle-shared':
         specifier: workspace:^
         version: link:../../shared/ext-lifecycle
@@ -642,6 +645,9 @@ importers:
       '@rcrsr/rill':
         specifier: ~0.23.0
         version: 0.23.0
+      '@rcrsr/rill-ext-auth-shared':
+        specifier: workspace:^
+        version: link:../../shared/ext-auth
       '@rcrsr/rill-ext-lifecycle-shared':
         specifier: workspace:^
         version: link:../../shared/ext-lifecycle
@@ -944,6 +950,12 @@ importers:
       undici-types:
         specifier: ^8.12.4
         version: 8.12.4
+
+  packages/shared/ext-auth:
+    devDependencies:
+      '@rcrsr/rill':
+        specifier: ~0.23.0
+        version: 0.23.0
 
   packages/shared/ext-fs:
     devDependencies:

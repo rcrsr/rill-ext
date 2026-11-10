@@ -81,7 +81,7 @@ use<ext:outlook.inbox>() => $result
 | `auth` | object | — | Authentication configuration (required). |
 | `auth.type` | string | — | `"bearer"` or `"session"` (required). |
 | `auth.token` | string | — | Static Bearer token. Required when `auth.type` is `"bearer"`. |
-| `auth.tokenVar` | string | — | RuntimeContext variable name holding the token. Required when `auth.type` is `"session"`. |
+| `auth.tokenVar` | string | — | Key in the host-supplied `hostContext` holding the token. Required when `auth.type` is `"session"`. |
 | `capabilities` | object | See defaults below | Operation permission flags. Partial overrides merged with defaults. |
 | `capabilities.mail.read` | boolean | `true` | Allow inbox, from, read, and search operations. |
 | `capabilities.mail.send` | boolean | `false` | Allow send and reply operations. |
@@ -102,13 +102,26 @@ use<ext:outlook.inbox>() => $result
 { "auth": { "type": "bearer", "token": "${OUTLOOK_TOKEN}" } }
 ```
 
-**Session mode** — read the token from a RuntimeContext variable at call time:
+**Session mode** — read the token from the host-supplied `hostContext` at call time:
 
 ```json
 { "auth": { "type": "session", "tokenVar": "user_token" } }
 ```
 
-Session mode supports per-user tokens in multi-tenant scripts. The variable is resolved from the RuntimeContext chain at each call.
+Session mode supports per-user tokens in multi-tenant hosts. The host places the token in `hostContext` under the `tokenVar` key when it creates the runtime context. The extension reads `ctx.hostContext[tokenVar]` at each call:
+
+```typescript
+const ctx = createRuntimeContext({
+  hostContext: { user_token: tokenForThisUser },
+});
+await execute(ast, ctx);
+```
+
+The value must be a non-empty string. A missing key or a non-string or empty value fails the call with `#AUTH`; there is no fallback to script variables.
+
+**Migration:** script variables are no longer read for session mode. A token set with `ctx.variables.set(...)` or passed as a script variable is ignored. Move it to `RuntimeOptions.hostContext`.
+
+**Leftover exposure:** `hostContext` is invisible to scripts but visible to every host function in the run, including other extensions. Supply only tokens for the current user.
 
 ### Default Capabilities
 
@@ -437,8 +450,8 @@ generic atoms. Host scripts match coarsely (`guard #AUTH`) or finely
 
 | Failure | Atom | `meta.raw.kind` |
 |---|---|---|
-| Session token variable not found | `#AUTH` | `session_token_missing` |
-| Session token variable is not a string | `#AUTH` | `invalid_session_token` |
+| Session token key missing from `hostContext` (`outlook: session token '<key>' not found`) | `#AUTH` | `session_token_missing` |
+| Session token is not a non-empty string (`outlook: session token '<key>' must be a non-empty string`) | `#AUTH` | `invalid_session_token` |
 | Recipient or attendee in `to` / `attendees` is not a string, number or boolean | `#INVALID_INPUT` | `invalid_recipient` |
 | Capability disabled in config | `#FORBIDDEN` | `capability_disabled` |
 | Empty `to` / `subject` / `body` / required field | `#INVALID_INPUT` | `invalid_input` |

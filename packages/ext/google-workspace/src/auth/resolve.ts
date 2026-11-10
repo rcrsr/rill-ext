@@ -1,11 +1,13 @@
 /**
  * Token resolution for Google Workspace authentication.
- * Implements resolveToken with TTL cache for service-account mode.
+ * Implements resolveToken with a scope-keyed TTL cache for the
+ * service-account and oauth-refresh modes.
  */
 
 import type { RuntimeContext } from '@rcrsr/rill';
+import { readHostCredential } from '@rcrsr/rill-ext-auth-shared';
 import type { GoogleAuth, ServiceAccountKey } from '../types.js';
-import { failAuth } from '../errors.js';
+import { PROVIDER, failAuth } from '../errors.js';
 import { signServiceAccountJwt } from './jwt.js';
 import { exchangeJwtForToken, exchangeRefreshToken } from './exchange.js';
 
@@ -26,6 +28,8 @@ interface TokenCacheSlot {
  * Mutable container for cached access token slots, keyed by scope set.
  * A token minted for one scope set must not satisfy a call needing another
  * (Google returns 403 insufficient_scopes), so each scope set caches separately.
+ * Each extension instance owns one cache and one fixed auth, so the credential
+ * is constant for the cache's lifetime and is not part of the key.
  * Passed in from the factory closure so it lives for the extension lifecycle.
  * Cleared on dispose().
  */
@@ -50,10 +54,10 @@ export function clearTokenCache(cache: TokenCache): void {
 }
 
 /**
- * Normalize a scope set into a stable cache key (order-independent).
+ * Build the cache key for an order-independent scope set.
  */
 function scopeCacheKey(scopes: string[]): string {
-  return [...scopes].sort().join(' ');
+  return JSON.stringify([...scopes].sort());
 }
 
 // ============================================================
@@ -64,25 +68,25 @@ function scopeCacheKey(scopes: string[]): string {
  * Resolve the Bearer token for Google API requests.
  *
  * - bearer: returns auth.token directly (no I/O)
- * - session: reads auth.tokenVar from RuntimeContext parent chain
- * - service-account: uses TTL cache; on miss/expiry signs JWT and exchanges
+ * - session: reads auth.tokenVar from ctx.hostContext (never script variables)
+ * - service-account: uses TTL cache keyed by scopes; on miss/expiry signs JWT and exchanges
  * for an access token, caching with TTL = expires_in - 300 s
- * - oauth-refresh: uses TTL cache; on miss/expiry exchanges refresh token for
+ * - oauth-refresh: uses TTL cache keyed by scopes; on miss/expiry exchanges refresh token for
  * an access token, caching with TTL = expires_in - 300 s
  *
  * The public shape is (auth, ctx) => Promise<string>.
  * The additional `cache`, `scopes`, and `signal` parameters are required
  * for the service-account flow and are supplied by the factory closure.
  * The factory binds these to produce the (auth, ctx) => Promise<string>
- * closure described in the spec. [SPEC]
+ * closure.
  *
  * @param auth - Validated GoogleAuth discriminated union
- * @param ctx - RuntimeContext for session variable lookup
+ * @param ctx - RuntimeContext; session mode reads its hostContext
  * @param cache - Factory-scoped token cache (cleared on dispose)
  * @param scopes - OAuth2 scopes for service-account JWT; ignored for other modes
  * @param signal - AbortSignal for token exchange HTTP request cancellation
  * @returns Resolved Bearer token string
- * @throws halt carrying invalid `#AUTH` (`raw.kind == 'session_token_missing'`) if session token variable not found
+ * @throws halt carrying invalid `#AUTH` (`raw.kind == 'session_token_missing'`) if the session token is absent from hostContext
  * @throws halt carrying invalid `#AUTH` on JWT signing or token exchange failure
  */
 export async function resolveToken(
@@ -97,34 +101,13 @@ export async function resolveToken(
     return auth.token;
   }
 
-  // --- session: walk context parent chain to find tokenVar ---
+  // --- session: read tokenVar from the host context ---
   if (auth.type === 'session') {
-    const tokenVar = auth.tokenVar;
-    let scope: RuntimeContext | undefined = ctx;
-
-    while (scope !== undefined) {
-      const value = scope.variables.get(tokenVar);
-      if (value !== undefined) {
-        if (typeof value !== 'string') {
-          failAuth(
-            ctx,
-            'invalid_session_token',
-            `google: session token '${tokenVar}' must be a string`,
-            { tokenVar }
-          );
-        }
-        return value;
-      }
-      scope = scope.parent;
-    }
-
-    // session token variable not found
-    failAuth(
-      ctx,
-      'session_token_missing',
-      `google: session token '${tokenVar}' not found`,
-      { tokenVar }
-    );
+    return readHostCredential(ctx, {
+      key: auth.tokenVar,
+      provider: PROVIDER,
+      label: 'google',
+    });
   }
 
   // --- service-account: check TTL cache, sign JWT and exchange on miss ---

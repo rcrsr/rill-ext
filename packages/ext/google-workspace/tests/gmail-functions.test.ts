@@ -737,7 +737,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
     },
   };
 
-  it('resolves bearer token from ctx.variables at call time and returns message dict', async () => {
+  it('resolves bearer token from ctx.hostContext at call time and returns message dict', async () => {
     globalThis.fetch = vi
       .fn()
       .mockResolvedValue(mockOkJson(GMAIL_MESSAGE_PAYLOAD)) as typeof fetch;
@@ -758,9 +758,9 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
     };
 
     const ext = createGoogleWorkspaceExtension(sessionConfig, makeFactoryCtx());
-    const ctx = createRuntimeContext();
-    // Inject the token into the context variable at call time (IR-21 session branch)
-    ctx.variables.set('google_token', 'session-resolved-token');
+    const ctx = createRuntimeContext({
+      hostContext: { google_token: 'session-resolved-token' },
+    });
 
     const result = (await getCallable(ext, 'gmail_read').fn(
       { message_id: 'msg-session' },
@@ -780,7 +780,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
     expect(Array.isArray(result['attachments'])).toBe(true);
   });
 
-  it('emits #AUTH when session tokenVar not found in context (IR-21 error path)', async () => {
+  it('emits #AUTH when session tokenVar not found in hostContext', async () => {
     globalThis.fetch = vi.fn() as typeof fetch;
 
     const sessionConfig = {
@@ -800,7 +800,7 @@ describe('gmail_read session auth [IR-21, AC-12]', () => {
 
     const ext = createGoogleWorkspaceExtension(sessionConfig, makeFactoryCtx());
     const ctx = createRuntimeContext();
-    // Intentionally do not set 'missing_token' in ctx.variables
+    // Intentionally do not set 'missing_token' in hostContext
 
     const caught = await getCallable(ext, 'gmail_read').fn(
       { message_id: 'msg-x' },

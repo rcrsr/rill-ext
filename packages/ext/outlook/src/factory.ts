@@ -36,7 +36,7 @@ import {
   DEFAULT_FOLDERS,
 } from './config.js';
 import { checkCapability } from './capabilities.js';
-import { mapFetchError } from './errors.js';
+import { PROVIDER, mapFetchError } from './errors.js';
 import type {
   OutlookAuth,
   OutlookConfig,
@@ -72,12 +72,6 @@ export interface ResolvedConfig {
   readonly maxResults: number;
   readonly folders: readonly string[];
 }
-
-// ============================================================
-// CONSTANTS
-// ============================================================
-
-const PROVIDER = 'outlook';
 
 // ============================================================
 // FACTORY

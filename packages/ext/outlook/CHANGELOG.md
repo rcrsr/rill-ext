@@ -11,6 +11,7 @@
 ### Fixed
 
 - **Post-dispose calls throw:** Host functions called after `dispose()` throw `#DISPOSED` with `raw.kind` `extension_disposed` instead of returning a value. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
+- **Session token (breaking for hosts):** `session` auth reads the token from `ctx.hostContext` under the `tokenVar` key, not from script variables, so scripts can no longer read it. Hosts must pass it through `RuntimeOptions.hostContext`. An empty or non-string token returns #AUTH `invalid_session_token`, and `raw` carries `token_var`. ([#158](https://github.com/rcrsr/rill-ext/pull/158))
 
 ## [0.23.0] - 2026-11-06
 

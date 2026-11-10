@@ -48,7 +48,7 @@ See [auth.md](auth.md) for full details on all four auth variants.
 }
 ```
 
-**Session token (per-call from RuntimeContext):**
+**Session token (per-call from `hostContext`):**
 
 ```json
 {
@@ -143,7 +143,7 @@ $today.events -> log
 | `auth` | object | — | Authentication configuration (required). |
 | `auth.type` | string | — | `"bearer"`, `"session"`, `"service-account"`, or `"oauth-refresh"` (required). |
 | `auth.token` | string | — | Static Bearer token. Required when `auth.type` is `"bearer"`. |
-| `auth.tokenVar` | string | — | RuntimeContext variable name holding the Bearer token. Required when `auth.type` is `"session"`. |
+| `auth.tokenVar` | string | — | Key in `hostContext` holding the Bearer token. Required when `auth.type` is `"session"`. |
 | `auth.keyJson` | string | — | GCP service account key JSON string. Required when `auth.type` is `"service-account"`. |
 | `auth.subject` | string | — | Email to impersonate via domain-wide delegation. Optional; `service-account` only. |
 | `auth.client_id` | string | — | GCP OAuth client ID. Required when `auth.type` is `"oauth-refresh"`. |

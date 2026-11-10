@@ -8,8 +8,7 @@
  */
 
 import type { RuntimeContext } from '@rcrsr/rill';
-
-const PROVIDER = 'outlook';
+import { PROVIDER } from './errors.js';
 
 /**
  * Check that a named capability is enabled.

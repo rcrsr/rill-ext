@@ -295,7 +295,7 @@ describe('session token resolution', () => {
     vi.restoreAllMocks();
   });
 
-  it('emits #AUTH when session token variable not found', async () => {
+  it('emits #AUTH when session token key missing from hostContext', async () => {
     const ext = createOutlookExtension(
       {
         auth: { type: 'session', tokenVar: 'MY_OUTLOOK_TOKEN' },
@@ -321,7 +321,7 @@ describe('session token resolution', () => {
     );
   });
 
-  it('session token resolves successfully when variable is set in context', async () => {
+  it('session token resolves successfully when key is set in hostContext', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -344,8 +344,9 @@ describe('session token resolution', () => {
       },
       makeFactoryCtx()
     );
-    const ctx = createRuntimeContext();
-    ctx.variables.set('MY_TOKEN', 'bearer-value-from-session');
+    const ctx = createRuntimeContext({
+      hostContext: { MY_TOKEN: 'bearer-value-from-session' },
+    });
 
     const result = await getCallable(ext, 'inbox').fn({ top: 10 }, ctx);
     expect(isInvalid(result)).toBe(false);

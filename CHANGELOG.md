@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test suite trust:** type-checks test files, fixes false-pass tests, and runs kv-redis and fs-s3 integration suites in CI. ([#147](https://github.com/rcrsr/rill-ext/pull/147))
 - **Test suite cleanup:** Removes redundant, self-evident and misnamed tests across every package, adds a shared KV contract suite run by kv-file, kv-sqlite and kv-redis, and deletes dead helpers in the shared vector package and mcp. ([#150](https://github.com/rcrsr/rill-ext/pull/150))
 - **Post-dispose delivery (breaking for scripts):** kv-redis, kv-sqlite, fs-s3, outlook, google-workspace, the five search extensions (brave, exa, searxng, serper, tavily) and the three vector extensions (chroma, pinecone, qdrant) now throw `#DISPOSED` after `dispose()` instead of returning it; datetime now throws `#DISPOSED` instead of returning `#INVALID_INPUT`. A `??` fallback past a disposed call must become `guard`. ([#152](https://github.com/rcrsr/rill-ext/pull/152))
-- **Type-aware lint cleanup:** clears 162 type-aware lint findings in src across 22 extensions and shared packages. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
+- **Type-aware lint cleanup:** clears every type-aware lint finding in src and tests across all extensions and shared packages, and removes the per-file `warn` relaxations, so the baseline rules fail lint in every file. No runtime change. ([#154](https://github.com/rcrsr/rill-ext/pull/154), [#155](https://github.com/rcrsr/rill-ext/pull/155))
 
 ### Fixed
 
@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Post-dispose calls throw:** every extension's host functions throw `#DISPOSED` with `raw.kind` `extension_disposed` after `dispose()`. exec, fetch, kv-file, claude-code, fs-local, crypto and text gain the guard, and the wrong kind is fixed elsewhere ([#149](https://github.com/rcrsr/rill-ext/issues/149)). ([#152](https://github.com/rcrsr/rill-ext/pull/152))
 - **In-flight dispose:** cancelled calls report `#DISPOSED` in claude-code, llm-openai, llm-gemini and fs-s3 ([#151](https://github.com/rcrsr/rill-ext/issues/151)). ([#153](https://github.com/rcrsr/rill-ext/pull/153))
 - **Non-scalar inputs:** exec, search, outlook and google-workspace return a typed error, not `"[object Object]"`. ([#154](https://github.com/rcrsr/rill-ext/pull/154))
+- **Session credentials (breaking for hosts):** google-workspace and outlook `session` auth read the token from `ctx.hostContext`, not script variables, so scripts can no longer read it. Hosts must pass it through `RuntimeOptions.hostContext`. A private `ext-auth` shared package holds the read. ([#158](https://github.com/rcrsr/rill-ext/pull/158))
 
 ## [0.23.0] - 2026-11-06
 

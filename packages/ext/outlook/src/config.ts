@@ -4,8 +4,9 @@
  */
 
 import { RuntimeError } from '@rcrsr/rill';
+import { readHostCredential } from '@rcrsr/rill-ext-auth-shared';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
-import { failInput } from './errors.js';
+import { PROVIDER, failInput } from './errors.js';
 import type {
   OutlookAuth,
   OutlookCapabilities,
@@ -36,8 +37,6 @@ export const DEFAULT_MAX_RESULTS = 50;
 
 /** Default mail folders allowlist when not specified. */
 export const DEFAULT_FOLDERS: readonly string[] = ['inbox'];
-
-const PROVIDER = 'outlook';
 
 // ============================================================
 // VALIDATION
@@ -133,44 +132,22 @@ export function mergeCapabilities(
 /**
  * Resolve the Bearer token for Graph API requests.
  * Bearer mode returns config.token directly.
- * Session mode reads the variable from RuntimeContext, walking the parent chain.
+ * Session mode reads the host-supplied `ctx.hostContext[auth.tokenVar]`;
+ * script variables are never consulted.
  *
- * Throws an invalid RillValue (`#AUTH`) when a session token variable is
- * not found; the wrap()'s catch passes it through unchanged.
+ * Throws an invalid RillValue (`#AUTH`) when the key is missing
+ * (`session_token_missing`) or not a non-empty string
+ * (`invalid_session_token`); the wrap()'s catch passes it through unchanged.
  */
 export function resolveToken(auth: OutlookAuth, ctx: RuntimeContext): string {
   if (auth.type === 'bearer') {
     return auth.token;
   }
 
-  const tokenVar = auth.tokenVar;
-  let scope: RuntimeContext | undefined = ctx;
-
-  while (scope !== undefined) {
-    const value = scope.variables.get(tokenVar);
-    if (value !== undefined) {
-      if (typeof value !== 'string') {
-        const invalidMessage = `outlook: session token '${tokenVar}' must be a string`;
-        throw ctx.invalidate(new Error(invalidMessage), {
-          code: 'AUTH',
-          provider: PROVIDER,
-          raw: {
-            kind: 'invalid_session_token',
-            tokenVar,
-            message: invalidMessage,
-          },
-        });
-      }
-      return value;
-    }
-    scope = scope.parent;
-  }
-
-  const message = `outlook: session token '${tokenVar}' not found`;
-  throw ctx.invalidate(new Error(message), {
-    code: 'AUTH',
+  return readHostCredential(ctx, {
+    key: auth.tokenVar,
     provider: PROVIDER,
-    raw: { kind: 'session_token_missing', tokenVar, message },
+    label: 'outlook',
   });
 }
 

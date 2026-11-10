@@ -152,6 +152,7 @@
           - 'packages/ext/outlook/**'
           - 'packages/ext/google-workspace/**'
           - 'packages/ext/claude-code/**'
+          - 'packages/shared/ext-auth/**'
 
 'area:utils':
   - changed-files:
