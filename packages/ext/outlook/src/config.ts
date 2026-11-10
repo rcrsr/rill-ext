@@ -6,7 +6,7 @@
 import { RuntimeError } from '@rcrsr/rill';
 import { readHostCredential } from '@rcrsr/rill-ext-auth-shared';
 import type { RillValue, RuntimeContext } from '@rcrsr/rill';
-import { failInput } from './errors.js';
+import { PROVIDER, failInput } from './errors.js';
 import type {
   OutlookAuth,
   OutlookCapabilities,
@@ -37,8 +37,6 @@ export const DEFAULT_MAX_RESULTS = 50;
 
 /** Default mail folders allowlist when not specified. */
 export const DEFAULT_FOLDERS: readonly string[] = ['inbox'];
-
-const PROVIDER = 'outlook';
 
 // ============================================================
 // VALIDATION

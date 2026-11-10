@@ -19,7 +19,7 @@ import {
   type RuntimeContext,
 } from '@rcrsr/rill';
 
-const PROVIDER = 'outlook';
+export const PROVIDER = 'outlook';
 
 /**
  * Build and throw an invalid RillValue carrying `#INVALID_INPUT`.

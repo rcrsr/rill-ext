@@ -1,10 +1,9 @@
 /**
  * Token resolution for Google Workspace authentication.
- * Implements resolveToken with a credential-keyed TTL cache for the
+ * Implements resolveToken with a scope-keyed TTL cache for the
  * service-account and oauth-refresh modes.
  */
 
-import { createHash } from 'node:crypto';
 import type { RuntimeContext } from '@rcrsr/rill';
 import { readHostCredential } from '@rcrsr/rill-ext-auth-shared';
 import type { GoogleAuth, ServiceAccountKey } from '../types.js';
@@ -26,11 +25,11 @@ interface TokenCacheSlot {
 }
 
 /**
- * Mutable container for cached access token slots, keyed by credential and
- * scope set. A token minted for one credential or scope set must not satisfy a
- * call needing another (a different credential would act as the wrong
- * identity; a different scope set returns 403 insufficient_scopes), so each
- * pair caches separately.
+ * Mutable container for cached access token slots, keyed by scope set.
+ * A token minted for one scope set must not satisfy a call needing another
+ * (Google returns 403 insufficient_scopes), so each scope set caches separately.
+ * Each extension instance owns one cache and one fixed auth, so the credential
+ * is constant for the cache's lifetime and is not part of the key.
  * Passed in from the factory closure so it lives for the extension lifecycle.
  * Cleared on dispose().
  */
@@ -55,36 +54,10 @@ export function clearTokenCache(cache: TokenCache): void {
 }
 
 /**
- * Hash credential parts into a hex digest. Parts are JSON-encoded as an array,
- * so (a, bc) and (ab, c) differ and null (absent) differs from any string.
- * Raw credential material never appears in a cache key.
+ * Build the cache key for an order-independent scope set.
  */
-function credentialDigest(parts: readonly (string | null)[]): string {
-  return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
-}
-
-/**
- * Identify the credential behind a service-account or oauth-refresh auth.
- */
-function credentialIdOf(
-  auth: Extract<GoogleAuth, { type: 'service-account' | 'oauth-refresh' }>
-): string {
-  if (auth.type === 'service-account') {
-    return credentialDigest([
-      auth.type,
-      auth.keyJson,
-      auth.subject === undefined ? null : auth.subject,
-    ]);
-  }
-  return credentialDigest([auth.type, auth.client_id, auth.refresh_token]);
-}
-
-/**
- * Build the cache key for a credential and an order-independent scope set.
- * The only way to build a slot key.
- */
-function tokenCacheKey(credentialId: string, scopes: string[]): string {
-  return `${credentialId}:${JSON.stringify([...scopes].sort())}`;
+function scopeCacheKey(scopes: string[]): string {
+  return JSON.stringify([...scopes].sort());
 }
 
 // ============================================================
@@ -96,9 +69,9 @@ function tokenCacheKey(credentialId: string, scopes: string[]): string {
  *
  * - bearer: returns auth.token directly (no I/O)
  * - session: reads auth.tokenVar from ctx.hostContext (never script variables)
- * - service-account: uses TTL cache keyed by credential and scopes; on miss/expiry signs JWT and exchanges
+ * - service-account: uses TTL cache keyed by scopes; on miss/expiry signs JWT and exchanges
  * for an access token, caching with TTL = expires_in - 300 s
- * - oauth-refresh: uses TTL cache keyed by credential and scopes; on miss/expiry exchanges refresh token for
+ * - oauth-refresh: uses TTL cache keyed by scopes; on miss/expiry exchanges refresh token for
  * an access token, caching with TTL = expires_in - 300 s
  *
  * The public shape is (auth, ctx) => Promise<string>.
@@ -139,7 +112,7 @@ export async function resolveToken(
 
   // --- service-account: check TTL cache, sign JWT and exchange on miss ---
   if (auth.type === 'service-account') {
-    const cacheKey = tokenCacheKey(credentialIdOf(auth), scopes);
+    const cacheKey = scopeCacheKey(scopes);
     // cache hit within TTL — reuse without signing or exchange
     const cachedSa = cache.slots.get(cacheKey);
     if (cachedSa !== undefined && cachedSa.expiresAtMs > Date.now()) {
@@ -176,7 +149,7 @@ export async function resolveToken(
   }
 
   // --- oauth-refresh: check TTL cache, exchange refresh token on miss ---
-  const cacheKey = tokenCacheKey(credentialIdOf(auth), scopes);
+  const cacheKey = scopeCacheKey(scopes);
   // cache hit within TTL — reuse without exchange
   const cachedRefresh = cache.slots.get(cacheKey);
   if (cachedRefresh !== undefined && cachedRefresh.expiresAtMs > Date.now()) {

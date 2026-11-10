@@ -1,6 +1,6 @@
 /**
  * Token resolution tests for Google Workspace authentication.
- * Covers session lookup, credential-keyed caching, and TTL expiry.
+ * Covers session lookup, scope-keyed caching, and TTL expiry.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -84,7 +84,7 @@ describe('clearTokenCache', () => {
     expect(cache.slots.size).toBe(0);
   });
 
-  it('is idempotent: safe to call when slot is already null', () => {
+  it('is idempotent on an empty cache', () => {
     const cache = createTokenCache();
     clearTokenCache(cache);
     expect(cache.slots.size).toBe(0);
@@ -477,150 +477,21 @@ describe('resolveToken — oauth-refresh', () => {
 });
 
 // ============================================================
-// resolveToken — credential-keyed cache
+// resolveToken — scope-keyed cache
 // ============================================================
 
-describe('resolveToken — credential-keyed cache', () => {
-  const OTHER_KEY_JSON = JSON.stringify({
-    ...(JSON.parse(VALID_KEY_JSON) as Record<string, unknown>),
-    private_key: 'other-private-key-material',
-  });
-
+describe('resolveToken — scope-keyed cache', () => {
   beforeEach(() => {
     mockSign.mockReturnValue('jwt');
   });
 
-  function saAuth(keyJson: string, subject?: string) {
-    return subject === undefined
-      ? { type: 'service-account' as const, keyJson }
-      : { type: 'service-account' as const, keyJson, subject };
-  }
-
-  it('mints separately for service accounts with different keyJson sharing one cache', async () => {
-    mockExchange
-      .mockResolvedValueOnce({ accessToken: 'token-a', expiresIn: 3600 })
-      .mockResolvedValueOnce({ accessToken: 'token-b', expiresIn: 3600 });
-    const cache = createTokenCache();
-    const ctx = createRuntimeContext();
-
-    const a1 = await resolveToken(
-      saAuth(VALID_KEY_JSON),
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-    const b1 = await resolveToken(
-      saAuth(OTHER_KEY_JSON),
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-    const a2 = await resolveToken(
-      saAuth(VALID_KEY_JSON),
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-    const b2 = await resolveToken(
-      saAuth(OTHER_KEY_JSON),
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-
-    expect([a1, b1, a2, b2]).toEqual([
-      'token-a',
-      'token-b',
-      'token-a',
-      'token-b',
-    ]);
-    expect(mockExchange).toHaveBeenCalledTimes(2);
-    expect(cache.slots.size).toBe(2);
-  });
-
-  it('mints separately for the same keyJson with different subjects', async () => {
-    mockExchange
-      .mockResolvedValueOnce({ accessToken: 'token-u1', expiresIn: 3600 })
-      .mockResolvedValueOnce({ accessToken: 'token-u2', expiresIn: 3600 });
-    const cache = createTokenCache();
-    const ctx = createRuntimeContext();
-
-    const u1 = await resolveToken(
-      saAuth(VALID_KEY_JSON, 'u1@x.com'),
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-    const u2 = await resolveToken(
-      saAuth(VALID_KEY_JSON, 'u2@x.com'),
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-
-    expect([u1, u2]).toEqual(['token-u1', 'token-u2']);
-    expect(mockExchange).toHaveBeenCalledTimes(2);
-  });
-
-  it('mints separately for no subject and an empty subject', async () => {
-    mockExchange
-      .mockResolvedValueOnce({ accessToken: 'token-none', expiresIn: 3600 })
-      .mockResolvedValueOnce({ accessToken: 'token-empty', expiresIn: 3600 });
-    const cache = createTokenCache();
-    const ctx = createRuntimeContext();
-
-    await resolveToken(saAuth(VALID_KEY_JSON), ctx, cache, SCOPES, SIGNAL);
-    await resolveToken(saAuth(VALID_KEY_JSON, ''), ctx, cache, SCOPES, SIGNAL);
-
-    expect(mockExchange).toHaveBeenCalledTimes(2);
-  });
-
-  it('mints separately for oauth-refresh auths with different refresh tokens', async () => {
-    mockRefresh
-      .mockResolvedValueOnce({ accessToken: 'token-r1', expiresIn: 3600 })
-      .mockResolvedValueOnce({ accessToken: 'token-r2', expiresIn: 3600 });
-    const cache = createTokenCache();
-    const ctx = createRuntimeContext();
-
-    const r1 = await resolveToken(
-      OAUTH_REFRESH_AUTH,
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-    const r2 = await resolveToken(
-      { ...OAUTH_REFRESH_AUTH, refresh_token: 'rtok-2' },
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-    const r1Again = await resolveToken(
-      OAUTH_REFRESH_AUTH,
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-
-    expect([r1, r2, r1Again]).toEqual(['token-r1', 'token-r2', 'token-r1']);
-    expect(mockRefresh).toHaveBeenCalledTimes(2);
-  });
-
-  it('caches the same credential separately per scope set and ignores scope order', async () => {
+  it('caches per scope set and ignores scope order', async () => {
     mockExchange
       .mockResolvedValueOnce({ accessToken: 'token-s1', expiresIn: 3600 })
       .mockResolvedValueOnce({ accessToken: 'token-s2', expiresIn: 3600 });
     const cache = createTokenCache();
     const ctx = createRuntimeContext();
-    const auth = saAuth(VALID_KEY_JSON);
+    const auth = { type: 'service-account' as const, keyJson: VALID_KEY_JSON };
     const wide = ['scope-a', 'scope-b'];
 
     const narrow = await resolveToken(auth, ctx, cache, ['scope-a'], SIGNAL);
@@ -639,31 +510,5 @@ describe('resolveToken — credential-keyed cache', () => {
       'token-s2',
     ]);
     expect(cache.slots.size).toBe(2);
-  });
-
-  it('keeps private_key and refresh_token material out of every slots key', async () => {
-    mockExchange.mockResolvedValue({ accessToken: 'tok', expiresIn: 3600 });
-    mockRefresh.mockResolvedValue({ accessToken: 'tok', expiresIn: 3600 });
-    const cache = createTokenCache();
-    const ctx = createRuntimeContext();
-    const privateKey = (JSON.parse(VALID_KEY_JSON) as { private_key: string })
-      .private_key;
-
-    await resolveToken(
-      saAuth(VALID_KEY_JSON, 'user@x.com'),
-      ctx,
-      cache,
-      SCOPES,
-      SIGNAL
-    );
-    await resolveToken(OAUTH_REFRESH_AUTH, ctx, cache, SCOPES, SIGNAL);
-
-    expect(cache.slots.size).toBe(2);
-    for (const key of cache.slots.keys()) {
-      expect(key).not.toContain(privateKey);
-      expect(key).not.toContain('PRIVATE KEY');
-      expect(key).not.toContain(OAUTH_REFRESH_AUTH.refresh_token);
-      expect(key).not.toContain('user@x.com');
-    }
   });
 });
